@@ -853,6 +853,69 @@ document.addEventListener('DOMContentLoaded', () => {
    *  On file:// gracefully falls back to normal navigation.
    * ========================================================== */
 
+  /**
+   * Dynamically load <script> and <link rel="stylesheet"> tags from the
+   * fetched page's <head> that aren't already present in the current page.
+   * Returns a Promise that resolves when all new assets have loaded.
+   */
+  function loadMissingHeadAssets(doc) {
+    var promises = [];
+
+    // Collect current page's script srcs and stylesheet hrefs
+    var currentScripts = {};
+    document.querySelectorAll('head script[src]').forEach(function(s) {
+      currentScripts[s.getAttribute('src')] = true;
+    });
+    var currentLinks = {};
+    document.querySelectorAll('head link[rel="stylesheet"]').forEach(function(l) {
+      currentLinks[l.getAttribute('href')] = true;
+    });
+
+    // Load missing stylesheets
+    doc.querySelectorAll('head link[rel="stylesheet"]').forEach(function(link) {
+      var href = link.getAttribute('href');
+      if (href && !currentLinks[href]) {
+        promises.push(new Promise(function(resolve) {
+          var el = document.createElement('link');
+          el.rel = 'stylesheet';
+          el.href = href;
+          el.onload = resolve;
+          el.onerror = resolve;
+          document.head.appendChild(el);
+        }));
+        currentLinks[href] = true;
+      }
+    });
+
+    // Load missing scripts (in order)
+    var scriptQueue = [];
+    doc.querySelectorAll('head script[src]').forEach(function(script) {
+      var src = script.getAttribute('src');
+      if (src && !currentScripts[src]) {
+        scriptQueue.push(src);
+        currentScripts[src] = true;
+      }
+    });
+
+    if (scriptQueue.length) {
+      var chainPromise = Promise.resolve();
+      scriptQueue.forEach(function(src) {
+        chainPromise = chainPromise.then(function() {
+          return new Promise(function(resolve) {
+            var el = document.createElement('script');
+            el.src = src;
+            el.onload = resolve;
+            el.onerror = resolve;
+            document.head.appendChild(el);
+          });
+        });
+      });
+      promises.push(chainPromise);
+    }
+
+    return promises.length ? Promise.all(promises) : Promise.resolve();
+  }
+
   function swapPage(doc, href, pushState) {
     // Title
     document.title = doc.title;
@@ -911,20 +974,25 @@ document.addEventListener('DOMContentLoaded', () => {
       oldFooter.innerHTML = newFooter.innerHTML;
     }
 
+    // Load missing <head> assets (scripts + stylesheets) from new page
+    var headAssets = loadMissingHeadAssets(doc);
+
     // History
     if (pushState) {
       history.pushState({ path: href }, '', href);
     }
 
-    // Scroll to top, fade in, re-init
+    // Scroll to top, fade in, re-init (after assets load)
     window.scrollTo(0, 0);
-    requestAnimationFrame(function() {
-      var m = document.querySelector('main');
-      var h = document.querySelector('.hero');
-      if (m) m.style.opacity = '';
-      if (h) h.style.opacity = '';
+    headAssets.then(function() {
+      requestAnimationFrame(function() {
+        var m = document.querySelector('main');
+        var h = document.querySelector('.hero');
+        if (m) m.style.opacity = '';
+        if (h) h.style.opacity = '';
+      });
+      reinit();
     });
-    reinit();
   }
 
   function navigateTo(href, pushState) {
