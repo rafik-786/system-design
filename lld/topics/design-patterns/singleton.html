@@ -1205,24 +1205,78 @@ builder.Services.AddHostedService&lt;EmailSenderWorker&gt;();</code></pre>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours. The bug was intermittent — it only appeared under concurrent load, never in single-threaded local testing. The engineer initially blamed the database.</p>
-        <h3 class="sub">Root Cause</h3>
-        <p class="body-text">No synchronization mechanism on the instance creation path. The classic <code>if (_instance == null)</code> check is not atomic.</p>
-        <h3 class="sub">Fix</h3>
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Fix.cs</span>
-          </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// Before (broken):
-if (_instance == null) _instance = new DbConnection();
 
-// After (fixed — use Lazy&lt;T&gt;):
-private static readonly Lazy&lt;DbConnection&gt; _instance
-    = new(() =&gt; new DbConnection());
-public static DbConnection Instance =&gt; _instance.Value;</code></pre>
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sbug1-bad" role="tab" aria-selected="true" aria-controls="sbug1-bad">Buggy Code</button>
+            <button class="tab-btn" data-tab="sbug1-fix" role="tab" aria-selected="false" aria-controls="sbug1-fix">Fix</button>
+          </div>
+          <div class="tab-panel active" id="sbug1-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DbConnectionManager.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Not thread-safe — race condition on first access
+public class DbConnectionManager
+{
+    private static DbConnectionManager? _instance;
+
+    public static DbConnectionManager Instance
+    {
+        get
+        {
+            // ❌ Two threads can both see _instance == null simultaneously
+            if (_instance == null)
+            {
+                // Thread A enters here, starts constructing...
+                // Thread B also enters — _instance is STILL null
+                _instance = new DbConnectionManager();
+                // Now there are 2 instances, each with its own connection pool
+            }
+            return _instance;
+        }
+    }
+
+    private readonly List&lt;DbConnection&gt; _pool = new();
+
+    private DbConnectionManager()
+    {
+        // Each instance opens 10 connections — 47 instances = 470 connections
+        for (int i = 0; i &lt; 10; i++)
+            _pool.Add(new DbConnection("Server=prod;..."));
+    }
+    // Under 10x traffic, 47 threads hit the race window in the first ms
+    // Result: 47 instances × 10 connections = 470 connections (limit is 100)
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sbug1-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DbConnectionManager.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Lazy&lt;T&gt; guarantees exactly one instance, thread-safe
+public class DbConnectionManager
+{
+    private static readonly Lazy&lt;DbConnectionManager&gt; _instance
+        = new(() =&gt; new DbConnectionManager());
+
+    public static DbConnectionManager Instance =&gt; _instance.Value;
+
+    private readonly List&lt;DbConnection&gt; _pool = new();
+
+    private DbConnectionManager()
+    {
+        for (int i = 0; i &lt; 10; i++)
+            _pool.Add(new DbConnection("Server=prod;..."));
+    }
+    // Lazy&lt;T&gt; uses a lock internally — only ONE thread runs the factory
+    // All other threads wait and get the same instance
+}</code></pre>
+              </div>
+            </div>
           </div>
         </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">If you see a manual null-check Singleton in a code review, flag it immediately. <code>Lazy&lt;T&gt;</code> exists for exactly this reason. The 1-line fix would have prevented a 4-hour outage.</p>
@@ -1240,23 +1294,49 @@ public static DbConnection Instance =&gt; _instance.Value;</code></pre>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">45 minutes. The stack trace was clear, but understanding <em>why</em> a DbContext was disposed while code was still using it took investigation. The term "captive dependency" wasn't known to the team.</p>
-        <h3 class="sub">Root Cause</h3>
-        <p class="body-text">A singleton captures a scoped dependency. The scoped service gets disposed after its request ends, but the singleton lives forever — holding a dead reference.</p>
-        <h3 class="sub">Fix</h3>
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">CaptiveDependencyFix.cs</span>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sbug2-bad" role="tab" aria-selected="true" aria-controls="sbug2-bad">Buggy Code</button>
+            <button class="tab-btn" data-tab="sbug2-fix" role="tab" aria-selected="false" aria-controls="sbug2-fix">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// Before (broken — singleton captures scoped service):
-public class NotificationService  // registered as Singleton
+          <div class="tab-panel active" id="sbug2-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">NotificationService.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Singleton captures a Scoped dependency — captive dependency
+// Registered as: services.AddSingleton&lt;NotificationService&gt;();
+public class NotificationService
 {
-    private readonly AppDbContext _db;  // registered as Scoped!
+    // ❌ AppDbContext is Scoped — disposed after each request
+    // But the Singleton lives forever, holding a dead reference
+    private readonly AppDbContext _db;
+
     public NotificationService(AppDbContext db) =&gt; _db = db;
+
+    public async Task SendAsync(int userId)
+    {
+        // Request 1: _db is alive — works perfectly ✅
+        // Request 1 ends: DI scope disposes _db
+        // Request 2: _db is DEAD — ObjectDisposedException 💀
+        var user = await _db.Users.FindAsync(userId);
+        await _emailSender.SendAsync(user.Email, "Hello!");
+    }
 }
 
-// After (fixed — inject IServiceScopeFactory):
+// Program.cs
+builder.Services.AddDbContext&lt;AppDbContext&gt;();     // Scoped (default)
+builder.Services.AddSingleton&lt;NotificationService&gt;(); // Singleton
+// DI injects the Scoped DbContext into the Singleton at construction time
+// The Singleton holds onto it forever — past the scope's lifetime</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sbug2-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">NotificationService.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Inject IServiceScopeFactory — create fresh scope per operation
 public class NotificationService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -1264,14 +1344,25 @@ public class NotificationService
 
     public async Task SendAsync(int userId)
     {
+        // Each call gets its own scope with a fresh DbContext
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;();
         var user = await db.Users.FindAsync(userId);
-        // ... send notification
+        await _emailSender.SendAsync(user.Email, "Hello!");
+        // scope.Dispose() cleans up the DbContext when done
     }
-}</code></pre>
+}
+
+// Program.cs — enable scope validation to catch this at startup
+builder.Host.UseDefaultServiceProvider(opts =&gt;
+{
+    opts.ValidateScopes = true;  // throws if Singleton captures Scoped
+});</code></pre>
+              </div>
+            </div>
           </div>
         </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-shield-halved"></i> Prevention</div>
           <p class="body-text">In ASP.NET Core, set <code>ValidateScopes = true</code> in development. The DI container will throw at startup if a singleton depends on a scoped service.</p>
@@ -1289,33 +1380,74 @@ public class NotificationService
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">90 minutes. The misleading part: the config file existed on disk. The exception said it didn't. No one suspected the exception was being <em>replayed from cache</em>.</p>
-        <h3 class="sub">Root Cause</h3>
-        <p class="body-text"><code>Lazy&lt;T&gt;</code> with default <code>LazyThreadSafetyMode.ExecutionAndPublication</code> caches exceptions permanently. Once the factory throws, the <code>Lazy&lt;T&gt;</code> is poisoned forever.</p>
-        <h3 class="sub">Fix</h3>
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">LazyExceptionFix.cs</span>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sbug3-bad" role="tab" aria-selected="true" aria-controls="sbug3-bad">Buggy Code</button>
+            <button class="tab-btn" data-tab="sbug3-fix" role="tab" aria-selected="false" aria-controls="sbug3-fix">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// Option A: Use PublicationOnly — does NOT cache exceptions
+          <div class="tab-panel active" id="sbug3-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConfigManager.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Lazy&lt;T&gt; default mode caches exceptions FOREVER
+public class ConfigManager
+{
+    // ❌ Default LazyThreadSafetyMode = ExecutionAndPublication
+    // If the factory throws, the exception is cached permanently
+    private static readonly Lazy&lt;ConfigManager&gt; _instance
+        = new(() =&gt; new ConfigManager());
+
+    public static ConfigManager Instance =&gt; _instance.Value;
+
+    private readonly IConfiguration _config;
+
+    private ConfigManager()
+    {
+        // ❌ During deployment, config volume isn't mounted yet (200ms delay)
+        // This throws FileNotFoundException
+        _config = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: false)  // THROWS!
+            .Build();
+    }
+    // 2:15:00.000 AM: Container starts, Lazy factory throws FileNotFoundException
+    // 2:15:00.200 AM: Config volume mounted — file now exists
+    // 2:15:00.201 AM: Next call to Instance → Lazy REPLAYS the cached exception
+    // 2:15:00.202 AM: Every subsequent call → same cached exception forever
+    // The Lazy&lt;T&gt; is "poisoned" — only a process restart clears it
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sbug3-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConfigManager.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Option A: PublicationOnly mode — does NOT cache exceptions
 private static readonly Lazy&lt;ConfigManager&gt; _instance = new(
     () =&gt; new ConfigManager(),
     LazyThreadSafetyMode.PublicationOnly  // retries on failure
 );
+// If factory throws, next call retries (no cached exception)
+// Trade-off: multiple threads may run the factory concurrently
+// (only one result wins, others are discarded)
 
-// Option B: Manual retry with Interlocked (full control)
+// ✅ Option B: Manual retry with Interlocked (full control)
 private static volatile ConfigManager? _instance;
 public static ConfigManager Instance
 {
     get
     {
         if (_instance is not null) return _instance;
-        var temp = new ConfigManager();   // may throw
+        var temp = new ConfigManager();   // may throw — that's OK, no caching
         Interlocked.CompareExchange(ref _instance, temp, null);
         return _instance;
+        // If constructor throws, _instance stays null
+        // Next call retries — eventually the config file will be there
     }
 }</code></pre>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1331,32 +1463,50 @@ public static ConfigManager Instance
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours. The misleading part: the code looked correct — it used <code>using</code> blocks, which is normally the right pattern. The team initially blamed the payment gateway for being slow.</p>
-        <h3 class="sub">Root Cause</h3>
-        <p class="body-text"><code>HttpClient</code> is designed to be reused. Disposing it doesn't immediately release the underlying TCP connection. Creating thousands of short-lived instances exhausts the OS socket pool.</p>
-        <h3 class="sub">Fix</h3>
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">HttpClientFix.cs</span>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sbug4-bad" role="tab" aria-selected="true" aria-controls="sbug4-bad">Buggy Code</button>
+            <button class="tab-btn" data-tab="sbug4-fix" role="tab" aria-selected="false" aria-controls="sbug4-fix">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// Before (broken — new HttpClient per call):
-public class PaymentService  // Singleton
+          <div class="tab-panel active" id="sbug4-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PaymentService.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Creating a new HttpClient per call — socket exhaustion
+// Registered as: services.AddSingleton&lt;PaymentService&gt;();
+public class PaymentService
 {
     public async Task&lt;bool&gt; ChargeAsync(decimal amount)
     {
-        using var client = new HttpClient();  // socket leak!
-        var resp = await client.PostAsync("https://api.pay.com/charge", ...);
-        return resp.IsSuccessStatusCode;
-    }
-}
+        // ❌ New HttpClient per call — looks correct (using = dispose)
+        // But Dispose() doesn't release the TCP socket immediately!
+        using var client = new HttpClient();
+        client.BaseAddress = new Uri("https://api.pay.com/");
 
-// After (fixed — use IHttpClientFactory):
-// In Program.cs:
-services.AddHttpClient&lt;PaymentService&gt;(c =&gt;
+        var resp = await client.PostAsync("charge", ...);
+        return resp.IsSuccessStatusCode;
+        // client.Dispose() called here — but the underlying TCP socket
+        // enters TIME_WAIT state for ~240 seconds before OS reclaims it
+    }
+    // At 300 payments/second:
+    // 300 × 240 seconds = 72,000 sockets in TIME_WAIT
+    // OS limit is 64,000 → SocketException: Address already in use
+    // Scaling to more pods makes it WORSE — more instances = more sockets
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sbug4-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PaymentService.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Use IHttpClientFactory — pools handlers, rotates DNS
+// Program.cs:
+builder.Services.AddHttpClient&lt;PaymentService&gt;(c =&gt;
     c.BaseAddress = new Uri("https://api.pay.com/"));
 
-// In Service:
+// Service — HttpClient is injected, managed by the factory
 public class PaymentService
 {
     private readonly HttpClient _client;
@@ -1364,12 +1514,19 @@ public class PaymentService
 
     public async Task&lt;bool&gt; ChargeAsync(decimal amount)
     {
+        // HttpClient is reused — no socket leak
         var resp = await _client.PostAsync("charge", ...);
         return resp.IsSuccessStatusCode;
     }
-}</code></pre>
+}
+// IHttpClientFactory pools HttpMessageHandler instances internally
+// Handlers are rotated every 2 minutes (prevents stale DNS)
+// One handler serves thousands of requests — no socket exhaustion</code></pre>
+              </div>
+            </div>
           </div>
         </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Why IHttpClientFactory?</div>
           <p class="body-text"><code>IHttpClientFactory</code> pools the underlying <code>HttpMessageHandler</code> instances and rotates them every 2 minutes, preventing both socket exhaustion and stale DNS issues.</p>
@@ -1387,36 +1544,66 @@ public class PaymentService
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">3 days to detect (finance caught the anomaly in revenue reports), 20 minutes to fix once the developer saw the code. The hardest part wasn't the fix — it was calculating the refund impact across 4,200 orders.</p>
-        <h3 class="sub">Root Cause</h3>
-        <p class="body-text">Mutable instance fields in a singleton are shared across all threads/requests. Any write by one request is visible to all others — creating a race condition and data leakage.</p>
-        <h3 class="sub">Fix</h3>
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">MutableStateFix.cs</span>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sbug5-bad" role="tab" aria-selected="true" aria-controls="sbug5-bad">Buggy Code</button>
+            <button class="tab-btn" data-tab="sbug5-fix" role="tab" aria-selected="false" aria-controls="sbug5-fix">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// Before (broken — mutable state in singleton):
-public class PricingEngine  // Singleton
+          <div class="tab-panel active" id="sbug5-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PricingEngine.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Mutable state in a Singleton — shared across ALL requests
+// Registered as: services.AddSingleton&lt;PricingEngine&gt;();
+public class PricingEngine
 {
-    private decimal _currentDiscount;  // shared across ALL requests!
+    // ❌ This field is shared by every thread, every request, every user
+    private decimal _currentDiscount;
 
     public void SetDiscount(decimal d) =&gt; _currentDiscount = d;
-    public decimal GetPrice(decimal basePrice) =&gt; basePrice * (1 - _currentDiscount);
-}
 
-// After (fixed — pass context, don't store it):
-public class PricingEngine  // Singleton — stateless
+    public decimal GetPrice(decimal basePrice)
+        =&gt; basePrice * (1 - _currentDiscount);
+
+    // 10:00:00 AM: Request from regular user → _currentDiscount = 0
+    //              GetPrice(100) = $100 ✅
+    // 10:00:01 AM: Request from VIP → SetDiscount(0.20m)
+    //              _currentDiscount is now 0.20 for EVERYONE
+    // 10:00:02 AM: 4,200 regular users call GetPrice(100) = $80
+    //              All get VIP price — $38,000 revenue loss
+    // The field persists because the Singleton lives for the app's lifetime
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sbug5-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PricingEngine.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Stateless Singleton — pass context as parameter, don't store it
+public class PricingEngine  // Singleton — no mutable fields
 {
     public decimal GetPrice(decimal basePrice, UserContext user)
     {
         var discount = user.IsVip ? 0.20m : 0m;
         return basePrice * (1 - discount);
+        // Each call computes discount from user context
+        // No shared state — no leaking between requests
     }
 }
 
-// Or use Scoped service for per-request state:
-services.AddScoped&lt;PricingContext&gt;();  // per-request lifetime</code></pre>
+// ✅ Alternative: Use Scoped service for per-request state
+public class PricingContext  // Scoped — one per request
+{
+    public decimal Discount { get; set; }
+}
+
+// Program.cs
+builder.Services.AddSingleton&lt;PricingEngine&gt;();  // stateless logic
+builder.Services.AddScoped&lt;PricingContext&gt;();      // per-request state</code></pre>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1426,43 +1613,96 @@ services.AddScoped&lt;PricingContext&gt;();  // per-request lifetime</code></pre
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 6: Event Handler Memory Leak in Singleton Event Publisher</h3>
       <div class="card-body">
-        <p class="body-text"><strong>Incident:</strong> <span class="text-muted">2024-02-15 — E-commerce platform, .NET 8</span></p>
-        <p class="body-text">The <code>NotificationService</code> singleton exposed an <code>event Action&lt;OrderEvent&gt; OnOrderPlaced</code>. Each HTTP request created a scoped <code>OrderHandler</code> that subscribed to the event in its constructor. The handler processed the order and was supposed to be GC'd after the request. Memory grew 2 MB/hour in production.</p>
-        <p class="body-text"><strong>Diagnosis time:</strong> 4 hours. <code>dotnet-dump</code> showed 847,000 live <code>OrderHandler</code> instances — all reachable via the Singleton's event delegate chain.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">EventLeakBug.cs</span></div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// ❌ BUG: Scoped handler subscribes, never unsubscribes
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>2024, e-commerce platform, .NET 8.</strong> The <code>NotificationService</code> singleton exposed an <code>event Action&lt;OrderEvent&gt; OnOrderPlaced</code>. Each HTTP request created a scoped <code>OrderHandler</code> that subscribed to the event in its constructor. The handler processed the order and was supposed to be GC'd after the request. Memory grew 2 MB/hour in production.</p>
+        </div>
+        <h3 class="sub">Time to Diagnose</h3>
+        <p class="body-text">4 hours. <code>dotnet-dump</code> showed 847,000 live <code>OrderHandler</code> instances — all reachable via the Singleton's event delegate chain.</p>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sbug6-bad" role="tab" aria-selected="true" aria-controls="sbug6-bad">Buggy Code</button>
+            <button class="tab-btn" data-tab="sbug6-fix" role="tab" aria-selected="false" aria-controls="sbug6-fix">Fix</button>
+          </div>
+          <div class="tab-panel active" id="sbug6-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrderHandler.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Scoped handler subscribes to Singleton event, never unsubscribes
+// Registered as: services.AddScoped&lt;OrderHandler&gt;();
 public class OrderHandler : IDisposable
 {
-    private readonly NotificationService _notifier;
+    private readonly NotificationService _notifier; // Singleton!
+
     public OrderHandler(NotificationService notifier)
     {
         _notifier = notifier;
-        _notifier.OnOrderPlaced += HandleOrder; // Subscribes every request
+        // ❌ Every request adds a NEW handler to the Singleton's delegate chain
+        _notifier.OnOrderPlaced += HandleOrder;
     }
-    private void HandleOrder(OrderEvent e) { /* ... */ }
-    public void Dispose() { } // ← Forgot to unsubscribe!
-}
 
-// ✅ FIX: Unsubscribe in Dispose + use weak event pattern
+    private void HandleOrder(OrderEvent e) { /* process order */ }
+
+    public void Dispose()
+    {
+        // ❌ Forgot to unsubscribe!
+        // The Singleton's event delegate still holds a strong reference
+        // to this OrderHandler — GC can NEVER collect it
+    }
+    // Request 1: OrderHandler #1 subscribes → delegate chain has 1 handler
+    // Request 2: OrderHandler #2 subscribes → delegate chain has 2 handlers
+    // Request 100,000: chain has 100,000 handlers — 2 MB/hour growth
+    // dotnet-dump shows 847,000 live OrderHandler instances
+    // All reachable via Singleton's event delegate — not GC-eligible
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sbug6-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrderHandler.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Fix: Unsubscribe in Dispose()
 public class OrderHandler : IDisposable
 {
     private readonly NotificationService _notifier;
+
     public OrderHandler(NotificationService notifier)
     {
         _notifier = notifier;
         _notifier.OnOrderPlaced += HandleOrder;
     }
-    private void HandleOrder(OrderEvent e) { /* ... */ }
-    public void Dispose() =&gt; _notifier.OnOrderPlaced -= HandleOrder;
+
+    private void HandleOrder(OrderEvent e) { /* process order */ }
+
+    public void Dispose()
+    {
+        // ✅ Remove the handler — breaks the strong reference
+        _notifier.OnOrderPlaced -= HandleOrder;
+        // Now GC can collect this OrderHandler after the request ends
+    }
 }
 
-// ✅ BETTER FIX: Use MediatR notifications (no direct coupling)
-// or IObservable&lt;T&gt; where subscription returns IDisposable</code></pre>
+// ✅ Better: Use MediatR notifications (no direct event coupling)
+public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
+{
+    public Task Handle(OrderPlacedEvent e, CancellationToken ct)
+    {
+        // No subscription/unsubscription — MediatR manages the lifecycle
+        return Task.CompletedTask;
+    }
+}
+// Or use IObservable&lt;T&gt; where subscription returns IDisposable</code></pre>
+              </div>
+            </div>
           </div>
         </div>
-        <p class="body-text mt-sm"><strong>Lesson:</strong> Singleton + C# events = memory leak trap. The Singleton lives forever, so its delegate chain holds strong references to every subscriber. Always unsubscribe in <code>Dispose()</code>, or prefer <code>IObservable&lt;T&gt;</code> / MediatR where subscription cleanup is built-in.</p>
+
+        <div class="callout callout-info mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
+          <p class="body-text">Singleton + C# events = memory leak trap. The Singleton lives forever, so its delegate chain holds strong references to every subscriber. Always unsubscribe in <code>Dispose()</code>, or prefer <code>IObservable&lt;T&gt;</code> / MediatR where subscription cleanup is built-in.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -3766,7 +4006,7 @@ builder.Services.AddSingleton&lt;IDatabaseManager, DatabaseManager&gt;();</code>
       </div>
     </div>
 
-    <p class="body-text">Use this checklist when reviewing Singleton code in PRs.</p>
+    <p class="body-text">Use this checklist when reviewing Singleton code in PRs. Print it, bookmark it, tattoo it on your forearm.</p>
 
     <div class="table-wrapper">
       <table>
