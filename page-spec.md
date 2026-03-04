@@ -14,7 +14,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" ...>
-  <title>{Pattern Name} — System Design Wiki</title>
+  <title>{Pattern Name} — System Guide</title>
   <link rel="icon" href="data:image/svg+xml,...">      ← unique emoji per page
   <link font-awesome 6.4.0>
   <link highlight.js atom-one-dark>
@@ -1374,7 +1374,7 @@ Dictionary&lt;string, List&lt;int&gt;&gt; // all brackets escaped</code></pre>
 
 ```html
 <footer class="footer">
-  <p>System Design Wiki — by Rafikul Alam</p>
+  <p>System Guide — by Rafikul Alam</p>
   <p class="mt-xs text-xs">Built with vanilla HTML, CSS &amp; JS — no frameworks</p>
 </footer>
 

@@ -1,5 +1,5 @@
 /* ============================================================
- *  System Design Wiki — Shared Scripts (SPA Edition)
+ *  System Guide — Shared Scripts (SPA Edition)
  *  Vanilla JS | No frameworks | Event-delegation | Fetch router
  * ============================================================ */
 
@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
       var svg = wrapper.querySelector('svg');
       if (!svg) return;
       var s = getState(svg);
-      var delta = e.deltaY > 0 ? -0.1 : 0.1;
+      var delta = e.deltaY > 0 ? -0.04 : 0.04;
       var newZoom = Math.min(Math.max(s.zoom + delta, ZOOM_MIN), ZOOM_MAX);
       if (newZoom === 1) { resetTransform(svg); return; }
       applyTransform(svg, newZoom, s.panX, s.panY);
@@ -293,7 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
         var svg = wrapper.querySelector('svg');
         if (!svg) return;
         var s = getState(svg);
-        var scale = dist / pinchState.startDist;
+        var rawScale = dist / pinchState.startDist;
+        var scale = 1 + (rawScale - 1) * 0.4;
         var newZoom = Math.min(Math.max(s.zoom * scale, ZOOM_MIN), ZOOM_MAX);
         applyTransform(svg, newZoom, s.panX, s.panY);
         pinchState.startDist = dist;
@@ -306,7 +307,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, { passive: false });
 
-    document.addEventListener('touchend', function () { pinchState = null; touchPanState = null; });
+    var justPinched = false;
+    document.addEventListener('touchend', function () {
+      if (pinchState) justPinched = true;
+      pinchState = null;
+      touchPanState = null;
+    });
 
     var lastTap = 0;
     document.addEventListener('dblclick', function (e) {
@@ -316,8 +322,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (svg) { resetTransform(svg); wrapper.style.cursor = ''; }
     });
     document.addEventListener('touchend', function (e) {
+      if (justPinched) { justPinched = false; lastTap = 0; return; }
       var wrapper = e.target.closest('.uml-diagram-wrapper');
       if (!wrapper) return;
+      if (e.touches.length > 0) return;
       var now = Date.now();
       if (now - lastTap < 300) {
         var svg = wrapper.querySelector('svg');

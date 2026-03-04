@@ -1,8 +1,8 @@
-# System Design Wiki
+# System Guide
 
 **[Live Site](https://rafik-786.github.io/system-design/)**
 
-A comprehensive, self-hosted wiki for mastering **Low-Level Design (LLD)** and **High-Level Design (HLD)** concepts — built with vanilla HTML, CSS & JS. No frameworks, no build tools.
+A comprehensive guide for mastering **Low-Level Design (LLD)** and **High-Level Design (HLD)** concepts — built with vanilla HTML, CSS & JS. No frameworks, no build tools.
 
 ## What's Inside
 
@@ -26,7 +26,7 @@ A comprehensive, self-hosted wiki for mastering **Low-Level Design (LLD)** and *
 - Practice exercises ranked by difficulty
 
 ## Features
-- **4 Dark Themes** — Navy, Purple, Green, Charcoal (persisted via localStorage)
+- **4 Dark Themes** — Navy, Purple, Emerald, Charcoal (persisted via localStorage)
 - **Per-page accent colors** — each topic gets its own color identity
 - **Right-edge dot navigation** — auto-generated from page sections
 - **Click-to-activate code blocks** — page scrolls freely over code, click to scroll inside
