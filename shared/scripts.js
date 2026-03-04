@@ -827,8 +827,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* -- Language switcher active state -- */
     var langDropdown = document.getElementById('langDropdown');
     if (langDropdown) {
-      var pathParts = window.location.pathname.replace(/\/+$/, '').split('/');
-      var currentFile = pathParts.pop().replace('.html', '');
+      var currentFile = window.location.pathname.split('/').pop().replace('.html', '');
       langDropdown.querySelectorAll('.lang-option').forEach(function(o) {
         o.classList.toggle('active', o.dataset.lang === currentFile);
       });
@@ -966,8 +965,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Skip external links, anchors, javascript:, mailto:
     if (href.startsWith('http') || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:')) return;
 
-    // Only intercept internal page links (no file extensions like .css, .js, .png)
-    if (/\.\w+$/.test(href) && !href.endsWith('.html')) return;
+    // Only intercept .html links
+    if (!href.endsWith('.html')) return;
 
     // Resolve relative URL to absolute
     var a = document.createElement('a');
@@ -984,17 +983,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!opt) return;
     e.stopPropagation();
     var lang = opt.dataset.lang;
-    var pathParts = window.location.pathname.replace(/\/+$/, '').split('/');
-    var currentFile = pathParts.pop().replace('.html', '');
+    var currentFile = window.location.pathname.split('/').pop().replace('.html', '');
     if (lang === currentFile) {
       var dd = document.getElementById('langDropdown');
       if (dd) dd.classList.remove('open');
       return;
     }
-    // Support both clean URLs (/csharp) and .html URLs (/csharp.html)
-    var newUrl = window.location.pathname.endsWith('.html')
-      ? window.location.href.replace(currentFile + '.html', lang + '.html')
-      : window.location.href.replace(currentFile, lang);
+    var newUrl = window.location.href.replace(currentFile + '.html', lang + '.html');
     localStorage.setItem('wiki-language', lang);
     var dd2 = document.getElementById('langDropdown');
     if (dd2) dd2.classList.remove('open');
