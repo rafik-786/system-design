@@ -352,23 +352,111 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ----------------------------------------------------------
-   *  11. Tooltip Touch Support (event delegation)
+   *  11. Tooltip Smart Positioning (event delegation)
+   *      Uses position:fixed to escape overflow:auto containers.
    * -------------------------------------------------------- */
-  document.addEventListener('click', (e) => {
-    const trigger = e.target.closest('.tooltip-trigger');
+  function positionTooltip(trigger, content) {
+    // 1. Capture trigger rect BEFORE moving anything
+    var rect = trigger.getBoundingClientRect();
+
+    // 2. Move tooltip to <body> so position:fixed escapes ALL transformed ancestors
+    //    (CSS transforms create a new containing block, breaking fixed positioning)
+    content._originalParent = content.parentNode;
+    document.body.appendChild(content);
+
+    // 3. Set up for offscreen measurement
+    content.style.position = 'fixed';
+    content.style.top = '-9999px';
+    content.style.left = '-9999px';
+    content.style.bottom = 'auto';
+    content.style.right = '';
+    content.style.transform = 'none';
+    content.style.visibility = 'hidden';
+    content.style.opacity = '0';
+    content.style.display = 'block';
+    content.classList.remove('below');
+
+    // 4. Read dimensions
+    var tipW = content.offsetWidth;
+    var tipH = content.offsetHeight;
+
+    // 5. Calculate position — centered above trigger
+    var left = rect.left + rect.width / 2 - tipW / 2;
+    var top = rect.top - tipH - 10;
+
+    // Flip below if overflowing top
+    var below = false;
+    if (top < 8) { top = rect.bottom + 10; below = true; }
+    // Shift horizontally if overflowing edges
+    if (left < 8) left = 8;
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - 8 - tipW;
+
+    // 6. Apply final position and show
+    content.style.left = left + 'px';
+    content.style.top = top + 'px';
+    content.classList.toggle('below', below);
+    content.style.visibility = '';
+    content.style.opacity = '';
+  }
+
+  function resetTooltip(content) {
+    // Move tooltip back to its original trigger parent
+    if (content._originalParent && content.parentNode === document.body) {
+      content._originalParent.appendChild(content);
+      content._originalParent = null;
+    }
+    content.style.position = '';
+    content.style.left = '';
+    content.style.top = '';
+    content.style.bottom = '';
+    content.style.right = '';
+    content.style.transform = '';
+    content.style.display = '';
+    content.classList.remove('below', 'visible');
+  }
+
+  // Helper: find tooltip-content for a trigger (may be in body or in trigger)
+  function getTooltipContent(trigger) {
+    return trigger._tooltipContent || trigger.querySelector('.tooltip-content');
+  }
+
+  // Desktop: mouseenter/mouseleave
+  document.addEventListener('mouseenter', function (e) {
+    var trigger = e.target.closest('.tooltip-trigger');
+    if (!trigger) return;
+    var content = getTooltipContent(trigger);
+    if (!content) return;
+    trigger._tooltipContent = content;  // store ref before it moves to body
+    positionTooltip(trigger, content);
+    content.classList.add('visible');
+  }, true);
+
+  document.addEventListener('mouseleave', function (e) {
+    var trigger = e.target.closest('.tooltip-trigger');
+    if (!trigger) return;
+    var content = getTooltipContent(trigger);
+    if (!content) return;
+    resetTooltip(content);
+  }, true);
+
+  // Touch: click to toggle
+  document.addEventListener('click', function (e) {
+    var trigger = e.target.closest('.tooltip-trigger');
     if (!trigger) {
-      document.querySelectorAll('.tooltip-content.visible').forEach((tc) => tc.classList.remove('visible'));
+      document.querySelectorAll('.tooltip-content.visible').forEach(function (tc) { resetTooltip(tc); });
       return;
     }
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-      e.preventDefault();
-      const content = trigger.querySelector('.tooltip-content');
-      if (!content) return;
-      document.querySelectorAll('.tooltip-content.visible').forEach((tc) => {
-        if (tc !== content) tc.classList.remove('visible');
-      });
-      content.classList.toggle('visible');
-    }
+    e.preventDefault();
+    var content = getTooltipContent(trigger);
+    if (!content) return;
+    trigger._tooltipContent = content;
+    var wasVisible = content.classList.contains('visible');
+    // Close all others
+    document.querySelectorAll('.tooltip-content.visible').forEach(function (tc) {
+      if (tc !== content) resetTooltip(tc);
+    });
+    if (wasVisible) { resetTooltip(content); }
+    else { positionTooltip(trigger, content); content.classList.add('visible'); }
   });
 
   /* ----------------------------------------------------------
@@ -739,7 +827,8 @@ document.addEventListener('DOMContentLoaded', () => {
     /* -- Language switcher active state -- */
     var langDropdown = document.getElementById('langDropdown');
     if (langDropdown) {
-      var currentFile = window.location.pathname.split('/').pop().replace('.html', '');
+      var pathParts = window.location.pathname.replace(/\/+$/, '').split('/');
+      var currentFile = pathParts.pop().replace('.html', '');
       langDropdown.querySelectorAll('.lang-option').forEach(function(o) {
         o.classList.toggle('active', o.dataset.lang === currentFile);
       });
@@ -877,8 +966,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Skip external links, anchors, javascript:, mailto:
     if (href.startsWith('http') || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:')) return;
 
-    // Only intercept .html links
-    if (!href.endsWith('.html')) return;
+    // Only intercept internal page links (no file extensions like .css, .js, .png)
+    if (/\.\w+$/.test(href) && !href.endsWith('.html')) return;
 
     // Resolve relative URL to absolute
     var a = document.createElement('a');
@@ -895,13 +984,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!opt) return;
     e.stopPropagation();
     var lang = opt.dataset.lang;
-    var currentFile = window.location.pathname.split('/').pop().replace('.html', '');
+    var pathParts = window.location.pathname.replace(/\/+$/, '').split('/');
+    var currentFile = pathParts.pop().replace('.html', '');
     if (lang === currentFile) {
       var dd = document.getElementById('langDropdown');
       if (dd) dd.classList.remove('open');
       return;
     }
-    var newUrl = window.location.href.replace(currentFile + '.html', lang + '.html');
+    // Support both clean URLs (/csharp) and .html URLs (/csharp.html)
+    var newUrl = window.location.pathname.endsWith('.html')
+      ? window.location.href.replace(currentFile + '.html', lang + '.html')
+      : window.location.href.replace(currentFile, lang);
     localStorage.setItem('wiki-language', lang);
     var dd2 = document.getElementById('langDropdown');
     if (dd2) dd2.classList.remove('open');

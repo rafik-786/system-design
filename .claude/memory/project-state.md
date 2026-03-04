@@ -1,10 +1,10 @@
-# System Design Wiki — Complete Project Knowledge Base
+# System Guide — Complete Project Knowledge Base
 
 ---
 
 ## 1. PROJECT OVERVIEW
 
-**What:** A comprehensive LLD (Low-Level Design) wiki as a static HTML website. Dark themed, production-quality notes for a senior/principal engineer. C# / .NET Core focused.
+**What:** A comprehensive LLD (Low-Level Design) guide as a static HTML website. Dark themed with teal/cyan accent, premium visual design (Linear/Vercel-tier). C# / .NET Core focused.
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
@@ -51,15 +51,27 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │   ├── index.html                          — LLD hub (23 patterns + 5 SOLID + 3 case studies + 3 advanced)
 │   └── topics/
 │       └── design-patterns/
-│           ├── singleton.html              — COMPLETE (3977+ lines, 24 sections, favicon: 1️⃣)
-│           └── factory-method.html         — COMPLETE (4831 lines, 24 sections, favicon: 🏭)
+│           ├── singleton/
+│           │   └── csharp.html             — COMPLETE (4220+ lines, 24 sections, favicon: 1️⃣)
+│           └── factory-method/
+│               ├── csharp.html             — COMPLETE (4837 lines, 24 sections, favicon: 🏭)
+│               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
+
+### Multi-Language Architecture (NEW)
+- Each topic is a **folder** (not a file): `factory-method/csharp.html`, `factory-method/java.html`
+- Each language file is a **complete standalone page** (theory duplicated, not shared)
+- Language switcher in toolbar navigates between sibling files (e.g. `csharp.html` ↔ `java.html`)
+- JS detects current language from filename, saves preference to `localStorage('wiki-language')`
+- Languages without content show a "Coming Soon" page with hero + link back to C# version
+- CSS: `.lang-switcher`, `.lang-dropdown`, `.lang-option`, `.lang-swatch` (cloned from theme switcher)
+- JS: Section 4c in scripts.js — navigation-based (not toggle-based)
 
 ### Relative Path Patterns
 - Home to shared: `shared/styles.css`
 - LLD hub to shared: `../shared/styles.css`
-- Topic page to shared: `../../../shared/styles.css` (3 levels deep)
+- Topic page to shared: `../../../../shared/styles.css` (4 levels deep — topic/lang/csharp.html)
 
 ---
 
@@ -122,15 +134,22 @@ Dependency Injection Deep Dive, Reflection & Metaprogramming, Unit Testing Patte
 
 ---
 
-## 6. THEME SYSTEM
+## 6. THEME SYSTEM & VISUAL DESIGN
+
+### Brand: "System Guide" (formerly "System Design Wiki")
+- Rebranded across ALL files (HTML titles, footers, README, page-spec, scripts comment)
+- Primary accent: teal `#14b8a6` (was blue `#3b82f6`)
+- Secondary accent: sky-blue `#38bdf8`
+- Link color: `#5eead4` (was `#93c5fd`)
+- RGB tokens: `--accent-primary-rgb: 20, 184, 166`
 
 ### 4 Themes (via `[data-theme]` on `<html>`)
 | Theme | `--bg-primary` | `--bg-secondary` | `--accent-primary` |
 |-------|---------------|------------------|-------------------|
-| Navy (default) | `#0f172a` | `#1e293b` | `#3b82f6` |
+| Navy (default) | `#0f172a` | `#1e293b` | `#14b8a6` (teal) |
 | Purple | `#13091f` | `#1e1533` | `#a78bfa` |
-| Green | `#0a1a14` | `#132d22` | `#34d399` |
-| Charcoal | `#121212` | `#1e1e1e` | `#60a5fa` |
+| Emerald (was "Green") | `#0a1a14` | `#132d22` | `#34d399` |
+| Charcoal | `#121212` | `#1e1e1e` | `#5eead4` (teal-light) |
 
 ### Per-Page Accent Colors (via `[data-accent]` on `<body>`)
 | Accent | Hex | RGB |
@@ -141,6 +160,41 @@ Dependency Injection Deep Dive, Reflection & Metaprogramming, Unit Testing Patte
 | cyan | `#06b6d4` | `6,182,212` |
 | yellow | `#f59e0b` | `245,158,11` |
 | red | `#ef4444` | `239,68,68` |
+
+### Premium Visual Effects (CSS-only, in styles.css)
+- **Hero**: Animated gradient bg (`heroGradientShift` 15s), dual glowing teal orbs (`::before`), dot grid overlay (`::after`), badge shimmer animation (`badgeShimmer` 4s), animated h1 gradient (`h1GradientFlow` 8s) with drop-shadow
+- **Landing cards**: `backdrop-filter: blur(12px)`, entrance animation (`landingCardEntrance` 0.6s with stagger), gradient border glow `::after` on hover, 3D perspective tilt on hover (`perspective(800px) rotateX(1deg)`), icon glow, CTA arrow slide
+- **Section headers**: Gradient text on `.section-title`, icon glow + border per color
+- **Cards**: Open state glow + depth shadow, hover glow
+- **Code windows**: Teal-tinted border, gradient titlebar
+- **UML containers**: Radial gradient bg, deeper box-shadows with teal glow, inset top highlight
+- **SVG UML diagrams**: Dual-layer `feDropShadow` glow filter, `linearGradient` header fills, teal color scheme fallbacks
+- **Progress bar**: Teal glow trail (`box-shadow`)
+- **Section dividers**: Wider gradient spread + glow
+- **Footer**: Premium redesign — brand mark, nav links, tech stack pill badges, gradient divider, copyright (see section 21)
+- **FAB buttons**: Hover glow
+- **Back-to-top**: Triple ring glow on hover
+- **Scroll-reveal**: 16px travel with spring easing (`cubic-bezier(0.16, 1, 0.3, 1)`)
+- **Content links**: Animated underline (`background-size: 0% → 100%`)
+- **Q&A items**: Active state glow
+- **TL;DR card**: Inner glow + shadow
+- **Exercise cards**: Cyan shadow
+
+### Keyframes Added
+1. `heroGradientShift` — 15s, background-position shift
+2. `badgeShimmer` — 4s, left-to-right sweep
+3. `h1GradientFlow` — 8s, background-position shift
+4. `landingCardEntrance` — 0.6s, opacity + translateY
+5. `landingCardEntranceDim` — same but caps at 0.55 opacity (for --soon cards)
+
+### Code Block Scrollbar Fix
+```css
+.macos-body pre code { overflow-x: auto !important; scrollbar-width: none; }
+.macos-body pre code::-webkit-scrollbar { display: none; }
+.macos-body .hljs { overflow-x: auto !important; scrollbar-width: none; }
+.macos-body .hljs::-webkit-scrollbar { display: none; }
+```
+Scrollbar hidden visually but content is still horizontally scrollable.
 
 ### Anti-Flash Script (inline in `<head>`)
 ```html
@@ -258,19 +312,31 @@ All interactivity is in one file. Key features:
 2. **Expand/Collapse All** — `#expandAllBtn` toggles all cards
 3. **Code block scroll** — click to activate scroll, ESC to deactivate, only one active at a time
 4. **Theme switcher** — `#themeBtn` dropdown, saves to `localStorage('wiki-theme')`
+4c. **Language switcher** — `#langBtn` dropdown, navigation-based (navigates to sibling file e.g. `csharp.html` ↔ `java.html`), saves to `localStorage('wiki-language')`
 5. **Progress bar** — `--scroll-pct` CSS variable updated on scroll
 6. **Back to top** — `.back-to-top.visible` when scrollY > 400
 7. **Q&A accordion** — `.qa-header` click toggles `.qa-item.active`
 8. **Collapsible toggle** — `.collapsible-header` click
 9. **Tab switcher** — `.tab-btn[data-tab]` switches `.tab-panel` visibility, scoped to parent container
 10. **Highlight.js** — `hljs.highlightAll()` on load, line numbers injected
-11. **Tooltip touch** — tap to show `.tooltip-content.visible`
+11. **Tooltip smart positioning** — JS-based `position:fixed`, moved to `<body>` to escape transformed ancestors, viewport edge detection, flip below if near top
 12. **Popup system** — `data-popup` triggers `openPopup(id)`, close via overlay/X/ESC
 13. **Keyboard a11y** — Enter/Space on `role="button"` elements
 14. **ARIA updates** — `aria-expanded` auto-updated after clicks
 15. **Copy to clipboard** — button injected into `.macos-titlebar`, 1.5s checkmark feedback
 16. **Scroll-reveal** — IntersectionObserver fades in cards/callouts (respects prefers-reduced-motion)
 17. **Cmd+K search** — command palette searches all `.section[id]` titles
+
+### UML Diagram Zoom (Section 9 in scripts.js)
+- **Ctrl+Wheel zoom**: delta ±0.04 per tick (was ±0.1, reduced for finer control)
+- **Pinch zoom**: dampened to 40% sensitivity — `scale = 1 + (rawScale - 1) * 0.4`
+- **Drag pan**: mouse drag when zoom > 1, touch single-finger pan when zoom > 1
+- **Double-click/tap reset**: resets to zoom=1, panX=0, panY=0
+- **Pinch-zoom fix**: `justPinched` flag prevents double-tap reset from false-triggering after pinch (two touchend events within 300ms)
+- **CSS**: `.uml-diagram-wrapper` has `touch-action: pan-x pan-y` to prevent browser native pinch-zoom from fighting JS zoom
+- **State storage**: `svg.dataset.zoom`, `svg.dataset.panX`, `svg.dataset.panY`
+- **Transform**: `svg.style.transform = 'translate(panX, panY) scale(zoom)'` with `transformOrigin: '0 0'`
+- **Limits**: ZOOM_MIN = 0.5, ZOOM_MAX = 3
 
 ---
 
@@ -283,7 +349,7 @@ All interactivity is in one file. Key features:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{Pattern Name} — System Design Wiki</title>
+  <title>{Pattern Name} — System Guide</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>{EMOJI}</text></svg>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
@@ -472,6 +538,8 @@ Each bug uses a tab-container with Buggy Code and Fix tabs:
 - Dead `href="#"` links changed to `<span>` / `<div>` for non-existent pages
 - Bug case studies use two-tab format (Buggy Code / Fix) — updated in BOTH singleton and factory-method
 - Exercise cards use `exercise-card` pattern with nested collapsible Hints/Solution
+- Browser scrollbar hidden (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`) — gradient progress bar in toolbar replaces it
+- Multi-language: separate files per language in topic folders (e.g. `factory-method/csharp.html`, `factory-method/java.html`) — NOT data-lang toggling in single file
 
 ### Audit Fixes Applied (Singleton)
 - Q16: Fixed incorrect .NET 8 disposal claim (externally-created instances are NOT disposed by container)
@@ -571,7 +639,114 @@ Each bug uses a tab-container with Buggy Code and Fix tabs:
 
 ---
 
-## 20. PATTERNS TO FOLLOW FOR NEXT PAGES
+## 20. TOOLTIP SYSTEM
+
+### Architecture
+- **137 tooltips** across 4 pages: index.html (10), lld/index.html (35), singleton/csharp.html (51), factory-method/csharp.html (41)
+- Pattern: `<span class="tooltip-trigger">TERM<span class="tooltip-content">DEFINITION</span></span>`
+- Only first occurrence of each term in body text (NOT inside `<code>` blocks)
+- Dashed underline (`border-bottom: 1px dashed`) + cursor: help
+
+### Positioning (scripts.js section 11)
+- **Problem**: CSS `transform` on parent elements (cards, animations) creates a new containing block, making `position: fixed` relative to the card instead of the viewport
+- **Solution**: On show, tooltip-content is **moved to `document.body`** via `appendChild()`, positioned with `position: fixed` using viewport coordinates from `getBoundingClientRect()`, then moved back to original parent on hide
+- `_tooltipContent` reference stored on trigger element so `querySelector` still works after reparenting
+- `_originalParent` stored on content element for cleanup
+- Edge detection: shifts horizontally if overflowing left/right, flips below if near viewport top
+- Desktop: `mouseenter`/`mouseleave` with capture phase (`true`) for event delegation
+- Touch: click to toggle, click-outside to close
+
+### CSS (styles.css section 28)
+- `.tooltip-content`: absolute positioning (CSS fallback), fixed width (`max-content`, `max-width: min(320px, 90vw)`), glass-style bg, teal border, arrow via `::after`
+- `.tooltip-content.visible`: `opacity: 1; visibility: visible; pointer-events: auto`
+- `.tooltip-content.below`: arrow points up instead of down
+- No CSS hover rules — fully JS-controlled
+
+### Tooltip Categories Added
+- **Home page**: Design patterns, SOLID, OOP, DI containers, reflection, distributed systems, scalability, load balancing, caching, message queues
+- **LLD hub**: All 23 GoF pattern names with definitions, 5 SOLID principles, 3 pattern category headers, DI, Reflection, Metaprogramming, Unit Testing
+- **Singleton page**: GoF, DI, ASP.NET Core, thread safety, volatile, lazy init, double-check lock, race condition, captive dependency, socket exhaustion, GC, CLR, memory barriers, instruction reordering, connection pool, request pipeline, live reload + many more
+- **Factory Method page**: GoF, DI, polymorphism, OCP, runtime data, handler pooling, JWT, captive dependency, Service Locator, FrozenDictionary, hot path, GC pressure, Gen 0, O(1), virtual methods, inheritance, tight coupling, downcasting, immutable + many more
+
+---
+
+## 21. FOOTER DESIGN
+
+### Structure (all 5 pages)
+```html
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — ...</p>
+    <div class="footer-links"><!-- Home, LLD, GitHub --></div>
+    <div class="footer-tech"><!-- HTML, CSS, JS, Zero deps badges --></div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2025 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+```
+
+### CSS Classes
+- `.footer-inner`: max-width 720px, centered
+- `.footer-brand`: 1.125rem bold, teal icon
+- `.footer-tagline`: muted, 0.8rem
+- `.footer-links`: flex row, icon + text links, hover → teal
+- `.footer-tech`: pill badges with teal bg/border, monospace font
+- `.footer-divider`: 60px gradient line
+- `.footer-copy`: 0.75rem, muted, 70% opacity
+
+### Navigation Links
+- Home page: #tracks, #about, GitHub
+- LLD hub: ../ (home), GitHub
+- Topic pages: ../../../../ (home), ../../../ (LLD), GitHub
+
+---
+
+## 22. CLEAN URLS
+
+### Approach
+- Stripped `.html` from ALL internal `<a href>` links across all 5 pages
+- `index.html` references → folder path (e.g., `lld/index.html` → `lld/`)
+- Topic pages → extensionless (e.g., `singleton/csharp.html` → `singleton/csharp`)
+- Works on GitHub Pages, Netlify, Vercel (all resolve extensionless URLs to .html files)
+
+### SPA Router Updates (scripts.js)
+- Changed interception rule: now intercepts all internal links, not just `.html` links
+- `if (/\.\w+$/.test(href) && !href.endsWith('.html')) return;` — skips .css/.js/.png but allows both clean and .html URLs
+- Language switcher: handles both clean (`/csharp`) and `.html` (`/csharp.html`) URL formats
+- `pathParts` parsing strips trailing slashes before extracting current file name
+
+---
+
+## 23. SVG UML SPACING CONVENTIONS
+
+### Header Heights
+- **Stereotyped boxes** (<<abstract>>, <<interface>>): **58px** header — stereotype at y=42, class name at y=64, divider at y=78
+- **Plain boxes** (concrete classes): **48px** header — class name at ~y=36, divider at ~y=48
+
+### Padding Rules
+- Left text padding: x=320 for glyphs, x=336 for text content
+- Row gaps: 28px between member rows
+- Bottom padding: ≥22px from last text to box bottom
+- Note tspan dy: 20px
+
+### Singleton SVG
+- viewBox: `0 0 680 380`
+- Singleton box: height=320, header=48px
+- Client box: width=190, height=130, header=48px
+- Legend at y=300
+
+### Factory Method SVG
+- viewBox: `0 0 820 480`
+- Creator: height=164, header=58px (stereotyped)
+- Product: height=138, header=58px (stereotyped)
+- ConcreteCreator: at y=286, height=116, header=48px
+- ConcreteProduct: at y=286, height=96, header=48px
+- Legend at y=430
+
+---
+
+## 24. PATTERNS TO FOLLOW FOR NEXT PAGES
 
 When building the next topic page (Abstract Factory, Builder, etc.):
 
