@@ -553,7 +553,13 @@ document.addEventListener('DOMContentLoaded', () => {
     var backToTop = document.getElementById('backToTop');
     if (backToTop) backToTop.classList.toggle('visible', window.scrollY > 400);
   }
-  window.addEventListener('scroll', onScroll, { passive: true });
+  var scrollTicking = false;
+  window.addEventListener('scroll', function() {
+    if (!scrollTicking) {
+      scrollTicking = true;
+      requestAnimationFrame(function() { onScroll(); scrollTicking = false; });
+    }
+  }, { passive: true });
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('#backToTop')) window.scrollTo({ top: 0, behavior: 'smooth' });
