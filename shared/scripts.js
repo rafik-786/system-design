@@ -272,20 +272,24 @@ document.addEventListener('DOMContentLoaded', () => {
         touchPanState = null;
         var dx = e.touches[0].clientX - e.touches[1].clientX;
         var dy = e.touches[0].clientY - e.touches[1].clientY;
+        wrapper.style.touchAction = 'none';
         pinchState = { wrapper: wrapper, startDist: Math.hypot(dx, dy) };
       } else if (e.touches.length === 1) {
         var svg = wrapper.querySelector('svg');
         if (!svg) return;
         var s = getState(svg);
         if (s.zoom > 1) {
-          touchPanState = { svg: svg, startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX: s.panX, panY: s.panY };
+          wrapper.style.touchAction = 'none';
+          touchPanState = { svg: svg, wrapper: wrapper, startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX: s.panX, panY: s.panY };
         }
       }
     }, { passive: true });
 
+    // Touchmove — passive on document (never blocks page scroll).
+    // When pinch/pan is active, CSS touch-action:none on the wrapper
+    // prevents browser gestures; JS just updates the transform.
     document.addEventListener('touchmove', function (e) {
       if (pinchState && e.touches.length === 2) {
-        e.preventDefault();
         var wrapper = pinchState.wrapper;
         var dx = e.touches[0].clientX - e.touches[1].clientX;
         var dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -297,19 +301,25 @@ document.addEventListener('DOMContentLoaded', () => {
         var scale = 1 + (rawScale - 1) * 0.4;
         var newZoom = Math.min(Math.max(s.zoom * scale, ZOOM_MIN), ZOOM_MAX);
         applyTransform(svg, newZoom, s.panX, s.panY);
+        wrapper.style.touchAction = 'none';
         pinchState.startDist = dist;
       } else if (touchPanState && e.touches.length === 1) {
-        e.preventDefault();
         var tdx = e.touches[0].clientX - touchPanState.startX;
         var tdy = e.touches[0].clientY - touchPanState.startY;
         var ts = getState(touchPanState.svg);
         applyTransform(touchPanState.svg, ts.zoom, touchPanState.panX + tdx, touchPanState.panY + tdy);
       }
-    }, { passive: false });
+    }, { passive: true });
 
     var justPinched = false;
     document.addEventListener('touchend', function () {
-      if (pinchState) justPinched = true;
+      if (pinchState) {
+        justPinched = true;
+        pinchState.wrapper.style.touchAction = '';
+      }
+      if (touchPanState && touchPanState.wrapper) {
+        touchPanState.wrapper.style.touchAction = '';
+      }
       pinchState = null;
       touchPanState = null;
     });
@@ -711,25 +721,15 @@ document.addEventListener('DOMContentLoaded', () => {
       bar.appendChild(btn);
     });
 
-    /* -- Wheel intercept on code blocks & diagrams -- */
+    /* -- Wheel intercept: only on inactive code blocks (pass-through scroll) -- */
     function interceptWheel(e) {
-      var diagram = e.target.closest('.uml-diagram-wrapper');
-      if (diagram) {
-        if (e.ctrlKey) return;
-        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-          e.preventDefault();
-          window.scrollBy(0, e.deltaY);
-        }
-        return;
-      }
       var body = e.target.closest('.macos-body');
       if (body && body !== activeBlock) {
         e.preventDefault();
         window.scrollBy(0, e.deltaY);
       }
     }
-    document.querySelectorAll('.macos-body, .uml-diagram-wrapper').forEach(function(el) {
-      // Remove old listener to avoid duplicates (same function ref)
+    document.querySelectorAll('.macos-body').forEach(function(el) {
       el.removeEventListener('wheel', interceptWheel);
       el.addEventListener('wheel', interceptWheel, { passive: false });
     });
