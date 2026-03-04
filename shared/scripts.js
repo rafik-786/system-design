@@ -69,15 +69,28 @@ document.addEventListener('DOMContentLoaded', () => {
   (function () {
     let activeBlock = null;
 
-    // Block wheel events on inactive code blocks so page scrolls through
-    document.addEventListener('wheel', (e) => {
+    // Block wheel events on inactive code blocks & diagrams so page scrolls through.
+    // Use a targeted approach: only attach non-passive listeners to the elements that need it.
+    function interceptWheel(e) {
+      const diagram = e.target.closest('.uml-diagram-wrapper');
+      if (diagram) {
+        if (e.ctrlKey) return; // zoom
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          e.preventDefault();
+          window.scrollBy(0, e.deltaY);
+        }
+        return;
+      }
       const body = e.target.closest('.macos-body');
       if (body && body !== activeBlock) {
         e.preventDefault();
-        // Forward scroll to the page
         window.scrollBy(0, e.deltaY);
       }
-    }, { passive: false });
+    }
+    // Attach to code blocks and diagrams only (not the whole document)
+    document.querySelectorAll('.macos-body, .uml-diagram-wrapper').forEach(function(el) {
+      el.addEventListener('wheel', interceptWheel, { passive: false });
+    });
 
     document.addEventListener('click', (e) => {
       const body = e.target.closest('.macos-body');
@@ -190,6 +203,39 @@ document.addEventListener('DOMContentLoaded', () => {
       themeDropdown.classList.remove('open');
     });
     document.addEventListener('click', function () { themeDropdown.classList.remove('open'); });
+  }
+
+  /* ----------------------------------------------------------
+   *  4c. Language Switcher (navigation-based)
+   * -------------------------------------------------------- */
+  const langBtn = document.getElementById('langBtn');
+  const langDropdown = document.getElementById('langDropdown');
+  if (langBtn && langDropdown) {
+    // Detect current language from filename (e.g. csharp.html → csharp)
+    var currentFile = window.location.pathname.split('/').pop().replace('.html', '');
+    localStorage.setItem('wiki-language', currentFile);
+    // Mark active option
+    var activeLangOpt = langDropdown.querySelector('[data-lang="' + currentFile + '"]');
+    if (activeLangOpt) {
+      langDropdown.querySelectorAll('.lang-option').forEach(function (o) { o.classList.remove('active'); });
+      activeLangOpt.classList.add('active');
+    }
+    langBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      langDropdown.classList.toggle('open');
+    });
+    langDropdown.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var opt = e.target.closest('.lang-option');
+      if (!opt) return;
+      var lang = opt.dataset.lang;
+      if (lang === currentFile) { langDropdown.classList.remove('open'); return; }
+      // Navigate to sibling file
+      var newUrl = window.location.pathname.replace(currentFile + '.html', lang + '.html');
+      localStorage.setItem('wiki-language', lang);
+      window.location.href = newUrl;
+    });
+    document.addEventListener('click', function () { langDropdown.classList.remove('open'); });
   }
 
   /* ----------------------------------------------------------
@@ -313,30 +359,134 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ----------------------------------------------------------
    *  10. Diagram Zoom
    * -------------------------------------------------------- */
-  const ZOOM_STEP = 0.15;
-  const ZOOM_MIN = 0.25;
-  const ZOOM_MAX = 3;
+  // Gesture-based diagram zoom + pan
+  (function () {
+    var ZOOM_MIN = 0.5, ZOOM_MAX = 3;
 
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.diagram-zoom-btn');
-    if (!btn) return;
+    function getState(svg) {
+      return {
+        zoom: parseFloat(svg.dataset.zoom) || 1,
+        panX: parseFloat(svg.dataset.panX) || 0,
+        panY: parseFloat(svg.dataset.panY) || 0
+      };
+    }
+    function applyTransform(svg, zoom, panX, panY) {
+      svg.dataset.zoom = zoom;
+      svg.dataset.panX = panX;
+      svg.dataset.panY = panY;
+      svg.style.transformOrigin = '0 0';
+      svg.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+    }
+    function resetTransform(svg) {
+      applyTransform(svg, 1, 0, 0);
+    }
 
-    const container = btn.closest('.mermaid-container');
-    if (!container) return;
+    // Ctrl+wheel zoom (trackpad pinch fires as Ctrl+wheel)
+    document.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey) return;
+      var wrapper = e.target.closest('.uml-diagram-wrapper');
+      if (!wrapper) return;
+      e.preventDefault();
+      var svg = wrapper.querySelector('svg');
+      if (!svg) return;
+      var s = getState(svg);
+      var delta = e.deltaY > 0 ? -0.1 : 0.1;
+      var newZoom = Math.min(Math.max(s.zoom + delta, ZOOM_MIN), ZOOM_MAX);
+      if (newZoom === 1) { resetTransform(svg); return; }
+      applyTransform(svg, newZoom, s.panX, s.panY);
+      wrapper.style.cursor = newZoom > 1 ? 'grab' : '';
+    }, { passive: false });
 
-    const svg = container.querySelector('svg');
-    if (!svg) return;
+    // Mouse drag to pan (when zoomed in)
+    var dragState = null;
+    document.addEventListener('mousedown', function (e) {
+      var wrapper = e.target.closest('.uml-diagram-wrapper');
+      if (!wrapper) return;
+      var svg = wrapper.querySelector('svg');
+      if (!svg) return;
+      var s = getState(svg);
+      if (s.zoom <= 1) return;
+      e.preventDefault();
+      wrapper.style.cursor = 'grabbing';
+      dragState = { svg: svg, wrapper: wrapper, startX: e.clientX, startY: e.clientY, panX: s.panX, panY: s.panY };
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!dragState) return;
+      e.preventDefault();
+      var dx = e.clientX - dragState.startX;
+      var dy = e.clientY - dragState.startY;
+      var s = getState(dragState.svg);
+      applyTransform(dragState.svg, s.zoom, dragState.panX + dx, dragState.panY + dy);
+    });
+    document.addEventListener('mouseup', function () {
+      if (dragState) { dragState.wrapper.style.cursor = getState(dragState.svg).zoom > 1 ? 'grab' : ''; dragState = null; }
+    });
 
-    const action = btn.getAttribute('data-zoom');
-    let current = parseFloat(svg.style.transform?.replace(/scale\(([^)]+)\)/, '$1')) || 1;
+    // Touch: pinch-to-zoom + single-finger pan when zoomed
+    var pinchState = null;
+    var touchPanState = null;
+    document.addEventListener('touchstart', function (e) {
+      var wrapper = e.target.closest('.uml-diagram-wrapper');
+      if (!wrapper) return;
+      if (e.touches.length === 2) {
+        touchPanState = null;
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchState = { wrapper: wrapper, startDist: Math.hypot(dx, dy) };
+      } else if (e.touches.length === 1) {
+        var svg = wrapper.querySelector('svg');
+        if (!svg) return;
+        var s = getState(svg);
+        if (s.zoom > 1) {
+          touchPanState = { svg: svg, startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX: s.panX, panY: s.panY };
+        }
+      }
+    }, { passive: true });
 
-    if (action === 'in')       current = Math.min(current + ZOOM_STEP, ZOOM_MAX);
-    else if (action === 'out') current = Math.max(current - ZOOM_STEP, ZOOM_MIN);
-    else if (action === 'reset') current = 1;
+    document.addEventListener('touchmove', function (e) {
+      if (pinchState && e.touches.length === 2) {
+        e.preventDefault();
+        var wrapper = pinchState.wrapper;
+        var dx = e.touches[0].clientX - e.touches[1].clientX;
+        var dy = e.touches[0].clientY - e.touches[1].clientY;
+        var dist = Math.hypot(dx, dy);
+        var svg = wrapper.querySelector('svg');
+        if (!svg) return;
+        var s = getState(svg);
+        var scale = dist / pinchState.startDist;
+        var newZoom = Math.min(Math.max(s.zoom * scale, ZOOM_MIN), ZOOM_MAX);
+        applyTransform(svg, newZoom, s.panX, s.panY);
+        pinchState.startDist = dist;
+      } else if (touchPanState && e.touches.length === 1) {
+        e.preventDefault();
+        var tdx = e.touches[0].clientX - touchPanState.startX;
+        var tdy = e.touches[0].clientY - touchPanState.startY;
+        var ts = getState(touchPanState.svg);
+        applyTransform(touchPanState.svg, ts.zoom, touchPanState.panX + tdx, touchPanState.panY + tdy);
+      }
+    }, { passive: false });
 
-    svg.style.transform = 'scale(' + current + ')';
-    svg.style.transformOrigin = 'top left';
-  });
+    document.addEventListener('touchend', function () { pinchState = null; touchPanState = null; });
+
+    // Double-tap / double-click to reset
+    var lastTap = 0;
+    document.addEventListener('dblclick', function (e) {
+      var wrapper = e.target.closest('.uml-diagram-wrapper');
+      if (!wrapper) return;
+      var svg = wrapper.querySelector('svg');
+      if (svg) { resetTransform(svg); wrapper.style.cursor = ''; }
+    });
+    document.addEventListener('touchend', function (e) {
+      var wrapper = e.target.closest('.uml-diagram-wrapper');
+      if (!wrapper) return;
+      var now = Date.now();
+      if (now - lastTap < 300) {
+        var svg = wrapper.querySelector('svg');
+        if (svg) resetTransform(svg);
+      }
+      lastTap = now;
+    });
+  })();
 
   /* ----------------------------------------------------------
    *  11. Sr Toggle (legacy)
@@ -686,17 +836,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Add search button to toolbar if toolbar exists
-  const toolbarRight = document.querySelector('.toolbar-right');
-  if (toolbarRight) {
-    const searchBtn = document.createElement('button');
-    searchBtn.className = 'fab-btn';
-    searchBtn.setAttribute('aria-label', 'Search sections (Ctrl+K)');
-    searchBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>';
-    searchBtn.addEventListener('click', openSearch);
-    // Insert before first button
-    toolbarRight.insertBefore(searchBtn, toolbarRight.firstChild);
-  }
+  // Add search button to toolbar (before fullscreen button)
+  (function() {
+    var toolbar = document.querySelector('.top-toolbar');
+    var fsBtn = document.getElementById('fullscreenBtn');
+    if (toolbar && fsBtn) {
+      var searchBtn = document.createElement('button');
+      searchBtn.className = 'fab-btn';
+      searchBtn.setAttribute('aria-label', 'Search sections (Ctrl+K)');
+      searchBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>';
+      searchBtn.addEventListener('click', openSearch);
+      toolbar.insertBefore(searchBtn, fsBtn);
+    }
+  })();
 
   /* ----------------------------------------------------------
    *  22. (Old sidebar removed — dot-nav replaces it)

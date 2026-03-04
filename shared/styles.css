@@ -145,7 +145,6 @@ button, input, select, textarea {
 }
 
 html {
-  scroll-behavior: smooth;
   overflow-x: hidden;
 }
 
@@ -157,21 +156,15 @@ body {
   font-size: 1rem;
   padding-top: 52px;
   overflow-x: hidden;
+  opacity: 1 !important;          /* Override inline hidden state once CSS loads */
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+/* Hide page scrollbar — progress bar in toolbar replaces it */
+html {
+  scrollbar-width: none;           /* Firefox */
 }
-::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-blue);
+html::-webkit-scrollbar {
+  display: none;                   /* Chrome, Edge, Safari */
 }
 
 /* ----------------------------------------------------------
@@ -276,54 +269,68 @@ body {
 /* ----------------------------------------------------------
    5. Top Toolbar
    ---------------------------------------------------------- */
+/* Floating pill toolbar */
 .top-toolbar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1.25rem;
-  background: var(--toolbar-bg);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(var(--accent-primary-rgb), 0.15);
-  box-shadow: var(--shadow-sm);
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(15, 20, 35, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 100px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   overflow: visible;
+  width: fit-content;
+  max-width: calc(100vw - 2rem);
 }
 
-/* #2 Reading progress bar */
+/* #2 Reading progress bar — thin line under the pill */
 .top-toolbar::after {
   content: '';
   position: absolute;
-  bottom: 0;
-  left: 0;
+  bottom: -4px;
+  left: 10%;
+  right: 10%;
   height: 2px;
+  border-radius: 2px;
   width: var(--scroll-pct, 0%);
+  max-width: 80%;
   background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
   transition: width 0.1s linear;
   z-index: 1;
 }
+.top-toolbar.no-progress::after { display: none; }
 
-.toolbar-left,
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+/* Hide language switcher globally until content is ready */
+.lang-switcher { display: none; }
+
+/* Separator between button groups */
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 0.1rem;
+  flex-shrink: 0;
 }
 
+
 .fab-btn {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  border: 1px solid rgba(var(--accent-primary-rgb), 0.3);
-  background: rgba(30, 41, 59, 0.8);
-  color: var(--text-link);
-  font-size: 0.9rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.82rem;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+  transition: background-color 0.2s, color 0.2s, transform 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -332,26 +339,18 @@ body {
   -webkit-tap-highlight-color: transparent;
   outline: none;
 }
-
-.fab-btn.active {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  border-color: transparent;
+.fab-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
-.fab-back {
-  border-color: rgba(239, 68, 68, 0.35);
-  color: #fca5a5;
-  width: 36px;
-  height: 36px;
-  font-size: 0.8rem;
-  margin-left: 0.75rem;
+.fab-btn.active {
+  background: rgba(var(--accent-primary-rgb), 0.25);
+  color: var(--accent-primary);
 }
 
-.fab-back:hover {
-  border-color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+.fab-home, .fab-back {
+  font-size: 0.8rem;
 }
 
 /* ----------------------------------------------------------
@@ -444,6 +443,64 @@ body {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .theme-option.active .theme-swatch {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.3);
+}
+
+/* ----------------------------------------------------------
+ *  Language Switcher
+ * -------------------------------------------------------- */
+.lang-switcher {
+  position: relative;
+}
+.lang-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.5rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 150px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1001;
+}
+.lang-dropdown.open {
+  display: flex;
+}
+.lang-option {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.lang-option:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.lang-option.active {
+  color: var(--accent-primary);
+}
+.lang-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  flex-shrink: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.lang-option.active .lang-swatch {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.3);
 }
@@ -834,31 +891,18 @@ body {
 }
 .macos-body.scroll-active {
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
   cursor: auto;
   box-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.3);
+  scrollbar-width: none;
 }
-
-.macos-body::-webkit-scrollbar {
-  width: 6px;
-}
-.macos-body::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.5);
-  border-radius: 3px;
-}
-.macos-body::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 3px;
-}
-.macos-body::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
+.macos-body::-webkit-scrollbar { display: none; }
 
 .macos-body pre {
   margin: 0;
   padding: 0;
   background: transparent;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .macos-body pre code {
@@ -907,10 +951,12 @@ body {
    ---------------------------------------------------------- */
 .table-wrapper {
   overflow-x: auto;
+  scrollbar-width: none;
   border-radius: 0.75rem;
   border: 1px solid var(--border-color);
   margin-bottom: 1.5rem;
 }
+.table-wrapper::-webkit-scrollbar { display: none; }
 
 table {
   width: 100%;
@@ -1340,13 +1386,9 @@ ul.styled.red li::before {
   border-bottom: 1px solid var(--border-color);
   border-radius: 0.75rem 0.75rem 0 0;
   overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--bg-tertiary) transparent;
+  scrollbar-width: none;
 }
-.tab-header::-webkit-scrollbar { height: 4px; }
-.tab-header::-webkit-scrollbar-track { background: transparent; }
-.tab-header::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
-.tab-header::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+.tab-header::-webkit-scrollbar { display: none; }
 
 .tab-btn {
   padding: 0.75rem 1.25rem;
@@ -1395,7 +1437,7 @@ ul.styled.red li::before {
 }
 
 .cheat-card pre {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .cheat-card-title {
@@ -1430,14 +1472,19 @@ ul.styled.red li::before {
    23a. SVG UML Diagrams
    ---------------------------------------------------------- */
 .uml-diagram-wrapper {
+  position: relative;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(var(--accent-primary-rgb), 0.2);
   border-radius: 12px;
   padding: 1.5rem;
   margin: 1rem 0;
-  overflow-x: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.uml-diagram-wrapper::-webkit-scrollbar {
+  display: none;
 }
 .uml-svg {
   width: 100%;
@@ -1875,19 +1922,10 @@ p.body-text {
   .top-toolbar {
     padding: 0.25rem 0.25rem;
   }
-  .toolbar-left,
-  .toolbar-right {
-    gap: 0.25rem;
-  }
   .fab-btn {
     width: 36px;
     height: 36px;
     font-size: 0.7rem;
-  }
-  .fab-back {
-    width: 36px;
-    height: 36px;
-    margin-left: 0.25rem;
   }
 }
 
@@ -2058,9 +2096,8 @@ p.body-text {
   to   { transform: translateY(0) scale(1); opacity: 1; }
 }
 
-.popup-content::-webkit-scrollbar { width: 6px; }
-.popup-content::-webkit-scrollbar-track { background: transparent; }
-.popup-content::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
+.popup-content::-webkit-scrollbar { display: none; }
+.popup-content { scrollbar-width: none; }
 
 .popup-close {
   position: absolute;
@@ -2595,8 +2632,8 @@ p.body-text {
   text-align: center;
   font-size: 0.85rem;
 }
-.search-results::-webkit-scrollbar { width: 4px; }
-.search-results::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+.search-results::-webkit-scrollbar { display: none; }
+.search-results { scrollbar-width: none; }
 
 /* ----------------------------------------------------------
    46. (reserved — old sidebar removed)
