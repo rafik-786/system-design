@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Singleton Pattern — System Design Wiki</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📘</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<!-- Mermaid MUST be initialized before body parses to avoid light-theme flash -->
+<script>mermaid.initialize({startOnLoad:true,theme:'base',themeVariables:{primaryColor:'#1e3a5f',primaryTextColor:'#f1f5f9',primaryBorderColor:'#3b82f6',lineColor:'#60a5fa',secondaryColor:'#2d1b4e',secondaryTextColor:'#f1f5f9',secondaryBorderColor:'#8b5cf6',tertiaryColor:'#1a3a2a',tertiaryTextColor:'#f1f5f9',tertiaryBorderColor:'#10b981',mainBkg:'#1e3a5f',nodeBorder:'#3b82f6',clusterBkg:'#0f172a',clusterBorder:'#334155',titleColor:'#f1f5f9',edgeLabelBackground:'#1e293b',nodeTextColor:'#f1f5f9',actorBkg:'#1e3a5f',actorBorder:'#3b82f6',actorTextColor:'#f1f5f9',actorLineColor:'#60a5fa',signalColor:'#60a5fa',signalTextColor:'#f1f5f9',labelBoxBkgColor:'#1e293b',labelBoxBorderColor:'#3b82f6',labelTextColor:'#f1f5f9',loopTextColor:'#f1f5f9',activationBorderColor:'#3b82f6',activationBkgColor:'#1e3a5f',sequenceNumberColor:'#f1f5f9',noteBkgColor:'#2d1b4e',noteTextColor:'#e2e8f0',noteBorderColor:'#8b5cf6',classText:'#f1f5f9',relationColor:'#60a5fa',relationLabelColor:'#94a3b8',fontFamily:'Inter',fontSize:'14px',background:'#0f172a'}});</script>
+<link rel="stylesheet" href="shared/styles.css">
+<script>/* Anti-flash: apply saved theme before paint */(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body>
+
+<!-- ========== TOP TOOLBAR ========== -->
+<header class="top-toolbar" role="banner">
+  <div class="toolbar-left">
+    <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+    <a href="index.html" class="fab-btn fab-back" aria-label="Back to Home"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  </div>
+  <div class="toolbar-right">
+    <div class="theme-switcher">
+      <button class="fab-btn" id="themeBtn" aria-label="Change theme"><i class="fa-solid fa-palette" aria-hidden="true"></i></button>
+      <div class="theme-dropdown" id="themeDropdown">
+        <button class="theme-option active" data-theme="navy"><span class="theme-swatch" style="background:#0f172a"></span>Navy</button>
+        <button class="theme-option" data-theme="purple"><span class="theme-swatch" style="background:#13091f"></span>Purple</button>
+        <button class="theme-option" data-theme="green"><span class="theme-swatch" style="background:#0a1a14"></span>Green</button>
+        <button class="theme-option" data-theme="charcoal"><span class="theme-swatch" style="background:#121212"></span>Charcoal</button>
+      </div>
+    </div>
+    <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+  </div>
+</header>
+
+<!-- ========== DOT NAV (auto-populated by JS) ========== -->
+<div class="dot-nav" id="dotNav" role="navigation" aria-label="Page sections"></div>
+
+<!-- ========== HERO ========== -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-gem"></i> GoF Creational Pattern</div>
+    <h1>Singleton Pattern</h1>
+    <p class="hero-subtitle">Ensures a class has only one instance and provides a global access point to it</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-comments"></i> 25 Q&As</span>
+      <span><i class="fa-solid fa-bug"></i> 5 Bug Studies</span>
+      <span><i class="fa-solid fa-triangle-exclamation"></i> 8 Pitfalls</span>
+      <span><i class="fa-solid fa-code"></i> C# / .NET</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+  <!-- ========== 1. TL;DR ========== -->
+  <div class="section" id="tldr">
+    <div class="section-header">
+      <div class="section-icon blue"><i class="fa-solid fa-bolt"></i></div>
+      <div>
+        <div class="section-num">Section 1</div>
+        <h2 class="section-title">TL;DR</h2>
+      </div>
+    </div>
+
+    <div class="tldr-card">
+      <p><strong>What:</strong> Singleton ensures only one instance of a class exists throughout the application's lifetime.</p>
+      <p><strong>When:</strong> Use when you need exactly one shared resource — like a configuration manager, connection pool, or logger.</p>
+      <p><strong>Quick Code:</strong></p>
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">Singleton.cs</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-csharp">public sealed class AppConfig
+{
+    private static readonly Lazy&lt;AppConfig&gt; _instance
+        = new(() =&gt; new AppConfig());
+
+    public static AppConfig Instance =&gt; _instance.Value;
+
+    private AppConfig() { /* load config */ }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 2. PREREQUISITES ========== -->
+  <div class="section" id="prereqs">
+    <div class="section-header">
+      <div class="section-icon yellow"><i class="fa-solid fa-book-open"></i></div>
+      <div>
+        <div class="section-num">Section 2</div>
+        <h2 class="section-title">Prerequisites</h2>
+      </div>
+    </div>
+
+    <div class="prereq-card">
+      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before reading this, you should understand:</div>
+      <div class="prereq-list">
+        <a href="#" class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Interfaces</a>
+        <a href="#" class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Static Members</a>
+        <a href="#" class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Thread Safety</a>
+        <a href="#" class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Lazy&lt;T&gt;</a>
+        <a href="#" class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Dependency Injection</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 3. ANALOGIES ========== -->
+  <div class="section" id="analogies">
+    <div class="section-header">
+      <div class="section-icon purple"><i class="fa-solid fa-lightbulb"></i></div>
+      <div>
+        <div class="section-num">Section 3</div>
+        <h2 class="section-title">Real-World Analogies</h2>
+      </div>
+    </div>
+
+    <div class="card open">
+      <h3 class="card-title" role="button" tabindex="0" aria-expanded="true"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> The President of a Country</h3>
+      <div class="card-body">
+        <p class="body-text">A country has exactly one president at any time. You can't just "create" a new president — there's a formal process. Everyone in the country refers to the same person when they say "the president."</p>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Real World</th><th>Code Concept</th></tr></thead>
+            <tbody>
+              <tr><td>The country</td><td>Your application</td></tr>
+              <tr><td>The president</td><td>The single instance</td></tr>
+              <tr><td>"You can't just create one"</td><td>Private constructor</td></tr>
+              <tr><td>Official channel to reach the president</td><td><code>Instance</code> property</td></tr>
+              <tr><td>Only one at a time</td><td>Thread-safe lazy initialization</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Sun</div>
+        <p class="body-text">There's only one Sun in our solar system. Every planet refers to the same Sun. No one can create a second one.</p>
+      </div>
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Windows Task Manager</div>
+        <p class="body-text">Press Ctrl+Shift+Esc multiple times — you always get the same Task Manager window, not a new one each time.</p>
+      </div>
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Clipboard</div>
+        <p class="body-text">Your OS has one clipboard. Copy from Chrome, paste in Notepad — same clipboard. Never two at once.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 4. CORE UML ========== -->
+  <div class="section" id="uml">
+    <div class="section-header">
+      <div class="section-icon blue"><i class="fa-solid fa-diagram-project"></i></div>
+      <div>
+        <div class="section-num">Section 4</div>
+        <h2 class="section-title">Core Pattern &amp; UML</h2>
+      </div>
+    </div>
+
+    <p class="body-text"><strong>GoF Definition:</strong> "Ensure a class only has one instance, and provide a global point of access to it."</p>
+
+    <h3 class="sub">Classic UML</h3>
+    <div class="diagram-toggle open" role="button" tabindex="0" aria-expanded="true">
+      <i class="fa-solid fa-diagram-project" aria-hidden="true"></i> Class Diagram — Classic Singleton
+      <i class="fa-solid fa-chevron-down chevron" aria-hidden="true"></i>
+    </div>
+    <div class="mermaid-container">
+      <div class="diagram-zoom-controls">
+        <button class="diagram-zoom-btn" data-zoom="in" title="Zoom in"><i class="fa-solid fa-plus"></i></button>
+        <button class="diagram-zoom-btn" data-zoom="out" title="Zoom out"><i class="fa-solid fa-minus"></i></button>
+        <button class="diagram-zoom-btn" data-zoom="reset" title="Reset"><i class="fa-solid fa-rotate-left"></i></button>
+      </div>
+      <div class="mermaid">
+classDiagram
+    class Singleton {
+        -static instance : Singleton
+        -Singleton()
+        +static getInstance() Singleton
+        +businessMethod() void
+    }
+    note for Singleton "Private constructor\nprevents external\ninstantiation"
+      </div>
+      <div class="diagram-hint">Pinch/scroll to zoom</div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Participant</th><th>Role</th><th>In Our Example</th></tr></thead>
+        <tbody>
+          <tr><td><code>Singleton</code></td><td>Defines the static Instance property and private constructor</td><td><code>AppConfig</code></td></tr>
+          <tr><td><code>instance</code></td><td>The single shared instance (created lazily)</td><td><code>_instance</code> field</td></tr>
+          <tr><td><code>getInstance()</code></td><td>Public access point</td><td><code>AppConfig.Instance</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== 5. CODE IMPLEMENTATIONS ========== -->
+  <div class="section" id="code">
+    <div class="section-header">
+      <div class="section-icon green"><i class="fa-solid fa-code"></i></div>
+      <div>
+        <div class="section-num">Section 5</div>
+        <h2 class="section-title">Code Implementations</h2>
+      </div>
+    </div>
+
+    <div class="tab-container">
+      <div class="tab-header" role="tablist">
+        <button class="tab-btn active" data-tab="impl-lazy" role="tab" aria-selected="true" aria-controls="impl-lazy">Lazy&lt;T&gt;</button>
+        <button class="tab-btn" data-tab="impl-dcheck" role="tab" aria-selected="false" aria-controls="impl-dcheck">Double-Check Lock</button>
+        <button class="tab-btn" data-tab="impl-di" role="tab" aria-selected="false" aria-controls="impl-di">DI Registration</button>
+      </div>
+
+      <div class="tab-panel active" id="impl-lazy" role="tabpanel">
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">LazyTSingleton.cs</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-csharp">public sealed class AppConfig
+{
+    // Lazy&lt;T&gt; guarantees thread-safe, lazy initialization
+    // The lambda runs ONCE, on first access
+    private static readonly Lazy&lt;AppConfig&gt; _instance
+        = new(() =&gt; new AppConfig());
+
+    // Public access point — everyone calls this
+    public static AppConfig Instance =&gt; _instance.Value;
+
+    // Private constructor — no one can "new AppConfig()"
+    private AppConfig()
+    {
+        // Load configuration from appsettings.json, env vars, etc.
+    }
+
+    public string GetSetting(string key) =&gt; /* ... */ "";
+}</code></pre>
+          </div>
+        </div>
+        <div class="callout callout-success">
+          <div class="callout-title"><i class="fa-solid fa-check"></i> Recommended</div>
+          <p class="body-text">This is the modern, preferred approach in C#. <code>Lazy&lt;T&gt;</code> handles thread safety and lazy init in one line.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="impl-dcheck" role="tabpanel">
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">DoubleCheckSingleton.cs</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-csharp">public sealed class AppConfig
+{
+    private static volatile AppConfig? _instance;
+    private static readonly object _lock = new();
+
+    public static AppConfig Instance
+    {
+        get
+        {
+            // First check — no lock needed (fast path)
+            if (_instance is null)
+            {
+                lock (_lock)
+                {
+                    // Second check — inside lock (thread-safe)
+                    _instance ??= new AppConfig();
+                }
+            }
+            return _instance;
+        }
+    }
+
+    private AppConfig() { }
+}</code></pre>
+          </div>
+        </div>
+        <div class="callout callout-warning">
+          <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> Legacy</div>
+          <p class="body-text">Works but more verbose than <code>Lazy&lt;T&gt;</code>. You might see this in older codebases.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="impl-di" role="tabpanel">
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">Program.cs</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// In ASP.NET Core — the DI container manages the singleton lifetime
+// No static Instance, no private constructor tricks needed
+
+builder.Services.AddSingleton&lt;IAppConfig, AppConfig&gt;();
+
+// Now inject via constructor — the DI container ensures ONE instance
+public class OrderService
+{
+    private readonly IAppConfig _config;
+
+    public OrderService(IAppConfig config) // same instance everywhere
+    {
+        _config = config;
+    }
+}</code></pre>
+          </div>
+        </div>
+        <div class="callout callout-success">
+          <div class="callout-title"><i class="fa-solid fa-check"></i> Best Practice</div>
+          <p class="body-text">In modern .NET apps, prefer DI-managed singletons. The container handles lifecycle, thread safety, and testability.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 6. JR vs SR ========== -->
+  <div class="section" id="jr-sr">
+    <div class="section-header">
+      <div class="section-icon cyan"><i class="fa-solid fa-users"></i></div>
+      <div>
+        <div class="section-num">Section 6</div>
+        <h2 class="section-title">Jr vs Sr Implementation</h2>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-title"><i class="fa-solid fa-clipboard-question"></i> Problem Statement</div>
+      <p class="body-text">Build a <strong>Logger</strong> that writes to a file. The entire application must share the same logger instance. It must handle concurrent writes from multiple threads.</p>
+    </div>
+
+    <div class="tab-container">
+      <div class="tab-header" role="tablist">
+        <button class="tab-btn active" data-tab="jr-tab" role="tab" aria-selected="true" aria-controls="jr-tab">Junior Approach</button>
+        <button class="tab-btn" data-tab="sr-tab" role="tab" aria-selected="false" aria-controls="sr-tab">Senior Approach</button>
+      </div>
+
+      <!-- Junior Tab -->
+      <div class="tab-panel active" id="jr-tab" role="tabpanel">
+        <h3 class="sub">How a Junior Thinks</h3>
+        <p class="body-text">"I need one logger. I'll make it static. A static class can hold the file stream, and I'll just call <code>Logger.Log()</code> everywhere."</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">Logger.cs (Junior)</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-csharp">public static class Logger
+{
+    private static StreamWriter _writer =
+        new StreamWriter("app.log", append: true);
+
+    public static void Log(string message)
+    {
+        _writer.WriteLine($"[{DateTime.Now}] {message}");
+        _writer.Flush();
+    }
+}</code></pre>
+          </div>
+        </div>
+
+        <h3 class="sub">Problems</h3>
+
+        <div class="problem-card">
+          <div class="problem-card-title"><i class="fa-solid fa-circle-xmark"></i> No Thread Safety</div>
+          <p class="problem-card-desc">Multiple threads calling <code>Log()</code> simultaneously will corrupt the file — interleaved writes, partial lines, or <code>IOException</code>.</p>
+          <button class="solution-btn" data-popup="popup-thread"><i class="fa-solid fa-lightbulb"></i> How a Senior Solves This</button>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title"><i class="fa-solid fa-circle-xmark"></i> Not Testable</div>
+          <p class="problem-card-desc">Static classes can't implement interfaces. Unit tests can't swap in a fake logger — they'll write to real files.</p>
+          <button class="solution-btn" data-popup="popup-test"><i class="fa-solid fa-lightbulb"></i> How a Senior Solves This</button>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title"><i class="fa-solid fa-circle-xmark"></i> Resource Leak</div>
+          <p class="problem-card-desc">The <code>StreamWriter</code> is never disposed. If the app crashes, buffered log entries may be lost.</p>
+          <button class="solution-btn" data-popup="popup-leak"><i class="fa-solid fa-lightbulb"></i> How a Senior Solves This</button>
+        </div>
+      </div>
+
+      <!-- Senior Tab -->
+      <div class="tab-panel" id="sr-tab" role="tabpanel">
+        <h3 class="sub">How a Senior Thinks</h3>
+        <p class="body-text">"I need a single instance, but I also need it to be <em>testable</em>, <em>thread-safe</em>, and <em>properly disposable</em>. I'll code against an interface, use a lock for thread safety, and register it as a DI singleton."</p>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sr-ilogger" role="tab" aria-selected="true" aria-controls="sr-ilogger">ILogger.cs</button>
+            <button class="tab-btn" data-tab="sr-filelogger" role="tab" aria-selected="false" aria-controls="sr-filelogger">FileLogger.cs</button>
+            <button class="tab-btn" data-tab="sr-program" role="tab" aria-selected="false" aria-controls="sr-program">Program.cs</button>
+          </div>
+          <div class="tab-panel active" id="sr-ilogger" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">ILogger.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public interface IAppLogger : IDisposable
+{
+    void Log(LogLevel level, string message);
+    void LogInfo(string message);
+    void LogError(string message, Exception? ex = null);
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sr-filelogger" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">FileLogger.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public sealed class FileLogger : IAppLogger
+{
+    private readonly StreamWriter _writer;
+    private readonly object _lock = new();
+
+    public FileLogger(string filePath)
+    {
+        _writer = new StreamWriter(filePath, append: true)
+        { AutoFlush = true };
+    }
+
+    public void Log(LogLevel level, string message)
+    {
+        lock (_lock) // thread-safe writes
+        {
+            _writer.WriteLine(
+                $"[{DateTime.UtcNow:O}] [{level}] {message}");
+        }
+    }
+
+    public void LogInfo(string msg) =&gt; Log(LogLevel.Info, msg);
+    public void LogError(string msg, Exception? ex = null)
+        =&gt; Log(LogLevel.Error, ex is null ? msg : $"{msg} | {ex}");
+
+    public void Dispose() =&gt; _writer.Dispose();
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sr-program" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Program.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// DI container ensures single instance
+builder.Services.AddSingleton&lt;IAppLogger&gt;(
+    sp =&gt; new FileLogger("logs/app.log"));
+
+// Inject in any service — always same instance
+public class OrderService
+{
+    private readonly IAppLogger _logger;
+    public OrderService(IAppLogger logger) =&gt; _logger = logger;
+}</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="sub">Design Decisions</h3>
+
+        <div class="concept-card">
+          <div class="concept-card-title"><i class="fa-solid fa-circle-check"></i> Interface Segregation</div>
+          <p class="concept-card-desc">Coding against <code>IAppLogger</code> allows swapping <code>FileLogger</code> with <code>ConsoleLogger</code>, <code>DatabaseLogger</code>, or a test double — without changing any service code.</p>
+        </div>
+
+        <div class="concept-card">
+          <div class="concept-card-title"><i class="fa-solid fa-circle-check"></i> Thread Safety via Lock</div>
+          <p class="concept-card-desc">The <code>lock (_lock)</code> ensures only one thread writes at a time. <code>AutoFlush = true</code> means no data loss on crash.</p>
+        </div>
+
+        <div class="concept-card">
+          <div class="concept-card-title"><i class="fa-solid fa-circle-check"></i> DI-Managed Lifetime</div>
+          <p class="concept-card-desc">Using <code>AddSingleton</code> lets the DI container handle creation and disposal. No static fields, no hidden global state.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 7. TOOLTIPS DEMO ========== -->
+  <div class="section" id="tooltips">
+    <div class="section-header">
+      <div class="section-icon blue"><i class="fa-solid fa-circle-info"></i></div>
+      <div>
+        <div class="section-num">Section 7</div>
+        <h2 class="section-title">Tooltips Demo</h2>
+      </div>
+    </div>
+
+    <p class="body-text">
+      The Singleton pattern ensures
+      <span class="tooltip-trigger">thread safety<span class="tooltip-content">Thread safety means that a piece of code works correctly even when multiple threads execute it simultaneously. Without thread safety, shared data can become corrupted — leading to race conditions, data loss, or crashes.</span></span>
+      by using a
+      <span class="tooltip-trigger">Lazy&lt;T&gt;<span class="tooltip-content">Lazy&lt;T&gt; is a .NET class that delays the creation of an object until it's first accessed. It's thread-safe by default (uses LazyThreadSafetyMode.ExecutionAndPublication) and perfect for expensive initializations that shouldn't happen at startup.</span></span>
+      wrapper. The
+      <span class="tooltip-trigger">volatile<span class="tooltip-content">The 'volatile' keyword tells the compiler and CPU not to cache this variable in registers or reorder reads/writes around it — always read/write from main memory. Needed for double-checked locking to prevent partially constructed objects being visible to other threads.</span></span>
+      keyword is used in the double-check locking approach to prevent
+      <span class="tooltip-trigger">instruction reordering<span class="tooltip-content">Modern CPUs and compilers can rearrange (reorder) instructions for performance optimization. Without volatile, Thread A might see a non-null reference to a Singleton that hasn't finished constructing — because the assignment happened before the constructor completed from Thread A's perspective.</span></span>.
+    </p>
+
+    <p class="body-text">
+      In modern .NET, prefer
+      <span class="tooltip-trigger">DI containers<span class="tooltip-content">A Dependency Injection (DI) container is a framework that automatically creates and manages object lifetimes. In ASP.NET Core, the built-in IServiceProvider handles this. You register services with AddSingleton, AddScoped, or AddTransient, and the container injects them via constructors.</span></span>
+      over manual singleton implementations. The
+      <span class="tooltip-trigger">AddSingleton<span class="tooltip-content">AddSingleton&lt;TService, TImpl&gt;() registers a service so that the DI container creates exactly ONE instance for the entire application lifetime. Every class that injects this service gets the same object. The container also handles disposal on shutdown.</span></span>
+      method provides the same guarantee with better
+      <span class="tooltip-trigger">testability<span class="tooltip-content">Testability refers to how easily code can be unit tested. Code that depends on static singletons is hard to test because you can't substitute a fake. Code that uses DI-injected interfaces is easy to test — just inject a mock or stub in your test setup.</span></span>.
+    </p>
+  </div>
+
+  <!-- ========== 8. WHEN TO USE ========== -->
+  <div class="section" id="when">
+    <div class="section-header">
+      <div class="section-icon green"><i class="fa-solid fa-check-double"></i></div>
+      <div>
+        <div class="section-num">Section 8</div>
+        <h2 class="section-title">When To Use / When Not To</h2>
+      </div>
+    </div>
+
+    <div class="when-use-grid">
+      <div>
+        <h3 class="sub text-green"><i class="fa-solid fa-check"></i> Use When</h3>
+        <div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check-circle"></i></span><span>Shared resource needs exactly one instance (config, logger, cache)</span></div>
+        <div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check-circle"></i></span><span>Object creation is expensive and reuse makes sense</span></div>
+        <div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check-circle"></i></span><span>Coordinating actions across the system (event bus, job scheduler)</span></div>
+      </div>
+      <div>
+        <h3 class="sub text-red"><i class="fa-solid fa-xmark"></i> Don't Use When</h3>
+        <div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-times-circle"></i></span><span>You just need a global variable (use DI instead)</span></div>
+        <div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-times-circle"></i></span><span>Multiple instances might be needed later (e.g., per-tenant config)</span></div>
+        <div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-times-circle"></i></span><span>The class has mutable state shared across requests (race condition risk)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 9. COMPARISON ========== -->
+  <div class="section" id="comparison">
+    <div class="section-header">
+      <div class="section-icon purple"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div>
+        <div class="section-num">Section 9</div>
+        <h2 class="section-title">Comparisons</h2>
+      </div>
+    </div>
+
+    <h3 class="sub">Singleton vs Static Class</h3>
+    <div class="comparison-grid">
+      <div class="comparison-panel bad">
+        <div class="comparison-header"><i class="fa-solid fa-times-circle"></i> Static Class</div>
+        <div class="pad-card">
+          <ul class="styled red">
+            <li>Cannot implement interfaces</li>
+            <li>Cannot be injected via DI</li>
+            <li>Hard to unit test</li>
+            <li>No polymorphism</li>
+            <li>Initialized eagerly on first access to any member</li>
+          </ul>
+        </div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="comparison-panel good">
+        <div class="comparison-header"><i class="fa-solid fa-check-circle"></i> Singleton</div>
+        <div class="pad-card">
+          <ul class="styled green">
+            <li>Can implement interfaces</li>
+            <li>Works with DI containers</li>
+            <li>Easily unit testable</li>
+            <li>Supports polymorphism</li>
+            <li>Can be lazily initialized</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 10. SOLID MAPPING ========== -->
+  <div class="section" id="solid">
+    <div class="section-header">
+      <div class="section-icon purple"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div>
+        <div class="section-num">Section 10</div>
+        <h2 class="section-title">SOLID Mapping</h2>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>Principle</th><th>Relation</th><th>Explanation</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tooltip-trigger">SRP<span class="tooltip-content">Single Responsibility Principle — A class should have only one reason to change. Each class should do one thing and do it well.</span></span></td>
+            <td><span class="badge badge-yellow">Depends</span></td>
+            <td>Singleton itself doesn't violate SRP, but developers often overload it with unrelated responsibilities.</td>
+          </tr>
+          <tr>
+            <td><span class="tooltip-trigger">OCP<span class="tooltip-content">Open/Closed Principle — Software entities should be open for extension but closed for modification. You should be able to add new behavior without changing existing code.</span></span></td>
+            <td><span class="badge badge-green">Supports</span></td>
+            <td>When using DI-managed singleton with interfaces, you can swap implementations without modifying clients.</td>
+          </tr>
+          <tr>
+            <td><span class="tooltip-trigger">DIP<span class="tooltip-content">Dependency Inversion Principle — High-level modules should not depend on low-level modules. Both should depend on abstractions (interfaces).</span></span></td>
+            <td><span class="badge badge-red">Can Violate</span></td>
+            <td>Classic <code>Singleton.Instance</code> creates tight coupling. DI-managed singleton fixes this.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== 11. BUG STUDIES ========== -->
+  <div class="section" id="bugs">
+    <div class="section-header">
+      <div class="section-icon red"><i class="fa-solid fa-bug"></i></div>
+      <div>
+        <div class="section-num">Section 11</div>
+        <h2 class="section-title">Bug Case Studies</h2>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Race Condition on Lazy Init</h3>
+      <div class="card-body">
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> Production Scenario</div>
+          <p class="body-text">Two HTTP requests hit the server at the exact same time. Both see <code>_instance</code> as null. Both create a new instance. Two database connections are opened instead of one. Connection pool exhaustion follows.</p>
+        </div>
+        <h3 class="sub">Root Cause</h3>
+        <p class="body-text">No synchronization mechanism on the instance creation path.</p>
+        <h3 class="sub">Fix</h3>
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">Fix.cs</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Before (broken):
+if (_instance == null) _instance = new DbConnection();
+
+// After (fixed — use Lazy&lt;T&gt;):
+private static readonly Lazy&lt;DbConnection&gt; _instance
+    = new(() =&gt; new DbConnection());
+public static DbConnection Instance =&gt; _instance.Value;</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 12. PITFALLS ========== -->
+  <div class="section" id="pitfalls">
+    <div class="section-header">
+      <div class="section-icon yellow"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div>
+        <div class="section-num">Section 12</div>
+        <h2 class="section-title">Pitfalls &amp; Anti-Patterns</h2>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Using Singleton as a global variable dump</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text"><strong>Mistake:</strong> Stuffing unrelated state into a singleton: user session, app config, feature flags, cache — all in one class.</p>
+          <p class="body-text"><strong>Why Bad:</strong> Violates SRP. Creates a "god object" that everything depends on. Changes ripple everywhere.</p>
+          <p class="body-text"><strong>Fix:</strong> Create separate singletons per responsibility. Register each via DI.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Singleton holding mutable state across HTTP requests</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text"><strong>Mistake:</strong> Storing per-request data (current user, tenant ID) in a singleton.</p>
+          <p class="body-text"><strong>Why Bad:</strong> Thread A's data leaks into Thread B's response. Security vulnerability + data corruption.</p>
+          <p class="body-text"><strong>Fix:</strong> Use <code>AddScoped</code> for per-request state. Singletons should only hold immutable or thread-safe data.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 13. INTERVIEW PITCH ========== -->
+  <div class="section" id="pitch">
+    <div class="section-header">
+      <div class="section-icon cyan"><i class="fa-solid fa-microphone"></i></div>
+      <div>
+        <div class="section-num">Section 13</div>
+        <h2 class="section-title">How to Explain in an Interview</h2>
+      </div>
+    </div>
+
+    <div class="callout callout-purple">
+      <div class="callout-title"><i class="fa-solid fa-microphone"></i> Your Script (90 seconds)</div>
+      <p class="body-text"><strong>Opening:</strong> "The Singleton pattern ensures a class has exactly one instance throughout the application."</p>
+      <p class="body-text"><strong>Core:</strong> "It works by making the constructor private — so no one can call <code>new</code> — and exposing a static property that returns the single instance. In C#, the cleanest way is using <code>Lazy&lt;T&gt;</code>, which handles thread safety automatically."</p>
+      <p class="body-text"><strong>Example:</strong> "A good real-world example is a configuration manager. You don't want multiple copies of your app's config floating around — one source of truth keeps things consistent."</p>
+      <p class="body-text"><strong>When:</strong> "I'd use it when I genuinely need one shared instance — like connection pools or caches. But in modern .NET, I prefer registering it with the DI container using <code>AddSingleton</code>, because that gives me the same behavior with better testability."</p>
+      <p class="body-text"><strong>Close:</strong> "The key trade-off is that classic Singleton introduces hidden global state and tight coupling, which is why the DI approach is preferred in production."</p>
+    </div>
+  </div>
+
+  <!-- ========== 14. Q&A ========== -->
+  <div class="section" id="qa">
+    <div class="section-header">
+      <div class="section-icon blue"><i class="fa-solid fa-comments"></i></div>
+      <div>
+        <div class="section-num">Section 14</div>
+        <h2 class="section-title">Interview Q&amp;As</h2>
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q1: What's the difference between a Singleton and a static class?</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body">
+        <div class="qa-content">
+          <div class="qa-think">
+            <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+            Consider interfaces, inheritance, DI, and lifecycle control.
+          </div>
+          <div class="body-text">
+            <p class="mb-sm"><strong>Static class</strong> limitations:</p>
+            <ul class="qa-list">
+              <li>Cannot implement interfaces</li>
+              <li>Cannot be inherited</li>
+              <li>Cannot be injected via DI</li>
+              <li>Eagerly loaded — no lazy initialization</li>
+            </ul>
+            <p class="mb-sm mt-md"><strong>Singleton</strong> advantages:</p>
+            <ul class="qa-list">
+              <li>Can implement interfaces and participate in DI</li>
+              <li>Supports lazy loading</li>
+              <li>Can be swapped with a test double</li>
+              <li>Controlled lifecycle — regular class semantics</li>
+            </ul>
+          </div>
+          <div class="qa-great">
+            <strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong>
+            "In modern .NET, I'd register the class as <code>AddSingleton&lt;IService, Service&gt;()</code> — the container handles the single-instance guarantee, and I can inject a mock in tests. Static classes can't do that."
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q2: How do you make a Singleton thread-safe in C#?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body">
+        <div class="qa-content">
+          <div class="qa-think">
+            <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+            Think about what happens if two threads call <code>Instance</code> at the exact same time when the instance doesn't exist yet.
+          </div>
+          <div class="body-text">
+            <p class="mb-sm">Three approaches to thread-safe Singleton:</p>
+            <ol class="qa-list">
+              <li><code>Lazy&lt;T&gt;</code> — thread-safe by default, simplest and recommended</li>
+              <li><strong>Double-checked locking</strong> with <code>volatile</code> — classic pattern but verbose and error-prone</li>
+              <li><strong>Static initializer</strong> — CLR guarantees thread safety for static constructors</li>
+            </ol>
+          </div>
+          <div class="qa-great">
+            <strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong>
+            "I prefer <code>Lazy&lt;T&gt;</code> because it's a single line, handles thread safety, and the intent is clear. Double-check locking is a red flag in code reviews — it's easy to get wrong and <code>Lazy&lt;T&gt;</code> exists for exactly this reason."
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q3: When would you NOT use the Singleton pattern?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body">
+        <div class="qa-content">
+          <div class="qa-think">
+            <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+            Consider testability, multi-tenancy, and hidden dependencies.
+          </div>
+          <div class="body-text">
+            <p class="mb-sm">Avoid Singleton when:</p>
+            <ol class="qa-list">
+              <li>The class has <strong>mutable state</strong> that varies per request or per user</li>
+              <li>You need <strong>multiple instances</strong> in the future (multi-tenant, multi-database)</li>
+              <li>It's used as a shortcut for <strong>global state</strong> instead of proper DI</li>
+              <li>It makes <strong>unit testing hard</strong> by introducing hidden dependencies</li>
+            </ol>
+          </div>
+          <div class="qa-great">
+            <strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong>
+            "The pattern itself isn't bad — the misuse is. If you find yourself accessing <code>Singleton.Instance</code> directly throughout the codebase instead of injecting it, you've created tight coupling that's hard to refactor. DI-managed singletons solve this entirely."
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 15. EXERCISES ========== -->
+  <div class="section" id="exercises">
+    <div class="section-header">
+      <div class="section-icon cyan"><i class="fa-solid fa-dumbbell"></i></div>
+      <div>
+        <div class="section-num">Section 15</div>
+        <h2 class="section-title">Practice Exercises</h2>
+      </div>
+    </div>
+
+    <div class="exercise-card">
+      <div class="exercise-card-title"><i class="fa-solid fa-code"></i> Exercise 1: Thread-Safe Singleton Without Lazy&lt;T&gt;</div>
+      <p class="exercise-card-desc">Implement a thread-safe Singleton for a <code>ConnectionPool</code> class without using <code>Lazy&lt;T&gt;</code>. Use double-checked locking. Ensure correctness with the <code>volatile</code> keyword.</p>
+
+      <div class="collapsible">
+        <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+          <span><i class="fa-solid fa-lightbulb text-yellow icon-gap"></i> Hints</span>
+          <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+        </div>
+        <div class="collapsible-content">
+          <div class="collapsible-body">
+            <ul class="styled">
+              <li>Use a <code>private static volatile</code> field for the instance</li>
+              <li>Create a <code>private static readonly object</code> for the lock</li>
+              <li>Check null before AND after acquiring the lock</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="collapsible">
+        <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+          <span><i class="fa-solid fa-check text-green icon-gap"></i> Solution</span>
+          <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+        </div>
+        <div class="collapsible-content">
+          <div class="collapsible-body">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">ConnectionPool.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public sealed class ConnectionPool
+{
+    private static volatile ConnectionPool? _instance;
+    private static readonly object _lock = new();
+
+    public static ConnectionPool Instance
+    {
+        get
+        {
+            if (_instance is null)
+            {
+                lock (_lock)
+                {
+                    _instance ??= new ConnectionPool();
+                }
+            }
+            return _instance;
+        }
+    }
+
+    private ConnectionPool() { /* init pool */ }
+}</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 16. CHEAT SHEET ========== -->
+  <div class="section" id="cheatsheet">
+    <div class="section-header">
+      <div class="section-icon green"><i class="fa-solid fa-table-cells"></i></div>
+      <div>
+        <div class="section-num">Section 16</div>
+        <h2 class="section-title">Cheat Sheet</h2>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="cheat-card">
+        <div class="cheat-card-title">Lazy&lt;T&gt; Singleton</div>
+        <div class="cheat-card-body"><pre>private static readonly
+  Lazy&lt;T&gt; _i = new(() =&gt; new T());
+public static T Instance
+  =&gt; _i.Value;</pre></div>
+      </div>
+      <div class="cheat-card">
+        <div class="cheat-card-title">DI Registration</div>
+        <div class="cheat-card-body"><pre>services.AddSingleton
+  &lt;IService, Service&gt;();
+
+// inject via constructor
+ctor(IService svc)</pre></div>
+      </div>
+      <div class="cheat-card">
+        <div class="cheat-card-title">Key Rules</div>
+        <div class="cheat-card-body"><pre>sealed class
+private ctor
+static Instance
+thread-safe init
+implement interface</pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 17. RELATED TOPICS ========== -->
+  <div class="section" id="related">
+    <div class="section-header">
+      <div class="section-icon blue"><i class="fa-solid fa-arrow-right"></i></div>
+      <div>
+        <div class="section-num">Section 17</div>
+        <h2 class="section-title">Related Topics / What to Study Next</h2>
+      </div>
+    </div>
+
+    <div class="related-grid">
+      <a href="#" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-industry"></i></div>
+        <div class="related-card-text">
+          <h4>Factory Method</h4>
+          <p>Creates objects without specifying exact class — complements Singleton</p>
+        </div>
+      </a>
+      <a href="#" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-syringe"></i></div>
+        <div class="related-card-text">
+          <h4>Dependency Injection Deep Dive</h4>
+          <p>How DI containers manage object lifetimes including Singleton</p>
+        </div>
+      </a>
+      <a href="#" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="related-card-text">
+          <h4>Thread Safety &amp; Concurrency</h4>
+          <p>Locks, volatile, concurrent collections — essential for Singleton</p>
+        </div>
+      </a>
+      <a href="#" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-cubes"></i></div>
+        <div class="related-card-text">
+          <h4>SOLID Principles</h4>
+          <p>Understand DIP violations that Singleton can cause</p>
+        </div>
+      </a>
+    </div>
+  </div>
+
+</main><!-- /wiki-container -->
+
+<!-- ========== POPUP OVERLAYS ========== -->
+<div class="popup-overlay" id="popup-thread">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Thread Safety</h3>
+    <p class="body-text">A senior wraps writes in a <code>lock</code> block to ensure only one thread writes at a time. Or better — uses a <code>ConcurrentQueue</code> with a background consumer thread for non-blocking logging.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+        <span class="macos-filename">ThreadSafeFix.cs</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-csharp">private readonly object _lock = new();
+
+public void Log(string message)
+{
+    lock (_lock)
+    {
+        _writer.WriteLine($"[{DateTime.UtcNow:O}] {message}");
+    }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popup-overlay" id="popup-test">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Testability</h3>
+    <p class="body-text">A senior defines an <code>ILogger</code> interface and implements it. Tests inject a <code>FakeLogger</code> that stores messages in a list — no file I/O, no side effects, fast assertions.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+        <span class="macos-filename">TestDouble.cs</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-csharp">public class FakeLogger : IAppLogger
+{
+    public List&lt;string&gt; Messages { get; } = new();
+    public void Log(LogLevel level, string msg)
+        =&gt; Messages.Add($"[{level}] {msg}");
+    public void LogInfo(string msg) =&gt; Log(LogLevel.Info, msg);
+    public void LogError(string msg, Exception? ex)
+        =&gt; Log(LogLevel.Error, msg);
+    public void Dispose() { }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popup-overlay" id="popup-leak">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Resource Management</h3>
+    <p class="body-text">A senior implements <code>IDisposable</code> and uses <code>AutoFlush = true</code> to prevent data loss. When registered with DI, the container calls <code>Dispose()</code> on app shutdown automatically.</p>
+  </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  <p>System Design Wiki — Prototype Preview</p>
+  <p class="mt-xs text-xs">All components rendered from shared/styles.css + shared/scripts.js</p>
+</footer>
+
+<button class="back-to-top" id="backToTop" aria-label="Back to top"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+<script src="shared/scripts.js"></script>
+</body>
+</html>
