@@ -1,8 +1,9 @@
 # Topic Page Specification — Build Guide
 
-> **Source of truth:** `lld/topics/design-patterns/singleton.html` (3977 lines, 24 sections)
+> **Source of truth:** `lld/topics/design-patterns/factory-method/csharp.html` (4837 lines, 24 sections, 51 tooltips)
+> **Previous reference:** `lld/topics/design-patterns/singleton/csharp.html` (4220+ lines, 24 sections, 52 tooltips)
 > **Original prototype:** `prototype.html` (1065 lines, 17 sections) from commit `d17f7f3`
-> Every future topic page MUST match these patterns exactly.
+> Every future topic page MUST match these patterns exactly. Target: **4500+ lines, 50+ tooltips** per page.
 
 ---
 
@@ -780,8 +781,15 @@ Each bug study uses a **two-tab container** — "Buggy Code" shows the full prob
 </div>
 ```
 
-**Note:** `qa-think` and `qa-great` are optional but should be present on most questions.
-**Note:** Some Hard questions may have code examples inside the answer using macos-window.
+**REQUIRED RULES for Q&A Items:**
+1. **`qa-think` is MANDATORY** on ALL questions (Easy, Medium, Hard). Never omit it.
+2. **`qa-great` is MANDATORY** on ALL questions. Every answer must end with a Great Answer Bonus.
+3. **`<div>` wrapper** around `qa-question` + `qa-meta` is REQUIRED (wraps them inside `qa-header` before the chevron).
+4. **Q numbering** is REQUIRED: `Q1:`, `Q2:`, ... `Q29:` — sequential across all difficulty groups.
+5. **Hard questions** should include code examples (macos-window) inside the answer body wherever a concept benefits from concrete code.
+6. **Answer depth:** Easy = 2-3 paragraphs, Medium = 3-4 paragraphs + lists, Hard = 4+ paragraphs + code + lists.
+7. **All 4 exercises** must have both Hint AND Solution collapsibles (Hard/Expert exercises may use tabbed solutions).
+8. **Never flatten** the `<div>` wrapper — the structure `<div><div class="qa-question">...</div><div class="qa-meta">...</div></div>` is essential for CSS layout.
 
 ### 5.18 Exercise Cards (with Hints + Solution collapsibles)
 
@@ -1283,6 +1291,8 @@ Used in: body text, SOLID table cells, anywhere technical jargon needs explanati
 
 ### 5.31 Evolution Timeline Cards
 
+Each era is a collapsible card with `fa-clock-rotate-left` icon. Colors rotate per era. Each card should have **code examples** (not just text) to show how the pattern was implemented in that .NET version.
+
 ```html
 <div class="card open">  <!-- first era open -->
   <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
@@ -1290,17 +1300,26 @@ Used in: body text, SOLID table cells, anywhere technical jargon needs explanati
     .NET 1.0–2.0 (2002–2005): {Era Name}
   </h3>
   <div class="card-body">
-    <p class="body-text">{context}</p>
-    <div class="macos-window mt-sm"><!-- code of that era --></div>
+    <p class="body-text">{context — include tooltips for era-specific terms}</p>
+    <div class="macos-window mt-sm"><!-- code showing how this pattern was used in that era --></div>
     <div class="callout callout-warning mt-sm">
       <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> Problems</div>
-      <p class="body-text">{what was wrong}</p>
+      <p class="body-text">{what was wrong with this approach}</p>
     </div>
   </div>
 </div>
 
 <!-- Subsequent eras: card (collapsed), different icon colors -->
 <!-- Colors rotate: text-yellow → text-blue → text-green → text-purple → text-cyan -->
+```
+
+**IMPORTANT — DO NOT use numbered icons (`fa-1`, `fa-2`, etc.) for Evolution cards.** Numbered icons are reserved for:
+- **Mini-Project** attempts (`fa-1 text-red`, `fa-2 text-yellow`, `fa-3 text-green`)
+- **Migration Guide** steps (`fa-1 text-blue`, `fa-2 text-blue`, etc.)
+
+Evolution cards always use `fa-clock-rotate-left` with rotating colors.
+
+**Every evolution card should contain code** — showing how the pattern was implemented in that era. Text-only evolution cards feel thin and don't teach effectively.
 ```
 
 ### 5.32 Deep Dive Section (topic-specific)
@@ -1372,17 +1391,37 @@ Dictionary&lt;string, List&lt;int&gt;&gt; // all brackets escaped</code></pre>
 
 ## 6. Footer + Back to Top
 
+**Updated premium footer** (replaces old minimal footer as of Feb 2025):
+
 ```html
 <footer class="footer">
-  <p>System Guide — by Rafikul Alam</p>
-  <p class="mt-xs text-xs">Built with vanilla HTML, CSS &amp; JS — no frameworks</p>
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../../index.html"><i class="fa-solid fa-cubes"></i>LLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2025 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
 </footer>
 
 <button class="back-to-top" id="backToTop" aria-label="Back to top">
   <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
 </button>
-<script src="../../../shared/scripts.js"></script>
+<script src="../../../../shared/scripts.js"></script>
 ```
+
+**Note:** Adjust `../../../../` relative paths based on page depth. Topic pages at `lld/topics/design-patterns/{pattern}/csharp.html` use `../../../../`.
 
 ---
 
@@ -1497,3 +1536,89 @@ Things that CHANGED from the prototype to the final singleton page:
 11. **body** got `data-accent="{color}"` attribute (not in prototype)
 12. **Favicon** changed from 📘 (generic) to unique per page
 13. **Back link** href changed from `index.html` to `../../index.html` (proper relative path for nested pages)
+
+---
+
+## 12. Quality Standards (MUST meet before shipping)
+
+Every topic page must meet these minimum thresholds:
+
+| Metric | Minimum | Reference (Factory Method) |
+|--------|---------|---------------------------|
+| Total lines | 4500+ | 4837 |
+| Tooltips | 50+ | 51 |
+| Code windows (macos-window) | 40+ | ~45 |
+| Bug studies with Buggy/Fix code tabs | 6 | 6 |
+| Q&As with think/answer/bonus | 29 | 29 |
+| Exercises with hints + full solutions | 4 | 4 |
+| Evolution cards with code | 5-6 (all with code) | 5 |
+| .NET Core examples with code | 5+ (all with code) | 7 |
+| Pitfalls with code examples | 8+ of 10 should have code | ~8 |
+
+### Section Depth Requirements
+
+**Every section must have substantial content, not just text.** Common thin-section mistakes:
+
+1. **Evolution cards without code** — WRONG. Every era must have a code example showing that era's idiom.
+2. **Pitfalls as text-only collapsibles** — Most (8+/10) should show bad code + explain the fix.
+3. **Exercise solutions missing** — ALL 4 exercises must have full working solution code in the Solution collapsible.
+4. **.NET Core cards without code** — Each card should have a code example showing DI registration + usage.
+5. **Bug studies with short code snippets** — Buggy tab should show the FULL problematic implementation (15-30 lines), not a 3-line snippet.
+
+### Structural Integrity Checklist
+
+Before shipping any page, verify:
+
+- [ ] All 24 sections present in correct order (Section 8 table)
+- [ ] Section icons match the icon/color table (Section 4)
+- [ ] Section 6 uses Jr/Sr tabs with problem cards + popup overlays (not collapsible cards)
+- [ ] Section 7 uses `fa-clock-rotate-left` icons (not numbered `fa-1` etc.)
+- [ ] Popup overlays placed after `</main>`, before `<footer>`
+- [ ] Premium footer with brand, links, tech stack, copyright
+- [ ] Hero meta counts match actual content (Q&As, bugs, pitfalls, testing strategies)
+- [ ] All code blocks use `macos-window` wrapper (never raw `<pre><code>`)
+- [ ] HTML entities escaped in all code blocks (`&lt;` `&gt;` `&amp;`)
+- [ ] Tooltips on first occurrence of technical terms throughout the page (50+ per page)
+- [ ] Q&A items ALL have: `<div>` wrapper, Q numbering, `qa-think`, `qa-great` (see §5.17 rules)
+- [ ] Section 9 when-items use `<span class="when-icon-yes"><i>` wrapper (not icon class directly on `<i>`)
+- [ ] Section 9 headers: "Use When" / "Don't Use When" (not "When To Use" / "When NOT To Use")
+- [ ] Section 15 has benchmark table + BenchmarkDotNet code example
+- [ ] Section 16 uses `callout-purple` (not `callout-blue`) with structured pitch format
+- [ ] Section 23 has 4-column table (# / Check / Why / Red Flag) + Roslyn callout
+- [ ] All exercises (1-4) have both Hint AND Solution collapsibles with full working code
+- [ ] Hard Q&As (Q13+) include code examples inside answers where concepts benefit from concrete code
+- [ ] Migration Guide steps all have code examples (not just text descriptions)
+- [ ] Comparison grids have tooltips on pattern names (Strategy, Builder, etc.)
+- [ ] SOLID section has tooltips on all 5 principle abbreviations
+
+### Common Build Mistakes (Do NOT Repeat)
+
+These mistakes were made during the Abstract Factory build and must be avoided on all future pages:
+
+1. **Q&A flat structure** — WRONG: `<div class="qa-question">` directly inside `qa-header` without a wrapping `<div>`. RIGHT: Always wrap `qa-question` + `qa-meta` in a `<div>` before the chevron `<i>`.
+2. **Missing qa-think/qa-great** — WRONG: Answer body with just `<p class="body-text">`. RIGHT: Every Q&A must have `qa-think` at the top and `qa-great` at the bottom.
+3. **Missing Q numbering** — WRONG: `What is the pattern?`. RIGHT: `Q1: What is the pattern?` — sequential across all difficulty groups.
+4. **Section 6 as collapsible cards** — WRONG: Using generic collapsible cards for Jr vs Sr. RIGHT: Use the exact Jr/Sr tab structure from §5.20 with problem cards + popup overlays.
+5. **Numbered icons on timeline** — WRONG: `fa-1`, `fa-2`, etc. on evolution cards. RIGHT: Use `fa-clock-rotate-left` with rotating colors. Numbered icons are ONLY for Mini-Project attempts and Migration Guide steps.
+6. **When-item icon structure** — WRONG: `<i class="fa-solid fa-check-circle when-icon-yes">`. RIGHT: `<span class="when-icon-yes"><i class="fa-solid fa-check-circle"></i></span>`.
+7. **Missing exercise solutions** — ALL 4 exercises must have complete, working solution code. Hard/Expert exercises should use tabbed solutions (Contracts/Implementation/Tests).
+8. **Text-only evolution eras** — WRONG: Era 3 with only text description. RIGHT: Every evolution era MUST have a code example showing that era's idiom.
+9. **Thin sections** — Target 4500+ lines. If a section is significantly shorter than Factory Method's equivalent, expand it.
+10. **Missing tooltips** — Target 50+ tooltips per page. Add tooltips to first occurrences of: SOLID principles, DI terms (scoped, transient, singleton), .NET types (DbContext, IServiceCollection), pattern names, and technical terms.
+11. **Cheat sheet without grid-3** — WRONG: Flat `cheat-card` with `<h3 class="sub">` headers and tables. RIGHT: `<div class="grid-3">` containing 3 cards with `cheat-card-title` + `cheat-card-body` + `<pre>` (see §5.19).
+12. **Exercise hints singular** — WRONG: `<i class="..."></i>Hint`. RIGHT: `<span><i class="..."></i> Hints</span>` — plural, wrapped in `<span>`, space after icon. Same `<span>` wrapper for Solution headers.
+13. **Generic section titles** — WRONG: "Pattern in .NET Core". RIGHT: "{Pattern Name} in .NET Core" — always include the specific pattern name in section titles.
+14. **Wrong pattern attribution in Section 8** — Every ".NET Core example" card MUST be a genuine instance of the page's pattern. Verify each example creates the right kind of abstraction: Abstract Factory = multiple product types in swappable families. Factory Method = single product. Builder = step-by-step construction. Strategy = swappable algorithms. Do NOT label Builder/Strategy/Factory Method examples as Abstract Factory (or vice versa).
+15. **Wrong .NET version in Evolution Timeline** — Double-check when each API was actually introduced. Common mistakes: `DbProviderFactory` = .NET 2.0 (NOT 1.0), `out`/`in` generic variance = .NET 4.0 (NOT 2.0), MEF = .NET 4.0 (NOT 3.5), keyed services = .NET 8 (NOT earlier). Always verify version attributions against official docs.
+16. **Stale cross-references after Section 8 changes** — When replacing Section 8 examples, also update: TL;DR "Modern .NET" line, Q3 answer ("Name a real .NET example"), Evolution Timeline era code samples, Interview Pitch (Section 16), and Cheat Sheet references. Search the ENTIRE file for the old API name before considering the fix complete.
+
+### Build Process: Per-Section Fact Check (MANDATORY)
+
+After generating EACH section (before moving to the next), run a fact-check + content review using parallel agents:
+
+1. **Agent 1 — Factual Accuracy**: Check all API names, .NET version attributions, code compilability, and pattern classifications are correct. No wrong facts.
+2. **Agent 2 — Content Quality**: Check the section is comprehensive, has appropriate depth for its topic, and has no thin areas. Each pattern page stands on its own — do NOT force-match other pages' style or depth.
+3. **Agent 3 — Cross-Reference Consistency**: Check that any APIs, examples, or terms introduced in this section are consistent with what's already written in earlier sections (no contradictions).
+4. **Agent 4 — Relevance Check**: Verify every example, analogy, comparison, and code snippet in the section is genuinely relevant to THIS specific pattern. Flag anything that's filler, tangential, or better suited to a different pattern's page.
+
+Run all 3 agents in parallel after each section. Fix any issues found BEFORE moving to the next section. This prevents error accumulation that requires expensive full-page reviews later.

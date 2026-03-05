@@ -8,14 +8,14 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 106 topics across 4 page types (Design Patterns, SOLID, Case Studies, Advanced). Currently 2 complete pages (Singleton, Factory Method), 33+ coming soon.
+**Scope:** 106 topics across 4 page types (Design Patterns, SOLID, Case Studies, Advanced). Currently 3 complete pages (Singleton, Factory Method, Abstract Factory), 32+ coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
 **Key Files:**
 - Master Plan: `C:\Users\Rafikul\.claude\plans\dynamic-tumbling-ritchie.md`
 - Session State: `c:/Users/Rafikul/Desktop/Learn/System Design/.claude/SESSION.md`
-- Build Spec: `page-spec.md` (root of project — 1490+ lines, 33 component patterns)
+- Build Spec: `page-spec.md` (root of project — 1600+ lines, 33 component patterns + build rules)
 
 ---
 
@@ -53,8 +53,11 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │       └── design-patterns/
 │           ├── singleton/
 │           │   └── csharp.html             — COMPLETE (4220+ lines, 24 sections, favicon: 1️⃣)
-│           └── factory-method/
-│               ├── csharp.html             — COMPLETE (4837 lines, 24 sections, favicon: 🏭)
+│           ├── factory-method/
+│           │   ├── csharp.html             — COMPLETE (4837 lines, 24 sections, favicon: 🏭)
+│           │   └── java.html               — COMING SOON placeholder
+│           └── abstract-factory/
+│               ├── csharp.html             — COMPLETE (4478 lines, 24 sections, favicon: 🏗️)
 │               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
@@ -82,7 +85,7 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 |---------|--------|--------|
 | Singleton | **Ready** | cyan/blue |
 | Factory Method | **Ready** | purple |
-| Abstract Factory | Coming Soon | — |
+| Abstract Factory | **Ready** | green |
 | Builder | Coming Soon | — |
 | Prototype | Coming Soon | — |
 
@@ -530,7 +533,60 @@ Each bug uses a tab-container with Buggy Code and Fix tabs:
 
 ---
 
-## 15. KEY TECHNICAL DECISIONS & AUDIT HISTORY
+## 15. ABSTRACT FACTORY PAGE — COMPLETED CONTENT
+
+**File:** `lld/topics/design-patterns/abstract-factory/csharp.html` (4478 lines)
+**Accent:** green (`data-accent="green"`) | **Favicon:** 🏗️
+
+| # | Section | Key Content |
+|---|---------|------------|
+| 1 | TL;DR | Warning callout: "Don't reach for AF when Factory Method suffices" + quick IUIFactory code |
+| 2 | Prerequisites | Factory Method, Interfaces, DI, Generics |
+| 3 | Analogies | Furniture Store (IKEA), Car Manufacturer (BMW), Phone Ecosystem (Apple/Android), Restaurant Kitchen |
+| 4 | UML | SVG: 8 GoF participants (AbstractFactory, ConcreteFactory1/2, AbstractProductA/B, ProductA1/A2/B1/B2, Client) |
+| 5 | Code | 3 tabs: Classic GoF, Modern DI, Keyed Services (.NET 8+) |
+| 6 | Jr vs Sr | Giant switch God Factory, 3 popup solutions (proper hierarchy, DI keyed, convention-based) |
+| 7 | Evolution | 6 eras: .NET 1.0 provider-specific → .NET 2.0 DbProviderFactory+generics → .NET 3.5-4.0 IoC → .NET Core DI → .NET 6 minimal APIs → .NET 8+ keyed services |
+| 8 | .NET Core | 7 GENUINE AF examples: DbProviderFactory, CultureInfo, IHttpClientFactory (named clients), EF Core providers, IFileProvider, IServiceProviderFactory, Encoding |
+| 9 | When To Use | 5+5 items + Q1-Q5 decision tree flowchart |
+| 10 | Comparisons | 4 grids: vs Factory Method, vs Builder, vs Strategy, vs Service Locator |
+| 11 | SOLID | SRP=Green, OCP=Green, LSP=Green, ISP=Yellow (fat interfaces), DIP=Green |
+| 12 | Bug Studies | 6 bugs: mixed families, captive dependency, missing family member, keyed service typo, circular dependency, thread-unsafe cache |
+| 13 | Pitfalls | 10 (God Factory, family explosion, leaking concrete, ignoring DI, AF for single product, string keys, unsealed factories, mixing at boundary, fat interface, partial registration) |
+| 14 | Testing | 4 strategies: test double factory, family consistency, DI container tests, WebApplicationFactory override |
+| 15 | Performance | Benchmark table (direct new → Factory Method → AF → DI → reflection), FrozenDictionary, BenchmarkDotNet code |
+| 16 | Pitch | 90-second interview script (IKEA analogy → DbProviderFactory → modern DI) |
+| 17 | Q&As | 29 (5 Easy, 7 Medium, 17 Hard — keyed services, AOT, covariant returns, plugin arch, parallel creation, ValueTask) |
+| 18 | Exercises | 4: Easy notification, Medium cross-database, Hard theme system, Expert cloud provider |
+| 19 | Cheat Sheet | 3 cards: Classic AF, DI + Keyed Services, Decision Rules |
+| 20 | Deep Dive | Plugin architecture with AssemblyLoadContext, hot-reload factories |
+| 21 | Mini-Project | Multi-Database Report Generator, 3 attempts (junior switch → mid interfaces → senior DI+tests) |
+| 22 | Migration | 4 steps: identify families → extract interfaces → concrete factories → DI registration |
+| 23 | Checklist | 12 items + 4th "Red Flag" column + Roslyn callout |
+| 24 | Related | Factory Method, Builder, Prototype, Bridge, DI/IoC |
+
+### Abstract Factory Content Accuracy Fixes Applied
+These were caught during multi-round content reviews:
+
+**Section 7 (Evolution Timeline):**
+- DbProviderFactory moved from Era 1 (.NET 1.0) to Era 2 (.NET 2.0) — it didn't exist in .NET 1.0
+- Era 1 now shows pre-factory provider-specific code (SqlConnection, OleDbConnection)
+- Removed `out` variance from Era 2 generics — covariance was .NET 4.0, not 2.0
+- Clarified MEF shipped with .NET 4.0 (third-party IoC containers were .NET 3.5)
+
+**Section 8 (.NET Core Examples) — 6 of 7 original cards were wrong or questionable:**
+- Card 2: ILoggerFactory → **CultureInfo** (ILoggerFactory is Factory Method — single product type)
+- Card 3: AuthenticationBuilder → **IHttpClientFactory** (AuthenticationBuilder is Builder pattern)
+- Card 4: IOptionsFactory → **EF Core Database Providers** (IOptionsFactory is Factory Method)
+- Card 5: WebApplicationFactory → **IFileProvider** (WebApplicationFactory is a test fixture/builder)
+- Card 6: IDistributedCache → **IServiceProviderFactory** (IDistributedCache is Strategy pattern)
+- Card 7: IHostBuilder → **Encoding** (IHostBuilder is Builder pattern)
+
+**Key lesson:** Most .NET APIs that "feel like" Abstract Factory are actually Factory Method (single product), Builder (step-by-step), or Strategy (swappable algorithms). True AF requires: (1) multiple distinct product types, (2) swappable families, (3) products within a family guaranteed compatible.
+
+---
+
+## 16. KEY TECHNICAL DECISIONS & AUDIT HISTORY
 
 ### Architecture Decisions
 - Replaced all Mermaid diagrams with custom SVGs (CSS variables for theme support)
@@ -748,22 +804,66 @@ Each bug uses a tab-container with Buggy Code and Fix tabs:
 
 ## 24. PATTERNS TO FOLLOW FOR NEXT PAGES
 
-When building the next topic page (Abstract Factory, Builder, etc.):
+When building the next topic page (Builder, Prototype, etc.):
 
-1. **Read `page-spec.md` first** — it's the definitive build guide
-2. **Copy factory-method.html as template** — it has the most polished structure
-3. **Follow the 24-section order exactly** — same IDs, same comment separators
-4. **Match quality bars:**
+1. **Read `page-spec.md` first** — it's the definitive build guide (especially "Common Build Mistakes" and "Build Process" sections)
+2. **Follow the 24-section order exactly** — same IDs, same comment separators
+3. **Quality bars (minimum):**
    - 6+ bug studies (two-tab format)
    - 10+ pitfalls
-   - 29+ Q&As (5 Easy, 7 Medium, 17+ Hard)
-   - 4+ exercises with hints + solutions
-   - 3-attempt mini-project with production concerns (health checks, metrics, disposal)
+   - 29+ Q&As (5 Easy, 7 Medium, 17+ Hard) — ALL with div wrapper, Q numbering, qa-think, qa-great
+   - 4+ exercises with complete solutions (Hard/Expert use tabbed solutions)
+   - 3-attempt mini-project with production concerns
    - Honest SOLID mapping (not all green)
    - Decision flowchart in When To Use
    - Performance benchmarks with numbers
-5. **SVG diagrams** — custom, using CSS variables, generic GoF naming
-6. **Pick unique accent color** per page
-7. **Pick unique emoji favicon** per page
-8. **Update `lld/index.html`** — change card from "Coming Soon" to "Ready" with link
-9. **Update hero meta badges** to match actual counts after all additions
+   - 50+ tooltips on first occurrences
+4. **SVG diagrams** — custom, using CSS variables, generic GoF naming
+5. **Pick unique accent color** per page
+6. **Pick unique emoji favicon** per page
+7. **Update `lld/index.html`** — change card from "Coming Soon" to "Ready" with link
+8. **Update hero meta badges** to match actual counts after all additions
+
+### Per-Section Build Process (MANDATORY)
+
+After writing EACH section, run 4 parallel review agents BEFORE moving to the next:
+
+1. **Agent 1 — Factual Accuracy**: API names, .NET version attributions, code compilability, pattern classifications
+2. **Agent 2 — Content Quality**: Comprehensive depth appropriate for the topic, no thin areas (each page stands on its own)
+3. **Agent 3 — Cross-Reference Consistency**: No contradictions with earlier sections on the same page
+4. **Agent 4 — Relevance Check**: Every example, analogy, and code snippet genuinely belongs to THIS pattern (not filler or misattributed)
+
+Fix all issues BEFORE moving to the next section. This prevents expensive full-page reviews later.
+
+### Pattern Attribution Rules (Critical — learned from Abstract Factory mistakes)
+
+When listing ".NET Core examples" (Section 8), verify EACH example is genuinely the page's pattern:
+
+| Pattern | Signature | NOT this pattern |
+|---------|-----------|-----------------|
+| **Abstract Factory** | Multiple distinct product types, swappable families, products compatible within family | Single product = Factory Method, step-by-step = Builder, swappable algo = Strategy |
+| **Factory Method** | Single product type, subclasses decide which concrete to create | Multiple products = Abstract Factory |
+| **Builder** | Step-by-step construction, fluent API, final Build() call | Creates ready objects = Factory |
+| **Strategy** | Swappable algorithms, same interface, different behavior | Creates objects = Factory |
+
+Common .NET misattributions to avoid:
+- `ILoggerFactory` = Factory Method (single product: ILogger), NOT Abstract Factory
+- `AuthenticationBuilder` = Builder, NOT Abstract Factory
+- `IOptionsFactory<T>` = Factory Method, NOT Abstract Factory
+- `IHostBuilder` = Builder, NOT Abstract Factory
+- `IDistributedCache` providers = Strategy, NOT Abstract Factory
+- `WebApplicationFactory<T>` = Test fixture, NOT Abstract Factory
+
+### .NET Version Attribution Cheat Sheet
+
+| Feature | Correct Version | Common Mistake |
+|---------|----------------|----------------|
+| DbProviderFactory | .NET 2.0 (2005) | NOT .NET 1.0 |
+| Generics | .NET 2.0 (2005) | — |
+| `out`/`in` variance | .NET 4.0 / C# 4.0 (2010) | NOT .NET 2.0 |
+| MEF | .NET 4.0 (2010) | NOT .NET 3.5 |
+| Built-in DI | .NET Core 1.0 (2016) | — |
+| Keyed services | .NET 8 (2023) | NOT earlier |
+| FrozenDictionary | .NET 8 (2023) | — |
+| Primary constructors | C# 12 / .NET 8 (2023) | — |
+| Covariant returns | C# 9 / .NET 5 (2020) | Classes only, NOT interfaces |
