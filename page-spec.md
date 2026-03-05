@@ -1621,4 +1621,61 @@ After generating EACH section (before moving to the next), run a fact-check + co
 3. **Agent 3 — Cross-Reference Consistency**: Check that any APIs, examples, or terms introduced in this section are consistent with what's already written in earlier sections (no contradictions).
 4. **Agent 4 — Relevance Check**: Verify every example, analogy, comparison, and code snippet in the section is genuinely relevant to THIS specific pattern. Flag anything that's filler, tangential, or better suited to a different pattern's page.
 
-Run all 3 agents in parallel after each section. Fix any issues found BEFORE moving to the next section. This prevents error accumulation that requires expensive full-page reviews later.
+Run all 4 agents in parallel after each section. Fix any issues found BEFORE moving to the next section. This prevents error accumulation that requires expensive full-page reviews later.
+
+---
+
+## LEARNING PATH ORDER
+
+Topics should be built and studied in this order (by learning dependency, NOT GoF category):
+
+### Phase 1: SOLID Principles (5)
+SRP → OCP → LSP → ISP → DIP
+
+### Phase 2: Tier 1 Gateway Patterns (5)
+Strategy → Singleton → Factory Method → Observer → Template Method
+
+### Phase 3: Tier 2 Structural (5)
+Decorator → Adapter → Facade → Proxy → Composite
+
+### Phase 4: Tier 3 Core (5)
+State → Command → Abstract Factory → Builder → Prototype
+→ STARTER CASE STUDIES (9) after this phase
+
+### Phase 5: Tier 4 Behavioral (4)
+Chain of Responsibility → Mediator → Iterator → Memento
+→ INTERMEDIATE CASE STUDIES (22) after this phase
+
+### Phase 6: Tier 5 Specialized (4)
+Bridge → Flyweight → Visitor → Interpreter
+→ ADVANCED + SPECIALIZED CASE STUDIES (42) after this phase
+
+### Phase 7: Advanced Topics (10)
+Concurrency → Testing → DI Deep Dive → Repository/UoW → Refactoring → Reflection → DDD → CQRS → Clean Architecture → Event-Driven
+
+---
+
+## CASE STUDY PAGE TEMPLATE
+
+Case study pages have a DIFFERENT structure from pattern pages. They focus on system design rather than pattern theory.
+
+### Case Study Page Sections (12 sections)
+| # | Section | HTML id | Description |
+|---|---------|---------|-------------|
+| 1 | TL;DR | `tldr` | Problem summary + key patterns used + difficulty level |
+| 2 | Requirements | `requirements` | Functional + non-functional requirements |
+| 3 | Core Classes & UML | `uml` | Class diagram showing all entities and relationships |
+| 4 | Design Decisions | `decisions` | Which patterns and why — with alternatives considered |
+| 5 | Code Implementation | `code` | Tabbed: Models → Services → Patterns → Usage |
+| 6 | Pattern Spotting | `patterns` | Cards showing where each pattern appears in the code |
+| 7 | Edge Cases & Concurrency | `edge-cases` | Thread safety, race conditions, boundary scenarios |
+| 8 | Testing Strategy | `testing` | Unit + integration tests for key behaviors |
+| 9 | Interview Q&As | `qa` | 5-8 questions specific to this case study |
+| 10 | Scaling Considerations | `scaling` | What changes when load increases (bridge to HLD) |
+| 11 | Practice Exercises | `exercises` | 2-3 extension challenges |
+| 12 | Related Topics | `related` | Links to pattern pages + other case studies |
+
+### Case Study Card Structure (on LLD hub)
+Each card shows: icon + name + difficulty badge (Easy/Medium/Hard) + pattern tags + Coming Soon status.
+Difficulty colors: Easy=green, Medium=yellow, Hard=red.
+Pattern tags: small pills showing 2-4 key patterns used.

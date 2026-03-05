@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 106 topics across 4 page types (Design Patterns, SOLID, Case Studies, Advanced). Currently 3 complete pages (Singleton, Factory Method, Abstract Factory), 32+ coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 4 complete pages (Singleton, Factory Method, Abstract Factory, Builder), 106 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -48,7 +48,7 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │   ├── styles.css                          — Master stylesheet (~25K tokens, theme system, all components)
 │   └── scripts.js                          — Shared JS (theme, tabs, cards, search, tooltips, copy, etc.)
 ├── lld/
-│   ├── index.html                          — LLD hub (23 patterns + 5 SOLID + 3 case studies + 3 advanced)
+│   ├── index.html                          — LLD hub (23 patterns + 5 SOLID + 72 case studies + 10 advanced)
 │   └── topics/
 │       └── design-patterns/
 │           ├── singleton/
@@ -86,7 +86,7 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 | Singleton | **Ready** | cyan/blue |
 | Factory Method | **Ready** | purple |
 | Abstract Factory | **Ready** | green |
-| Builder | Coming Soon | — |
+| Builder | **Ready** | cyan |
 | Prototype | Coming Soon | — |
 
 ### Structural Patterns (7)
@@ -98,11 +98,117 @@ Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Obse
 ### SOLID Principles (5)
 Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion — ALL Coming Soon
 
-### Case Studies (3)
-Parking Lot System, Elevator System, Tic-Tac-Toe — ALL Coming Soon
+### Case Studies (72) — ALL Coming Soon
 
-### Advanced Topics (3)
-Dependency Injection Deep Dive, Reflection & Metaprogramming, Unit Testing Patterns — ALL Coming Soon
+**Starter (9)** — after Phase 4 (15 patterns):
+1. Parking Lot System (Easy) — Factory, State, Singleton
+2. Tic-Tac-Toe (Easy) — Strategy, State, Observer
+3. Vending Machine (Easy) — State, Strategy
+4. LRU Cache (Medium) — Proxy, Strategy, Singleton
+5. Logging Framework (Medium) — Decorator, Singleton, Strategy
+6. Snake & Ladder (Medium) — Strategy, State, Factory
+7. Shopping Cart System (Easy) — Strategy, Observer, Composite
+8. Review & Rating System (Easy) — Strategy, Observer
+9. Plugin System (Medium) — Strategy, Factory, Composite
+
+**Intermediate (22)** — after Phase 5 (19 patterns):
+10. Library Management (Medium) — Factory, Strategy, Observer
+11. Hotel Booking (Medium) — Builder, Strategy, Observer
+12. Movie Ticket Booking (Medium) — Builder, Strategy, State
+13. Elevator System (Medium) — Strategy, State, Command
+14. Car Rental System (Medium) — Factory, State, Strategy
+15. Restaurant Management (Medium) — Command, Observer, Strategy
+16. Task Management (Medium) — Command, Observer, State
+17. Digital Wallet Service (Medium) — Command, Observer, State
+18. Notification System (Medium) — Observer, Strategy, Chain of Resp
+19. Calendar App (Medium) — Observer, Composite, Builder
+20. Inventory Management (Medium) — Observer, Strategy, Singleton
+21. In-Memory File System (Medium) — Composite, Iterator, Strategy
+22. Rate Limiter (Medium) — Strategy, Singleton, Proxy
+23. Stack Overflow / Q&A (Medium) — Observer, Strategy, State
+24. Pub-Sub Messaging (Medium) — Observer, Mediator
+25. Course Registration (Medium) — Observer, State, Strategy
+26. Minesweeper (Medium) — State, Observer, Strategy
+27. ATM System (Medium) — State, Chain of Resp
+28. Deck of Cards (Easy) — Factory, Iterator
+29. Traffic Signal Control (Easy) — State, Observer, Mediator
+30. Customer Support Ticketing (Medium) — State, Chain of Resp, Observer
+31. Online Examination System (Medium) — Strategy, State, Factory
+
+**Advanced (20)** — after learning all 23 patterns:
+32. Chess Game (Hard) — Strategy, State, Command, Memento
+33. Splitwise / Expense Sharing (Hard) — Strategy, Observer, Mediator
+34. Online Shopping / Amazon (Hard) — Abstract Factory, Strategy, State
+35. Ride-Sharing / Uber (Hard) — Strategy, Observer, State, Mediator
+36. Music Streaming / Spotify (Hard) — Iterator, Strategy, Observer
+37. Stock Brokerage (Hard) — Observer, Strategy, Command
+38. Food Delivery / Swiggy (Hard) — Strategy, Observer, State, Chain of Resp
+39. Airline Management (Hard) — Strategy, State, Builder
+40. Social Network / LinkedIn (Hard) — Observer, Mediator, Composite
+41. CricInfo / Sports Scoring (Hard) — Observer, State, Strategy
+42. Online Auction System (Hard) — Observer, State, Strategy
+43. Payment Gateway / Stripe (Hard) — Strategy, State, Observer
+44. Chat Application / WhatsApp (Hard) — Mediator, Observer, State
+45. Collaborative Text Editor (Hard) — Command, Observer, Memento
+46. Task / Job Scheduler (Hard) — Strategy, Command, State
+47. Social Media Feed (Hard) — Observer, Strategy, Iterator
+48. Circuit Breaker (Hard) — State, Proxy, Observer
+49. Workflow Engine (Hard) — State, Command, Template Method
+50. Rules Engine (Hard) — Strategy, Interpreter, Chain of Resp
+51. Event Sourcing System (Hard) — Command, Memento, Observer
+
+**Specialized — Healthcare & HR (4):**
+52. Appointment Booking (Medium) — State, Observer, Factory
+53. Employee Management (Medium) — Composite, Observer, State
+54. Payroll System (Hard) — Strategy, Command, Template Method
+55. Permission / RBAC (Medium) — Composite, Strategy, Chain of Resp
+
+**Specialized — Logistics & Reservations (3):**
+56. Order & Delivery System (Medium) — State, Strategy, Observer
+57. Train / Bus Ticket Booking (Medium) — State, Observer, Strategy
+58. Flight Booking System (Hard) — State, Strategy, Builder
+
+**Specialized — Media & Content (3):**
+59. Video Platform / YouTube (Hard) — Observer, Strategy, Decorator
+60. Streaming Service / Netflix (Hard) — State, Strategy, Decorator
+61. Blog / CMS Platform (Medium) — Template Method, Observer, Strategy
+
+**Specialized — Smart / IoT (2):**
+62. Smart Home System (Hard) — Observer, Command, Facade
+63. Thermostat Control (Medium) — State, Mediator, Observer
+
+**Specialized — Design Tools (2):**
+64. Whiteboard / Drawing App (Hard) — Command, Memento, Composite
+65. Spreadsheet / Excel-like (Hard) — Observer, Composite, Command
+
+**Specialized — Classic Data Structures (3):**
+66. HashMap Implementation (Medium) — Iterator, Strategy
+67. Thread Pool (Hard) — Command, State, Template Method
+68. Connection Pool (Medium) — Factory, Singleton
+
+**Specialized — Auth & Infrastructure (4):**
+69. Authentication System (Hard) — Chain of Resp, Strategy, Observer
+70. URL Shortener (Medium) — Factory, Strategy, Singleton
+71. In-Memory Key-Value Store (Hard) — Strategy, Observer, Factory
+72. Autocomplete / Typeahead (Medium) — Strategy, Observer
+
+**Specialized — Enterprise (1):**
+73. Multi-Tenant SaaS App (Hard) — Abstract Factory, Strategy, Proxy
+
+### Advanced Topics (10) — ALL Coming Soon
+1. Concurrency Patterns — async/await, Task, Channel<T>, SemaphoreSlim
+2. Unit Testing Patterns — Test doubles, AAA, mocking
+3. DI Deep Dive — Lifetimes, scopes, keyed services
+4. Repository & Unit of Work — EF Core abstraction debate
+5. Refactoring Patterns — Extract Method, Replace Conditional with Polymorphism
+6. Reflection & Metaprogramming — Source generators, expression trees
+7. DDD Tactical Patterns — Entities, Value Objects, Aggregates, Domain Events
+8. CQRS — Command/Query separation, MediatR
+9. Clean Architecture — Dependency rule, layers, ports & adapters
+10. Event-Driven Architecture — Domain events, integration events
+
+### Learning Path Order (7 Phases)
+Phase 1: SOLID Principles (5) → Phase 2: Tier 1 Gateway (Strategy, Singleton, Factory Method, Observer, Template Method) → Phase 3: Tier 2 Structural (Decorator, Adapter, Facade, Proxy, Composite) → Phase 4: Tier 3 Core (State, Command, Abstract Factory, Builder, Prototype) → STARTER CASE STUDIES (9) → Phase 5: Tier 4 Behavioral (Chain of Resp, Mediator, Iterator, Memento) → INTERMEDIATE CASE STUDIES (21) → Phase 6: Tier 5 Specialized (Bridge, Flyweight, Visitor, Interpreter) → ADVANCED + SPECIALIZED CASE STUDIES (42) → Phase 7: Advanced Topics (10)
 
 ---
 
