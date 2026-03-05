@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 4 complete pages (Singleton, Factory Method, Abstract Factory, Builder), 106 coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 6 complete pages (Singleton, Factory Method, Abstract Factory, Builder, SRP, OCP), 104 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -59,6 +59,13 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │           └── abstract-factory/
 │               ├── csharp.html             — COMPLETE (4478 lines, 24 sections, favicon: 🏗️)
 │               └── java.html               — COMING SOON placeholder
+│       └── principles/
+│           ├── srp/
+│           │   ├── csharp.html             — COMPLETE (4515 lines, 24 sections, favicon: 🎯)
+│           │   └── java.html               — COMING SOON placeholder
+│           └── ocp/
+│               ├── csharp.html             — COMPLETE (3944 lines, 24 sections, favicon: 🚪)
+│               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
 
@@ -96,7 +103,13 @@ Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy — ALL Coming S
 Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor — ALL Coming Soon
 
 ### SOLID Principles (5)
-Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion — ALL Coming Soon
+| Principle | Status | Accent |
+|-----------|--------|--------|
+| Single Responsibility (SRP) | **Ready** | green |
+| Open/Closed (OCP) | **Ready** | purple |
+| Liskov Substitution | Coming Soon | — |
+| Interface Segregation | Coming Soon | — |
+| Dependency Inversion | Coming Soon | — |
 
 ### Case Studies (72) — ALL Coming Soon
 
@@ -304,6 +317,10 @@ Phase 1: SOLID Principles (5) → Phase 2: Tier 1 Gateway (Strategy, Singleton, 
 .macos-body .hljs::-webkit-scrollbar { display: none; }
 ```
 Scrollbar hidden visually but content is still horizontally scrollable.
+
+### Mobile Fixes Applied
+- **Prereq items**: Changed from `display: flex` pill layout to `display: block` with absolute-positioned icon. Text flows naturally on all screens. No more word-grid chaos with inline `<code>` and tooltip spans.
+- **Callout variants**: Added `callout-red` and `callout-blue` CSS classes (were missing, only `callout-danger` and `callout-info` existed).
 
 ### Anti-Flash Script (inline in `<head>`)
 ```html
