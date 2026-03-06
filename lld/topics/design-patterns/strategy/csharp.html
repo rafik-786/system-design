@@ -436,7 +436,7 @@ public sealed class BubbleSortStrategy&lt;T&gt; : ISortStrategy&lt;T&gt; where T
 
     public void Sort(Span&lt;T&gt; data)
     {
-        // O(n^2) — only suitable for small datasets (&lt; 50 elements)
+        // O(n²) comparison-based sort — simple but slow for large datasets
         for (int i = 0; i &lt; data.Length - 1; i++)
             for (int j = 0; j &lt; data.Length - i - 1; j++)
                 if (data[j].CompareTo(data[j + 1]) &gt; 0)
@@ -449,30 +449,14 @@ public sealed class QuickSortStrategy&lt;T&gt; : ISortStrategy&lt;T&gt; where T 
 {
     public string Name =&gt; "QuickSort";
 
-    public void Sort(Span&lt;T&gt; data) =&gt; QuickSort(data, 0, data.Length - 1);
-
-    private static void QuickSort(Span&lt;T&gt; data, int low, int high)
+    public void Sort(Span&lt;T&gt; data)
     {
-        if (low &gt;= high) return;
-        int pivot = Partition(data, low, high);
-        QuickSort(data, low, pivot - 1);
-        QuickSort(data, pivot + 1, high);
-    }
-
-    private static int Partition(Span&lt;T&gt; data, int low, int high)
-    {
-        T pivot = data[high];
-        int i = low - 1;
-        for (int j = low; j &lt; high; j++)
-        {
-            if (data[j].CompareTo(pivot) &lt;= 0)
-            {
-                i++;
-                (data[i], data[j]) = (data[j], data[i]);
-            }
-        }
-        (data[i + 1], data[high]) = (data[high], data[i + 1]);
-        return i + 1;
+        // O(n log n) average — divide-and-conquer with in-place partitioning
+        // Full implementation omitted: the pattern point is that
+        // SortingEngine doesn't care which algorithm runs here
+        var temp = data.ToArray();
+        Array.Sort(temp);            // stand-in for real quicksort
+        temp.CopyTo(data);
     }
 }
 
@@ -483,22 +467,11 @@ public sealed class MergeSortStrategy&lt;T&gt; : ISortStrategy&lt;T&gt; where T 
 
     public void Sort(Span&lt;T&gt; data)
     {
-        if (data.Length &lt;= 1) return;
-        int mid = data.Length / 2;
-        T[] left = data[..mid].ToArray();
-        T[] right = data[mid..].ToArray();
-        Sort(left);
-        Sort(right);
-        Merge(data, left, right);
-    }
-
-    private static void Merge(Span&lt;T&gt; data, T[] left, T[] right)
-    {
-        int i = 0, j = 0, k = 0;
-        while (i &lt; left.Length &amp;&amp; j &lt; right.Length)
-            data[k++] = left[i].CompareTo(right[j]) &lt;= 0 ? left[i++] : right[j++];
-        while (i &lt; left.Length) data[k++] = left[i++];
-        while (j &lt; right.Length) data[k++] = right[j++];
+        // O(n log n) stable — splits, sorts halves, merges back
+        // Full implementation omitted: focus is on interchangeable strategies
+        T[] temp = data.ToArray();
+        Array.Sort(temp);
+        temp.CopyTo(data);
     }
 }
 
@@ -1170,7 +1143,7 @@ public class NotificationService(IServiceProvider sp)
         <div class="pad-card">
           <ul class="styled">
             <li>Client <strong>chooses</strong> which algorithm to use</li>
-            <li>Strategy is set once (at construction/injection time)</li>
+            <li>Strategy is chosen by the <strong>client</strong> (typically at injection time, but can be swapped explicitly)</li>
             <li>Strategies are <strong>independent</strong> — no transitions between them</li>
             <li>Context doesn't know which strategy it holds</li>
             <li>Example: payment method selection at checkout</li>
@@ -2289,7 +2262,7 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
           <p>Strategy eliminates growing conditional logic (if/else chains, switch statements) by extracting each branch into its own class. Instead of one method doing 10 things based on a type flag, you have 10 focused classes each doing one thing. The client code delegates to whichever class is injected.</p>
           <p>This solves three problems simultaneously: <strong>(1)</strong> the monolithic method that grows with every new variant (OCP violation), <strong>(2)</strong> the inability to test one variant without setting up the others, and <strong>(3)</strong> the tight coupling between the client and every concrete algorithm.</p>
         </div>
-        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "It turns runtime branching into compile-time polymorphism. The switch statement disappears — replaced by DI resolving the right implementation. The Context class goes from 500 lines to 20."</div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "It turns runtime branching into clean runtime polymorphism. The switch statement disappears — replaced by DI resolving the right implementation. The Context class goes from 500 lines to 20."</div>
       </div></div>
     </div>
 
@@ -2853,14 +2826,33 @@ public sealed class PayPalStrategy(
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when Strategy v1 and v2 need to coexist during a rolling deployment?</div>
         <div class="body-text">
-          <p>In microservices, different service instances may run different versions simultaneously. Strategy versioning approaches:</p>
+          <p>Use <strong>versioned Keyed Services</strong> so multiple strategy implementations coexist in the same DI container. Share the strategy contract via a NuGet package so all services reference the same interface:</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">VersionedStrategies.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Shared contract (distributed via NuGet package)
+public interface IPaymentStrategy { Task&lt;PaymentResult&gt; ChargeAsync(Order order); }
+
+// Register both versions side-by-side
+services.AddKeyedScoped&lt;IPaymentStrategy, PaymentV1&gt;("payment-v1");
+services.AddKeyedScoped&lt;IPaymentStrategy, PaymentV2&gt;("payment-v2");
+
+// Resolve based on API version header or feature flag
+public class PaymentStrategyResolver(IServiceProvider sp)
+{
+    public IPaymentStrategy Resolve(string apiVersion) =&gt;
+        sp.GetRequiredKeyedService&lt;IPaymentStrategy&gt;(
+            apiVersion == "2" ? "payment-v2" : "payment-v1");
+}</code></pre>
+            </div>
+          </div>
           <ul class="qa-list">
-            <li><strong>Key versioning:</strong> Use keys like <code>"pricing-v1"</code>, <code>"pricing-v2"</code>. A resolver picks the version based on feature flags or API version headers.</li>
-            <li><strong>Backward compatibility:</strong> New strategy versions must handle inputs from older clients. Use the Adapter pattern to wrap v1 input into v2 format.</li>
-            <li><strong>Canary deployment:</strong> Route 5% of traffic to the service instance with the new strategy. Monitor error rates before full rollout.</li>
+            <li><strong>Contract sharing:</strong> Publish <code>IPaymentStrategy</code> in a shared NuGet package. Both v1 and v2 implement the same interface, so the context doesn't change.</li>
+            <li><strong>Version resolution:</strong> A resolver reads the API version header (or feature flag) and picks the matching keyed service. During rolling deploys, both versions serve traffic simultaneously.</li>
+            <li><strong>Audit trail:</strong> Log which strategy version processed each request. If v2 has a bug, query <code>WHERE strategy_version = 'payment-v2'</code> to find affected orders.</li>
           </ul>
         </div>
-        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Store the strategy version used with each transaction. If the new pricing strategy has a bug, you can identify affected orders by querying 'where strategy_version = v2' instead of guessing."</div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Version the NuGet package with the strategy contract using SemVer. Minor bumps add optional parameters with defaults so v1 callers keep working. Breaking changes get a new major version and a new interface — <code>IPaymentStrategyV3</code> — so the old and new can coexist in the same container."</div>
       </div></div>
     </div>
 
@@ -3066,7 +3058,7 @@ builder.Services.Decorate&lt;IPaymentStrategy, LoggingPaymentDecorator&gt;();</c
         <i class="fa-solid fa-code"></i> Exercise 1: Replace a Switch Statement
         <span class="badge badge-green">Easy</span>
       </div>
-      <p class="exercise-card-desc">Refactor this notification service to use Strategy pattern. The switch currently handles Email, SMS, and Push notifications inline.</p>
+      <p class="exercise-card-desc">Refactor this report service to use Strategy pattern. The switch currently handles PDF, Excel, and CSV generation inline with format-specific logic tangled together.</p>
 
       <div class="collapsible">
         <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
@@ -3076,10 +3068,10 @@ builder.Services.Decorate&lt;IPaymentStrategy, LoggingPaymentDecorator&gt;();</c
         <div class="collapsible-content">
           <div class="collapsible-body">
             <ul class="styled">
-              <li>Define <code>INotificationStrategy</code> with a <code>SendAsync(string to, string message)</code> method</li>
-              <li>Create three classes: <code>EmailNotification</code>, <code>SmsNotification</code>, <code>PushNotification</code></li>
-              <li>Add a <code>Channel</code> property to identify each strategy</li>
-              <li>The context just calls <code>strategy.SendAsync()</code> without knowing which channel runs</li>
+              <li>Define <code>IReportFormatter</code> with a <code>byte[] Generate(ReportData data)</code> method</li>
+              <li>Create three classes: <code>PdfFormatter</code>, <code>ExcelFormatter</code>, <code>CsvFormatter</code></li>
+              <li>Add a <code>FileExtension</code> property so the context can name the output file</li>
+              <li>The context just calls <code>formatter.Generate()</code> without knowing which format runs</li>
             </ul>
           </div>
         </div>
@@ -3093,40 +3085,43 @@ builder.Services.Decorate&lt;IPaymentStrategy, LoggingPaymentDecorator&gt;();</c
         <div class="collapsible-content">
           <div class="collapsible-body">
             <div class="macos-window">
-              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">NotificationStrategy.cs</span></div>
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ReportFormatter.cs</span></div>
               <div class="macos-body">
-<pre><code class="language-csharp">public interface INotificationStrategy
+<pre><code class="language-csharp">public record ReportData(string Title, List&lt;string[]&gt; Rows);
+
+public interface IReportFormatter
 {
-    string Channel { get; }
-    Task SendAsync(string to, string message);
+    string FileExtension { get; }
+    byte[] Generate(ReportData data);
 }
 
-public sealed class EmailNotification(ISmtpClient smtp) : INotificationStrategy
+public sealed class PdfFormatter : IReportFormatter
 {
-    public string Channel =&gt; "Email";
-    public async Task SendAsync(string to, string message)
-        =&gt; await smtp.SendAsync(to, "Notification", message);
+    public string FileExtension =&gt; ".pdf";
+    public byte[] Generate(ReportData data)
+        =&gt; PdfLibrary.CreateDocument(data.Title, data.Rows);
 }
 
-public sealed class SmsNotification(ISmsClient sms) : INotificationStrategy
+public sealed class ExcelFormatter : IReportFormatter
 {
-    public string Channel =&gt; "SMS";
-    public async Task SendAsync(string to, string message)
-        =&gt; await sms.SendSmsAsync(to, message);
+    public string FileExtension =&gt; ".xlsx";
+    public byte[] Generate(ReportData data)
+        =&gt; ExcelLibrary.CreateWorkbook(data.Title, data.Rows);
 }
 
-public sealed class PushNotification(IPushService push) : INotificationStrategy
+public sealed class CsvFormatter : IReportFormatter
 {
-    public string Channel =&gt; "Push";
-    public async Task SendAsync(string to, string message)
-        =&gt; await push.SendPushAsync(to, message);
+    public string FileExtension =&gt; ".csv";
+    public byte[] Generate(ReportData data)
+        =&gt; Encoding.UTF8.GetBytes(
+            string.Join("\n", data.Rows.Select(r =&gt; string.Join(",", r))));
 }
 
-// Context — doesn't know which channel runs
-public class NotificationService(INotificationStrategy strategy)
+// Context — doesn't know which format runs
+public class ReportService(IReportFormatter formatter)
 {
-    public Task NotifyAsync(string userId, string message)
-        =&gt; strategy.SendAsync(userId, message);
+    public byte[] Export(ReportData data) =&gt; formatter.Generate(data);
+    public string FileName(string name) =&gt; $"{name}{formatter.FileExtension}";
 }</code></pre>
               </div>
             </div>
@@ -4176,9 +4171,9 @@ public class ProcessingService(IServiceProvider sp)
 
 <!-- ========== POPUP OVERLAYS ========== -->
 <div class="popup-overlay" id="popup-ocp">
-  <div class="popup-card">
-    <button class="popup-close" aria-label="Close" onclick="this.closest('.popup-overlay').classList.remove('active')">&times;</button>
-    <h3><i class="fa-solid fa-lock-open text-green icon-gap"></i> Senior Solution: Open/Closed Principle</h3>
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Open/Closed Principle</h3>
     <p class="body-text">A senior extracts each payment type into its own class implementing <code>IPaymentStrategy</code>. Adding Apple Pay means writing one new class — the switch statement doesn't exist anymore. No existing code is touched, tested code stays tested, and merge conflicts disappear.</p>
     <div class="macos-window mt-sm">
       <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OCPSolution.cs</span></div>
@@ -4208,9 +4203,9 @@ builder.Services.AddScoped&lt;IPaymentStrategy, ApplePayStrategy&gt;();
 </div>
 
 <div class="popup-overlay" id="popup-testable">
-  <div class="popup-card">
-    <button class="popup-close" aria-label="Close" onclick="this.closest('.popup-overlay').classList.remove('active')">&times;</button>
-    <h3><i class="fa-solid fa-vial text-green icon-gap"></i> Senior Solution: Testability</h3>
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Testability</h3>
     <p class="body-text">Each strategy is its own class with constructor-injected dependencies. Mock the dependencies, test the strategy in complete isolation. No Stripe test keys needed for PayPal tests. No SMTP server needed for credit card tests.</p>
     <div class="macos-window mt-sm">
       <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TestingSolution.cs</span></div>
@@ -4239,9 +4234,9 @@ public async Task CreditCard_SuccessfulCharge_ReturnsTransactionId()
 </div>
 
 <div class="popup-overlay" id="popup-deps">
-  <div class="popup-card">
-    <button class="popup-close" aria-label="Close" onclick="this.closest('.popup-overlay').classList.remove('active')">&times;</button>
-    <h3><i class="fa-solid fa-syringe text-green icon-gap"></i> Senior Solution: Dependency Injection</h3>
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Dependency Injection</h3>
     <p class="body-text">Each strategy receives its dependencies through constructor injection. API keys come from <code>IOptions&lt;T&gt;</code>, HTTP clients from <code>IHttpClientFactory</code>, logging from <code>ILogger&lt;T&gt;</code>. No hardcoded strings, no <code>new HttpClient()</code>, no secrets in source code.</p>
     <div class="macos-window mt-sm">
       <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DISolution.cs</span></div>
@@ -4269,7 +4264,7 @@ public sealed class PayPalStrategy(
   </div>
 </div>
 
-<footer class="site-footer">
+<footer class="footer">
   <p>&copy; 2025 System Guide — Built for engineers who want to <em>understand</em>, not just memorize.</p>
 </footer>
 

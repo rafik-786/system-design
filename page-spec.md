@@ -1679,3 +1679,42 @@ Case study pages have a DIFFERENT structure from pattern pages. They focus on sy
 Each card shows: icon + name + difficulty badge (Easy/Medium/Hard) + pattern tags + Coming Soon status.
 Difficulty colors: Easy=green, Medium=yellow, Hard=red.
 Pattern tags: small pills showing 2-4 key patterns used.
+
+---
+
+## UI/UX QUALITY CHECKLIST (Mandatory for Every Page)
+
+> Discovered through comprehensive audits of ISP, DIP, Prototype, and Strategy pages.
+> Every new page MUST pass all these checks before committing.
+
+### Theme Compliance
+1. **Use only supported `data-accent` values:** `purple`, `green`, `cyan`, `yellow`, `red`, `blue`, `orange`. If you need a new accent, add it to `shared/styles.css` under "Per-Page Accent Overrides" section first.
+2. **NO hardcoded colors in inline styles** — use CSS variables (`var(--text-primary)`, `var(--bg-secondary)`, `var(--accent-primary)`, etc.). Exception: language swatches (brand colors like C# purple `#68217a`, Java orange `#f89820`).
+3. **SVG diagrams must use CSS variables** — `fill="var(--text-primary, #e2e8f0)"`, `stroke="var(--accent-primary, #06b6d4)"`. Hardcoded colors in SVGs will NOT adapt to theme changes.
+4. **"Coming Soon" cards** — use `opacity:0.6` sparingly. On light themes, this can push text below WCAG AA contrast. Prefer `color: var(--text-muted)` instead.
+
+### Mobile Responsiveness
+5. **SVG UML diagrams** — always use `viewBox` + `style="width:100%; max-width:720px"`. On screens < 375px, text becomes illegible. For complex diagrams, add `min-width: 500px` to trigger horizontal scroll inside the `.macos-body` container.
+6. **Tables** — always wrap in `<div class="table-wrapper">`. The CSS provides `overflow-x: auto`.
+7. **Side-by-side layouts** — `.comparison-grid`, `.when-use-grid`, `.grid-3` all have responsive breakpoints in CSS. Never add custom side-by-side flex layouts without `flex-wrap: wrap`.
+8. **Code blocks** — always inside `.macos-body` containers which provide `overflow-x: auto`.
+
+### Tooltip Rules
+9. **NEVER put tooltips inside `<pre><code>` blocks** — highlight.js will break the tooltip HTML. Use plain text inside code blocks.
+10. **Tooltips in table cells** — be aware that `.table-wrapper` `overflow-x: auto` can clip tooltips on mobile. For critical tooltips, consider placing the explanation as a footnote below the table instead.
+11. **Tooltip content length** — CSS caps at `max-width: min(320px, 90vw)` with word-wrap. Content up to ~300 characters is fine. Beyond that, consider using a callout box instead.
+12. **No nested tooltips** — never put a `tooltip-trigger` inside another `tooltip-trigger`.
+13. **Tooltips in collapsible sections** — the CSS now sets `overflow: visible` on `.collapsible.active .collapsible-content`, so tooltips work when expanded.
+
+### HTML Structure
+14. **One footer, one `scripts.js`** — verify the page ends cleanly with `</footer>` → `<button class="back-to-top">` → `<script src="scripts.js">` → `</body></html>`. No duplicates.
+15. **LLD Hub card CSS class** — when marking a page "Ready", the status `<span>` MUST have `lld-topic-status--ready` class AND the card must be an `<a>` tag (not `<div>`).
+16. **Font Awesome icons** — only use icons from Font Awesome Free. Pro-only icons (like `fa-lambda`, `fa-function`) will render as blank. Check at https://fontawesome.com/search?o=r&m=free.
+
+### Teaching Quality Standards
+17. **Analogies** — must map accurately to the pattern. Cookie cutter = Factory (creates from raw material), NOT Prototype (copies existing object). Photocopier/Save As = Prototype.
+18. **Code examples in Section 5** — focus on pattern structure, not algorithm internals. If showing a sorting strategy, stub the algorithm body (`// O(n²) — implementation details omitted`). The pattern is the lesson, not the algorithm.
+19. **Q&A overlap** — check that Q&As don't repeat content already covered in earlier sections verbatim. If a Q matches Section 3 (Analogies) or Section 14 (Testing), reframe it to teach something NEW.
+20. **Exercise overlap** — exercises should use different domains than the Mini-Project. If the mini-project builds a notification system, exercises should NOT also build notification systems.
+21. **Comparison sections** — include at least one brief code snippet showing the relationship. Abstract bullet points ("Pattern A does X, Pattern B does Y") don't create understanding without concrete code.
+22. **"Don't Use When" lists** — always include honest cases where the pattern/principle is overkill. This builds trust and teaches judgment, not just rules.

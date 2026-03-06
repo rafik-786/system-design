@@ -480,6 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
   }
+  window.openPopup = openPopup;
 
   function closeAllPopups() {
     document.querySelectorAll('.popup-overlay.active').forEach((o) => {
@@ -727,18 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bar.appendChild(btn);
     });
 
-    /* -- Wheel intercept: only on inactive code blocks (pass-through scroll) -- */
-    function interceptWheel(e) {
-      var body = e.target.closest('.macos-body');
-      if (body && body !== activeBlock) {
-        e.preventDefault();
-        window.scrollBy(0, e.deltaY);
-      }
-    }
-    document.querySelectorAll('.macos-body').forEach(function(el) {
-      el.removeEventListener('wheel', interceptWheel);
-      el.addEventListener('wheel', interceptWheel, { passive: false });
-    });
+    /* -- Wheel intercept: handled via document-level listener (see below reinit) -- */
 
     /* -- Dot navigation -- */
     if (currentDotObserver) { currentDotObserver.disconnect(); currentDotObserver = null; }
@@ -923,6 +913,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function swapPage(doc, href, pushState) {
+    // Reset popup state in case user navigates while a popup is open
+    document.querySelectorAll('.popup-overlay.active').forEach(function(o) {
+      o.classList.remove('active');
+    });
+    document.body.style.overflow = '';
+
     // Title
     document.title = doc.title;
 
@@ -959,6 +955,14 @@ document.addEventListener('DOMContentLoaded', () => {
       oldMain.innerHTML = newMain.innerHTML;
     }
 
+    // Popup overlays (live outside <main>, between main and footer)
+    document.querySelectorAll('.popup-overlay').forEach(function(el) { el.remove(); });
+    var newPopups = doc.querySelectorAll('.popup-overlay');
+    var insertRef = document.querySelector('footer') || null;
+    newPopups.forEach(function(popup) {
+      document.body.insertBefore(document.adoptNode(popup), insertRef);
+    });
+
     // Dot-nav
     var newDotNav = doc.getElementById('dotNav');
     var oldDotNav = document.getElementById('dotNav');
@@ -974,8 +978,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Footer
-    var newFooter = doc.querySelector('.footer');
-    var oldFooter = document.querySelector('.footer');
+    var newFooter = doc.querySelector('footer');
+    var oldFooter = document.querySelector('footer');
     if (newFooter && oldFooter) {
       oldFooter.innerHTML = newFooter.innerHTML;
     }
@@ -1120,5 +1124,14 @@ document.addEventListener('DOMContentLoaded', () => {
    *  SECTION D — INITIAL PAGE SETUP
    * ========================================================== */
   reinit();
+
+  /* -- Wheel intercept: single document-level listener (survives SPA navigation) -- */
+  document.addEventListener('wheel', function(e) {
+    var body = e.target.closest('.macos-body');
+    if (body && body !== activeBlock) {
+      e.preventDefault();
+      window.scrollBy(0, e.deltaY);
+    }
+  }, { passive: false });
 
 }); /* end DOMContentLoaded */

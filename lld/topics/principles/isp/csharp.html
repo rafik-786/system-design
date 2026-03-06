@@ -512,7 +512,7 @@ public class AdminOrdersController(
     IWriteRepository&lt;Order&gt; writer) : ControllerBase
 {
     [HttpGet]    public IActionResult List() =&gt; Ok(reader.GetPaged(1, 20));
-    [HttpDelete] public IActionResult Delete(int id) =&gt; /* use writer */;
+    [HttpDelete] public IActionResult Delete(int id) { writer.Delete(id); return NoContent(); }
 }</code></pre>
           </div>
         </div>
@@ -2351,7 +2351,7 @@ public void ProductionCode_ShouldNotThrow_NotImplementedException()
         .GetResult();
 
     Assert.True(result.IsSuccessful,
-        $"Found NotImplementedException in: {string.Join(", ", result.FailingTypeNames ?? Array.Empty&lt;string&gt;())}");
+        $"Found NotImplementedException in: {string.Join(", ", result.FailingTypes?.Select(t =&gt; t.FullName) ?? Array.Empty&lt;string&gt;())}");
 }
 
 // Also check with Roslyn analyzer: IDE0051 (unused members) + CA1065 (throw in property)</code></pre>
@@ -2365,37 +2365,30 @@ public void ProductionCode_ShouldNotThrow_NotImplementedException()
         <i class="fa-solid fa-vial text-purple" aria-hidden="true"></i> Strategy 3: Mock Usage Analysis
       </h3>
       <div class="card-body">
-        <p class="body-text">Analyze your test suite to find mocks where less than half the interface methods are actually invoked — indicating the consumer's dependency is too wide.</p>
+        <p class="body-text">Use <code>MockBehavior.Strict</code> in Moq to detect ISP violations. A strict mock throws on any method call you didn't explicitly set up — so if your class only needs 2 of 8 methods, you only set up those 2. If the test passes, great. If it blows up on an unexpected call, your interface is too fat for that consumer.</p>
         <div class="macos-window mt-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MockUsageAnalysis.cs</span></div>
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StrictMockISPDetection.cs</span></div>
           <div class="macos-body">
-<pre><code class="language-csharp">// Custom test helper: track which mock methods are actually called
-public class MockUsageTracker&lt;T&gt; : DispatchProxy where T : class
+<pre><code class="language-csharp">// Strict mocks throw on any unconfigured call — perfect ISP detector
+[Fact]
+public void UserLoader_OnlyNeedsGetById()
 {
-    private readonly HashSet&lt;string&gt; _calledMethods = new();
-    private T _inner = null!;
+    // Only set up the methods your SUT actually needs
+    var mock = new Mock&lt;IFatRepository&gt;(MockBehavior.Strict);
+    mock.Setup(r =&gt; r.GetById(It.IsAny&lt;int&gt;())).Returns(new User());
 
-    public static (T Proxy, MockUsageTracker&lt;T&gt; Tracker) Create(T inner)
-    {
-        var proxy = Create&lt;T, MockUsageTracker&lt;T&gt;&gt;() as MockUsageTracker&lt;T&gt;!;
-        proxy._inner = inner;
-        return ((T)(object)proxy, proxy);
-    }
+    var sut = new UserLoader(mock.Object);
+    sut.LoadUser(42);
 
-    protected override object? Invoke(MethodInfo? method, object?[]? args)
-    {
-        _calledMethods.Add(method!.Name);
-        return method.Invoke(_inner, args);
-    }
-
-    public double UsageRatio =&gt;
-        (double)_calledMethods.Count / typeof(T).GetMethods().Length;
-
-    public IEnumerable&lt;string&gt; UnusedMethods =&gt;
-        typeof(T).GetMethods().Select(m =&gt; m.Name).Except(_calledMethods);
+    // If UserLoader secretly calls Delete() or Update() — BOOM!
+    // Strict mock throws MockException on any unconfigured call.
+    // That explosion is your ISP violation signal.
+    mock.VerifyAll(); // Only configured methods were called
 }
 
-// In tests: if UsageRatio &lt; 0.5, the interface is probably too fat for this consumer</code></pre>
+// If you only set up 2 of 8 methods and the test passes,
+// your class doesn't need those other 6 methods.
+// → Split the interface so this consumer gets a slim one.</code></pre>
           </div>
         </div>
       </div>
@@ -3372,7 +3365,7 @@ public void AllInterfaces_ResolveTo_SameInstance()
         <i class="fa-solid fa-code"></i> Exercise 4: Detect &amp; Fix ISP Violations
         <span class="badge badge-red">Hard</span>
       </div>
-      <p class="exercise-card-desc">Write an architecture test using reflection that: (1) finds all interfaces with &gt;7 methods, (2) finds all classes that implement an interface but throw <code>NotImplementedException</code> in any method, and (3) reports both as ISP violations.</p>
+      <p class="exercise-card-desc">Write an architecture test using reflection that scans your assembly and finds all public interfaces with more than 7 methods — a reliable heuristic for "fat interfaces" that likely violate ISP. Report the interface name and method count for each violation.</p>
 
       <div class="collapsible">
         <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
@@ -3382,10 +3375,10 @@ public void AllInterfaces_ResolveTo_SameInstance()
         <div class="collapsible-content">
           <div class="collapsible-body">
             <ul class="styled">
-              <li>Use <code>Assembly.GetTypes().Where(t =&gt; t.IsInterface)</code> for interfaces</li>
-              <li>Use <code>typeof(NotImplementedException)</code> with IL inspection or simpler approach</li>
-              <li>For the NotImplementedException check, use Mono.Cecil or Roslyn to scan method bodies</li>
-              <li>Simpler approach: instantiate and call each method, catch NotImplementedException</li>
+              <li>Use <code>Assembly.GetTypes().Where(t =&gt; t.IsInterface)</code> to find interfaces</li>
+              <li>Filter with <code>t.IsPublic</code> to skip internal/compiler-generated interfaces</li>
+              <li>Use <code>BindingFlags.Public | BindingFlags.Instance</code> and exclude special names (property getters/setters)</li>
+              <li>Pick a reasonable threshold (7 is a good default) and make it configurable</li>
             </ul>
           </div>
         </div>
@@ -3402,57 +3395,57 @@ public void AllInterfaces_ResolveTo_SameInstance()
               <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ISPDetectionTests.cs</span></div>
               <div class="macos-body">
 <pre><code class="language-csharp">using System.Reflection;
-using System.Reflection.Emit;
 
-public class IspViolationDetector
+public class FatInterfaceDetector
 {
     private readonly Assembly _assembly;
-    public IspViolationDetector(Assembly assembly) =&gt; _assembly = assembly;
+    private readonly int _maxMethods;
 
-    // Check 1: Fat interfaces (method count threshold)
-    public IEnumerable&lt;string&gt; FindFatInterfaces(int maxMethods = 7) =&gt;
+    public FatInterfaceDetector(Assembly assembly, int maxMethods = 7)
+    {
+        _assembly = assembly;
+        _maxMethods = maxMethods;
+    }
+
+    public IReadOnlyList&lt;FatInterfaceViolation&gt; FindViolations() =&gt;
         _assembly.GetTypes()
             .Where(t =&gt; t.IsInterface &amp;&amp; t.IsPublic)
-            .Where(t =&gt; t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                          .Count(m =&gt; !m.IsSpecialName) &gt; maxMethods)
-            .Select(t =&gt; $"{t.Name}: {t.GetMethods().Count(m =&gt; !m.IsSpecialName)} methods");
-
-    // Check 2: Classes with NotImplementedException (IL scan)
-    public IEnumerable&lt;string&gt; FindNotImplementedMethods() =&gt;
-        _assembly.GetTypes()
-            .Where(t =&gt; t.IsClass &amp;&amp; !t.IsAbstract)
-            .SelectMany(t =&gt; t.GetMethods(BindingFlags.Public | BindingFlags.Instance))
-            .Where(m =&gt; ThrowsNotImplemented(m))
-            .Select(m =&gt; $"{m.DeclaringType!.Name}.{m.Name}()");
-
-    private static bool ThrowsNotImplemented(MethodInfo method)
-    {
-        try
-        {
-            var body = method.GetMethodBody();
-            if (body == null) return false;
-            var il = body.GetILAsByteArray();
-            // Simplified: check if method body is very short (throw only)
-            return il != null &amp;&amp; il.Length &lt; 10 &amp;&amp;
-                   method.GetMethodBody()?.ExceptionHandlingClauses.Count == 0;
-        }
-        catch { return false; }
-    }
+            .Select(t =&gt; new
+            {
+                Type = t,
+                MethodCount = t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                                .Count(m =&gt; !m.IsSpecialName) // exclude property accessors
+            })
+            .Where(x =&gt; x.MethodCount &gt; _maxMethods)
+            .Select(x =&gt; new FatInterfaceViolation(x.Type.FullName!, x.MethodCount))
+            .ToList();
 }
 
-[Fact]
-public void NoFatInterfaces()
+public record FatInterfaceViolation(string InterfaceName, int MethodCount)
 {
-    var detector = new IspViolationDetector(typeof(Program).Assembly);
-    var violations = detector.FindFatInterfaces().ToList();
-    Assert.Empty(violations);
+    public override string ToString() =&gt;
+        $"{InterfaceName} has {MethodCount} methods (max: 7)";
 }
 
+// Usage in tests:
 [Fact]
-public void NoNotImplementedExceptions()
+public void Assembly_ShouldNotHave_FatInterfaces()
 {
-    var detector = new IspViolationDetector(typeof(Program).Assembly);
-    var violations = detector.FindNotImplementedMethods().ToList();
+    var detector = new FatInterfaceDetector(typeof(Program).Assembly);
+    var violations = detector.FindViolations();
+
+    Assert.True(violations.Count == 0,
+        $"Fat interfaces found:\n{string.Join("\n", violations)}");
+}
+
+[Theory]
+[InlineData(5)]  // stricter threshold for core domain
+[InlineData(10)] // relaxed threshold for legacy code
+public void CustomThreshold_DetectsFatInterfaces(int max)
+{
+    var detector = new FatInterfaceDetector(typeof(Program).Assembly, max);
+    var violations = detector.FindViolations();
+
     Assert.Empty(violations);
 }</code></pre>
               </div>
@@ -3999,7 +3992,7 @@ public interface IUserAuthenticator { /* ... */ }
 [Obsolete("Use IUserReader/IUserWriter/IUserAuthenticator instead")]
 public interface IUserService : IUserReader, IUserWriter, IUserAuthenticator { }
 
-// The <span class="tooltip-trigger">[Obsolete]<span class="tooltip-content">A .NET attribute that marks code as deprecated. The compiler generates CS0618 warnings (or errors, if configured) wherever the obsolete type is used. It's a gentle migration tool — existing code still compiles but developers see warnings guiding them to the new interfaces.</span></span> attribute generates compiler warnings for existing consumers
+// The [Obsolete] attribute generates compiler warnings for existing consumers
 // Guiding them to migrate without breaking their code</code></pre>
           </div>
         </div>
@@ -4204,7 +4197,7 @@ public async Task SendInvoice_SendsEmail()
   </div>
 </div>
 
-<footer class="site-footer">
+<footer class="footer">
   <p>&copy; 2025 System Guide — Built for engineers who want to <em>understand</em>, not just memorize.</p>
 </footer>
 

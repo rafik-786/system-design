@@ -649,6 +649,32 @@ public class ReportGenerator
           <i class="fa-solid fa-triangle-exclamation icon-gap"></i>
           <strong>Problems:</strong> This class violates SRP (data access + formatting + business logic), OCP (new formats require modifying existing code), ISP (callers can't request just data or just formatting), AND DIP (welded to SQL Server, iTextSharp, EPPlus). All five SOLID principles violated in one class.
         </div>
+
+        <h3 class="sub">Problems</h3>
+
+        <div class="problem-card">
+          <div class="problem-card-title"><i class="fa-solid fa-circle-xmark"></i> Untestable Without Infrastructure</div>
+          <p class="problem-card-desc">ReportGenerator creates <code>SqlConnection</code> directly — you can't test it without a running SQL Server. Every test is a slow integration test. CI/CD pipelines break when the database is down.</p>
+          <button class="solution-btn" data-popup="popup-testability">
+            <i class="fa-solid fa-lightbulb"></i> How a Senior Solves This
+          </button>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title"><i class="fa-solid fa-circle-xmark"></i> Vendor Lock-in</div>
+          <p class="problem-card-desc">Switching from iTextSharp to QuestPDF means rewriting the class. Replacing SQL Server with an API data source means rewriting the class. Every infrastructure swap is a full rewrite — because business logic is welded to concrete libraries.</p>
+          <button class="solution-btn" data-popup="popup-swappability">
+            <i class="fa-solid fa-lightbulb"></i> How a Senior Solves This
+          </button>
+        </div>
+
+        <div class="problem-card">
+          <div class="problem-card-title"><i class="fa-solid fa-circle-xmark"></i> No Layer Boundaries</div>
+          <p class="problem-card-desc">Data access, formatting, and business logic all live in one class. New developers can't tell where "business rules" end and "infrastructure" begins. Every change risks breaking unrelated functionality.</p>
+          <button class="solution-btn" data-popup="popup-layers">
+            <i class="fa-solid fa-lightbulb"></i> How a Senior Solves This
+          </button>
+        </div>
       </div>
 
       <div class="tab-panel" id="sr-approach" role="tabpanel">
@@ -814,21 +840,21 @@ app.MapGet("/reports/{format}", async (
 
     <!-- Problem/Solution Popup Triggers -->
     <div class="grid-3 mt-md">
-      <div class="card" style="cursor:pointer;" onclick="document.getElementById('popup-testability').classList.add('active')">
+      <div class="card" style="cursor:pointer;" onclick="openPopup('popup-testability')">
         <h3 class="card-title"><i class="fa-solid fa-vial text-green icon-gap"></i> Testability</h3>
         <div class="card-body">
           <p class="body-text">How DIP enables unit testing without real infrastructure.</p>
           <span class="badge badge-green">Click to explore</span>
         </div>
       </div>
-      <div class="card" style="cursor:pointer;" onclick="document.getElementById('popup-swappability').classList.add('active')">
+      <div class="card" style="cursor:pointer;" onclick="openPopup('popup-swappability')">
         <h3 class="card-title"><i class="fa-solid fa-arrows-rotate text-blue icon-gap"></i> Swappability</h3>
         <div class="card-body">
           <p class="body-text">Changing infrastructure without touching business logic.</p>
           <span class="badge badge-blue">Click to explore</span>
         </div>
       </div>
-      <div class="card" style="cursor:pointer;" onclick="document.getElementById('popup-layers').classList.add('active')">
+      <div class="card" style="cursor:pointer;" onclick="openPopup('popup-layers')">
         <h3 class="card-title"><i class="fa-solid fa-layer-group text-purple icon-gap"></i> Layer Architecture</h3>
         <div class="card-body">
           <p class="body-text">How DIP shapes project structure and layer boundaries.</p>
@@ -1327,6 +1353,20 @@ builder.Services.AddScoped&lt;IUserValidator&lt;AppUser&gt;, StrictEmailValidato
           <li>Strategy often <strong>uses</strong> DIP (depends on interface)</li>
         </ul>
       </div>
+    </div>
+  </div>
+  <div class="macos-window mt-sm">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StrategyUsesDIP.cs</span></div>
+    <div class="macos-body">
+<pre><code class="language-csharp">// Strategy IS DIP in action:
+// IShippingCalculator (abstraction) owned by the domain layer
+// FedExCalculator (low-level detail) depends on the abstraction
+// OrderService (high-level policy) depends on the abstraction
+// Both point inward → DIP!
+public class OrderService(IShippingCalculator calc)
+{
+    public decimal GetShipping(Order o) => calc.Calculate(o);
+}</code></pre>
     </div>
   </div>
 </div>
@@ -2169,7 +2209,7 @@ public async Task ProcessAsync_ValidOrder_ChargesAndSaves()
            .ReturnsAsync(PaymentResult.Ok("ch_test_123"));
 
     var sut = new OrderProcessor(repo.Object, payment.Object, notifier.Object, logger);
-    var order = new Order { Amount = 99.99m, PaymentToken = "tok_test" };
+    var order = new Order { Total = 99.99m, PaymentToken = "tok_test" };
 
     // Act
     var result = await sut.ProcessAsync(order);
@@ -2336,7 +2376,7 @@ public void AllServices_CanBeResolved()
       <i class="fa-solid fa-memory text-blue" aria-hidden="true"></i> Virtual Dispatch (Interface Calls)
     </h3>
     <div class="card-body">
-      <p class="body-text">Calling a method through an interface uses <span class="tooltip-trigger">virtual dispatch<span class="tooltip-content">When calling a method on an interface or virtual method, the CLR looks up the actual implementation in a vtable (virtual method table) at runtime. This adds one pointer dereference (~1ns) compared to a direct call. The JIT compiler can sometimes devirtualize these calls when it proves only one implementation exists.</span></span> — one extra pointer lookup (~1ns). The JIT often <strong>devirtualizes</strong> these when it can prove only one implementation exists (which is common in DI scenarios).</p>
+      <p class="body-text">Calling a method through an interface uses <span class="tooltip-trigger">virtual dispatch<span class="tooltip-content">When calling a method on an interface or virtual method, the CLR looks up the actual implementation in a vtable (virtual method table) at runtime. This adds one pointer dereference (~1ns) compared to a direct call. The JIT compiler can sometimes devirtualize these calls when it proves only one implementation exists.</span></span> — one extra pointer lookup (~1ns). The JIT often <strong>devirtualizes</strong> these when it can prove only one implementation exists (which is common in DI scenarios). When the JIT sees that only one class implements <code>IOrderRepository</code> in your app, it can prove the call target at compile time and inline the method directly — eliminating virtual dispatch entirely.</p>
       <p class="body-text mt-sm"><strong>Verdict:</strong> Unmeasurable in business applications. Only matters in ultra-hot paths (game engines, allocators, parsers processing millions of items per second).</p>
     </div>
   </div>
@@ -3871,55 +3911,59 @@ MyApp.WebApi/              → Entry point (references: Application + Infrastruc
 
 <!-- ========== POPUP OVERLAYS ========== -->
 <div class="popup-overlay" id="popup-testability">
-  <div class="popup-card">
-    <button class="popup-close" aria-label="Close" onclick="this.closest('.popup-overlay').classList.remove('active')">&times;</button>
-    <h3><i class="fa-solid fa-vial text-green icon-gap"></i> How DIP Enables Testability</h3>
-    <p class="body-text">Without DIP, testing <code>OrderProcessor</code> requires a real SQL Server, a Stripe account, and a SendGrid API key. Tests are slow, flaky, and expensive. With DIP, you inject mocks:</p>
-    <div class="macos-window mt-sm">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TestingWithDIP.cs</span></div>
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Testable Without Infrastructure</h3>
+    <p class="body-text">A senior defines <code>IReportDataSource</code> as an abstraction and injects it. Now tests can pass in a fake data source — no SQL Server required. Tests run in milliseconds, not seconds.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TestableReports.cs</span></div>
       <div class="macos-body">
 <pre><code class="language-csharp">[Fact]
-public async Task ProcessAsync_SuccessfulPayment_SavesOrderAndNotifies()
+public async Task GenerateReport_WithTestData_RendersPdf()
 {
-    var repo = new Mock&lt;IOrderRepository&gt;();
-    var payment = new Mock&lt;IPaymentGateway&gt;();
-    var notifier = new Mock&lt;INotifier&gt;();
-    var logger = NullLogger&lt;OrderProcessor&gt;.Instance;
+    var dataSource = new Mock&lt;IReportDataSource&gt;();
+    dataSource.Setup(d =&gt; d.GetSalesAsync(It.IsAny&lt;DateTime&gt;(), It.IsAny&lt;DateTime&gt;()))
+              .ReturnsAsync(new List&lt;SalesRecord&gt;
+              {
+                  new(1, 100m, DateTime.Today, "Widget")
+              });
 
-    payment.Setup(p =&gt; p.ChargeAsync(100m, "tok_test"))
-           .ReturnsAsync(PaymentResult.Ok("ch_123"));
+    var formatter = new Mock&lt;IReportFormatter&gt;();
+    formatter.Setup(f =&gt; f.Format).Returns("pdf");
+    formatter.Setup(f =&gt; f.Render(It.IsAny&lt;IReadOnlyList&lt;SalesRecord&gt;&gt;(), It.IsAny&lt;ReportMetadata&gt;()))
+             .Returns(new byte[] { 0x25, 0x50, 0x44 });
 
-    var processor = new OrderProcessor(repo.Object, payment.Object, notifier.Object, logger);
-    var result = await processor.ProcessAsync(testOrder);
+    var generator = new ReportGenerator(
+        dataSource.Object, new[] { formatter.Object },
+        NullLogger&lt;ReportGenerator&gt;.Instance);
+    var result = await generator.GenerateAsync("pdf", DateTime.Today.AddDays(-30), DateTime.Today);
 
-    Assert.True(result.IsSuccess);
-    repo.Verify(r =&gt; r.SaveAsync(testOrder), Times.Once);
-    notifier.Verify(n =&gt; n.SendAsync(testOrder.CustomerEmail, It.IsAny&lt;string&gt;(), It.IsAny&lt;string&gt;()), Times.Once);
-}
-
-// Fast (no I/O), isolated (no infrastructure), deterministic (no flaky network)</code></pre>
+    Assert.NotEmpty(result);
+    // Fast (no SQL), isolated (no iTextSharp), deterministic (no flaky DB)</code></pre>
       </div>
     </div>
   </div>
 </div>
 
 <div class="popup-overlay" id="popup-swappability">
-  <div class="popup-card">
-    <button class="popup-close" aria-label="Close" onclick="this.closest('.popup-overlay').classList.remove('active')">&times;</button>
-    <h3><i class="fa-solid fa-arrows-rotate text-blue icon-gap"></i> Swapping Infrastructure Without Pain</h3>
-    <p class="body-text">With DIP, swapping Stripe for PayPal is <strong>one new class + one DI line</strong>. Business logic never changes.</p>
-    <div class="macos-window mt-sm">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SwappingProviders.cs</span></div>
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Swap Vendors Painlessly</h3>
+    <p class="body-text">With DIP, switching from iTextSharp to QuestPDF is <strong>one new class + one DI line</strong>. The business logic (<code>ReportGenerator</code>) never changes — it depends on <code>IReportFormatter</code>, not on any specific PDF library.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SwappingVendors.cs</span></div>
       <div class="macos-body">
-<pre><code class="language-csharp">// Before: Stripe
-builder.Services.AddScoped&lt;IPaymentGateway, StripePaymentGateway&gt;();
+<pre><code class="language-csharp">// Before: iTextSharp
+builder.Services.AddScoped&lt;IReportFormatter, ITextSharpPdfFormatter&gt;();
 
-// After: PayPal (one line change)
-builder.Services.AddScoped&lt;IPaymentGateway, PayPalPaymentGateway&gt;();
+// After: QuestPDF (one line change, zero business logic changes)
+builder.Services.AddScoped&lt;IReportFormatter, QuestPdfFormatter&gt;();
 
-// OrderProcessor, tests, controllers — ZERO changes
-// The class PayPalPaymentGateway implements IPaymentGateway
-// It lives in the Infrastructure project
+// Similarly, swap SQL Server for an API data source:
+// Before: builder.Services.AddScoped&lt;IReportDataSource, SqlReportDataSource&gt;();
+// After:  builder.Services.AddScoped&lt;IReportDataSource, ApiReportDataSource&gt;();
+
+// ReportGenerator, tests, controllers — ZERO changes
 // Business logic doesn't even know the swap happened</code></pre>
       </div>
     </div>
@@ -3927,33 +3971,32 @@ builder.Services.AddScoped&lt;IPaymentGateway, PayPalPaymentGateway&gt;();
 </div>
 
 <div class="popup-overlay" id="popup-layers">
-  <div class="popup-card">
-    <button class="popup-close" aria-label="Close" onclick="this.closest('.popup-overlay').classList.remove('active')">&times;</button>
-    <h3><i class="fa-solid fa-layer-group text-purple icon-gap"></i> DIP Shapes Your Project Structure</h3>
-    <p class="body-text">In a DIP-compliant project, interfaces live in the business layer, implementations in infrastructure. The <span class="tooltip-trigger">composition root<span class="tooltip-content">The one place in your application where abstractions are wired to implementations. In ASP.NET Core, this is Program.cs. The composition root is the only code that knows about ALL concrete types. Every other class only knows about interfaces.</span></span> (Program.cs) wires everything.</p>
-    <div class="macos-window mt-sm">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Clear Layer Boundaries</h3>
+    <p class="body-text">A senior puts interfaces in the Domain project and implementations in Infrastructure. The <span class="tooltip-trigger">composition root<span class="tooltip-content">The one place in your application where abstractions are wired to implementations. In ASP.NET Core, this is Program.cs. The composition root is the only code that knows about ALL concrete types. Every other class only knows about interfaces.</span></span> (Program.cs) wires everything together — it's the only place that knows about concrete types.</p>
+    <div class="macos-window mt-md">
       <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ProjectStructure.txt</span></div>
       <div class="macos-body">
 <pre><code class="language-csharp">MyApp.sln
 ├── MyApp.Domain/          ← Interfaces + Entities (ZERO external NuGet packages)
-│   ├── IOrderRepository.cs
-│   ├── IPaymentGateway.cs
-│   └── Order.cs
+│   ├── IReportDataSource.cs
+│   ├── IReportFormatter.cs
+│   └── SalesRecord.cs
 ├── MyApp.Application/     ← Business logic (references: Domain only)
-│   ├── OrderProcessor.cs
-│   └── ReportGenerator.cs
+│   └── ReportGenerator.cs    ← depends on IReportDataSource + IReportFormatter
 ├── MyApp.Infrastructure/  ← Implementations (references: Domain + NuGet packages)
-│   ├── SqlOrderRepository.cs
-│   ├── StripePaymentGateway.cs
-│   └── DependencyInjection.cs  ← "services.AddScoped&lt;IOrderRepo, SqlOrderRepo&gt;()"
+│   ├── SqlReportDataSource.cs   ← depends on System.Data.SqlClient
+│   ├── ITextSharpPdfFormatter.cs ← depends on iTextSharp NuGet
+│   └── DependencyInjection.cs
 └── MyApp.WebApi/           ← Entry point (references: Application + Infrastructure)
-    └── Program.cs          ← Composition root</code></pre>
+    └── Program.cs          ← Composition root wires abstractions → implementations</code></pre>
       </div>
     </div>
   </div>
 </div>
 
-<footer class="site-footer">
+<footer class="footer">
   <p>&copy; 2025 System Guide — Built for engineers who want to <em>understand</em>, not just memorize.</p>
 </footer>
 
