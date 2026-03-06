@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 7 complete pages (Singleton, Factory Method, Abstract Factory, Builder, SRP, OCP, LSP), 103 coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 8 complete pages (Singleton, Factory Method, Abstract Factory, Builder, SRP, OCP, LSP, Parking Lot), 102 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -16,6 +16,7 @@
 - Master Plan: `C:\Users\Rafikul\.claude\plans\dynamic-tumbling-ritchie.md`
 - Session State: `c:/Users/Rafikul/Desktop/Learn/System Design/.claude/SESSION.md`
 - Build Spec: `page-spec.md` (root of project — 1600+ lines, 33 component patterns + build rules)
+- Case Study Spec: `case-study-spec.md` (root of project — 18-part framework for all case study pages)
 
 ---
 
@@ -69,6 +70,10 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │           └── lsp/
 │               ├── csharp.html             — COMPLETE (3604 lines, 24 sections, favicon: 🔄)
 │               └── java.html               — COMING SOON placeholder
+│       └── case-studies/
+│           └── parking-lot/
+│               ├── csharp.html             — COMPLETE (4902 lines, 24 sections, 60 tooltips, 13 SVGs, favicon: 🅿️) ← ENRICHED
+│               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
 
@@ -117,7 +122,7 @@ Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Obse
 ### Case Studies (72) — ALL Coming Soon
 
 **Starter (9)** — after Phase 4 (15 patterns):
-1. Parking Lot System (Easy) — Factory, State, Singleton
+1. Parking Lot System (Easy) — **Ready** — Strategy, Result Pattern, Singleton (DI), Decorator | accent: orange, 4902 lines, 60 tooltips, 13 SVGs ← ENRICHED
 2. Tic-Tac-Toe (Easy) — Strategy, State, Observer
 3. Vending Machine (Easy) — State, Strategy
 4. LRU Cache (Medium) — Proxy, Strategy, Singleton

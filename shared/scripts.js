@@ -682,9 +682,10 @@ document.addEventListener('DOMContentLoaded', () => {
    *  Called on initial load AND after each SPA navigation.
    * ========================================================== */
 
-  // Track observers so we can disconnect on next reinit
+  // Track observers and listeners so we can clean up on next reinit
   var currentDotObserver = null;
   var currentRevealObserver = null;
+  var currentSidebarScrollHandler = null;
 
   function reinit() {
     /* -- Highlight.js -- */
@@ -838,6 +839,61 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    /* -- Sidebar (case study pages) -- */
+    if (currentSidebarScrollHandler) {
+      window.removeEventListener('scroll', currentSidebarScrollHandler);
+      currentSidebarScrollHandler = null;
+    }
+    (function() {
+      var sidebar = document.getElementById('sidebar');
+      var toggle = document.getElementById('sidebar-toggle');
+      var closeBtn = document.getElementById('sidebar-close');
+      var backdrop = document.getElementById('sidebar-backdrop');
+      if (!sidebar) return;
+
+      function openSidebar() { sidebar.classList.add('open'); if (backdrop) backdrop.classList.add('visible'); }
+      function closeSidebar() { sidebar.classList.remove('open'); if (backdrop) backdrop.classList.remove('visible'); }
+      if (toggle) toggle.onclick = openSidebar;
+      if (closeBtn) closeBtn.onclick = closeSidebar;
+      if (backdrop) backdrop.onclick = closeSidebar;
+
+      // Active link tracking on scroll
+      var links = sidebar.querySelectorAll('a[href^="#"]');
+      var sidebarSections = [];
+      links.forEach(function(a) {
+        var id = a.getAttribute('href').slice(1);
+        var el = document.getElementById(id);
+        if (el) sidebarSections.push({ el: el, a: a });
+      });
+      function updateSidebarActive() {
+        var scrollY = window.scrollY + 120;
+        var current = sidebarSections[0];
+        for (var i = 0; i < sidebarSections.length; i++) {
+          if (sidebarSections[i].el.offsetTop <= scrollY) current = sidebarSections[i];
+        }
+        links.forEach(function(a) { a.classList.remove('active'); });
+        if (current) current.a.classList.add('active');
+      }
+      currentSidebarScrollHandler = updateSidebarActive;
+      window.addEventListener('scroll', updateSidebarActive);
+      updateSidebarActive();
+
+      // Sidebar link click: scroll to target + close on mobile
+      links.forEach(function(a) {
+        a.addEventListener('click', function(e) {
+          e.preventDefault();
+          var targetId = this.getAttribute('href').slice(1);
+          var target = document.getElementById(targetId);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Update URL hash without triggering another scroll
+            history.replaceState(null, '', '#' + targetId);
+          }
+          if (window.innerWidth <= 1100) closeSidebar();
+        });
+      });
+    })();
+
     /* -- Progress bar -- */
     onScroll();
   }
@@ -926,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
     var newBody = doc.querySelector('body');
     if (newBody) {
       document.body.setAttribute('data-accent', newBody.getAttribute('data-accent') || '');
+      document.body.className = newBody.className;
     }
 
     // Toolbar
