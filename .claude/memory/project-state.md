@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 6 complete pages (Singleton, Factory Method, Abstract Factory, Builder, SRP, OCP), 104 coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 7 complete pages (Singleton, Factory Method, Abstract Factory, Builder, SRP, OCP, LSP), 103 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -63,8 +63,11 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │           ├── srp/
 │           │   ├── csharp.html             — COMPLETE (4515 lines, 24 sections, favicon: 🎯)
 │           │   └── java.html               — COMING SOON placeholder
-│           └── ocp/
-│               ├── csharp.html             — COMPLETE (3944 lines, 24 sections, favicon: 🚪)
+│           ├── ocp/
+│           │   ├── csharp.html             — COMPLETE (3944 lines, 24 sections, favicon: 🚪)
+│           │   └── java.html               — COMING SOON placeholder
+│           └── lsp/
+│               ├── csharp.html             — COMPLETE (3604 lines, 24 sections, favicon: 🔄)
 │               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
@@ -107,7 +110,7 @@ Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Obse
 |-----------|--------|--------|
 | Single Responsibility (SRP) | **Ready** | green |
 | Open/Closed (OCP) | **Ready** | purple |
-| Liskov Substitution | Coming Soon | — |
+| Liskov Substitution (LSP) | **Ready** | cyan |
 | Interface Segregation | Coming Soon | — |
 | Dependency Inversion | Coming Soon | — |
 
