@@ -1088,7 +1088,28 @@ Also fixed: `table-wrap` → `table-wrapper` across entire file (5 occurrences).
 
 ---
 
-## 26. PATTERNS TO FOLLOW FOR NEXT PAGES
+## 26. COMMON MISTAKES (FIXED — NEVER REPEAT)
+
+**Full catalog**: `memory/common-mistakes.md` in global auto-memory directory.
+
+### SVG Diamond Fix (Applied 2026-03-08)
+- **5 pages fixed**: Singleton, Strategy, Builder, Abstract Factory, Prototype
+- **Bug**: `<rect transform="rotate(45)">` created duplicate floating diamonds
+- **Fix**: Replaced with `<polygon points="0,-42 84,0 0,42 -84,0">` — proper diamond shape
+- **Rule**: NEVER use rotated rect for diamonds. Always use polygon.
+
+### S12/S13/S17 Enrichment (Applied 2026-03-08)
+- **Decorator**: 5775→7006 lines. 6 bug SVGs, 8 pitfall code pairs, 15+ Q&A enrichments
+- **Singleton**: 4220→5334 lines. 12 SVGs, 16 code windows, 6 "How to Spot" callouts
+- **Strategy**: 4447→5316 lines. 15 SVGs, expanded narratives, 10 pitfall code pairs
+
+### User Mandates for Content Quality
+- **Extensive SVG usage**: Add SVGs EVERYWHERE a concept can be visualized. Not optional.
+- **Tabbed code**: Bad/Good, Before/After, Buggy/Fix comparisons MUST be tabbed, not stacked.
+- **Rich prose**: Every answer must be beginner-friendly, self-contained, with walkthroughs.
+- **No thin content**: Single-paragraph answers are NOT acceptable for Medium/Hard Q&As.
+
+## 27. PATTERNS TO FOLLOW FOR NEXT PAGES
 
 When building the next topic page (Builder, Prototype, etc.):
 

@@ -1220,7 +1220,7 @@ public class NotificationService(IServiceProvider sp)
 
         <!-- Q1: Multiple ways to do the same thing? -->
         <g transform="translate(360, 45)">
-          <rect x="-90" y="-25" width="180" height="50" rx="0" transform="rotate(45)" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" style="transform-origin: center; transform: rotate(45deg) scale(0.55);"/>
+          <polygon points="0,-42 84,0 0,42 -84,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5"/>
           <text text-anchor="middle" y="-6" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Multiple ways to do</text>
           <text text-anchor="middle" y="10" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">the same thing?</text>
         </g>
@@ -1237,7 +1237,7 @@ public class NotificationService(IServiceProvider sp)
 
         <!-- Q2: Selected at runtime? -->
         <g transform="translate(360, 155)">
-          <rect x="-90" y="-25" width="180" height="50" rx="0" transform="rotate(45)" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" style="transform-origin: center; transform: rotate(45deg) scale(0.55);"/>
+          <polygon points="0,-42 84,0 0,42 -84,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5"/>
           <text text-anchor="middle" y="-6" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Selected at</text>
           <text text-anchor="middle" y="10" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">runtime?</text>
         </g>
@@ -1255,7 +1255,7 @@ public class NotificationService(IServiceProvider sp)
 
         <!-- Q3: Behavior changes based on internal state? -->
         <g transform="translate(360, 265)">
-          <rect x="-90" y="-25" width="180" height="50" rx="0" transform="rotate(45)" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" style="transform-origin: center; transform: rotate(45deg) scale(0.55);"/>
+          <polygon points="0,-42 84,0 0,42 -84,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5"/>
           <text text-anchor="middle" y="-6" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Behavior tied to</text>
           <text text-anchor="middle" y="10" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">internal state?</text>
         </g>
@@ -1273,7 +1273,7 @@ public class NotificationService(IServiceProvider sp)
 
         <!-- Q4: How many algorithms? -->
         <g transform="translate(360, 370)">
-          <rect x="-90" y="-25" width="180" height="50" rx="0" transform="rotate(45)" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" style="transform-origin: center; transform: rotate(45deg) scale(0.55);"/>
+          <polygon points="0,-42 84,0 0,42 -84,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5"/>
           <text text-anchor="middle" y="-6" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">How many</text>
           <text text-anchor="middle" y="10" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">algorithms?</text>
         </g>
@@ -1483,10 +1483,53 @@ public class NotificationService(IServiceProvider sp)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Friday 5pm deploy.</strong> A developer added a new <code>BankTransferStrategy</code> class but forgot to register it in <code>Program.cs</code>. The factory's <code>IEnumerable&lt;IPaymentStrategy&gt;</code> didn't include it. Users selecting "Bank Transfer" at checkout got a <code>NotSupportedException</code> from the factory. 200+ failed orders before the on-call noticed.</p>
+          <p class="body-text"><strong>Friday 5pm deploy.</strong> The team's e-commerce app lets users pay by credit card, PayPal, or bank transfer. Each method is a separate strategy class, and the app uses a factory to pick the right one based on what the user selects at checkout.</p>
+          <p class="body-text">A developer wrote a brand-new <code>BankTransferStrategy</code> class. It compiled fine. It passed its own unit tests. The PR was reviewed and merged. Deployment went smoothly. Everyone went home for the weekend.</p>
+          <p class="body-text">But the developer forgot one critical step: <strong>telling the DI container that this new class exists.</strong> The class was sitting in the codebase, ready to work, but nobody told the app to actually use it. Think of it like hiring a new employee but never giving them a desk or login credentials.</p>
+          <p class="body-text">The factory builds its strategy dictionary from what the DI container gives it. Since <code>BankTransferStrategy</code> was never registered, the factory's dictionary simply didn't have an entry for "BankTransfer." When users selected bank transfer at checkout, the factory looked up the key, found nothing, and threw a <code>NotSupportedException</code>. This became a 500 error on the checkout page: "Something went wrong."</p>
+          <p class="body-text">Over the next 90 minutes, 200+ orders failed. Customers who picked credit card or PayPal were fine, so the issue wasn't immediately obvious from monitoring dashboards that only tracked total error rates. The on-call engineer finally spotted it after filtering errors by payment type.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">45 minutes — the error message said "Payment type 'BankTransfer' is not registered" but the team searched the strategy class first (which looked fine) before checking DI registration.</p>
+        <p class="body-text">45 minutes. The error message said "Payment type 'BankTransfer' is not registered" but the team searched the strategy class first (which looked perfect) before thinking to check <code>Program.cs</code> where DI registrations live. The class existed, its unit tests passed, and its code was correct. The gap was between "writing the code" and "wiring it into the application."</p>
+
+        <svg viewBox="0 0 720 260" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing BankTransferStrategy exists but is not registered in the DI container, so the factory dictionary is missing its entry">
+          <defs>
+            <marker id="b1-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            <marker id="b1-arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <rect x="10" y="10" width="160" height="80" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="90" y="40" text-anchor="middle" fill="#22c55e" font-size="12" font-family="system-ui, sans-serif" font-weight="600">DI Container</text>
+          <text x="90" y="58" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">CreditCard ✓</text>
+          <text x="90" y="72" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">PayPal ✓</text>
+
+          <line x1="170" y1="50" x2="230" y2="50" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#b1-arrow)"/>
+          <text x="200" y="42" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, sans-serif">injects</text>
+
+          <rect x="232" y="10" width="180" height="80" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="322" y="35" text-anchor="middle" fill="#22c55e" font-size="12" font-family="system-ui, sans-serif" font-weight="600">Factory Dictionary</text>
+          <text x="322" y="55" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">"CreditCard" → ✓</text>
+          <text x="322" y="70" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">"PayPal" → ✓</text>
+
+          <rect x="480" y="10" width="220" height="80" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="590" y="35" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">BankTransferStrategy</text>
+          <text x="590" y="55" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">Class exists in codebase</text>
+          <text x="590" y="70" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">NOT registered in DI!</text>
+
+          <rect x="140" y="130" width="200" height="50" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="240" y="155" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">User selects "Bank Transfer"</text>
+          <text x="240" y="170" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">at checkout</text>
+
+          <line x1="340" y1="155" x2="400" y2="155" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#b1-arrow)"/>
+
+          <rect x="402" y="130" width="200" height="50" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="502" y="152" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">factory.GetStrategy</text>
+          <text x="502" y="168" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">("BankTransfer")</text>
+
+          <line x1="502" y1="180" x2="502" y2="210" stroke="#ef4444" stroke-width="2" marker-end="url(#b1-arrow-red)"/>
+
+          <rect x="382" y="212" width="240" height="40" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="502" y="237" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">NotSupportedException → 500</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1509,6 +1552,7 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
 // → 500 Internal Server Error → user sees "Something went wrong"</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the first two lines. We're telling the DI container: "Hey, when someone asks for an <code>IPaymentStrategy</code>, here are two implementations you can provide: CreditCard and PayPal." But our brand-new BankTransferStrategy? It's sitting in a file somewhere, perfectly written, but we never told the DI container about it. The factory gets an <code>IEnumerable&lt;IPaymentStrategy&gt;</code> from DI, builds a dictionary from those, and "BankTransfer" simply isn't in the dictionary. The lookup fails, and a 500 error goes to the user.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1535,12 +1579,18 @@ foreach (var type in new[] { "CreditCard", "PayPal", "BankTransfer" })
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Fix 1 is the obvious answer: just add the missing line. But that's still manual, so Fix 2 is the real solution. Assembly scanning (using the Scrutor library) automatically finds every class that implements <code>IPaymentStrategy</code> and registers it. You can never "forget" again because the scan does it for you. Fix 3 is the safety net: at startup, we try to resolve every expected strategy key. If any one is missing, the app crashes immediately at deploy time instead of quietly failing when a real customer hits checkout two hours later.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Use <span class="tooltip-trigger">assembly scanning<span class="tooltip-content">Scrutor is a NuGet package that scans assemblies for classes implementing a given interface and registers them automatically. builder.Services.Scan(s => s.FromAssemblyOf&lt;IStrategy&gt;().AddClasses(c => c.AssignableTo&lt;IStrategy&gt;()).AsImplementedInterfaces()). New strategies are auto-discovered — zero manual registration.</span></span> (Scrutor) to auto-register strategies, and add a startup validation step that resolves every expected strategy key. Fail at deploy time, not at checkout time.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for classes that implement your strategy interface (e.g., <code>: IPaymentStrategy</code>). Then search your <code>Program.cs</code> (or wherever DI is configured) for registrations of that interface. If the count doesn't match, you have an unregistered strategy. Better yet, write a unit test that compares reflection-discovered implementations against DI registrations.</p>
         </div>
       </div>
     </div>
@@ -1553,10 +1603,58 @@ foreach (var type in new[] { "CreditCard", "PayPal", "BankTransfer" })
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Load test revealed data leaks.</strong> A <code>DiscountStrategy</code> stored the customer's discount percentage in a field. Registered as <span class="tooltip-trigger">Singleton<span class="tooltip-content">Singleton lifetime means ONE instance is shared across ALL requests and threads for the entire application lifetime. If that instance has mutable fields, Thread A's writes are visible to Thread B — causing data races, incorrect calculations, and data leaks between users.</span></span>, one customer's 20% discount bled into another customer's checkout. 15% of orders got incorrect pricing during peak traffic.</p>
+          <p class="body-text"><strong>Load test revealed data leaks between customers.</strong> Here's the setup: the team had a <code>LoyaltyDiscountStrategy</code> that figures out how much discount a customer gets. Gold members get 20% off, Silver gets 10%, everyone else gets nothing.</p>
+          <p class="body-text">The developer designed it in two steps. First, you call <code>Configure(customer)</code> which reads the customer's loyalty tier and saves the discount percentage into a field on the strategy object. Then, you call <code>Calculate(subtotal)</code> which uses that saved percentage to compute the discount.</p>
+          <p class="body-text">Sounds reasonable, right? The problem: this strategy was registered as a <span class="tooltip-trigger">Singleton<span class="tooltip-content">Singleton lifetime means ONE instance is shared across ALL requests and threads for the entire application lifetime. If that instance has mutable fields, Thread A's writes are visible to Thread B — causing data races, incorrect calculations, and data leaks between users.</span></span>. That means there's <strong>one single instance</strong> of this object shared by every request, every user, every thread in the entire application. Imagine a shared whiteboard in an office where different people keep erasing and rewriting the same number.</p>
+          <p class="body-text">During peak traffic, Thread A configures the strategy for a Gold customer (writes 20 to the field), but before Thread A can call <code>Calculate()</code>, Thread B comes in for a basic customer and overwrites the field with 0. Now Thread A calls <code>Calculate()</code> and reads 0 instead of 20. The Gold customer gets zero discount. Meanwhile, Thread C might read Thread B's 0 or Thread A's 20, depending on timing.</p>
+          <p class="body-text">15% of orders during the load test got incorrect pricing. Some customers got discounts they shouldn't have, some lost discounts they earned. The numbers were essentially random, depending on which thread happened to write to the field last.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">3 hours — the bug only appeared under concurrent load. Single-threaded tests passed perfectly. The team had to correlate customer IDs with discount amounts in production logs to spot the pattern.</p>
+        <p class="body-text">3 hours. The bug only appeared under concurrent load. Every single-threaded unit test passed perfectly because there was only one "person" using the whiteboard at a time. The team had to correlate customer IDs with discount amounts in production logs to spot the pattern: Gold customers sometimes getting 0% discount, basic customers sometimes getting 20%.</p>
+
+        <svg viewBox="0 0 720 280" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing two threads racing to write and read a shared mutable field on a Singleton strategy, causing data corruption">
+          <defs>
+            <marker id="b2-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            <marker id="b2-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+            <marker id="b2-arr-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+          </defs>
+          <!-- Singleton box -->
+          <rect x="250" y="10" width="220" height="60" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+          <text x="360" y="32" text-anchor="middle" fill="#eab308" font-size="12" font-family="system-ui, sans-serif" font-weight="600">Singleton Strategy (1 instance)</text>
+          <text x="360" y="52" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="system-ui, sans-serif">_discountPercentage = ???</text>
+
+          <!-- Thread A -->
+          <rect x="30" y="100" width="160" height="40" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="110" y="125" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Thread A: Gold Customer</text>
+
+          <line x1="190" y1="115" x2="290" y2="55" stroke="#22c55e" stroke-width="1.5" marker-end="url(#b2-arr-grn)"/>
+          <text x="218" y="78" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">1. Configure → writes 20</text>
+
+          <!-- Thread B -->
+          <rect x="530" y="100" width="170" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="615" y="125" text-anchor="middle" fill="#ef4444" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Thread B: Basic Customer</text>
+
+          <line x1="530" y1="115" x2="435" y2="55" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b2-arr-red)"/>
+          <text x="502" y="78" fill="#ef4444" font-size="9" font-family="system-ui, sans-serif">2. Configure → writes 0</text>
+
+          <!-- Timeline -->
+          <line x1="110" y1="160" x2="110" y2="265" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <line x1="615" y1="160" x2="615" y2="265" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+          <!-- Step 3 -->
+          <rect x="30" y="180" width="160" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+          <text x="110" y="200" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">3. Calculate(100)</text>
+
+          <rect x="250" y="180" width="220" height="35" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="360" y="196" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">Reads 0 (Thread B's value!)</text>
+          <text x="360" y="210" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">100 * 0/100 = $0 discount</text>
+
+          <line x1="190" y1="197" x2="248" y2="197" stroke="#22c55e" stroke-width="1" marker-end="url(#b2-arr-grn)"/>
+
+          <!-- Result -->
+          <rect x="180" y="232" width="360" height="35" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="254" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">Gold customer gets $0 discount instead of $20!</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1594,6 +1692,7 @@ builder.Services.AddSingleton&lt;IDiscountStrategy, LoyaltyDiscountStrategy&gt;(
 // Thread A: Calculate(100) → 100 * 0/100 = $0 ← WRONG! Gold customer got no discount</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> See that <code>_discountPercentage</code> field on line 4? That's the shared whiteboard. The <code>Configure()</code> method writes to it, and the <code>Calculate()</code> method reads from it. With a Singleton, this is ONE object serving ALL requests simultaneously. Thread A writes 20, Thread B writes 0, and then Thread A reads 0 because Thread B overwrote it. The two-step "configure then calculate" design is fundamentally unsafe when the object is shared.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1623,12 +1722,18 @@ builder.Services.AddSingleton&lt;IDiscountStrategy, LoyaltyDiscountStrategy&gt;(
 // builder.Services.AddScoped&lt;IDiscountStrategy, StatefulDiscount&gt;();</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of saving customer data in a field (shared whiteboard), we pass it directly as a method parameter. Now the <code>Calculate()</code> method receives everything it needs as input, computes the result using only local variables (which live on each thread's own stack, not shared memory), and returns the answer. There's no field to overwrite, no shared state, no race condition. Each thread gets its own copy of the <code>percentage</code> variable. The strategy can safely stay as a Singleton because it doesn't hold any per-request data.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Strategies should be <strong>stateless</strong> whenever possible — pass varying data as method parameters, not mutable fields. If you must have state, register as Scoped or Transient, never Singleton. Run concurrency tests during CI.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for strategy classes that have <strong>non-readonly fields</strong> or properties with setters. If a strategy object is mutated after construction (anything that isn't set in the constructor), it's stateful. Then check how it's registered in DI: if it's <code>AddSingleton</code> and has mutable fields, you have a race condition waiting to happen under concurrent load.</p>
         </div>
       </div>
     </div>
@@ -1641,10 +1746,50 @@ builder.Services.AddSingleton&lt;IDiscountStrategy, LoyaltyDiscountStrategy&gt;(
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Customer refund crashed.</strong> The <code>IPaymentStrategy</code> interface had 4 methods: <code>Process</code>, <code>Refund</code>, <code>Void</code>, <code>Capture</code>. Bitcoin strategy couldn't support refunds (blockchain transactions are irreversible), so the developer threw <code>NotImplementedException</code>. A customer service agent tried to refund a Bitcoin payment and got a 500 error.</p>
+          <p class="body-text"><strong>Customer service refund crashed.</strong> The team's payment system had a single interface, <code>IPaymentStrategy</code>, with four methods: <code>ProcessAsync</code>, <code>RefundAsync</code>, <code>VoidAsync</code>, and <code>CaptureAsync</code>. Every payment strategy had to implement all four.</p>
+          <p class="body-text">This worked fine for credit cards and PayPal, which support all those operations. But then the team added Bitcoin as a payment method. Here's the thing: blockchain transactions are <strong>irreversible by design.</strong> You literally cannot refund or void a Bitcoin payment. It's not a limitation of their code; it's how the technology works.</p>
+          <p class="body-text">The developer was stuck. The interface forced them to implement <code>RefundAsync</code>, <code>VoidAsync</code>, and <code>CaptureAsync</code> even though Bitcoin can't do any of those. So they did what many developers do in this situation: they threw <code>NotImplementedException</code> from all three methods. Essentially, the class was saying "yes, I can do refunds" (because it implements the interface) but then throwing an error when you actually ask it to do one. The class was <em>lying about its capabilities.</em></p>
+          <p class="body-text">A few weeks later, a customer service agent tried to refund a Bitcoin order through the admin dashboard. The system called <code>RefundAsync</code>, got a <code>NotImplementedException</code>, and showed a 500 error page. The agent tried again. Same error. They escalated to engineering, thinking the refund system was broken. Meanwhile, the customer waited three days for their refund before the team realized Bitcoin refunds are literally impossible and the admin UI should have never shown the "Refund" button in the first place.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">10 minutes — the stack trace pointed directly at the <code>NotImplementedException</code>. But the <em>design fix</em> took 2 days because refactoring the interface affected all existing strategies.</p>
+        <p class="body-text">10 minutes to find the <code>NotImplementedException</code>. But the <em>design fix</em> took 2 full days because splitting the interface meant updating every existing strategy (CreditCard, PayPal, BankTransfer) and every place that called those methods. This is the real cost of fat interfaces: the fix is never just the one class that broke.</p>
+
+        <svg viewBox="0 0 720 280" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing a fat interface forcing Bitcoin to implement methods it cannot support, causing NotImplementedException at runtime">
+          <defs>
+            <marker id="b3-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <!-- Fat interface -->
+          <rect x="230" y="8" width="260" height="95" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+          <text x="360" y="28" text-anchor="middle" fill="#eab308" font-size="12" font-family="system-ui, sans-serif" font-weight="600">IPaymentStrategy (fat)</text>
+          <text x="360" y="46" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif">ProcessAsync() ✓</text>
+          <text x="360" y="60" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">RefundAsync() ✗ for Bitcoin</text>
+          <text x="360" y="74" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">VoidAsync() ✗ for Bitcoin</text>
+          <text x="360" y="88" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">CaptureAsync() ✗ for Bitcoin</text>
+
+          <!-- CreditCard -->
+          <rect x="30" y="135" width="175" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="117" y="157" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">CreditCardStrategy</text>
+          <text x="117" y="175" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">All 4 methods work ✓</text>
+          <line x1="117" y1="135" x2="300" y2="103" stroke="#22c55e" stroke-width="1" marker-end="url(#b3-arrow)"/>
+
+          <!-- Bitcoin -->
+          <rect x="270" y="135" width="180" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="157" text-anchor="middle" fill="#ef4444" font-size="11" font-family="system-ui, sans-serif" font-weight="600">BitcoinStrategy</text>
+          <text x="360" y="175" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">3 of 4 throw exceptions!</text>
+          <line x1="360" y1="135" x2="360" y2="103" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b3-arrow)"/>
+
+          <!-- PayPal -->
+          <rect x="515" y="135" width="175" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="602" y="157" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">PayPalStrategy</text>
+          <text x="602" y="175" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">All 4 methods work ✓</text>
+          <line x1="602" y1="135" x2="420" y2="103" stroke="#22c55e" stroke-width="1" marker-end="url(#b3-arrow)"/>
+
+          <!-- Runtime call -->
+          <rect x="200" y="215" width="320" height="50" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="236" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">Agent clicks "Refund" on Bitcoin order</text>
+          <text x="360" y="254" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">NotImplementedException → 500 error</text>
+          <line x1="360" y1="190" x2="360" y2="213" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1681,6 +1826,7 @@ public class BitcoinStrategy : IPaymentStrategy
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The interface on lines 2-7 says "any payment strategy must be able to process, refund, void, and capture." That's fine for credit cards, but Bitcoin physically cannot do three of those things. The developer's hands were tied: the interface forced them to write methods that do nothing except blow up. Lines 15-20 are essentially lies. The class says "I implement IPaymentStrategy" (which implies I can do all four operations), but three of them throw exceptions. The compiler is happy, but the system is broken at runtime.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1725,12 +1871,18 @@ else
     return BadRequest("This payment method doesn't support refunds");</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of one big interface that forces every strategy to support every operation, we split it into small, focused interfaces. <code>IPaymentProcessor</code> handles the core payment. <code>IRefundable</code> is only for strategies that actually support refunds. Bitcoin only implements <code>IPaymentProcessor</code> and never lies about capabilities it doesn't have. The refund endpoint uses C#'s <code>is</code> pattern matching to check: "Does this strategy support refunds?" If yes, call it. If no, return a clear error message to the UI. Now the admin dashboard can hide the "Refund" button for Bitcoin orders entirely because it can check <code>strategy is IRefundable</code> at render time.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">If any implementation throws <code>NotImplementedException</code>, your interface is too fat. Split it per ISP. Use <code>is</code> pattern matching to check capabilities at runtime. A strategy should <strong>never lie</strong> about what it can do.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your entire codebase for <code>NotImplementedException</code>. Every instance is a red flag: it means some class is promising it can do something but actually can't. Also check for methods that return dummy values or do nothing (empty method bodies). These are all signs that the interface is forcing implementations to lie.</p>
         </div>
       </div>
     </div>
@@ -1743,10 +1895,44 @@ else
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Guest checkout crashed.</strong> Logged-in users had a discount strategy resolved from their profile. Guest users had no profile, so the discount strategy was null. The pricing engine called <code>_discount.Calculate()</code> on null — <code>NullReferenceException</code> on every guest checkout.</p>
+          <p class="body-text"><strong>Guest checkout crashed.</strong> The e-commerce app applied discounts based on loyalty tiers. When a logged-in user reached checkout, the system looked up their loyalty tier (Gold, Silver, etc.) and resolved the matching discount strategy. Gold members got 20% off, Silver got 10%.</p>
+          <p class="body-text">But what about guest users? They don't have accounts, so they don't have loyalty tiers. The factory method that resolves discount strategies received <code>null</code> as the loyalty tier and returned <code>null</code> as the strategy. The pricing engine then called <code>discount.Calculate(subtotal)</code> on null, and boom: <code>NullReferenceException</code>.</p>
+          <p class="body-text">Every single guest checkout crashed. This wasn't a rare edge case either. Guest checkout accounted for 40% of all orders. The site was essentially broken for nearly half of all customers. The team quickly added a <code>if (discount != null)</code> check as a hotfix, but that just kicked the can down the road. Every place in the codebase that used the discount strategy now needed its own null check, and forgetting any one of them would cause the same crash.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">5 minutes — the NRE stack trace was clear. But it revealed a design gap: the system didn't have a <span class="tooltip-trigger">Null Object<span class="tooltip-content">A design pattern where instead of using null, you provide a "do nothing" implementation. NullDiscountStrategy returns 0 discount. This eliminates null checks throughout the codebase — the Context always has a valid strategy, it just might be one that does nothing.</span></span> fallback.</p>
+        <p class="body-text">5 minutes. The <code>NullReferenceException</code> stack trace pointed directly at the line. But it revealed a deeper design gap: the system assumed every user would always have a discount strategy, and had no concept of "no discount."</p>
+
+        <svg viewBox="0 0 720 250" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing factory returning null for guest users, causing NullReferenceException in PricingEngine">
+          <defs>
+            <marker id="b4-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            <marker id="b4-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+            <marker id="b4-arr-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+          </defs>
+          <!-- Factory -->
+          <rect x="250" y="10" width="220" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="360" y="32" text-anchor="middle" fill="#22c55e" font-size="12" font-family="system-ui, sans-serif" font-weight="600">Discount Factory</text>
+          <text x="360" y="50" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">GetStrategy(loyaltyTier)</text>
+
+          <!-- Gold path -->
+          <rect x="30" y="95" width="160" height="40" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="110" y="119" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif">"Gold" → 20% discount ✓</text>
+          <line x1="250" y1="55" x2="140" y2="93" stroke="#22c55e" stroke-width="1" marker-end="url(#b4-arr-grn)"/>
+
+          <!-- Guest path -->
+          <rect x="530" y="95" width="170" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="615" y="119" text-anchor="middle" fill="#ef4444" font-size="11" font-family="system-ui, sans-serif">null tier → returns null</text>
+          <line x1="470" y1="55" x2="590" y2="93" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b4-arr-red)"/>
+
+          <!-- Pricing Engine -->
+          <rect x="370" y="160" width="260" height="40" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="500" y="184" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">PricingEngine: discount.Calculate()</text>
+          <line x1="615" y1="135" x2="540" y2="158" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b4-arr-red)"/>
+
+          <!-- NRE -->
+          <rect x="400" y="215" width="200" height="30" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="500" y="235" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">NullReferenceException!</text>
+          <line x1="500" y1="200" x2="500" y2="213" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b4-arr-red)"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1772,6 +1958,7 @@ public class PricingEngine(IDiscountStrategy? discount)
 // discount.Calculate() → NullReferenceException → 500 error</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Notice the <code>?</code> in <code>IDiscountStrategy? discount</code> on the first line. That question mark is the C# way of saying "this might be null." But then on line 7, we call <code>discount.Calculate(subtotal)</code> without checking whether <code>discount</code> is actually null. For logged-in Gold and Silver members, the factory returns a real strategy object, and everything works. For guest users with no loyalty tier, the factory returns null, and this line crashes. The <code>?</code> was an honest declaration that null is possible, but the code never handled the null case.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1806,12 +1993,18 @@ public class PricingEngine(IDiscountStrategy discount)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of returning null for "no discount," we created a <code>NoDiscount</code> class that implements <code>IDiscountStrategy</code> but always returns zero. It's a real, valid strategy object; it just happens to do nothing. Now the factory never returns null. Guest users get <code>NoDiscount.Instance</code>, which calculates a discount of $0. The pricing engine doesn't need any null checks because it always has a real strategy object to work with. Every code path is safe by default. Notice the parameter type changed from <code>IDiscountStrategy?</code> (nullable) to <code>IDiscountStrategy</code> (non-nullable). The type system now enforces that a strategy is always present.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Never return null from a factory — use the <strong><span class="tooltip-trigger">Null Object pattern<span class="tooltip-content">Instead of returning null when no strategy applies, return a strategy that does nothing. NullDiscountStrategy.Calculate() returns 0. NullLogger.Log() discards messages. The Context never needs null checks — every code path is safe.</span></span></strong>. A "do nothing" strategy (<code>NoDiscount</code>, <code>NullLogger</code>) eliminates null checks throughout your codebase and makes every code path safe by default.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for nullable strategy parameters (<code>IStrategy?</code>) and factory methods that can return null. Also search for <code>if (strategy != null)</code> null checks scattered around the codebase. If you find either, you're missing a Null Object implementation. The fix is simple: create a "do nothing" strategy and make the factory's default case return it instead of null.</p>
         </div>
       </div>
     </div>
@@ -1824,10 +2017,53 @@ public class PricingEngine(IDiscountStrategy discount)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Inconsistent behavior across endpoints.</strong> Three different controllers each had their own switch statement to select the payment strategy. When "ApplePay" was added, two controllers were updated but one was missed. Users accessing checkout via the mobile API got "Unknown payment type" while the web API worked fine.</p>
+          <p class="body-text"><strong>Inconsistent behavior across endpoints.</strong> The app had three API endpoints that needed to pick the right payment strategy: the web checkout page, the mobile app checkout, and an internal admin tool for manual charges. Each controller had its own copy-pasted switch statement to map "CreditCard" to <code>CreditCardStrategy</code>, "PayPal" to <code>PayPalStrategy</code>, and so on.</p>
+          <p class="body-text">When the team added Apple Pay support, the developer updated the web controller and the admin tool's switch statement. They tested both, confirmed Apple Pay worked, and shipped the PR. But they didn't realize the mobile controller had its own separate switch statement doing the same thing. It was in a different file, written months earlier by a different developer.</p>
+          <p class="body-text">For two weeks, Apple Pay worked perfectly on the website but crashed on the mobile app. Mobile users who selected Apple Pay at checkout got "Unknown payment type." The team initially assumed the bug was in the mobile client app (maybe the iOS app was sending the wrong string?), which sent them on a wild goose chase through Swift code. It took 2 hours of comparing server-side logs from both endpoints before someone realized the problem was three identical switch statements, with one of them out of date.</p>
+          <p class="body-text">This is the classic copy-paste problem. Every copy of the switch statement is a liability. With N copies and a new strategy, you need to update N files. Miss one, and you get a silent inconsistency that only shows up through that specific code path.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">2 hours — the team assumed it was a mobile client bug. Only after comparing server logs from web vs mobile endpoints did they discover the missing case in the mobile controller.</p>
+        <p class="body-text">2 hours. The team spent most of that time looking at the mobile client instead of the server, because the web version worked fine. Only when they compared raw HTTP responses from both endpoints side-by-side did they see that the same request got different results from different controllers.</p>
+
+        <svg viewBox="0 0 720 260" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing three controllers with duplicated switch statements, where one is missing the ApplePay case">
+          <defs>
+            <marker id="b5-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-size="13" font-family="system-ui, sans-serif" font-weight="600">Strategy selection duplicated in 3 places</text>
+
+          <!-- Web Controller -->
+          <rect x="20" y="40" width="210" height="90" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="125" y="60" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Web Controller</text>
+          <text x="125" y="78" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">CreditCard ✓</text>
+          <text x="125" y="91" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">PayPal ✓</text>
+          <text x="125" y="104" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">ApplePay ✓ (updated)</text>
+          <text x="125" y="120" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">switch #1</text>
+
+          <!-- Mobile Controller -->
+          <rect x="255" y="40" width="210" height="90" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="60" text-anchor="middle" fill="#ef4444" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Mobile Controller</text>
+          <text x="360" y="78" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">CreditCard ✓</text>
+          <text x="360" y="91" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">PayPal ✓</text>
+          <text x="360" y="104" text-anchor="middle" fill="#ef4444" font-size="9" font-family="system-ui, sans-serif">ApplePay ✗ MISSING!</text>
+          <text x="360" y="120" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">switch #2</text>
+
+          <!-- Admin Controller -->
+          <rect x="490" y="40" width="210" height="90" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="595" y="60" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Admin Controller</text>
+          <text x="595" y="78" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">CreditCard ✓</text>
+          <text x="595" y="91" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">PayPal ✓</text>
+          <text x="595" y="104" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">ApplePay ✓ (updated)</text>
+          <text x="595" y="120" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">switch #3</text>
+
+          <!-- Mobile user path -->
+          <rect x="180" y="160" width="200" height="35" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="280" y="182" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">Mobile user picks ApplePay</text>
+          <line x1="280" y1="160" x2="340" y2="132" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b5-arrow)"/>
+
+          <rect x="220" y="210" width="240" height="35" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="340" y="232" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">"Unknown payment type" → 500</text>
+          <line x1="280" y1="195" x2="320" y2="208" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b5-arrow)"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1870,6 +2106,7 @@ public class MobileCheckoutController : ControllerBase
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Both controllers have their own switch statements doing the exact same job: mapping a string to a strategy class. The web controller on lines 6-12 was updated to include ApplePay. But the mobile controller on lines 21-26 is an older copy that never got the update. This is the fundamental problem with duplication: you need to remember to update every copy, and humans are terrible at remembering. The compiler can't help you here because each switch is independently valid. It's only when a user hits the mobile path with "ApplePay" that the missing case becomes a runtime error.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -1901,12 +2138,18 @@ public class WebCheckoutController(IPaymentStrategyFactory factory) : Controller
 // Adding ApplePay: one new class + one DI line + ZERO controller changes</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of each controller doing its own strategy lookup, we created one factory that owns the entire mapping. The factory builds a dictionary from all registered strategies at startup. Both controllers now simply call <code>factory.GetStrategy(req.PaymentType)</code> and get the correct strategy. When you add Apple Pay (or any new strategy), you write one new class, register it in DI, and every controller automatically gets access to it through the factory. Zero controller changes needed, zero duplication, zero chance of forgetting to update a copy.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Strategy selection logic should live in <strong>one place</strong> — a factory or the DI container. If you find strategy resolution code in more than one file, you have a <span class="tooltip-trigger">DRY violation<span class="tooltip-content">Don't Repeat Yourself. Duplicated strategy selection means every new strategy requires updates in N places. A factory or Keyed Services ensures strategy resolution is centralized, so new strategies are added in exactly one place.</span></span> waiting to cause an inconsistency bug.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for the strategy interface name (e.g., <code>IPaymentStrategy</code>) and see how many places resolve or select a specific implementation. If you find switch statements or dictionary lookups in more than one file, you have duplicated selection logic. Consolidate it into a single factory class or use .NET 8 Keyed Services.</p>
         </div>
       </div>
     </div>
@@ -1919,10 +2162,55 @@ public class WebCheckoutController(IPaymentStrategyFactory factory) : Controller
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>All payments went through PayPal.</strong> A developer registered two implementations of <code>IPaymentStrategy</code> without using keyed services. .NET DI's "last registration wins" behavior meant <code>PayPalStrategy</code> (registered last) was always injected, even when customers chose credit card.</p>
+          <p class="body-text"><strong>All payments went through PayPal.</strong> A developer registered two implementations of <code>IPaymentStrategy</code> in the DI container. CreditCard was registered first, PayPal second. Both registrations used the same interface: <code>IPaymentStrategy</code>.</p>
+          <p class="body-text">Here's the surprising behavior: when a controller asked DI for a single <code>IPaymentStrategy</code>, .NET's DI container always gave it the <strong>last one registered.</strong> Not the first. Not an error. Not a warning. Just silently the last one. Since PayPal was registered second, every single checkout used <code>PayPalStrategy</code>, regardless of what the customer selected.</p>
+          <p class="body-text">Customers who chose "Credit Card" were actually being charged through PayPal. The payments went through (because PayPal accepted the charges), but the reconciliation was a nightmare. Stripe's dashboard showed zero revenue. PayPal showed double the expected volume. The accounting team flagged it after one hour, thinking it was a PayPal processing issue. It was actually a one-line DI registration ordering bug.</p>
+          <p class="body-text">The worst part? There was no error. No exception. No warning in the logs. The system worked "correctly" by DI container rules; it just wasn't the behavior anyone expected. This is a silent, data-corrupting bug.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">1 hour — Stripe dashboard showed zero charges, PayPal showed double the expected volume. Logging revealed every checkout was hitting PayPalStrategy regardless of user selection.</p>
+        <p class="body-text">1 hour. The Stripe dashboard tipped them off (zero charges), but the team first suspected Stripe API issues, then network problems, then configuration errors. Only after adding a log statement that printed the concrete strategy type (<code>strategy.GetType().Name</code>) did they see "PayPalStrategy" on every request, including credit card checkouts.</p>
+
+        <svg viewBox="0 0 720 250" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing .NET DI last-registration-wins behavior where PayPal always wins over CreditCard">
+          <defs>
+            <marker id="b6-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            <marker id="b6-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-size="13" font-family="system-ui, sans-serif" font-weight="600">.NET DI: "Last Registration Wins"</text>
+
+          <!-- Registration order -->
+          <rect x="40" y="40" width="250" height="65" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="165" y="60" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="system-ui, sans-serif" font-weight="600">DI Registrations (Program.cs)</text>
+          <text x="165" y="78" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">1st: AddScoped → CreditCardStrategy</text>
+          <text x="165" y="93" text-anchor="middle" fill="#eab308" font-size="10" font-family="system-ui, sans-serif" font-weight="600">2nd: AddScoped → PayPalStrategy ← LAST</text>
+
+          <!-- Arrow -->
+          <line x1="290" y1="72" x2="340" y2="72" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#b6-arrow)"/>
+
+          <!-- Resolve single -->
+          <rect x="342" y="40" width="200" height="65" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+          <text x="442" y="60" text-anchor="middle" fill="#eab308" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Resolve Single</text>
+          <text x="442" y="78" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">sp.GetService&lt;IPayment&gt;()</text>
+          <text x="442" y="93" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">Always → PayPalStrategy</text>
+
+          <!-- vs Resolve all -->
+          <rect x="560" y="40" width="140" height="65" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="630" y="60" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Resolve All</text>
+          <text x="630" y="78" text-anchor="middle" fill="#e2e8f0" font-size="9" font-family="system-ui, sans-serif">IEnumerable&lt;T&gt;</text>
+          <text x="630" y="93" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">Gets both ✓</text>
+
+          <!-- User picks credit card -->
+          <rect x="80" y="135" width="230" height="40" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="195" y="160" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">User picks "Credit Card" at checkout</text>
+
+          <line x1="310" y1="155" x2="375" y2="155" stroke="#ef4444" stroke-width="1.5" marker-end="url(#b6-arr-red)"/>
+
+          <rect x="377" y="135" width="230" height="40" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="492" y="152" text-anchor="middle" fill="#ef4444" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Gets PayPalStrategy anyway!</text>
+          <text x="492" y="168" text-anchor="middle" fill="#ef4444" font-size="9" font-family="system-ui, sans-serif">No error, no warning. Silent.</text>
+
+          <rect x="200" y="200" width="320" height="35" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="222" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="600">Stripe: $0 | PayPal: 2x revenue | Accounting: panic</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1941,6 +2229,7 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();  // ← Th
 // IEnumerable&lt;IPaymentStrategy&gt; would give both, but single injection gives last</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Both lines register a different class for the same interface. In .NET's DI container, when you register multiple implementations for the same interface and then inject a <em>single</em> instance (not <code>IEnumerable</code>), the container gives you the last one registered. Line 2 registers CreditCard. Line 3 registers PayPal. PayPal is last, so PayPal always wins. The DI container doesn't throw an error, doesn't warn you, doesn't even log a message. It just silently picks the last one. This is documented behavior, but it trips up even experienced developers.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -1962,12 +2251,18 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
 // Always inject IPaymentStrategyFactory and resolve by key</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Fix 1 (Keyed Services) gives each registration a unique string key. When you resolve by key, there's no ambiguity: "CreditCard" always gives you <code>CreditCardStrategy</code>, "PayPal" always gives you <code>PayPalStrategy</code>. Fix 2 (IEnumerable + Factory) keeps both registrations, but instead of injecting a single <code>IPaymentStrategy</code>, you inject <em>all of them</em> as a collection and let a factory pick the right one by name. Fix 3 is the rule that prevents this class of bugs entirely: never let any controller inject <code>IPaymentStrategy</code> directly. Always go through a factory or keyed resolution.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Never inject a <strong>single</strong> <code>IStrategy</code> when you have multiple implementations registered. Use Keyed Services (.NET 8+), <code>IEnumerable&lt;IStrategy&gt;</code> with a factory, or named registrations. The "last registration wins" behavior is silent and dangerous.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your DI registrations for cases where the same interface appears in multiple <code>AddScoped</code>/<code>AddSingleton</code> lines. Then check if any class injects that interface as a single instance (not <code>IEnumerable</code>). If yes, you're silently getting only the last-registered one. Add a unit test that resolves <code>IEnumerable&lt;IStrategy&gt;</code> and asserts the count matches your expectation.</p>
         </div>
       </div>
     </div>
@@ -1991,8 +2286,22 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating an interface, two classes, and a factory to replace a simple <code>if (isPremium) discount = 10 else discount = 0</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> More code, more files, more DI registrations — all for a binary choice that will never grow. The code is <em>harder</em> to read, not easier.</p>
-          <p class="body-text"><strong>Fix:</strong> Use Strategy when you have 3+ variants or when you <em>expect</em> the number to grow. For 2 simple options with no dependencies, a conditional is perfectly fine.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You just learned Strategy pattern and you're excited. You see a conditional and think "I should extract that into strategies!" The pattern looks clean in tutorials, so you reach for it everywhere. But patterns exist to solve complexity, and sometimes a simple <code>if</code> statement is the best code. Not everything needs to be a class hierarchy.</p>
+          <p class="body-text">Think of it this way: you don't hire a moving company to carry a sandwich across the room. The overhead of the tool must match the complexity of the problem. Two simple options with no dependencies, no external APIs, and no growth potential? An <code>if</code> is perfect.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverEngineered.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Over-engineered for a simple binary choice
+public interface IDiscountStrategy { decimal GetDiscount(); }
+public class PremiumDiscount : IDiscountStrategy { public decimal GetDiscount() =&gt; 10m; }
+public class NoDiscount : IDiscountStrategy { public decimal GetDiscount() =&gt; 0m; }
+// + factory, + DI registration, + tests for each class = ~50 lines
+
+// ✅ Just use an if statement — this is perfectly readable
+decimal discount = isPremium ? 10m : 0m;</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Use Strategy when you have 3+ variants, when each variant has its own dependencies (API clients, settings), or when you <em>know</em> the number will grow. For 2 simple options with no dependencies, a conditional is perfectly fine and far more readable.</p>
         </div>
       </div>
     </div>
@@ -2005,8 +2314,33 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> An <code>IPaymentStrategy</code> with <code>Process()</code>, <code>Refund()</code>, <code>Void()</code>, <code>Capture()</code>, <code>GetStatus()</code>, and <code>SendReceipt()</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Forces every implementation to deal with methods it may not support. Bitcoin can't refund. Cash on delivery can't capture. Leads to <code>NotImplementedException</code> landmines.</p>
-          <p class="body-text"><strong>Fix:</strong> Apply ISP — split into focused interfaces: <code>IPaymentProcessor</code>, <code>IRefundable</code>, <code>IVoidable</code>. Implementations only adopt the interfaces they genuinely support.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It feels natural to group all payment-related operations into one interface. After all, they're all about payments, right? The developer thinks "these operations belong together because they all relate to the same domain." But grouping by domain isn't the same as grouping by capability. Not every payment method can do every operation. Forcing them to pretend they can is a recipe for runtime exceptions.</p>
+          <p class="body-text">This is an ISP (Interface Segregation Principle) violation. The interface is making promises that some implementations can't keep. When a class throws <code>NotImplementedException</code>, it's essentially lying to the caller: "I implement this interface, meaning I can do everything it defines" when actually it can't.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodInterface.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ God interface — too many methods, not all strategies can support all of them
+public interface IPaymentStrategy
+{
+    Task&lt;PaymentResult&gt; ProcessAsync(decimal amount, PaymentContext ctx);
+    Task&lt;RefundResult&gt; RefundAsync(string txId, decimal amount);
+    Task VoidAsync(string txId);
+    Task&lt;CaptureResult&gt; CaptureAsync(string authId, decimal amount);
+    Task&lt;StatusResult&gt; GetStatusAsync(string txId);
+    Task SendReceiptAsync(string txId, string email);
+}
+
+// ✅ Split by capability — each strategy only implements what it truly supports
+public interface IPaymentProcessor { Task&lt;PaymentResult&gt; ProcessAsync(...); }
+public interface IRefundable { Task&lt;RefundResult&gt; RefundAsync(...); }
+public interface IVoidable { Task VoidAsync(...); }
+
+// Bitcoin only implements process. CreditCard implements all three.
+public class BitcoinStrategy : IPaymentProcessor { /* only ProcessAsync */ }
+public class CreditCardStrategy : IPaymentProcessor, IRefundable, IVoidable { /* all */ }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Apply ISP. Split your fat interface into focused, single-capability interfaces. Each strategy class then implements only the interfaces it genuinely supports. Callers use <code>is</code> pattern matching to check capabilities: <code>if (strategy is IRefundable r) await r.RefundAsync(...);</code></p>
         </div>
       </div>
     </div>
@@ -2019,8 +2353,35 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> The Context casting the strategy to a concrete type: <code>if (strategy is CreditCardStrategy cc) cc.SetApiVersion("v2")</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Defeats the entire purpose of Strategy. The Context now depends on concrete implementations, making it impossible to swap strategies transparently.</p>
-          <p class="body-text"><strong>Fix:</strong> The Context should ONLY call methods defined on the strategy interface. If you need type-specific behavior, add it to the interface or use a separate interface that some strategies implement.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You have a strategy interface, but one specific implementation needs some extra setup. Maybe the Stripe API requires a version header, or PayPal needs a sandbox toggle. The quick fix is to cast the strategy to its concrete type inside the Context and call the extra method. It "works" today, but you've just hardwired the Context to a specific implementation.</p>
+          <p class="body-text">The whole point of Strategy is that the Context doesn't know or care which concrete strategy it holds. The moment you write <code>if (strategy is CreditCardStrategy)</code>, you've broken that contract. Now the Context can't work with new strategies without being modified. You can't swap CreditCardStrategy for a mock in tests without the cast failing. You've turned a clean abstraction into a leaky one.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LeakyContext.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Context knows about concrete strategies — defeats the pattern
+public class CheckoutService(IPaymentStrategy strategy)
+{
+    public async Task&lt;OrderResult&gt; ProcessOrder(Order order)
+    {
+        if (strategy is CreditCardStrategy cc)
+            cc.SetApiVersion("v2");  // ❌ Tight coupling to CreditCard
+        if (strategy is PayPalStrategy pp)
+            pp.EnableSandbox(false);  // ❌ Tight coupling to PayPal
+
+        return await strategy.ProcessAsync(order.Total, order.Context);
+    }
+}
+
+// ✅ Move configuration into the strategy itself (via DI/options)
+public class CreditCardStrategy(IOptions&lt;StripeSettings&gt; opts) : IPaymentStrategy
+{
+    // API version comes from settings, not from the Context
+    public async Task&lt;PaymentResult&gt; ProcessAsync(decimal amount, PaymentContext ctx)
+        =&gt; await _stripe.ChargeAsync(amount, opts.Value.ApiVersion);
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> The Context should ONLY call methods defined on the strategy interface. Strategy-specific configuration belongs inside the strategy class, injected via <code>IOptions&lt;T&gt;</code> or constructor parameters. The Context never knows what kind of strategy it's holding.</p>
         </div>
       </div>
     </div>
@@ -2032,9 +2393,24 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> CreditCardStrategy needs <code>IStripeClient</code>, PayPalStrategy needs <code>IPayPalClient</code> + <code>IHttpClientFactory</code>, BankTransferStrategy needs <code>IBankApi</code> + <code>IEncryptionService</code>. Registering all of them means DI must resolve dependencies for ALL strategies even when only one is used.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Increased memory usage, slower startup, potential for DI resolution failures on strategies that aren't even needed for the current request.</p>
-          <p class="body-text"><strong>Fix:</strong> Use <strong>lazy resolution</strong> via <span class="tooltip-trigger"><code>Func&lt;string, IPaymentStrategy&gt;</code><span class="tooltip-content">A factory delegate registered in DI: builder.Services.AddScoped(sp => (string key) => key switch { "CreditCard" => sp.GetRequiredService&lt;CreditCardStrategy&gt;(), ... }). This defers strategy creation until the key is known, avoiding eager resolution of all strategies.</span></span> factory delegate, or use Keyed Services to resolve only the needed strategy. Alternatively, register strategies as Transient so unused ones aren't created.</p>
+          <p class="body-text"><strong>Mistake:</strong> CreditCardStrategy needs <code>IStripeClient</code>, PayPalStrategy needs <code>IPayPalClient</code> + <code>IHttpClientFactory</code>, BankTransferStrategy needs <code>IBankApi</code> + <code>IEncryptionService</code>. Registering all of them means DI must resolve dependencies for ALL strategies even when only one is used per request.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You register all strategies eagerly (using <code>IEnumerable&lt;IPaymentStrategy&gt;</code> in a factory). The DI container creates instances of ALL strategies every time the factory is resolved, even though the current request will only use one. If CreditCardStrategy needs an expensive Stripe client, PayPal needs an HTTP client factory, and Bitcoin needs a blockchain node connection, you're paying the construction cost of all three when you only need one.</p>
+          <p class="body-text">For most web apps this is negligible. But if strategies have expensive dependencies (database connections, HTTP clients with connection pools, third-party SDK initializations), the waste adds up, and you might hit DI resolution failures for services that aren't even configured for the current environment.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LazyResolution.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Eager: ALL strategies created even though only one is used
+public class PaymentFactory(IEnumerable&lt;IPaymentStrategy&gt; all) { /* all created */ }
+
+// ✅ Lazy: Only the needed strategy is created
+builder.Services.AddKeyedScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;("CreditCard");
+builder.Services.AddKeyedScoped&lt;IPaymentStrategy, PayPalStrategy&gt;("PayPal");
+
+// Resolve only what you need — other strategies are never instantiated
+var strategy = sp.GetRequiredKeyedService&lt;IPaymentStrategy&gt;("CreditCard");</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Use Keyed Services (.NET 8+) to resolve only the specific strategy needed. Or use a <span class="tooltip-trigger"><code>Func&lt;string, IPaymentStrategy&gt;</code><span class="tooltip-content">A factory delegate registered in DI: builder.Services.AddScoped(sp => (string key) => key switch { "CreditCard" => sp.GetRequiredService&lt;CreditCardStrategy&gt;(), ... }). This defers strategy creation until the key is known, avoiding eager resolution of all strategies.</span></span> factory delegate that defers creation until the key is known.</p>
         </div>
       </div>
     </div>
@@ -2071,9 +2447,36 @@ Func&lt;string, string&gt; formatter = s =&gt; s.ToUpper();  // One line, zero f
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> Assuming the Context validates all input before calling the strategy. But the Context doesn't know what each strategy requires (PayPal needs an email, Bitcoin needs a wallet address).</p>
-          <p class="body-text"><strong>Why Bad:</strong> Invalid data reaches the external API and fails with cryptic errors ("invalid_request" from PayPal) instead of a clear validation message.</p>
-          <p class="body-text"><strong>Fix:</strong> Each strategy should validate its own inputs. Add a <code>Validate()</code> method to the interface, or validate at the start of <code>ProcessAsync()</code>. Strategy-specific validation is strategy-specific responsibility.</p>
+          <p class="body-text"><strong>Mistake:</strong> Assuming the Context validates all input before calling the strategy. But the Context doesn't know what each strategy requires (PayPal needs an email, Bitcoin needs a wallet address, CreditCard needs a card token).</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You think validation is the Context's job. After all, the Context is the entry point, so it should validate everything, right? But the Context works with the abstract interface. It doesn't know that PayPalStrategy needs an email or that BitcoinStrategy needs a wallet address. Only the specific strategy knows what it needs. If you skip strategy-level validation, bad data flows through to the external API, which rejects it with a cryptic error like <code>{"error": "invalid_request"}</code> instead of a clear "Please provide your email for PayPal checkout."</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StrategyValidation.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ No validation — bad data reaches the external API
+public class PayPalStrategy : IPaymentStrategy
+{
+    public async Task&lt;PaymentResult&gt; ProcessAsync(decimal amount, PaymentContext ctx)
+    {
+        // ctx.Email might be null — PayPal API will reject it with a cryptic error
+        return await _paypal.ChargeAsync(ctx.Email, amount);
+    }
+}
+
+// ✅ Strategy validates its own required inputs
+public class PayPalStrategy : IPaymentStrategy
+{
+    public async Task&lt;PaymentResult&gt; ProcessAsync(decimal amount, PaymentContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx.Email, nameof(ctx.Email));
+        if (!ctx.Email.Contains('@'))
+            throw new ArgumentException("Valid email required for PayPal");
+
+        return await _paypal.ChargeAsync(ctx.Email, amount);
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Each strategy should validate its own inputs at the start of its method. The Context handles general validation (amount > 0), but strategy-specific requirements (email, wallet address, card token) are validated by the strategy itself. Fail with a clear, actionable message instead of letting the external API reject it.</p>
         </div>
       </div>
     </div>
@@ -2086,8 +2489,32 @@ Func&lt;string, string&gt; formatter = s =&gt; s.ToUpper();  // One line, zero f
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Storing request-specific data in strategy fields (e.g., <code>_lastTransactionId</code>, <code>_currentCustomer</code>).</p>
-          <p class="body-text"><strong>Why Bad:</strong> If the strategy is shared (Singleton or Scoped across requests), mutable state causes race conditions. Even with Transient lifetime, it makes strategies harder to reason about and test.</p>
-          <p class="body-text"><strong>Fix:</strong> Keep strategies <strong>stateless</strong>. Pass all data through method parameters. Return results as new objects. If you must track state, use a separate per-request context object.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It feels convenient to store intermediate results in a field. "I'll save the customer info during <code>Configure()</code> and use it in <code>Calculate()</code>." This two-step pattern (set state, then use state) works in single-threaded tests but blows up in production where multiple threads share the same strategy instance. Even if you use Transient lifetime, mutable state makes strategies harder to test and reason about because the output depends on when methods were called, not just what was passed in.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StatefulVsStateless.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Stateful — data saved in fields
+public class ShippingStrategy : IShippingStrategy
+{
+    private Address _destination;  // ❌ Mutable state
+    private double _weight;         // ❌ Mutable state
+
+    public void Configure(Address dest, double weight) {
+        _destination = dest; _weight = weight;
+    }
+    public decimal Calculate() =&gt; /* uses _destination and _weight */;
+}
+
+// ✅ Stateless — everything passed as parameters
+public class ShippingStrategy : IShippingStrategy
+{
+    // No fields! Pure function: input → output
+    public decimal Calculate(Address destination, double weight)
+        =&gt; /* uses parameters only, no shared state */;
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Keep strategies <strong>stateless</strong>. Pass all data through method parameters. Return results as new objects. Think of strategies as pure functions: same input always produces same output, with no side effects on the object. If you must track state across method calls, use a separate per-request context object that you pass around.</p>
         </div>
       </div>
     </div>
@@ -2114,8 +2541,24 @@ Func&lt;string, string&gt; formatter = s =&gt; s.ToUpper();  // One line, zero f
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Only testing the Context end-to-end, with one strategy. The other strategies are "tested by proxy" through integration tests.</p>
-          <p class="body-text"><strong>Why Bad:</strong> When a strategy has a bug, the integration test fails and it's unclear whether the problem is in the Context, the factory, or the strategy. You lose the isolation benefit that Strategy provides.</p>
-          <p class="body-text"><strong>Fix:</strong> Write dedicated unit tests for EACH strategy class. Mock its dependencies, test its logic in isolation. Also test the factory separately. The whole point of Strategy is that each algorithm is independently testable.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You write integration tests that go through the full flow (controller → factory → strategy → external API mock) and consider your strategies "covered." But when the integration test fails, it's unclear whether the problem is in the Context, the factory, the DI wiring, or the strategy itself. You've lost the biggest benefit of Strategy pattern: each algorithm is an independent unit that can be tested in isolation.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TestingStrategy.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Only one integration test that happens to use CreditCard
+[Fact] public async Task Checkout_Works() { /* tests full flow, one strategy */ }
+
+// ✅ Test EACH strategy independently + the factory + the Context
+[Fact] public async Task CreditCardStrategy_ValidCharge_ReturnsSuccess() { /* ... */ }
+[Fact] public async Task PayPalStrategy_MissingEmail_ThrowsArgNull() { /* ... */ }
+[Fact] public async Task BitcoinStrategy_ValidAddress_Processes() { /* ... */ }
+[Fact] public void Factory_ValidKey_ReturnsCorrectStrategy() { /* ... */ }
+[Fact] public void Factory_UnknownKey_ThrowsNotSupported() { /* ... */ }
+[Fact] public async Task Context_StrategySucceeds_SavesOrder() { /* mock strategy */ }
+[Fact] public async Task Context_StrategyFails_DoesNotSave() { /* mock strategy */ }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Write three test suites: (1) Each strategy class gets its own tests with mocked dependencies. (2) The factory gets tests for key resolution and error cases. (3) The Context gets tests with a mocked strategy interface. When something breaks, you know exactly which layer failed.</p>
         </div>
       </div>
     </div>
@@ -2128,8 +2571,29 @@ Func&lt;string, string&gt; formatter = s =&gt; s.ToUpper();  // One line, zero f
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Using Strategy to manage order status (Pending → Processing → Shipped → Delivered) by manually swapping strategies in the Context.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Strategy is for selecting ONE algorithm at configuration time. State is for objects whose behavior changes based on internal state transitions. Forcing Strategy into a State role means the Context must manage transitions manually — error-prone and confusing.</p>
-          <p class="body-text"><strong>Fix:</strong> If the object's behavior changes over its lifecycle based on internal state, use State pattern. If the algorithm is chosen once at creation/injection time, use Strategy. They look similar structurally but have very different intents.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Strategy and State look almost identical in code: both have an interface with concrete implementations, and the Context holds a reference to it. The difference is in <em>who changes the behavior and when.</em> With Strategy, the client (or DI container) picks the algorithm once and it stays fixed for the lifetime of the request. With State, the object itself transitions between behaviors as its internal condition changes.</p>
+          <p class="body-text">A simple way to tell them apart: ask "Does the behavior change because the <em>user chose differently</em> or because the <em>object's condition changed?</em>" User picks "PayPal" at checkout? That's Strategy. Order moves from "Pending" to "Shipped" because it was dispatched? That's State. If you're manually calling <code>context.SetStrategy(newStrategy)</code> multiple times during the object's lifecycle, you probably want State pattern instead.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StrategyVsState.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Forcing Strategy pattern for state transitions
+public class Order
+{
+    private IOrderBehavior _strategy;  // ❌ Manually swapped
+
+    public void MarkAsProcessing() { _strategy = new ProcessingBehavior(); }
+    public void MarkAsShipped()    { _strategy = new ShippedBehavior(); }
+    public void MarkAsDelivered()  { _strategy = new DeliveredBehavior(); }
+    // ❌ Context is managing transitions — that's State pattern's job!
+}
+
+// ✅ Use State pattern when behavior transitions over the object's lifecycle
+// ✅ Use Strategy when the algorithm is chosen once at creation/injection time
+// Payment method = Strategy (user picks once, stays fixed)
+// Order lifecycle = State (transitions through multiple stages)</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> If the object's behavior changes over its lifecycle based on internal state transitions, use State pattern (where states know about each other and manage transitions). If the algorithm is chosen once at creation/injection time and doesn't change, use Strategy. They're structurally similar but serve very different purposes.</p>
         </div>
       </div>
     </div>
@@ -2429,6 +2893,49 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
         <div class="body-text">
           <p>Strategy eliminates growing conditional logic (if/else chains, switch statements) by extracting each branch into its own class. Instead of one method doing 10 things based on a type flag, you have 10 focused classes each doing one thing. The client code delegates to whichever class is injected.</p>
           <p>This solves three problems simultaneously: <strong>(1)</strong> the monolithic method that grows with every new variant (OCP violation), <strong>(2)</strong> the inability to test one variant without setting up the others, and <strong>(3)</strong> the tight coupling between the client and every concrete algorithm.</p>
+
+          <svg viewBox="0 0 720 170" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Before: switch statement grows with every case. After: each case is its own class, switch disappears">
+            <defs>
+              <marker id="qa1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+            </defs>
+
+            <!-- Before -->
+            <rect x="20" y="8" width="300" height="150" rx="8" fill="#0f172a" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="28" text-anchor="middle" fill="#ef4444" font-size="12" font-family="system-ui, sans-serif" font-weight="700">Before: Switch Statement</text>
+            <text x="170" y="50" text-anchor="start" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif" x="40">case "CreditCard": ... 50 lines</text>
+            <text x="170" y="65" text-anchor="start" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif" x="40">case "PayPal": ... 60 lines</text>
+            <text x="170" y="80" text-anchor="start" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif" x="40">case "Bitcoin": ... 45 lines</text>
+            <text x="170" y="95" text-anchor="start" fill="#ef4444" font-size="9" font-family="system-ui, sans-serif" x="40">case "ApplePay": ... ← modify!</text>
+            <text x="170" y="110" text-anchor="start" fill="#ef4444" font-size="9" font-family="system-ui, sans-serif" x="40">case "GooglePay": ... ← modify!</text>
+            <text x="170" y="130" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">500 lines, all tangled together</text>
+            <text x="170" y="148" text-anchor="middle" fill="#ef4444" font-size="9" font-family="system-ui, sans-serif">Every new case = modify existing code</text>
+
+            <!-- Arrow -->
+            <line x1="330" y1="80" x2="385" y2="80" stroke="#22c55e" stroke-width="2" marker-end="url(#qa1-arr)"/>
+            <text x="357" y="72" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="600">Refactor</text>
+
+            <!-- After -->
+            <rect x="390" y="8" width="310" height="150" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="545" y="28" text-anchor="middle" fill="#22c55e" font-size="12" font-family="system-ui, sans-serif" font-weight="700">After: Strategy Pattern</text>
+
+            <rect x="405" y="38" width="125" height="25" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+            <text x="467" y="55" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">Context: 20 lines</text>
+
+            <rect x="545" y="38" width="140" height="25" rx="4" fill="#1e293b" stroke="#16a34a" stroke-width="1"/>
+            <text x="615" y="55" text-anchor="middle" fill="#16a34a" font-size="9" font-family="system-ui, sans-serif">CreditCardStrategy</text>
+
+            <rect x="405" y="72" width="125" height="25" rx="4" fill="#1e293b" stroke="#16a34a" stroke-width="1"/>
+            <text x="467" y="89" text-anchor="middle" fill="#16a34a" font-size="9" font-family="system-ui, sans-serif">PayPalStrategy</text>
+
+            <rect x="545" y="72" width="140" height="25" rx="4" fill="#1e293b" stroke="#16a34a" stroke-width="1"/>
+            <text x="615" y="89" text-anchor="middle" fill="#16a34a" font-size="9" font-family="system-ui, sans-serif">BitcoinStrategy</text>
+
+            <rect x="405" y="106" width="125" height="25" rx="4" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+            <text x="467" y="123" text-anchor="middle" fill="#eab308" font-size="9" font-family="system-ui, sans-serif">NEW: ApplePayStrat</text>
+
+            <text x="545" y="145" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif">Each class: 40-60 lines, isolated</text>
+            <text x="545" y="155" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">New case = new file, zero changes</text>
+          </svg>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "It turns runtime branching into clean runtime polymorphism. The switch statement disappears — replaced by DI resolving the right implementation. The Context class goes from 500 lines to 20."</div>
       </div></div>
@@ -2445,9 +2952,52 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Look at the UML diagram — which boxes are there?</div>
         <div class="body-text">
-          <p><strong>Context</strong> — holds a reference to the strategy interface and delegates algorithm execution to it. Example: <code>CheckoutService</code>.</p>
-          <p><strong>Strategy (interface)</strong> — defines the contract that all algorithms must follow. Example: <code>IPaymentStrategy</code>.</p>
-          <p><strong>Concrete Strategies</strong> — individual classes implementing the interface, each encapsulating one algorithm. Example: <code>CreditCardStrategy</code>, <code>PayPalStrategy</code>.</p>
+          <p><strong>Context</strong> — the class that needs an algorithm but doesn't want to know which specific one runs. It holds a reference to the strategy interface and delegates work to it. Example: <code>CheckoutService</code> knows it needs to process a payment but doesn't care whether it's credit card or PayPal.</p>
+          <p><strong>Strategy (interface)</strong> — the contract that all algorithms must follow. It defines <em>what</em> can be done without saying <em>how.</em> Example: <code>IPaymentStrategy</code> with a <code>ProcessAsync()</code> method.</p>
+          <p><strong>Concrete Strategies</strong> — individual classes implementing the interface, each containing one specific algorithm. Example: <code>CreditCardStrategy</code> talks to Stripe, <code>PayPalStrategy</code> talks to PayPal's API.</p>
+
+          <svg viewBox="0 0 720 200" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing the three Strategy pattern participants: Context holds a reference to Strategy interface, which is implemented by Concrete Strategies">
+            <defs>
+              <marker id="qa2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+              <marker id="qa2-arr-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+            </defs>
+            <!-- Context -->
+            <rect x="30" y="60" width="180" height="65" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="120" y="82" text-anchor="middle" fill="#22c55e" font-size="13" font-family="system-ui, sans-serif" font-weight="700">Context</text>
+            <text x="120" y="100" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">CheckoutService</text>
+            <text x="120" y="115" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">has-a IPaymentStrategy</text>
+
+            <!-- Arrow to Interface -->
+            <line x1="210" y1="92" x2="270" y2="92" stroke="#22c55e" stroke-width="2" marker-end="url(#qa2-arr-grn)"/>
+            <text x="240" y="84" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, sans-serif">delegates to</text>
+
+            <!-- Interface -->
+            <rect x="272" y="55" width="195" height="75" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2" stroke-dasharray="6,3"/>
+            <text x="370" y="75" text-anchor="middle" fill="#a5f3fc" font-size="10" font-family="system-ui, sans-serif" font-style="italic">&laquo;interface&raquo;</text>
+            <text x="370" y="92" text-anchor="middle" fill="#22c55e" font-size="13" font-family="system-ui, sans-serif" font-weight="700">IPaymentStrategy</text>
+            <text x="370" y="110" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">ProcessAsync(amount, ctx)</text>
+
+            <!-- Concrete A -->
+            <rect x="510" y="15" width="190" height="55" rx="8" fill="#1e293b" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="605" y="37" text-anchor="middle" fill="#16a34a" font-size="11" font-family="system-ui, sans-serif" font-weight="600">CreditCardStrategy</text>
+            <text x="605" y="55" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">calls Stripe API</text>
+            <line x1="510" y1="42" x2="467" y2="75" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+            <!-- Concrete B -->
+            <rect x="510" y="80" width="190" height="55" rx="8" fill="#1e293b" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="605" y="102" text-anchor="middle" fill="#16a34a" font-size="11" font-family="system-ui, sans-serif" font-weight="600">PayPalStrategy</text>
+            <text x="605" y="120" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">calls PayPal API</text>
+            <line x1="510" y1="107" x2="467" y2="95" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+            <!-- Concrete C -->
+            <rect x="510" y="145" width="190" height="55" rx="8" fill="#1e293b" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="605" y="167" text-anchor="middle" fill="#16a34a" font-size="11" font-family="system-ui, sans-serif" font-weight="600">BitcoinStrategy</text>
+            <text x="605" y="185" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">calls blockchain node</text>
+            <line x1="510" y1="172" x2="467" y2="120" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+            <text x="120" y="160" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, sans-serif">Context doesn't know</text>
+            <text x="120" y="172" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, sans-serif">which strategy it holds</text>
+          </svg>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In modern .NET there's an implicit fourth participant: the DI container or factory that selects and injects the right concrete strategy into the Context."</div>
       </div></div>
@@ -2566,6 +3116,58 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
             <li><strong>Strategy:</strong> the CLIENT selects which algorithm to use. The strategy is set once and doesn't change during the object's lifecycle. Payment method selection: user picks CreditCard at checkout.</li>
             <li><strong>State:</strong> the OBJECT changes its behavior based on internal state transitions. States know about each other. Order lifecycle: Pending → Processing → Shipped → Delivered, each state changes what methods do.</li>
           </ul>
+
+          <svg viewBox="0 0 720 230" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Side-by-side comparison of Strategy (client chooses once) vs State (object transitions through stages)">
+            <defs>
+              <marker id="qa8-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+              <marker id="qa8-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+              <marker id="qa8-pur" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a78bfa"/></marker>
+            </defs>
+
+            <!-- Strategy side -->
+            <rect x="10" y="8" width="340" height="210" rx="10" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="180" y="30" text-anchor="middle" fill="#22c55e" font-size="14" font-family="system-ui, sans-serif" font-weight="700">Strategy Pattern</text>
+            <text x="180" y="48" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">Client picks once, stays fixed</text>
+
+            <rect x="30" y="65" width="120" height="35" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+            <text x="90" y="87" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">User picks "PayPal"</text>
+
+            <line x1="150" y1="82" x2="195" y2="82" stroke="#22c55e" stroke-width="1.5" marker-end="url(#qa8-grn)"/>
+
+            <rect x="197" y="65" width="140" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="267" y="87" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="600">PayPalStrategy</text>
+
+            <text x="180" y="125" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Same strategy for entire request</text>
+            <text x="180" y="142" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">No transitions, no state changes</text>
+
+            <rect x="60" y="160" width="230" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="175" y="182" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif">Who changes it? The CLIENT</text>
+
+            <!-- State side -->
+            <rect x="370" y="8" width="340" height="210" rx="10" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="540" y="30" text-anchor="middle" fill="#a78bfa" font-size="14" font-family="system-ui, sans-serif" font-weight="700">State Pattern</text>
+            <text x="540" y="48" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">Object transitions through stages</text>
+
+            <rect x="390" y="65" width="80" height="30" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="430" y="84" text-anchor="middle" fill="#a78bfa" font-size="9" font-family="system-ui, sans-serif">Pending</text>
+
+            <line x1="470" y1="80" x2="500" y2="80" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#qa8-pur)"/>
+
+            <rect x="502" y="65" width="90" height="30" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="547" y="84" text-anchor="middle" fill="#a78bfa" font-size="9" font-family="system-ui, sans-serif">Processing</text>
+
+            <line x1="592" y1="80" x2="622" y2="80" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#qa8-pur)"/>
+
+            <rect x="624" y="65" width="72" height="30" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="660" y="84" text-anchor="middle" fill="#a78bfa" font-size="9" font-family="system-ui, sans-serif">Shipped</text>
+
+            <text x="540" y="120" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Behavior changes at each stage</text>
+            <text x="540" y="137" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">States know about each other</text>
+
+            <rect x="420" y="160" width="240" height="35" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="540" y="182" text-anchor="middle" fill="#a78bfa" font-size="10" font-family="system-ui, sans-serif">Who changes it? The OBJECT itself</text>
+          </svg>
+
           <p>Key test: Does the behavior change because the <em>user chose differently</em> (Strategy) or because the <em>object's internal condition changed</em> (State)?</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In Strategy, the Context doesn't know which strategy it holds. In State, the Context usually knows its current state and state objects trigger transitions to other states."</div>
@@ -2584,6 +3186,46 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What files change when you add a new algorithm?</div>
         <div class="body-text">
           <p>Adding a new algorithm requires creating one new class that implements the strategy interface and one <span class="tooltip-trigger">DI registration line<span class="tooltip-content">builder.Services.AddScoped&lt;IPaymentStrategy, NewStrategy&gt;() or AddKeyedScoped with a key. This single line in Program.cs is the only "wiring" needed. If you use Scrutor's assembly scanning, even this line is automatic.</span></span>. The Context class, existing strategies, factory, and tests all remain untouched. The system is <strong>open for extension</strong> (new strategy classes) and <strong>closed for modification</strong> (existing code doesn't change).</p>
+
+          <svg viewBox="0 0 720 200" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing that adding GooglePayStrategy requires zero changes to existing code — only new files">
+            <defs>
+              <marker id="qa9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-size="13" font-family="system-ui, sans-serif" font-weight="600">Adding Google Pay — What changes?</text>
+
+            <!-- Existing code -->
+            <rect x="30" y="40" width="150" height="45" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="105" y="58" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="600">CheckoutService</text>
+            <text x="105" y="73" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">No changes ✓</text>
+
+            <rect x="200" y="40" width="150" height="45" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="275" y="58" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="600">CreditCardStrategy</text>
+            <text x="275" y="73" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">No changes ✓</text>
+
+            <rect x="370" y="40" width="150" height="45" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="445" y="58" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="600">PayPalStrategy</text>
+            <text x="445" y="73" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">No changes ✓</text>
+
+            <rect x="540" y="40" width="150" height="45" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="615" y="58" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="600">Factory / Tests</text>
+            <text x="615" y="73" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">No changes ✓</text>
+
+            <text x="360" y="108" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="system-ui, sans-serif">Existing code: CLOSED for modification (untouched)</text>
+
+            <line x1="360" y1="118" x2="360" y2="135" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
+
+            <!-- New code -->
+            <rect x="130" y="140" width="200" height="45" rx="6" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+            <text x="230" y="158" text-anchor="middle" fill="#eab308" font-size="11" font-family="system-ui, sans-serif" font-weight="700">NEW: GooglePayStrategy</text>
+            <text x="230" y="175" text-anchor="middle" fill="#eab308" font-size="9" font-family="system-ui, sans-serif">implements IPaymentStrategy</text>
+
+            <rect x="370" y="140" width="240" height="45" rx="6" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+            <text x="490" y="158" text-anchor="middle" fill="#eab308" font-size="11" font-family="system-ui, sans-serif" font-weight="700">NEW: 1 DI registration line</text>
+            <text x="490" y="175" text-anchor="middle" fill="#eab308" font-size="9" font-family="system-ui, sans-serif">AddKeyedScoped("GooglePay")</text>
+
+            <text x="360" y="198" text-anchor="middle" fill="#eab308" font-size="11" font-family="system-ui, sans-serif">New code: OPEN for extension (new files only)</text>
+          </svg>
+
           <p>Compare to a switch statement: adding a case means opening the existing method, modifying tested code, risking regressions, and creating merge conflicts with other developers adding their own cases.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "With assembly scanning (Scrutor), even the DI registration is automatic. A new strategy class is truly 'drop it in and it works' — zero modifications anywhere."</div>
@@ -2642,7 +3284,39 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when the factory can't find a matching strategy — return null or something else?</div>
         <div class="body-text">
-          <p>Null Object is a strategy implementation that does nothing. Instead of returning null when no strategy applies, return a "do nothing" strategy: <code>NoDiscount</code> returns 0, <code>NullLogger</code> discards messages. The Context never needs null checks — it always has a valid strategy.</p>
+          <p>Null Object is a strategy implementation that does nothing. Instead of returning null when no strategy applies, you return a "do nothing" strategy: <code>NoDiscount</code> returns 0 discount, <code>NullLogger</code> discards messages. The Context never needs null checks because it always has a valid, real strategy object. It just happens to be one that does nothing useful.</p>
+
+          <svg viewBox="0 0 720 180" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Null Object pattern: factory returns NoDiscount instead of null, eliminating NullReferenceException risk">
+            <defs>
+              <marker id="qa12-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+              <marker id="qa12-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+              <marker id="qa12-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+            </defs>
+
+            <!-- Without Null Object -->
+            <text x="180" y="18" text-anchor="middle" fill="#ef4444" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Without Null Object</text>
+            <rect x="30" y="30" width="130" height="35" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+            <text x="95" y="52" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">Guest user</text>
+            <line x1="160" y1="47" x2="195" y2="47" stroke="#ef4444" stroke-width="1.5" marker-end="url(#qa12-red)"/>
+            <rect x="197" y="30" width="120" height="35" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="257" y="52" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">returns null</text>
+            <line x1="317" y1="47" x2="340" y2="47" stroke="#ef4444" stroke-width="1.5" marker-end="url(#qa12-red)"/>
+            <text x="355" y="52" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif">NRE!</text>
+
+            <!-- With Null Object -->
+            <text x="180" y="98" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">With Null Object</text>
+            <rect x="30" y="110" width="130" height="35" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+            <text x="95" y="132" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">Guest user</text>
+            <line x1="160" y1="127" x2="195" y2="127" stroke="#22c55e" stroke-width="1.5" marker-end="url(#qa12-grn)"/>
+            <rect x="197" y="110" width="140" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="267" y="132" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif">NoDiscount()</text>
+            <line x1="337" y1="127" x2="380" y2="127" stroke="#22c55e" stroke-width="1.5" marker-end="url(#qa12-grn)"/>
+            <rect x="382" y="110" width="180" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+            <text x="472" y="132" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif">Calculate() → $0, safe ✓</text>
+
+            <text x="360" y="170" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Context never needs null checks — strategy is always a valid object</text>
+          </svg>
+
           <p>This eliminates <code>NullReferenceException</code> risks and simplifies the Context code. Every code path is safe because the strategy reference is never null.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> ".NET already uses this: NullLogger&lt;T&gt;.Instance is a Null Object strategy for ILogger&lt;T&gt;. It implements ILogger perfectly but discards all messages. You can inject it in tests or fallback scenarios."</div>
@@ -2660,8 +3334,56 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> One uses composition, the other uses inheritance — which is which?</div>
         <div class="body-text">
-          <p><strong>Strategy</strong> uses composition (has-a): the Context holds a reference to the strategy interface. The entire algorithm is replaced. Each strategy is an independent class.</p>
+          <p><strong>Strategy</strong> uses composition (has-a): the Context holds a reference to the strategy interface. The entire algorithm is replaced. Each strategy is an independent class with its own dependencies.</p>
           <p><strong>Template Method</strong> uses inheritance (is-a): a base class defines the algorithm skeleton and subclasses override specific steps. Only the varying steps are replaced, the shared skeleton stays in the base class.</p>
+
+          <svg viewBox="0 0 720 210" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Comparison of Strategy (composition, entire algorithm replaced) vs Template Method (inheritance, only steps overridden)">
+            <defs>
+              <marker id="qa13-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+
+            <!-- Strategy side -->
+            <rect x="10" y="5" width="340" height="195" rx="10" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="180" y="25" text-anchor="middle" fill="#22c55e" font-size="13" font-family="system-ui, sans-serif" font-weight="700">Strategy (Composition)</text>
+
+            <rect x="30" y="40" width="130" height="50" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="95" y="60" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif" font-weight="600">Context</text>
+            <text x="95" y="78" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">has-a IStrategy</text>
+
+            <line x1="160" y1="65" x2="195" y2="65" stroke="#22c55e" stroke-width="1.5" marker-end="url(#qa13-arr)"/>
+
+            <rect x="197" y="40" width="140" height="50" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="267" y="60" text-anchor="middle" fill="#a5f3fc" font-size="9" font-family="system-ui, sans-serif" font-style="italic">IPaymentStrategy</text>
+            <text x="267" y="78" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">ProcessAsync()</text>
+
+            <rect x="40" y="110" width="120" height="35" rx="6" fill="#1e293b" stroke="#16a34a" stroke-width="1"/>
+            <text x="100" y="132" text-anchor="middle" fill="#16a34a" font-size="9" font-family="system-ui, sans-serif">CreditCardStrategy</text>
+
+            <rect x="180" y="110" width="110" height="35" rx="6" fill="#1e293b" stroke="#16a34a" stroke-width="1"/>
+            <text x="235" y="132" text-anchor="middle" fill="#16a34a" font-size="9" font-family="system-ui, sans-serif">PayPalStrategy</text>
+
+            <text x="180" y="168" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">Entire algorithm replaced</text>
+            <text x="180" y="183" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">Classes are independent</text>
+
+            <!-- Template Method side -->
+            <rect x="370" y="5" width="340" height="195" rx="10" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="540" y="25" text-anchor="middle" fill="#a78bfa" font-size="13" font-family="system-ui, sans-serif" font-weight="700">Template Method (Inheritance)</text>
+
+            <rect x="440" y="40" width="200" height="55" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="540" y="58" text-anchor="middle" fill="#a78bfa" font-size="10" font-family="system-ui, sans-serif" font-weight="600">abstract ReportGenerator</text>
+            <text x="540" y="72" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">Generate() { Header(); Body(); Footer(); }</text>
+            <text x="540" y="84" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="system-ui, sans-serif">abstract Body(); // only this varies</text>
+
+            <rect x="400" y="115" width="115" height="35" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
+            <text x="457" y="137" text-anchor="middle" fill="#8b5cf6" font-size="9" font-family="system-ui, sans-serif">PdfReport : base</text>
+
+            <rect x="535" y="115" width="130" height="35" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
+            <text x="600" y="137" text-anchor="middle" fill="#8b5cf6" font-size="9" font-family="system-ui, sans-serif">ExcelReport : base</text>
+
+            <text x="540" y="168" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">Only steps overridden</text>
+            <text x="540" y="183" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">Skeleton shared via base class</text>
+          </svg>
+
           <p>Use Strategy when algorithms are completely different. Use Template Method when they share 80% of their logic and only vary in specific steps.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Strategy is more flexible — you can change it at runtime and test implementations in isolation. Template Method is more concise when algorithms genuinely share a skeleton. In modern C#, I tend to prefer Strategy because composition is easier to test and DI supports it natively."</div>
@@ -2699,6 +3421,50 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How do you assign different users to different strategy implementations?</div>
         <div class="body-text">
           <p>Create two implementations of the same strategy interface (e.g., <code>ClassicCheckoutFlow</code> and <code>StreamlinedCheckoutFlow</code>). A strategy resolver checks the user's A/B test assignment (via feature flags, user segment, or random hash) and returns the appropriate implementation.</p>
+
+          <svg viewBox="0 0 720 220" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="A/B testing flow: user segment determines which checkout strategy runs, same Context for both">
+            <defs>
+              <marker id="qa15-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+              <marker id="qa15-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+              <marker id="qa15-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#60a5fa"/></marker>
+            </defs>
+
+            <rect x="30" y="30" width="130" height="50" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+            <text x="95" y="52" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Incoming User</text>
+            <text x="95" y="68" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">hits /checkout</text>
+
+            <line x1="160" y1="55" x2="220" y2="55" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#qa15-arr)"/>
+
+            <rect x="222" y="20" width="170" height="70" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+            <text x="307" y="42" text-anchor="middle" fill="#eab308" font-size="11" font-family="system-ui, sans-serif" font-weight="600">Strategy Resolver</text>
+            <text x="307" y="58" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">checks user.AbGroup</text>
+            <text x="307" y="73" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">or feature flag %</text>
+
+            <!-- Group A -->
+            <line x1="392" y1="40" x2="460" y2="30" stroke="#22c55e" stroke-width="1.5" marker-end="url(#qa15-grn)"/>
+            <text x="430" y="25" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif">Group A (50%)</text>
+
+            <rect x="462" y="10" width="230" height="45" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="577" y="30" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">ClassicCheckoutFlow</text>
+            <text x="577" y="45" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">3-step checkout (current)</text>
+
+            <!-- Group B -->
+            <line x1="392" y1="70" x2="460" y2="82" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#qa15-blue)"/>
+            <text x="430" y="92" fill="#60a5fa" font-size="9" font-family="system-ui, sans-serif">Group B (50%)</text>
+
+            <rect x="462" y="65" width="230" height="45" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="2"/>
+            <text x="577" y="83" text-anchor="middle" fill="#60a5fa" font-size="11" font-family="system-ui, sans-serif" font-weight="600">StreamlinedCheckoutFlow</text>
+            <text x="577" y="98" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">1-page checkout (experiment)</text>
+
+            <!-- Same context -->
+            <rect x="200" y="130" width="320" height="40" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="360" y="155" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, sans-serif">Same CheckoutController — identical code for both groups</text>
+
+            <!-- Metrics -->
+            <rect x="200" y="185" width="320" height="30" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+            <text x="360" y="205" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">Metrics captured per-strategy: conversion rate, avg time, errors</text>
+          </svg>
+
           <p>The Context code (checkout page, API endpoint) is identical for both groups — it just delegates to whichever strategy the resolver provides. Metrics are captured per-strategy to compare performance.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Use a factory that takes the user's segment as input: factory.GetStrategy(user.AbGroup). The factory maps 'A' to ClassicCheckout and 'B' to StreamlinedCheckout. Toggle the experiment by changing the factory mapping — zero code changes in the checkout flow."</div>
@@ -2852,7 +3618,43 @@ builder.Services.AddSingleton&lt;IDiscountStrategy&gt;(sp =&gt;
     new CompositeDiscountStrategy(sp.GetServices&lt;IDiscountStrategy&gt;()));</code></pre>
             </div>
           </div>
-          <p>The Context still sees a single <code>IDiscountStrategy</code> — it doesn't know it's actually invoking multiple strategies underneath.</p>
+          <svg viewBox="0 0 720 200" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Composite strategy: Context sees one IDiscountStrategy, but it delegates to multiple child strategies inside">
+            <defs>
+              <marker id="qa20-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+              <marker id="qa20-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+            </defs>
+
+            <rect x="30" y="60" width="160" height="50" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="110" y="82" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="600">PricingEngine</text>
+            <text x="110" y="97" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">(Context)</text>
+
+            <line x1="190" y1="85" x2="240" y2="85" stroke="#22c55e" stroke-width="1.5" marker-end="url(#qa20-grn)"/>
+            <text x="215" y="77" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui, sans-serif">sees 1</text>
+
+            <rect x="242" y="45" width="210" height="80" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+            <text x="347" y="67" text-anchor="middle" fill="#eab308" font-size="11" font-family="system-ui, sans-serif" font-weight="700">CompositeDiscount</text>
+            <text x="347" y="82" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">: IDiscountStrategy</text>
+            <text x="347" y="97" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">Calculate() = sum of all</text>
+            <text x="347" y="112" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">child discounts</text>
+
+            <line x1="452" y1="65" x2="505" y2="45" stroke="#16a34a" stroke-width="1.5" marker-end="url(#qa20-arr)"/>
+            <line x1="452" y1="85" x2="505" y2="85" stroke="#16a34a" stroke-width="1.5" marker-end="url(#qa20-arr)"/>
+            <line x1="452" y1="105" x2="505" y2="130" stroke="#16a34a" stroke-width="1.5" marker-end="url(#qa20-arr)"/>
+
+            <rect x="507" y="25" width="190" height="35" rx="6" fill="#1e293b" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="602" y="47" text-anchor="middle" fill="#16a34a" font-size="10" font-family="system-ui, sans-serif">PercentageDiscount (10%)</text>
+
+            <rect x="507" y="70" width="190" height="35" rx="6" fill="#1e293b" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="602" y="92" text-anchor="middle" fill="#16a34a" font-size="10" font-family="system-ui, sans-serif">LoyaltyDiscount ($5 off)</text>
+
+            <rect x="507" y="115" width="190" height="35" rx="6" fill="#1e293b" stroke="#16a34a" stroke-width="1.5"/>
+            <text x="602" y="137" text-anchor="middle" fill="#16a34a" font-size="10" font-family="system-ui, sans-serif">CouponDiscount ($20 off)</text>
+
+            <text x="360" y="180" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Context sees ONE strategy. Composite delegates to MANY.</text>
+            <text x="360" y="195" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Same interface, transparent composition.</text>
+          </svg>
+
+          <p>The Context still sees a single <code>IDiscountStrategy</code> — it doesn't know it's actually invoking multiple strategies underneath. This is the Composite pattern combined with Strategy.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Be careful with ordering — if Percentage is applied before Flat, the total differs from Flat-before-Percentage. The composite should document its aggregation order."</div>
       </div></div>
@@ -3204,6 +4006,73 @@ builder.Services.Decorate&lt;IPaymentStrategy, LoggingPaymentDecorator&gt;();</c
             <li><strong>Register in DI:</strong> Wire strategies via DI. The factory resolves them automatically.</li>
             <li><strong>Add assembly scanning:</strong> Future strategies auto-register. Zero manual DI lines needed.</li>
           </ol>
+
+          <svg viewBox="0 0 720 190" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Timeline showing incremental refactoring from a 500-line switch to Strategy pattern across multiple PRs">
+            <defs>
+              <marker id="qa29-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+            </defs>
+
+            <!-- Timeline line -->
+            <line x1="40" y1="90" x2="680" y2="90" stroke="#334155" stroke-width="2"/>
+
+            <!-- PR 1 -->
+            <circle cx="80" cy="90" r="16" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="80" y="94" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, sans-serif" font-weight="700">1</text>
+            <text x="80" y="125" text-anchor="middle" fill="#e2e8f0" font-size="9" font-family="system-ui, sans-serif" font-weight="600">Extract</text>
+            <text x="80" y="138" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="system-ui, sans-serif">interface</text>
+            <text x="80" y="60" text-anchor="middle" fill="#ef4444" font-size="8" font-family="system-ui, sans-serif">500-line</text>
+            <text x="80" y="72" text-anchor="middle" fill="#ef4444" font-size="8" font-family="system-ui, sans-serif">switch</text>
+
+            <line x1="96" y1="90" x2="164" y2="90" stroke="#334155" stroke-width="2" marker-end="url(#qa29-arr)"/>
+
+            <!-- PR 2 -->
+            <circle cx="200" cy="90" r="16" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+            <text x="200" y="94" text-anchor="middle" fill="#eab308" font-size="10" font-family="system-ui, sans-serif" font-weight="700">2</text>
+            <text x="200" y="125" text-anchor="middle" fill="#e2e8f0" font-size="9" font-family="system-ui, sans-serif" font-weight="600">1st case</text>
+            <text x="200" y="138" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="system-ui, sans-serif">→ class</text>
+            <text x="200" y="60" text-anchor="middle" fill="#eab308" font-size="8" font-family="system-ui, sans-serif">400-line</text>
+            <text x="200" y="72" text-anchor="middle" fill="#eab308" font-size="8" font-family="system-ui, sans-serif">switch</text>
+
+            <line x1="216" y1="90" x2="284" y2="90" stroke="#334155" stroke-width="2" marker-end="url(#qa29-arr)"/>
+
+            <!-- PR 3 -->
+            <circle cx="320" cy="90" r="16" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+            <text x="320" y="94" text-anchor="middle" fill="#eab308" font-size="10" font-family="system-ui, sans-serif" font-weight="700">3</text>
+            <text x="320" y="125" text-anchor="middle" fill="#e2e8f0" font-size="9" font-family="system-ui, sans-serif" font-weight="600">More cases</text>
+            <text x="320" y="138" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="system-ui, sans-serif">1 PR each</text>
+            <text x="320" y="60" text-anchor="middle" fill="#eab308" font-size="8" font-family="system-ui, sans-serif">shrinking</text>
+            <text x="320" y="72" text-anchor="middle" fill="#eab308" font-size="8" font-family="system-ui, sans-serif">switch...</text>
+
+            <line x1="336" y1="90" x2="404" y2="90" stroke="#334155" stroke-width="2" marker-end="url(#qa29-arr)"/>
+
+            <!-- PR 4 -->
+            <circle cx="440" cy="90" r="16" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="440" y="94" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="700">4</text>
+            <text x="440" y="125" text-anchor="middle" fill="#e2e8f0" font-size="9" font-family="system-ui, sans-serif" font-weight="600">Add</text>
+            <text x="440" y="138" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="system-ui, sans-serif">factory</text>
+            <text x="440" y="60" text-anchor="middle" fill="#22c55e" font-size="8" font-family="system-ui, sans-serif">switch</text>
+            <text x="440" y="72" text-anchor="middle" fill="#22c55e" font-size="8" font-family="system-ui, sans-serif">gone!</text>
+
+            <line x1="456" y1="90" x2="524" y2="90" stroke="#334155" stroke-width="2" marker-end="url(#qa29-arr)"/>
+
+            <!-- PR 5 -->
+            <circle cx="560" cy="90" r="16" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="560" y="94" text-anchor="middle" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif" font-weight="700">5</text>
+            <text x="560" y="125" text-anchor="middle" fill="#e2e8f0" font-size="9" font-family="system-ui, sans-serif" font-weight="600">Wire DI</text>
+            <text x="560" y="138" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="system-ui, sans-serif">+ scanning</text>
+
+            <line x1="576" y1="90" x2="644" y2="90" stroke="#334155" stroke-width="2" marker-end="url(#qa29-arr)"/>
+
+            <!-- Done -->
+            <circle cx="680" cy="90" r="16" fill="#22c55e" stroke="#22c55e" stroke-width="2"/>
+            <text x="680" y="94" text-anchor="middle" fill="#0f172a" font-size="10" font-family="system-ui, sans-serif" font-weight="700">✓</text>
+            <text x="680" y="125" text-anchor="middle" fill="#22c55e" font-size="9" font-family="system-ui, sans-serif" font-weight="600">Done!</text>
+            <text x="680" y="60" text-anchor="middle" fill="#22c55e" font-size="8" font-family="system-ui, sans-serif">Clean</text>
+            <text x="680" y="72" text-anchor="middle" fill="#22c55e" font-size="8" font-family="system-ui, sans-serif">Strategy</text>
+
+            <text x="360" y="175" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Each step is a deployable, reversible PR. Revert any step without breaking earlier ones.</text>
+          </svg>
+
           <p>Each step is a deployable, reversible PR. If step 3 breaks, revert step 3 — steps 1-2 are still working in production.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Use the Strangler Fig pattern: the old switch statement gradually shrinks as cases are migrated to strategy classes. The old and new code coexist safely during the transition. I'd start with the case that has the most bugs — it gets the most testing benefit."</div>

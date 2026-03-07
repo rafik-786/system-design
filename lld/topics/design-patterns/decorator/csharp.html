@@ -2101,10 +2101,53 @@ foreach (var item in report)
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text"><strong>Notification microservice.</strong> <code>INotifier</code> has three methods: <code>Send()</code>, <code>SendAsync()</code>, and <code>GetStatus()</code>. A developer writes a <code>LoggingNotifierDecorator</code> that overrides <code>Send()</code> to add logging &mdash; but forgets to forward <code>SendAsync()</code> and <code>GetStatus()</code>. Those methods silently return defaults (empty task, null status). Status dashboard shows all notifications as "unknown" for 2 days before anyone notices.</p>
+        <p class="body-text"><strong>Notification microservice.</strong> The team has an <code>INotifier</code> interface with three methods: <code>Send()</code> for synchronous delivery, <code>SendAsync()</code> for background delivery, and <code>GetStatus()</code> for checking whether a notification was delivered.</p>
+        <p class="body-text">A developer gets a task: "Add logging to all notifications." They create a <code>LoggingNotifierDecorator</code> that wraps the real notifier. They carefully add logging to the <code>Send()</code> method &mdash; it works great, messages are logged, tests pass. Ship it.</p>
+        <p class="body-text">Two days later, QA flags a mystery: the notification status dashboard shows <strong>every notification as "unknown."</strong> The async background notifications are also silently failing &mdash; jobs are queued but never actually delivered. The decorator compiled fine, all unit tests passed (they only tested <code>Send()</code>), and no exceptions were thrown anywhere.</p>
+        <p class="body-text">The root cause? The developer only overrode <code>Send()</code>. For <code>SendAsync()</code> and <code>GetStatus()</code>, they wrote quick placeholder implementations just to satisfy the compiler: <code>return Task.CompletedTask</code> and <code>return default</code>. These placeholders <strong>don&apos;t forward to the real notifier</strong> &mdash; they just return empty values and pretend everything is fine.</p>
       </div>
+
+      <h3 class="sub">What Went Wrong</h3>
+      <p class="body-text">Think of it like a mail forwarding service. You hired someone to forward <em>all</em> your mail, but they only forward letters &mdash; they throw away packages and postcards. That&apos;s exactly what this decorator does: it forwards <code>Send()</code> calls but silently drops <code>SendAsync()</code> and <code>GetStatus()</code>.</p>
+
+      <!-- SVG: Forwarding gap visualization -->
+      <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing which methods are forwarded and which are dropped">
+        <defs>
+          <marker id="b1-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6"/></marker>
+          <marker id="b1-x" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/></marker>
+        </defs>
+        <!-- Caller -->
+        <rect x="10" y="20" width="140" height="220" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="80" y="46" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="600" fill="#334155">Caller</text>
+        <text x="80" y="80" text-anchor="middle" font-family="system-ui" font-size="11" fill="#64748b">Send()</text>
+        <text x="80" y="130" text-anchor="middle" font-family="system-ui" font-size="11" fill="#64748b">SendAsync()</text>
+        <text x="80" y="180" text-anchor="middle" font-family="system-ui" font-size="11" fill="#64748b">GetStatus()</text>
+        <!-- Decorator -->
+        <rect x="230" y="20" width="200" height="220" rx="10" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+        <text x="330" y="46" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="600" fill="#6d28d9">LoggingDecorator</text>
+        <text x="330" y="80" text-anchor="middle" font-family="system-ui" font-size="11" fill="#16a34a">✅ Logs + forwards</text>
+        <text x="330" y="130" text-anchor="middle" font-family="system-ui" font-size="11" fill="#ef4444">❌ Returns empty Task</text>
+        <text x="330" y="180" text-anchor="middle" font-family="system-ui" font-size="11" fill="#ef4444">❌ Returns default</text>
+        <!-- Real Service -->
+        <rect x="510" y="20" width="190" height="220" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="605" y="46" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="600" fill="#15803d">Real Notifier</text>
+        <text x="605" y="80" text-anchor="middle" font-family="system-ui" font-size="11" fill="#16a34a">✅ Receives call</text>
+        <text x="605" y="130" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">Never called!</text>
+        <text x="605" y="180" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">Never called!</text>
+        <!-- Arrows -->
+        <line x1="150" y1="77" x2="228" y2="77" stroke="#8b5cf6" stroke-width="2" marker-end="url(#b1-arrow)"/>
+        <line x1="430" y1="77" x2="508" y2="77" stroke="#22c55e" stroke-width="2" marker-end="url(#b1-arrow)"/>
+        <line x1="150" y1="127" x2="228" y2="127" stroke="#ef4444" stroke-width="2" marker-end="url(#b1-x)"/>
+        <line x1="430" y1="127" x2="460" y2="127" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+        <text x="470" y="131" font-family="system-ui" font-size="18" fill="#ef4444">✗</text>
+        <line x1="150" y1="177" x2="228" y2="177" stroke="#ef4444" stroke-width="2" marker-end="url(#b1-x)"/>
+        <line x1="430" y1="177" x2="460" y2="177" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+        <text x="470" y="181" font-family="system-ui" font-size="18" fill="#ef4444">✗</text>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">2 days &mdash; the decorator compiled fine (it implemented the interface with default returns). Nobody noticed until QA flagged the status dashboard showing blanks.</p>
+      <p class="body-text">2 days &mdash; the decorator compiled fine (it implemented the interface with default returns). Nobody noticed until QA flagged the status dashboard showing blanks. The sneaky part: <strong>no exceptions were thrown.</strong> The decorator silently returned empty values instead of failing loudly.</p>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
           <button class="tab-btn active" data-tab="dbug1-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2148,6 +2191,7 @@ public class LoggingNotifierDecorator : INotifier
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the last two lines. <code>SendAsync()</code> returns <code>Task.CompletedTask</code> &mdash; that means "I&apos;m done, everything went fine!" But it never called <code>_inner.SendAsync()</code>, so the actual notification was never sent. Same with <code>GetStatus()</code> &mdash; it returns <code>default</code> (which is <code>null</code> for a reference type), so the dashboard shows "unknown" for every notification. The developer wrote these lines just to make the compiler happy, not realizing they were silently swallowing real functionality.</p>
         </div>
         <div class="tab-panel" id="dbug1-fix" role="tabpanel">
           <div class="macos-window">
@@ -2190,11 +2234,17 @@ public class LoggingNotifierDecorator : NotifierDecoratorBase
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> The trick is a <strong>base decorator class</strong> that sits between the interface and your concrete decorators. This base class has one job: forward every single method to the inner component. It marks each method as <code>virtual</code>, so concrete decorators (like <code>LoggingNotifierDecorator</code>) can override only the methods they care about. Everything else automatically passes through. If the interface gets a new method tomorrow, you add it once in the base class &mdash; all decorators inherit the forwarding for free.</p>
         </div>
       </div>
+
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
         <p class="body-text">Always create a <strong>base decorator class</strong> that forwards every interface method by default. Concrete decorators override only the methods they enhance. This guarantees nothing gets silently swallowed.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">If your decorator implements an interface directly (not through a base class), search for methods that return <code>default</code>, <code>null</code>, <code>Task.CompletedTask</code>, or throw <code>NotImplementedException</code> &mdash; those are likely methods you forgot to forward.</p>
       </div>
     </div>
   </div>
@@ -2207,10 +2257,40 @@ public class LoggingNotifierDecorator : NotifierDecoratorBase
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text"><strong>E-commerce order service.</strong> Two different developers both added <code>services.Decorate&lt;IOrderService, LoggingOrderDecorator&gt;()</code> in separate PRs. After merge, every order operation was logged twice. Log storage costs doubled overnight. Nobody noticed for a week because the app worked fine &mdash; just noisier.</p>
+        <p class="body-text"><strong>E-commerce order service.</strong> The team uses Scrutor&apos;s <code>services.Decorate&lt;&gt;()</code> to wrap <code>IOrderService</code> with a logging decorator. It works perfectly &mdash; every order placement, cancellation, and status check gets logged.</p>
+        <p class="body-text">A week later, a second developer on the same team gets a similar task: "Make sure all order operations are logged." They don&apos;t realize logging is already wired up (it&apos;s buried in a 200-line <code>Program.cs</code>). They add the <strong>exact same line</strong>: <code>services.Decorate&lt;IOrderService, LoggingOrderDecorator&gt;()</code>. Both PRs pass code review &mdash; neither reviewer scrolled far enough to spot the duplicate.</p>
+        <p class="body-text">After the merge, every order operation is now logged <strong>twice</strong>. The app works perfectly fine &mdash; orders go through, customers are happy. But behind the scenes, log storage costs have doubled. Nobody notices for a full week until DevOps flags an unexpected spike in log ingestion billing.</p>
       </div>
+
+      <h3 class="sub">What Went Wrong</h3>
+      <p class="body-text">Imagine you asked two different assistants to photocopy every document that comes in. Neither assistant knows about the other. Now every document gets photocopied twice &mdash; double the paper, double the ink, same result. That&apos;s what happened here: two identical decorator layers were wrapped around the same service.</p>
+
+      <!-- SVG: Double-wrapping visualization -->
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing double-wrapped decorator chain">
+        <defs>
+          <marker id="b2-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6"/></marker>
+        </defs>
+        <!-- Outer logging -->
+        <rect x="10" y="15" width="700" height="170" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+        <text x="30" y="40" font-family="system-ui" font-size="12" font-weight="600" fill="#dc2626">LoggingDecorator #2 (duplicate!)</text>
+        <text x="30" y="58" font-family="system-ui" font-size="11" fill="#dc2626">📝 Logs "PlaceOrder called"</text>
+        <!-- Inner logging -->
+        <rect x="50" y="70" width="620" height="100" rx="10" fill="#fefce8" stroke="#eab308" stroke-width="2"/>
+        <text x="70" y="95" font-family="system-ui" font-size="12" font-weight="600" fill="#a16207">LoggingDecorator #1 (original)</text>
+        <text x="70" y="113" font-family="system-ui" font-size="11" fill="#a16207">📝 Logs "PlaceOrder called" (again!)</text>
+        <!-- Real service -->
+        <rect x="120" y="125" width="200" height="35" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="220" y="147" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#15803d">OrderService</text>
+        <!-- Result -->
+        <text x="400" y="148" font-family="system-ui" font-size="12" fill="#64748b">= 2× log entries per call</text>
+        <!-- Arrows -->
+        <line x1="350" y1="50" x2="350" y2="68" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#b2-arrow)"/>
+        <line x1="280" y1="110" x2="280" y2="123" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#b2-arrow)"/>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">1 week &mdash; only discovered when the DevOps team flagged unexpectedly high log ingestion costs. Tracing showed duplicate log entries with identical timestamps.</p>
+      <p class="body-text">1 week &mdash; only discovered when DevOps flagged unexpectedly high log ingestion costs. Tracing showed duplicate log entries with identical timestamps. The tricky part: the app behaved correctly in every way &mdash; the only symptom was <strong>doubled logs</strong>, which is easy to miss when you&apos;re not actively watching log volume.</p>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
           <button class="tab-btn active" data-tab="dbug2-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2236,6 +2316,7 @@ services.Decorate&lt;IOrderService, LoggingOrderDecorator&gt;(); // ❌ duplicat
 // Every method call logged TWICE</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Scrutor&apos;s <code>Decorate&lt;&gt;()</code> method works by replacing the existing service registration with a new one that wraps it. When called twice with the same decorator, it wraps the already-wrapped service again. The DI container doesn&apos;t check "is this decorator already applied?" &mdash; it blindly stacks another layer. The result is <code>LoggingDecorator(LoggingDecorator(OrderService))</code>, a chain where the same logging happens at two levels.</p>
         </div>
         <div class="tab-panel" id="dbug2-fix" role="tabpanel">
           <div class="macos-window">
@@ -2282,11 +2363,17 @@ public void NoDuplicateDecorators()
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> Option 1 creates a <code>DecorateSafe</code> extension method that checks the service collection <em>before</em> adding a decorator. It scans for any existing registration where the same decorator type is already wrapping the same service. If found, it silently skips. Option 2 is a safety net &mdash; an integration test that builds your entire DI container and asserts that no service has duplicate decorator types. This catches the bug at test time, not in production billing.</p>
         </div>
       </div>
+
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">Decorator registration in DI containers is <strong>invisible at the usage site</strong>. Two people can both add the same decorator in separate PRs and neither will notice during code review. Add guard checks or integration tests to catch duplicates.</p>
+        <p class="body-text">Decorator registration in DI containers is <strong>invisible at the usage site</strong>. Two people can both add the same decorator in separate PRs and neither will notice during code review. The <code>Program.cs</code> file doesn&apos;t scream "this decorator is already here!" &mdash; it&apos;s just another line among hundreds.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">If you see unexpectedly high log volume, duplicate database calls, or any side-effect happening more than once &mdash; check your DI registration for duplicate <code>Decorate&lt;&gt;()</code> calls. Search your <code>Program.cs</code> for the decorator type name and see if it appears more than once.</p>
       </div>
     </div>
   </div>
@@ -2299,10 +2386,50 @@ public void NoDuplicateDecorators()
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text"><strong>API gateway with caching and logging.</strong> <code>CachingDecorator</code> wraps <code>LoggingDecorator</code> wraps <code>RealService</code>. Cache hits return immediately from <code>CachingDecorator</code> &mdash; the <code>LoggingDecorator</code> underneath never runs. Result: cache hits are completely invisible in logs. The team thinks traffic dropped 90% when actually 90% of requests are just cached.</p>
+        <p class="body-text"><strong>API gateway with caching and logging.</strong> The team wraps their <code>IProductService</code> with two decorators: a <code>CachingDecorator</code> (caches responses for 5 minutes) and a <code>LoggingDecorator</code> (logs every method call). Both work individually. But when stacked together, something strange happens.</p>
+        <p class="body-text">After deploying, the monitoring dashboard shows that API traffic has dropped 90%. The team panics &mdash; did the CDN misconfigure? Did DNS fail? They spend hours checking infrastructure. Traffic hasn&apos;t actually dropped at all. 90% of requests are returning from cache, and those cached responses <strong>never pass through the logging decorator</strong>. The logger only sees the 10% that are cache misses.</p>
+        <p class="body-text">The problem: the <code>CachingDecorator</code> is the <strong>outermost layer</strong>. When it finds a cached response, it returns immediately &mdash; the request never reaches the <code>LoggingDecorator</code> sitting underneath. It&apos;s like putting a security camera <em>inside</em> a locked room instead of at the entrance &mdash; you only see people who make it past the lock.</p>
       </div>
+
+      <h3 class="sub">What Went Wrong</h3>
+
+      <!-- SVG: Wrong vs Right decorator order -->
+      <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram comparing wrong vs correct decorator ordering">
+        <defs>
+          <marker id="b3-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/></marker>
+        </defs>
+        <!-- Wrong order (left) -->
+        <text x="170" y="20" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700" fill="#dc2626">❌ Wrong Order</text>
+        <rect x="30" y="35" width="280" height="230" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="2"/>
+        <text x="170" y="58" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#dc2626">CachingDecorator (outer)</text>
+        <rect x="55" y="68" width="230" height="50" rx="6" fill="#fff" stroke="#f87171" stroke-width="1"/>
+        <text x="170" y="88" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">Cache hit? → Return immediately</text>
+        <text x="170" y="103" text-anchor="middle" font-family="system-ui" font-size="10" fill="#dc2626">Logger NEVER sees this request</text>
+        <rect x="55" y="128" width="230" height="45" rx="6" fill="#fefce8" stroke="#eab308" stroke-width="1"/>
+        <text x="170" y="148" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#a16207">LoggingDecorator (inner)</text>
+        <text x="170" y="165" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">Only sees cache MISSES (10%)</text>
+        <rect x="80" y="183" width="180" height="35" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1"/>
+        <text x="170" y="205" text-anchor="middle" font-family="system-ui" font-size="11" fill="#15803d">ProductService</text>
+        <text x="170" y="248" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">📊 Dashboard shows 10% traffic</text>
+
+        <!-- Right order (right) -->
+        <text x="550" y="20" text-anchor="middle" font-family="system-ui" font-size="14" font-weight="700" fill="#16a34a">✅ Correct Order</text>
+        <rect x="410" y="35" width="280" height="230" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="2"/>
+        <text x="550" y="58" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#15803d">LoggingDecorator (outer)</text>
+        <rect x="435" y="68" width="230" height="50" rx="6" fill="#fff" stroke="#86efac" stroke-width="1"/>
+        <text x="550" y="88" text-anchor="middle" font-family="system-ui" font-size="11" fill="#15803d">Logs EVERY request first</text>
+        <text x="550" y="103" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">Then forwards to caching layer</text>
+        <rect x="435" y="128" width="230" height="45" rx="6" fill="#eff6ff" stroke="#60a5fa" stroke-width="1"/>
+        <text x="550" y="148" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="600" fill="#2563eb">CachingDecorator (inner)</text>
+        <text x="550" y="165" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">Cache hit → return, miss → forward</text>
+        <rect x="460" y="183" width="180" height="35" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1"/>
+        <text x="550" y="205" text-anchor="middle" font-family="system-ui" font-size="11" fill="#15803d">ProductService</text>
+        <text x="550" y="248" text-anchor="middle" font-family="system-ui" font-size="11" fill="#16a34a">📊 Dashboard shows 100% traffic</text>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">3 hours &mdash; the metrics showed a massive traffic drop. It took a while to realize the traffic was there but invisible due to decorator ordering.</p>
+      <p class="body-text">3 hours &mdash; the metrics showed a massive traffic drop. The team checked CDN, DNS, load balancers, and health endpoints before someone thought to add a breakpoint in the logging decorator and realized it wasn&apos;t being called for most requests.</p>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
           <button class="tab-btn active" data-tab="dbug3-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2327,6 +2454,7 @@ services.Decorate&lt;IProductService, CachingDecorator&gt;();  // outer ❌
 // Result: 90% of traffic is invisible in logs</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> In Scrutor, the last <code>Decorate&lt;&gt;()</code> call becomes the outermost wrapper. Here, <code>CachingDecorator</code> is registered last, so it&apos;s the first thing that handles every request. When it finds a cached response (90% of the time), it returns immediately &mdash; the call never reaches <code>LoggingDecorator</code> sitting inside. The logging layer only runs on the 10% of requests that are cache misses.</p>
         </div>
         <div class="tab-panel" id="dbug3-fix" role="tabpanel">
           <div class="macos-window">
@@ -2352,11 +2480,17 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
 // Innermost: Validation (closest to real service)</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> By putting <code>LoggingDecorator</code> on the outside (registered last), every request hits logging first. After logging, the request flows inward to <code>CachingDecorator</code>, which either returns a cached response or forwards to the real service. The rule of thumb is simple: <strong>decorators that need to see everything go on the outside; decorators that short-circuit go on the inside.</strong></p>
         </div>
       </div>
+
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">Decorator order matters. The <strong>outermost decorator runs first</strong>. Put logging on the outside so it sees everything. Put caching closer to the real service. Document the intended order with comments in your DI setup.</p>
+        <p class="body-text">Decorator order matters. The <strong>outermost decorator runs first</strong>. Any decorator that can short-circuit (caching, circuit breaker) will block inner decorators from running. Put observability (logging, metrics) on the outside, and put optimization (caching, throttling) closer to the real service.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">If your logs show dramatically less traffic than your load balancer &mdash; or if certain decorator behaviors seem to "disappear" &mdash; check the registration order in your DI setup. The last <code>Decorate&lt;&gt;()</code> call is the outermost layer.</p>
       </div>
     </div>
   </div>
@@ -2369,10 +2503,43 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text"><strong>File processing service.</strong> A <code>GZipStream</code> wrapping a <code>FileStream</code> is disposed, but the <code>FileStream</code> handle is never released. Files remain locked. Subsequent writes fail with <code>IOException: The process cannot access the file</code>. Intermittent in production because GC eventually collects, but under load the file locks pile up.</p>
+        <p class="body-text"><strong>File processing service.</strong> The team builds a <code>CompressingStreamDecorator</code> that wraps a <code>FileStream</code> with <code>GZipStream</code> for on-the-fly compression. It works great in testing &mdash; files are compressed and written correctly.</p>
+        <p class="body-text">In production under load, something weird starts happening: file writes fail with <code>IOException: The process cannot access the file because it is being used by another process</code>. But there <em>is</em> no other process &mdash; the file handle was never released from a previous request. The <code>FileStream</code> is sitting in memory, still holding the file lock, waiting for the garbage collector to eventually clean it up.</p>
+        <p class="body-text">Under low traffic, the GC runs often enough that handles get cleaned up before they cause problems. Under high load, the GC can&apos;t keep up, and file handles pile up like dirty dishes &mdash; eventually there&apos;s no clean dish (file handle) left and the kitchen (service) shuts down.</p>
       </div>
+
+      <h3 class="sub">What Went Wrong</h3>
+      <p class="body-text">Think of it like a chain of boxes. You have a small box (FileStream) inside a medium box (GZipStream) inside a big box (your decorator). When someone says "throw everything away," they throw away the big box &mdash; but if the big box&apos;s disposal fails halfway through, the small box inside is left open on the floor. Nothing cleans it up.</p>
+
+      <!-- SVG: Disposal chain with broken link -->
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing broken disposal chain in nested streams">
+        <!-- Outer: Decorator -->
+        <rect x="20" y="15" width="680" height="190" rx="12" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+        <text x="40" y="38" font-family="system-ui" font-size="12" font-weight="600" fill="#6d28d9">CompressingStreamDecorator.Dispose()</text>
+        <!-- Middle: GZipStream -->
+        <rect x="60" y="50" width="560" height="140" rx="10" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+        <text x="80" y="73" font-family="system-ui" font-size="12" font-weight="600" fill="#a16207">GZipStream.Dispose()</text>
+        <text x="80" y="93" font-family="system-ui" font-size="11" fill="#a16207">⚡ If this throws an exception...</text>
+        <!-- Inner: FileStream -->
+        <rect x="100" y="108" width="260" height="65" rx="8" fill="#fef2f2" stroke="#ef4444" stroke-width="2"/>
+        <text x="120" y="133" font-family="system-ui" font-size="12" font-weight="600" fill="#dc2626">FileStream (NOT disposed!)</text>
+        <text x="120" y="153" font-family="system-ui" font-size="11" fill="#dc2626">🔒 File handle still locked</text>
+        <!-- Arrow showing exception -->
+        <text x="400" y="115" font-family="system-ui" font-size="28" fill="#ef4444">💥</text>
+        <text x="400" y="145" font-family="system-ui" font-size="11" fill="#ef4444">Exception thrown here</text>
+        <text x="400" y="163" font-family="system-ui" font-size="11" fill="#ef4444">Inner stream never reached</text>
+        <!-- Fix label -->
+        <rect x="640" y="60" width="70" height="25" rx="5" fill="#f0fdf4" stroke="#22c55e" stroke-width="1"/>
+        <text x="675" y="77" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#16a34a">try/finally</text>
+        <text x="675" y="115" text-anchor="middle" font-family="system-ui" font-size="10" fill="#16a34a">guarantees</text>
+        <text x="675" y="133" text-anchor="middle" font-family="system-ui" font-size="10" fill="#16a34a">inner is</text>
+        <text x="675" y="151" text-anchor="middle" font-family="system-ui" font-size="10" fill="#16a34a">always</text>
+        <text x="675" y="169" text-anchor="middle" font-family="system-ui" font-size="10" fill="#16a34a">disposed</text>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">5 hours &mdash; the IOException only appeared under high load when GC couldn&apos;t keep up. Process Monitor revealed leaked file handles pointing to "already disposed" streams.</p>
+      <p class="body-text">5 hours &mdash; the IOException only appeared under high load when GC couldn&apos;t keep up. Process Monitor revealed leaked file handles pointing to "already disposed" streams. The intermittent nature made it especially hard to reproduce locally.</p>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
           <button class="tab-btn active" data-tab="dbug4-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2411,6 +2578,7 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The decorator creates a <code>GZipStream</code> with the default <code>leaveOpen: false</code>, which means GZipStream <em>should</em> dispose the inner stream when it&apos;s disposed. But there&apos;s a subtle trap: if <code>_gzip.Dispose()</code> throws an exception (e.g., while flushing compressed data), the code jumps past <code>base.Dispose()</code> and the inner <code>FileStream</code> is never explicitly cleaned up. The file handle leaks. Even without the exception, having two things that both think they own the inner stream&apos;s lifetime (the GZipStream via <code>leaveOpen: false</code> AND the decorator via <code>_innerStream</code>) is a recipe for confusion.</p>
         </div>
         <div class="tab-panel" id="dbug4-fix" role="tabpanel">
           <div class="macos-window">
@@ -2449,11 +2617,17 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> Two key changes. First, <code>leaveOpen: true</code> tells GZipStream "don&apos;t touch the inner stream&apos;s lifetime &mdash; that&apos;s not your job." Now there&apos;s exactly one owner of each resource. Second, <code>try/finally</code> guarantees that even if <code>_gzip.Dispose()</code> throws an exception, the <code>finally</code> block will still run and dispose the inner stream. The <code>_disposed</code> flag prevents double-disposal if someone calls Dispose twice (which is allowed by the IDisposable contract).</p>
         </div>
       </div>
+
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">When decorators wrap <code>IDisposable</code> objects, <strong>always propagate Dispose through the entire chain</strong>. Use <code>try/finally</code> to guarantee the inner resource is released even if the outer disposal throws. Use <code>leaveOpen</code> parameters to control who owns the inner stream&apos;s lifetime.</p>
+        <p class="body-text">When decorators wrap <code>IDisposable</code> objects, <strong>always propagate Dispose through the entire chain</strong>. Use <code>try/finally</code> to guarantee the inner resource is released even if the outer disposal throws. Use <code>leaveOpen</code> parameters to make ownership explicit &mdash; only one object should control each resource&apos;s lifetime.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">If you see intermittent <code>IOException</code> or <code>ObjectDisposedException</code> under load but not in local testing, check your decorator&apos;s <code>Dispose()</code> method. Is it using <code>try/finally</code>? Is ownership of the inner resource clear? Run a load test and watch file handle count in Process Monitor.</p>
       </div>
     </div>
   </div>
@@ -2466,10 +2640,53 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text"><strong>ASP.NET Core payment service.</strong> A <code>RetryDecorator</code> wraps <code>IPaymentGateway.ChargeAsync()</code>. The developer calls <code>_inner.ChargeAsync().Result</code> instead of <code>await _inner.ChargeAsync()</code>. Under load, the thread pool is exhausted and the app <span class="tooltip-trigger">deadlocks<span class="tooltip-content">In ASP.NET (pre-Core) and some UI frameworks, calling .Result or .Wait() on an async method blocks the current thread while the async method needs that same thread to complete its continuation. The thread waits for itself &mdash; classic deadlock. ASP.NET Core&apos;s thread pool mitigates this but still exhausts threads under load.</span></span>. Requests hang for 30 seconds then timeout.</p>
+        <p class="body-text"><strong>ASP.NET Core payment service.</strong> The team builds a <code>RetryDecorator</code> that wraps <code>IPaymentGateway.ChargeAsync()</code> &mdash; if the payment gateway fails, the decorator retries up to 3 times with exponential backoff. Simple idea, and it works perfectly in testing (one request at a time).</p>
+        <p class="body-text">In production, things go sideways fast. Under load (10+ concurrent payment requests), the entire application <strong>freezes</strong>. Requests hang for 30 seconds and then timeout. No exceptions, no errors in logs &mdash; just silence. The service appears completely healthy from the outside (health checks pass), but no work is getting done.</p>
+        <p class="body-text">The root cause: the developer used <code>.Result</code> instead of <code>await</code>. This <span class="tooltip-trigger">blocks the calling thread<span class="tooltip-content">In ASP.NET (pre-Core) and some UI frameworks, calling .Result or .Wait() on an async method blocks the current thread while the async method needs that same thread to complete its continuation. The thread waits for itself &mdash; classic deadlock. ASP.NET Core&apos;s thread pool mitigates this but still exhausts threads under load.</span></span> while waiting for the async operation to complete. With enough concurrent requests, every thread in the thread pool is blocked waiting, and there are no free threads left to actually <em>do</em> the work. It&apos;s like everyone in a restaurant waiting for a waiter, but all the waiters are also waiting for something &mdash; nobody moves.</p>
       </div>
+
+      <h3 class="sub">What Went Wrong</h3>
+
+      <!-- SVG: Thread pool exhaustion timeline -->
+      <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing thread pool exhaustion from blocking async calls">
+        <text x="360" y="20" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#334155">Thread Pool Under Load</text>
+        <!-- Thread pool box -->
+        <rect x="20" y="30" width="680" height="190" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+        <!-- Threads -->
+        <rect x="40" y="50" width="120" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="100" y="72" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#dc2626">Thread 1: BLOCKED</text>
+        <text x="100" y="100" text-anchor="middle" font-family="system-ui" font-size="9" fill="#dc2626">waiting on .Result</text>
+
+        <rect x="180" y="50" width="120" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="240" y="72" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#dc2626">Thread 2: BLOCKED</text>
+        <text x="240" y="100" text-anchor="middle" font-family="system-ui" font-size="9" fill="#dc2626">waiting on .Result</text>
+
+        <rect x="320" y="50" width="120" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="380" y="72" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#dc2626">Thread 3: BLOCKED</text>
+        <text x="380" y="100" text-anchor="middle" font-family="system-ui" font-size="9" fill="#dc2626">waiting on .Result</text>
+
+        <rect x="460" y="50" width="120" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="520" y="72" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#dc2626">Thread 4: BLOCKED</text>
+        <text x="520" y="100" text-anchor="middle" font-family="system-ui" font-size="9" fill="#dc2626">waiting on .Result</text>
+
+        <rect x="600" y="50" width="80" height="35" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="640" y="72" text-anchor="middle" font-family="system-ui" font-size="10" fill="#94a3b8">Thread N...</text>
+
+        <!-- Queue -->
+        <rect x="40" y="120" width="640" height="40" rx="6" fill="#fefce8" stroke="#eab308" stroke-width="1"/>
+        <text x="360" y="138" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#a16207">⏳ Incoming requests queued &mdash; no threads available to process them</text>
+        <text x="360" y="153" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">Requests wait 30s → timeout → 503 Service Unavailable</text>
+
+        <!-- Fix comparison -->
+        <rect x="40" y="175" width="310" height="35" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1"/>
+        <text x="195" y="197" text-anchor="middle" font-family="system-ui" font-size="11" fill="#15803d">✅ With <tspan font-weight="600">await</tspan>: thread released back to pool while waiting</text>
+        <rect x="370" y="175" width="310" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1"/>
+        <text x="525" y="197" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">❌ With <tspan font-weight="600">.Result</tspan>: thread sits idle, holding its seat</text>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">8 hours &mdash; thread dumps showed all threads blocked on <code>.Result</code>. The deadlock only appeared under load (10+ concurrent requests) and never in local debugging.</p>
+      <p class="body-text">8 hours &mdash; thread dumps showed all threads blocked on <code>.Result</code>. The deadlock only appeared under load (10+ concurrent requests) and never in local debugging with a single request. This is the classic "works on my machine" async trap.</p>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
           <button class="tab-btn active" data-tab="dbug5-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2505,6 +2722,7 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Two blocking calls hide in this code. First, <code>.Result</code> on line 12 &mdash; this tells the current thread "sit here and wait until the async operation finishes." The thread can&apos;t do anything else while waiting. Second, <code>Thread.Sleep()</code> on line 16 &mdash; this literally puts the thread to sleep for 1-3 seconds. During that time, the thread is holding a seat in the thread pool but doing zero work. Multiply this by 10+ concurrent requests, and every thread is either blocked on <code>.Result</code> or sleeping on <code>Thread.Sleep</code>. No threads left to process new requests &mdash; the entire service freezes.</p>
         </div>
         <div class="tab-panel" id="dbug5-fix" role="tabpanel">
           <div class="macos-window">
@@ -2537,11 +2755,17 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> <code>await</code> tells the thread "go do something else &mdash; I&apos;ll come back when the result is ready." The thread is <strong>released back to the thread pool</strong> while the async operation runs. Similarly, <code>Task.Delay()</code> sets a timer and releases the thread during the wait, unlike <code>Thread.Sleep()</code> which holds the thread hostage. With <code>await</code>, 100 concurrent requests can be served by just a handful of threads, because each thread handles multiple requests by switching between them while they wait for I/O.</p>
         </div>
       </div>
+
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
         <p class="body-text">If the interface method is async (<code>Task</code>/<code>Task&lt;T&gt;</code>), the decorator <strong>must be async all the way through</strong>. Never use <code>.Result</code>, <code>.Wait()</code>, or <code>Thread.Sleep()</code> inside an async decorator. Use <code>await</code> and <code>Task.Delay()</code> instead.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">Search your codebase for <code>.Result</code>, <code>.Wait()</code>, and <code>Thread.Sleep()</code> inside async methods. If you find any, they&apos;re potential deadlock landmines. The fix is almost always: replace <code>.Result</code> with <code>await</code>, replace <code>Thread.Sleep</code> with <code>await Task.Delay</code>.</p>
       </div>
     </div>
   </div>
@@ -2554,10 +2778,46 @@ services.Decorate&lt;IProductService, LoggingDecorator&gt;();  // outer — logs
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text"><strong>Event bus with subscriber deduplication.</strong> A <code>HashSet&lt;IEventHandler&gt;</code> tracks active subscribers. The same handler instance is first registered undecorated, then later registered again through the DI container which wraps it in a <code>LoggingDecorator</code>. The <code>HashSet</code> sees them as different objects (different <code>GetHashCode()</code> values) &mdash; the handler fires twice for every event.</p>
+        <p class="body-text"><strong>Event bus with subscriber deduplication.</strong> The team builds an in-memory event bus that uses a <code>HashSet&lt;IEventHandler&gt;</code> to track active subscribers. The HashSet prevents duplicate registrations &mdash; if the same handler is registered twice, it&apos;s ignored.</p>
+        <p class="body-text">Later, the team adds a logging decorator to all event handlers via DI. Now the same <code>OrderHandler</code> instance exists in two forms: the raw handler and the decorated version (<code>LoggingDecorator(OrderHandler)</code>). The HashSet sees these as <strong>two different objects</strong> because they have different <code>GetHashCode()</code> values (default object identity). Both get registered. Every event now fires the handler <strong>twice</strong> &mdash; once through the decorator, once directly.</p>
+        <p class="body-text">The symptom: orders are sending double confirmation emails, inventory is decremented twice, and audit logs show duplicate entries. The app doesn&apos;t crash &mdash; it just does everything twice.</p>
       </div>
+
+      <h3 class="sub">What Went Wrong</h3>
+      <p class="body-text">Think of it like a guest list at a party. "John Smith" is on the list. Then "John Smith wearing a hat" shows up. The bouncer checks the list and says "You&apos;re not on here &mdash; the John I have doesn&apos;t wear a hat." Both get in. A decorator is like putting a hat on someone &mdash; they&apos;re still the same person, but the default identity check (which looks at the hat, not the person) doesn&apos;t know that.</p>
+
+      <!-- SVG: Identity mismatch in HashSet -->
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how HashSet treats decorated and undecorated objects as different">
+        <!-- HashSet -->
+        <rect x="250" y="10" width="220" height="180" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="360" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#334155">HashSet&lt;IEventHandler&gt;</text>
+        <!-- Slot 1: raw handler -->
+        <rect x="270" y="50" width="180" height="35" rx="6" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
+        <text x="360" y="72" text-anchor="middle" font-family="system-ui" font-size="11" fill="#2563eb">OrderHandler (hash: 847)</text>
+        <!-- Slot 2: decorated handler -->
+        <rect x="270" y="95" width="180" height="35" rx="6" fill="#faf5ff" stroke="#8b5cf6" stroke-width="1.5"/>
+        <text x="360" y="117" text-anchor="middle" font-family="system-ui" font-size="11" fill="#6d28d9">LoggingDecorator (hash: 293)</text>
+        <!-- Label -->
+        <text x="360" y="155" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">❌ Both added — different hash codes!</text>
+        <text x="360" y="175" text-anchor="middle" font-family="system-ui" font-size="10" fill="#dc2626">Same handler fires TWICE per event</text>
+        <!-- Left arrow: raw -->
+        <rect x="20" y="50" width="160" height="35" rx="6" fill="#eff6ff" stroke="#60a5fa" stroke-width="1"/>
+        <text x="100" y="72" text-anchor="middle" font-family="system-ui" font-size="11" fill="#2563eb">Direct registration</text>
+        <line x1="180" y1="67" x2="268" y2="67" stroke="#60a5fa" stroke-width="1.5"/>
+        <!-- Left arrow: decorated -->
+        <rect x="20" y="95" width="160" height="35" rx="6" fill="#faf5ff" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="100" y="117" text-anchor="middle" font-family="system-ui" font-size="11" fill="#6d28d9">Via DI (decorated)</text>
+        <line x1="180" y1="112" x2="268" y2="112" stroke="#8b5cf6" stroke-width="1.5"/>
+        <!-- Right: result -->
+        <rect x="530" y="60" width="170" height="80" rx="8" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="615" y="85" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#dc2626">On each event:</text>
+        <text x="615" y="105" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">📧 2× emails sent</text>
+        <text x="615" y="125" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">📦 2× inventory deducted</text>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">4 hours &mdash; event handlers appeared to fire twice. Adding breakpoints showed two different object references for what was logically the same handler.</p>
+      <p class="body-text">4 hours &mdash; event handlers appeared to fire twice. Adding breakpoints showed two different object references for what was logically the same handler. The confusion: everything worked correctly <em>before</em> adding the logging decorator, and the decorator itself had no bugs.</p>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
           <button class="tab-btn active" data-tab="dbug6-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2598,6 +2858,7 @@ hashSet.Add(handler);     // added
 hashSet.Add(decorated);   // ALSO added — duplicate!</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> By default, every C# object gets its <code>Equals()</code> and <code>GetHashCode()</code> from <code>System.Object</code>, which uses <strong>reference identity</strong> &mdash; two objects are only "equal" if they&apos;re literally the same memory address. The <code>LoggingHandlerDecorator</code> is a completely new object with a different address than the <code>OrderHandler</code> it wraps. So even though they represent the same logical handler, the HashSet sees two distinct entries. The decorator never overrides <code>Equals</code> or <code>GetHashCode</code> to say "I&apos;m the same as my inner handler."</p>
         </div>
         <div class="tab-panel" id="dbug6-fix" role="tabpanel">
           <div class="macos-window">
@@ -2640,11 +2901,17 @@ hashSet.Add(handler);     // added
 hashSet.Add(decorated);   // NOT added — Equals returns true</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> By overriding <code>Equals()</code> and <code>GetHashCode()</code>, we tell C#: "This decorator&apos;s identity is the same as whatever it wraps." When the HashSet checks <code>GetHashCode()</code>, both the raw handler and the decorator return the <em>same</em> hash code (the inner handler&apos;s). When it checks <code>Equals()</code>, the decorator compares its inner handler to the other object. Now the HashSet correctly recognizes them as duplicates and prevents the double registration.</p>
         </div>
       </div>
+
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
         <p class="body-text">If decorated objects participate in collections that use equality (<code>HashSet</code>, <code>Dictionary</code>, <code>Distinct()</code>), override <code>Equals()</code> and <code>GetHashCode()</code> to <strong>delegate to the inner component</strong>. A decorator is logically the same object &mdash; its identity should match.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">If side effects (emails, database writes, notifications) happen more than once when they should happen once, and you recently added a decorator &mdash; check if the decorated objects are stored in any <code>HashSet</code>, <code>Dictionary</code>, or compared with <code>.Equals()</code>. The decorator might be seen as a different object than the original.</p>
       </div>
     </div>
   </div>
@@ -2669,9 +2936,52 @@ hashSet.Add(decorated);   // NOT added — Equals returns true</code></pre>
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Writing a decorator that extends <code>OrderService</code> (concrete class) instead of implementing <code>IOrderService</code> (interface). The decorator is now tightly coupled to the concrete class and breaks if the class changes its internals.</p>
-        <p class="body-text"><strong>Why Bad:</strong> You can&apos;t stack multiple decorators easily &mdash; each one extends a different concrete class. You lose the composability that makes Decorator powerful. Plus, the decorator inherits all the concrete class&apos;s baggage (fields, constructors, virtual method pitfalls).</p>
-        <p class="body-text"><strong>Fix:</strong> Always decorate the <strong>interface</strong>, never the concrete class. Define <code>IOrderService</code>, have both the real service and decorators implement it. The decorator takes <code>IOrderService</code> in its constructor and delegates to it.</p>
+        <p class="body-text"><strong>Mistake:</strong> Writing a decorator that extends <code>OrderService</code> (concrete class) instead of implementing <code>IOrderService</code> (interface).</p>
+        <p class="body-text"><strong>Why This Happens:</strong> You might think "I already have <code>OrderService</code>, I&apos;ll just extend it and add logging in the override." It feels natural &mdash; inheritance is the first tool most developers reach for. But this couples your decorator directly to the concrete class. If <code>OrderService</code> changes its constructor, adds a new field, or restructures its internals, your decorator breaks. Worse: you can&apos;t stack multiple decorators easily, because each one extends a different concrete class.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — decorating concrete class</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Extends concrete class — tightly coupled
+public class LoggingOrderService : OrderService
+{
+    public LoggingOrderService(IDbContext db, ILogger logger)
+        : base(db) { } // Must know OrderService's constructor!
+
+    public override async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
+    {
+        _logger.LogInformation("Creating order...");
+        return await base.CreateAsync(req); // calls concrete method
+    }
+}
+// ❌ Can't stack: LoggingOrderService + CachingOrderService?
+// CachingOrderService also extends OrderService — can't extend both!</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Good — decorating interface</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Implements interface — loosely coupled
+public class LoggingOrderDecorator : IOrderService
+{
+    private readonly IOrderService _inner; // could be anything!
+    private readonly ILogger _logger;
+
+    public LoggingOrderDecorator(IOrderService inner, ILogger logger)
+    {
+        _inner = inner;
+        _logger = logger;
+    }
+
+    public async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
+    {
+        _logger.LogInformation("Creating order...");
+        return await _inner.CreateAsync(req); // delegates to interface
+    }
+}
+// ✅ Stackable: new LoggingDecorator(new CachingDecorator(new OrderService()))</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>The key difference:</strong> When you decorate the interface, your decorator doesn&apos;t care what&apos;s inside. It could wrap the real service, another decorator, or a mock for testing. That&apos;s the composability that makes Decorator powerful.</p>
       </div>
     </div>
   </div>
@@ -2684,9 +2994,48 @@ hashSet.Add(decorated);   // NOT added — Equals returns true</code></pre>
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Building a single <code>SuperDecorator</code> that adds logging AND caching AND retry AND validation AND metrics all in one class. It has 500 lines and 8 constructor parameters.</p>
-        <p class="body-text"><strong>Why Bad:</strong> This defeats the entire purpose of Decorator. You wanted composability and SRP &mdash; now you have a monolith wrapper. Want to disable caching but keep logging? You can&apos;t. It&apos;s all or nothing.</p>
-        <p class="body-text"><strong>Fix:</strong> One decorator = one responsibility. <code>LoggingDecorator</code>, <code>CachingDecorator</code>, <code>RetryDecorator</code> &mdash; each tiny, each independently testable, each opt-in. Compose them in your DI container.</p>
+        <p class="body-text"><strong>Mistake:</strong> Building a single <code>SuperDecorator</code> that adds logging AND caching AND retry AND validation AND metrics all in one class.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> You start with just logging. Then someone asks for caching, so you add it to the same class. Then retry logic. Then metrics. Before you know it, you have a 500-line "decorator" with 8 constructor parameters that does everything. It feels efficient &mdash; one class, one place &mdash; but you&apos;ve just recreated the monolith problem that Decorator was supposed to solve.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — God Decorator</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ One decorator doing EVERYTHING
+public class SuperOrderDecorator : IOrderService
+{
+    private readonly IOrderService _inner;
+    private readonly ILogger _logger;
+    private readonly IMemoryCache _cache;
+    private readonly IMetrics _metrics;
+    private readonly RetryPolicy _retryPolicy;
+    // ...8 constructor params, 500 lines
+
+    public async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
+    {
+        _logger.LogInformation("Creating...");    // logging
+        _metrics.IncrementCounter("orders");      // metrics
+        if (_cache.TryGet(req.Key, out var cached)) return cached; // caching
+        return await _retryPolicy.ExecuteAsync(   // retry
+            () => _inner.CreateAsync(req));
+    }
+}
+// ❌ Want caching without retry? Can't. It's all or nothing.</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Good — One decorator per concern</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Each decorator does ONE thing — compose in DI
+services.AddScoped&lt;IOrderService, OrderService&gt;();
+services.Decorate&lt;IOrderService, CachingDecorator&gt;();   // opt-in
+services.Decorate&lt;IOrderService, RetryDecorator&gt;();     // opt-in
+services.Decorate&lt;IOrderService, MetricsDecorator&gt;();   // opt-in
+services.Decorate&lt;IOrderService, LoggingDecorator&gt;();   // opt-in
+
+// ✅ Want caching without retry? Just remove one line.
+// ✅ Each decorator: ~50 lines, 1 constructor param, independently testable.</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>Rule of thumb:</strong> if your decorator has more than 2-3 constructor parameters (beyond the inner service), it&apos;s probably doing too much. Split it.</p>
       </div>
     </div>
   </div>
@@ -2747,9 +3096,30 @@ public class LoggingOrderDecorator : OrderServiceDecoratorBase
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> The decorator takes <code>IOrderService inner</code> in its constructor but forgets to also accept (or doesn&apos;t need) the dependencies that the <em>next</em> decorator in the chain requires. Worse: manually newing up the inner service instead of letting DI handle it.</p>
-        <p class="body-text"><strong>Why Bad:</strong> DI containers handle constructor injection automatically. But if you manually construct decorators, you must thread every dependency through. Miss one and you get <code>NullReferenceException</code> at runtime.</p>
-        <p class="body-text"><strong>Fix:</strong> Let the DI container handle construction entirely. Use <span class="tooltip-trigger">Scrutor<span class="tooltip-content">Scrutor is a .NET library that extends Microsoft&apos;s DI container with assembly scanning and decoration support. services.Decorate&lt;IService, Decorator&gt;() automatically wraps the existing registration. The decorator&apos;s constructor receives the &quot;inner&quot; service plus any other dependencies from the container. Install: dotnet add package Scrutor</span></span>&apos;s <code>services.Decorate&lt;TService, TDecorator&gt;()</code> &mdash; it automatically resolves all constructor parameters, including the inner service.</p>
+        <p class="body-text"><strong>Mistake:</strong> Manually constructing decorator chains with <code>new</code> instead of letting the DI container handle it.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> You might think "I&apos;ll just manually wire the decorators in <code>Program.cs</code> to keep things simple." So you write something like <code>new LoggingDecorator(new CachingDecorator(new OrderService(db)), logger)</code>. This works for 2-3 dependencies. But as the chain grows, you have to manually pass every dependency to every constructor &mdash; miss one and you get a <code>NullReferenceException</code> at runtime. It&apos;s also fragile: if any constructor signature changes, you must update the manual wiring.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — manual wiring</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Manual construction — fragile, verbose, error-prone
+var db = new SqlOrderRepository(connectionString);
+var service = new OrderService(db);
+var cached = new CachingDecorator(service, new MemoryCache(options));
+var logged = new LoggingDecorator(cached, loggerFactory.CreateLogger&lt;...&gt;());
+// ❌ Every new decorator means updating this chain manually</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Good — DI handles everything</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ DI resolves all constructor params automatically
+services.AddScoped&lt;IOrderService, OrderService&gt;();
+services.Decorate&lt;IOrderService, CachingDecorator&gt;();
+services.Decorate&lt;IOrderService, LoggingDecorator&gt;();
+// ✅ Add/remove decorators = add/remove one line. Done.</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>Fix:</strong> Use <span class="tooltip-trigger">Scrutor<span class="tooltip-content">Scrutor is a .NET library that extends Microsoft&apos;s DI container with assembly scanning and decoration support. services.Decorate&lt;IService, Decorator&gt;() automatically wraps the existing registration. The decorator&apos;s constructor receives the &quot;inner&quot; service plus any other dependencies from the container. Install: dotnet add package Scrutor</span></span>&apos;s <code>services.Decorate&lt;TService, TDecorator&gt;()</code>. It automatically resolves all constructor parameters, including the inner service. No manual wiring, no forgotten dependencies.</p>
       </div>
     </div>
   </div>
@@ -2762,9 +3132,37 @@ public class LoggingOrderDecorator : OrderServiceDecoratorBase
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Creating a <code>LoggingUserRepository</code> decorator that wraps <code>IUserRepository</code> when there&apos;s only ever one implementation and logging will always be needed. You now have two classes, a base decorator, and DI wiring for something that could have been 3 lines of logging in the original class.</p>
-        <p class="body-text"><strong>Why Bad:</strong> Over-engineering. Decorator shines when you have multiple optional behaviors that combine dynamically. For a single permanent behavior on a single implementation, it&apos;s just unnecessary ceremony.</p>
-        <p class="body-text"><strong>Fix:</strong> Ask yourself: "Will I ever want this behavior <em>without</em> the other? Will there be multiple combinations?" If both answers are no, just put the code directly in the class. Decorator is a tool, not a religion.</p>
+        <p class="body-text"><strong>Mistake:</strong> Using the Decorator pattern when a simple method call or inheritance would do the job perfectly.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> After learning Decorator, you might start seeing every problem as a nail. "I need to add logging? Decorator! Validation? Decorator! Error handling? Decorator!" But if you only have one implementation and the behavior is always needed (not optional, not combinable), creating a full decorator chain is like building a highway to cross the street.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Over-engineered — decorator for permanent behavior</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ 3 classes + DI wiring for something that's ALWAYS on
+public interface IUserRepository { Task&lt;User&gt; GetByIdAsync(int id); }
+public class UserRepository : IUserRepository { ... }
+public class LoggingUserRepository : IUserRepository { ... } // always needed
+// Program.cs:
+services.AddScoped&lt;IUserRepository, UserRepository&gt;();
+services.Decorate&lt;IUserRepository, LoggingUserRepository&gt;(); // never removed</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Simple — just add logging directly</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ If logging is ALWAYS needed and there's only one implementation:
+public class UserRepository : IUserRepository
+{
+    private readonly ILogger&lt;UserRepository&gt; _logger;
+
+    public async Task&lt;User&gt; GetByIdAsync(int id)
+    {
+        _logger.LogInformation("Getting user {Id}", id);
+        return await _db.Users.FindAsync(id);
+    }
+}</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>When to use Decorator vs direct code:</strong> Ask yourself two questions: (1) Will I ever want this behavior <em>without</em> the other? (2) Will there be multiple combinations? If both answers are no, just put the code in the class. Decorator is a tool for composability &mdash; if nothing is being composed, use simpler tools.</p>
       </div>
     </div>
   </div>
@@ -2777,9 +3175,28 @@ public class LoggingOrderDecorator : OrderServiceDecoratorBase
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Misconfigured DI registration where Decorator A resolves Decorator B, and Decorator B resolves Decorator A. The container tries to create an infinite chain and throws a <code>StackOverflowException</code> at startup (or worse, at first request).</p>
-        <p class="body-text"><strong>Why Bad:</strong> StackOverflow with no meaningful stack trace &mdash; just pages of the same two decorator constructors calling each other. Can be extremely confusing to debug, especially with auto-wired DI containers.</p>
-        <p class="body-text"><strong>Fix:</strong> Decorators should always wrap the <strong>same interface</strong> they implement. Never have Decorator A depend on Decorator B as a <em>different</em> interface. Keep decoration linear: Real &rarr; Decorator1 &rarr; Decorator2 &rarr; Decorator3. Test your DI container at startup with a "resolve all services" health check.</p>
+        <p class="body-text"><strong>Mistake:</strong> Misconfigured DI where decorators accidentally create a circular dependency.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> You might have a <code>LoggingDecorator</code> that wraps <code>IOrderService</code>, but internally it also depends on <code>INotificationService</code>. Meanwhile, the <code>INotificationService</code> implementation depends on <code>IOrderService</code>. The DI container tries to resolve A → B → A → B... and throws a <code>StackOverflowException</code> or a circular dependency error. The stack trace is just pages of the same two constructors calling each other &mdash; very confusing to debug.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — circular dependency</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ LoggingDecorator needs INotificationService...
+public class LoggingOrderDecorator : IOrderService
+{
+    public LoggingOrderDecorator(IOrderService inner,
+        INotificationService notifier) { } // ❌ circular!
+}
+
+// ❌ ...but NotificationService needs IOrderService
+public class NotificationService : INotificationService
+{
+    public NotificationService(IOrderService orders) { } // ❌ back to start!
+}
+// DI tries: IOrderService → LoggingDecorator → INotificationService
+//   → NotificationService → IOrderService → LoggingDecorator → 💥</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>Fix:</strong> Keep decoration linear: Real → Decorator1 → Decorator2. Decorators should only depend on the interface they&apos;re decorating plus cross-cutting concerns (ILogger, IMetrics). If a decorator needs another service, consider using <code>Lazy&lt;T&gt;</code> to break the circular dependency, or restructure so the dependency flows one way.</p>
       </div>
     </div>
   </div>
@@ -2792,9 +3209,41 @@ public class LoggingOrderDecorator : OrderServiceDecoratorBase
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> A <code>CachingDecorator</code> returns cached data that&apos;s stale by 30 minutes, but the interface contract promises "current data." Or a <code>RetryDecorator</code> silently swallows exceptions that the caller expects to handle. The decorator subtly changes the behavior contract.</p>
-        <p class="body-text"><strong>Why Bad:</strong> Callers rely on the interface&apos;s behavioral contract. If a decorator changes that contract (stale data, swallowed errors, different ordering), the caller&apos;s assumptions break. Bugs appear far from the decorator code, making them very hard to trace.</p>
-        <p class="body-text"><strong>Fix:</strong> A decorator must <strong>honor the interface contract</strong>. Caching? Document the staleness window as an acceptable trade-off. Retry? Re-throw the final exception so callers still see failures. Add integration tests that verify decorated behavior matches undecorated contracts.</p>
+        <p class="body-text"><strong>Mistake:</strong> A decorator changes the behavioral contract that callers expect from the interface.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> You add a <code>CachingDecorator</code> that returns data from 30 minutes ago, but the interface contract implies "current data." Or a <code>RetryDecorator</code> catches exceptions and returns a fallback value, but the caller expects to handle those exceptions. The decorator looks like it implements the same interface, but it <em>behaves</em> differently in ways callers don&apos;t expect. Bugs show up far from the decorator code, because the caller&apos;s assumptions are silently violated.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — decorator silently swallows errors</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ RetryDecorator swallows the final exception
+public async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
+{
+    for (int i = 0; i &lt; 3; i++)
+    {
+        try { return await _inner.CreateAsync(req); }
+        catch { /* swallow and retry */ }
+    }
+    return null!; // ❌ Returns null instead of throwing!
+    // Caller expects an Order or an exception — gets neither
+}</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Good — decorator preserves the contract</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Retry decorator re-throws the final exception
+public async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
+{
+    Exception? lastException = null;
+    for (int i = 0; i &lt; 3; i++)
+    {
+        try { return await _inner.CreateAsync(req); }
+        catch (Exception ex) { lastException = ex; }
+    }
+    throw lastException!; // ✅ Caller still sees the failure
+}</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>Fix:</strong> A decorator must <strong>honor the interface contract</strong>. If the interface says "returns Order or throws," the decorator must do the same. Caching is fine if you document the staleness window. Retry is fine if you re-throw the final exception. The key test: does the caller need to know whether a decorator is present? If yes, the contract is broken.</p>
       </div>
     </div>
   </div>
@@ -2807,9 +3256,30 @@ public class LoggingOrderDecorator : OrderServiceDecoratorBase
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Only testing the full decorator chain end-to-end. When a test fails, you have no idea if the bug is in the CachingDecorator, the LoggingDecorator, or the real service. You spend hours peeling layers to isolate the problem.</p>
-        <p class="body-text"><strong>Why Bad:</strong> End-to-end tests are slow, flaky, and give poor bug localization. If the caching decorator has a bug, you want to know immediately &mdash; not after debugging 4 layers.</p>
-        <p class="body-text"><strong>Fix:</strong> Test each decorator with a <strong>mock inner service</strong>. The mock returns predictable data; the test verifies only that the decorator adds its behavior correctly (logs the right message, caches the right key, retries the right number of times). Then add one integration test for the full chain.</p>
+        <p class="body-text"><strong>Mistake:</strong> Only testing the full decorator chain end-to-end, never testing decorators individually.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> You might think "The chain works as a whole in production, so I should test the whole chain." But when a test fails, you have no idea <em>which</em> decorator is broken. Is it the CachingDecorator? The LoggingDecorator? The real service? You spend hours adding breakpoints and peeling layers to isolate the problem.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Good — test each decorator in isolation</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Mock the inner service — test ONLY the decorator's behavior
+[Fact]
+public async Task CachingDecorator_SecondCall_ReturnsCached()
+{
+    var mock = new Mock&lt;IOrderService&gt;();
+    mock.Setup(s => s.GetByIdAsync(It.IsAny&lt;Guid&gt;()))
+        .ReturnsAsync(new Order { Id = Guid.NewGuid() });
+
+    var decorator = new CachingDecorator(mock.Object, new MemoryCache(...));
+
+    var first = await decorator.GetByIdAsync(orderId);
+    var second = await decorator.GetByIdAsync(orderId); // should hit cache
+
+    mock.Verify(s => s.GetByIdAsync(orderId), Times.Once); // ✅ inner called once
+    Assert.Same(first, second); // ✅ same cached object
+}</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm"><strong>Fix:</strong> Test each decorator with a <strong>mock inner service</strong>. The mock returns predictable data; the test verifies only the decorator&apos;s specific behavior. Then add <em>one</em> integration test for the full chain as a sanity check.</p>
       </div>
     </div>
   </div>
@@ -3190,7 +3660,50 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Imagine you have 4 optional features (logging, caching, retry, metrics) for one service. How many subclass combinations would you need with inheritance?</div>
       <div class="body-text">
-        <p>Decorator solves the "feature combination explosion" problem. Say you have a service and 4 optional features. With inheritance, you&apos;d need up to 16 subclass combinations (2<sup>4</sup>). With Decorator, you need just 4 small wrapper classes that you stack at runtime. Each decorator implements the same interface as the thing it wraps, adds one behavior, and delegates the rest to the inner object. The client doesn&apos;t know (or care) how many layers are wrapped around the real service.</p>
+        <p>Decorator solves the "feature combination explosion" problem. Here&apos;s the scenario: you have a service that sends notifications, and you want to optionally add logging, caching, retry, and metrics to it. With inheritance, you&apos;d need a separate subclass for every possible combination — <code>LoggingService</code>, <code>CachingService</code>, <code>LoggingCachingService</code>, <code>LoggingRetryService</code>, <code>LoggingCachingRetryMetricsService</code>... that&apos;s 2<sup>4</sup> = <strong>16 classes</strong> for just 4 features. Add a 5th feature? Now it&apos;s 32 classes.</p>
+        <p>Decorator avoids this entirely. You write 4 small wrapper classes — one per feature. Each one implements the same interface as the thing it wraps, adds one behavior, and delegates everything else to the inner object. At runtime, you stack whichever ones you need: <code>new Logging(new Retry(new RealService()))</code>. Want caching too? Just wrap another layer. Don&apos;t need retry? Leave it out. The client code doesn&apos;t know (or care) how many layers are around the real service — it just sees the interface.</p>
+        <!-- SVG: Inheritance explosion vs Decorator composition -->
+        <svg viewBox="0 0 700 230" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Inheritance explosion (16 classes) vs Decorator composition (4 classes)">
+          <!-- Inheritance side -->
+          <text x="160" y="20" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#dc2626">❌ Inheritance: 16 classes</text>
+          <rect x="100" y="30" width="120" height="25" rx="5" fill="#fef2f2" stroke="#ef4444" stroke-width="1"/>
+          <text x="160" y="47" text-anchor="middle" font-family="system-ui" font-size="9" fill="#dc2626">Service</text>
+          <rect x="10" y="65" width="95" height="20" rx="4" fill="#fef2f2" stroke="#f87171" stroke-width="1"/>
+          <text x="57" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#dc2626">LoggingService</text>
+          <rect x="110" y="65" width="95" height="20" rx="4" fill="#fef2f2" stroke="#f87171" stroke-width="1"/>
+          <text x="157" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#dc2626">CachingService</text>
+          <rect x="210" y="65" width="95" height="20" rx="4" fill="#fef2f2" stroke="#f87171" stroke-width="1"/>
+          <text x="257" y="79" text-anchor="middle" font-family="system-ui" font-size="8" fill="#dc2626">RetryService</text>
+          <rect x="10" y="95" width="95" height="20" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="57" y="109" text-anchor="middle" font-family="system-ui" font-size="7" fill="#dc2626">LogCache</text>
+          <rect x="110" y="95" width="95" height="20" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="157" y="109" text-anchor="middle" font-family="system-ui" font-size="7" fill="#dc2626">LogRetry</text>
+          <rect x="210" y="95" width="95" height="20" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="257" y="109" text-anchor="middle" font-family="system-ui" font-size="7" fill="#dc2626">CacheRetry</text>
+          <rect x="10" y="125" width="95" height="20" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="57" y="139" text-anchor="middle" font-family="system-ui" font-size="7" fill="#dc2626">LogCacheRetry</text>
+          <rect x="110" y="125" width="95" height="20" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="157" y="139" text-anchor="middle" font-family="system-ui" font-size="7" fill="#dc2626">LogMetrics</text>
+          <rect x="210" y="125" width="95" height="20" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+          <text x="257" y="139" text-anchor="middle" font-family="system-ui" font-size="7" fill="#dc2626">... + 8 more</text>
+          <text x="160" y="170" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">4 features = 16 subclasses</text>
+          <text x="160" y="186" text-anchor="middle" font-family="system-ui" font-size="11" fill="#dc2626">5 features = 32 subclasses</text>
+          <text x="160" y="202" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#dc2626">N features = 2ᴺ subclasses 💥</text>
+
+          <!-- Decorator side -->
+          <text x="530" y="20" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#16a34a">✅ Decorator: 4 classes</text>
+          <rect x="430" y="35" width="200" height="155" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+          <rect x="450" y="50" width="160" height="28" rx="6" fill="#fff" stroke="#86efac" stroke-width="1"/>
+          <text x="530" y="69" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">LoggingDecorator</text>
+          <rect x="450" y="85" width="160" height="28" rx="6" fill="#fff" stroke="#86efac" stroke-width="1"/>
+          <text x="530" y="104" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">CachingDecorator</text>
+          <rect x="450" y="120" width="160" height="28" rx="6" fill="#fff" stroke="#86efac" stroke-width="1"/>
+          <text x="530" y="139" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">RetryDecorator</text>
+          <rect x="450" y="155" width="160" height="28" rx="6" fill="#fff" stroke="#86efac" stroke-width="1"/>
+          <text x="530" y="174" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">MetricsDecorator</text>
+          <text x="530" y="210" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#16a34a">N features = N classes ✅</text>
+          <text x="530" y="226" text-anchor="middle" font-family="system-ui" font-size="10" fill="#16a34a">Stack any combo at runtime</text>
+        </svg>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Decorator embodies the Open/Closed Principle perfectly &mdash; I can add new behaviors without modifying any existing class. In .NET, the Stream class hierarchy is the canonical example: FileStream, BufferedStream, GZipStream, CryptoStream all compose through wrapping."</div>
     </div></div>
@@ -3205,9 +3718,30 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you add logging to an object at runtime using inheritance? What about removing it?</div>
       <div class="body-text">
-        <p>Inheritance fixes behavior at compile time &mdash; you pick a subclass and that&apos;s what you get. Decorator adds behavior at runtime by wrapping objects. With inheritance, combining features requires new subclasses for every combination. With Decorator, you stack wrappers: <code>new Logging(new Caching(new RealService()))</code>. You can also remove a layer without touching the others. Inheritance is "is-a"; Decorator is "has-a" with the same interface.</p>
+        <p>Think of it this way: <strong>inheritance is like baking a cake with the ingredients already mixed in</strong>. Once it&apos;s baked, you can&apos;t remove the chocolate. <strong>Decorator is like adding toppings</strong> &mdash; you can add frosting, sprinkles, and a cherry, and you can always scrape off a topping you don&apos;t want.</p>
+        <p>Technically, inheritance fixes behavior at <strong>compile time</strong>. You pick a subclass (<code>LoggingOrderService</code>) and that&apos;s what you get forever. If you want logging + caching, you need a new subclass <code>LoggingCachingOrderService</code>. Decorator adds behavior at <strong>runtime</strong> by wrapping objects. You stack wrappers dynamically: <code>new Logging(new Caching(new RealService()))</code>. Tomorrow you can swap out <code>Caching</code> for <code>Redis</code> without rewriting anything.</p>
+        <p>Three practical differences that matter in interviews:</p>
+        <ol class="qa-list">
+          <li><strong>Combinability:</strong> Inheritance needs a new class for every combination (2<sup>N</sup> explosion). Decorator needs N classes total — compose any subset.</li>
+          <li><strong>Runtime flexibility:</strong> With Decorator, you can add/remove behavior based on configuration, feature flags, or tenant settings. Inheritance is static.</li>
+          <li><strong>C# limitation:</strong> C# doesn&apos;t support multiple inheritance. You literally can&apos;t create <code>LoggingAndCachingService</code> by inheriting from both <code>LoggingService</code> and <code>CachingService</code>. Decorator sidesteps this entirely through composition.</li>
+        </ol>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Inheritance vs Decorator</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// INHERITANCE: behavior locked at compile time
+var service = new LoggingCachingOrderService(db); // can't change at runtime
+// Want logging without caching? Need ANOTHER class
+
+// DECORATOR: behavior composed at runtime
+IOrderService service = new OrderService(db);
+service = new CachingDecorator(service);  // add caching
+service = new LoggingDecorator(service);  // add logging
+// Want logging without caching? Just remove one line</code></pre>
+          </div>
+        </div>
       </div>
-      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "C# doesn&apos;t support multiple inheritance, so you literally can&apos;t create LoggingAndCachingService by inheriting from both. Decorator sidesteps this limitation entirely through composition."</div>
+      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The Decorator relationship is &apos;has-a with the same interface&apos; &mdash; the wrapper IS-A IOrderService but HAS-A IOrderService inside. This dual identity is what makes it transparent to the client. The client calls the same interface regardless of whether there are 0 or 10 decorators in between."</div>
     </div></div>
   </div>
 
@@ -3274,6 +3808,18 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> When you write <code>new GZipStream(new BufferedStream(new FileStream(...)))</code>, which object is the "real" component and which are decorators?</div>
       <div class="body-text">
         <p><code>Stream</code> is the abstract base (the Component). <code>FileStream</code>, <code>MemoryStream</code>, <code>NetworkStream</code> are concrete components &mdash; they read/write actual data. <code>BufferedStream</code>, <code>GZipStream</code>, <code>CryptoStream</code>, <code>BrotliStream</code> are decorators &mdash; they take a <code>Stream</code> in their constructor and add a feature (buffering, compression, encryption) while still being a <code>Stream</code> themselves. You can stack any combination: compress then encrypt, buffer then compress, etc.</p>
+        <!-- SVG: .NET Stream decorator layers -->
+        <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Diagram showing .NET Stream decorator layers">
+          <rect x="10" y="10" width="680" height="160" rx="12" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+          <text x="30" y="35" font-family="system-ui" font-size="12" font-weight="600" fill="#6d28d9">CryptoStream (encrypts bytes)</text>
+          <rect x="40" y="45" width="620" height="115" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="60" y="68" font-family="system-ui" font-size="12" font-weight="600" fill="#2563eb">GZipStream (compresses bytes)</text>
+          <rect x="70" y="78" width="560" height="72" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+          <text x="90" y="100" font-family="system-ui" font-size="12" font-weight="600" fill="#a16207">BufferedStream (batches I/O)</text>
+          <rect x="100" y="110" width="200" height="30" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="200" y="130" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="700" fill="#15803d">FileStream</text>
+          <text x="350" y="130" font-family="system-ui" font-size="11" fill="#64748b">← the only one touching disk</text>
+        </svg>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The Stream pattern also shows a Decorator gotcha: the <code>leaveOpen</code> constructor parameter. By default, disposing the outer stream disposes the inner one too. Set <code>leaveOpen: true</code> when you need the inner stream to survive the outer&apos;s disposal."</div>
     </div></div>
@@ -3290,9 +3836,26 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
       <div class="body-text">
         <p class="mb-sm">Two approaches:</p>
         <ol class="qa-list">
-          <li><strong>Manual factory (built-in DI):</strong> Register a factory lambda that resolves the inner service and wraps it: <code>services.AddScoped&lt;IOrderService&gt;(sp =&gt; new LoggingDecorator(new OrderService(sp.GetRequiredService&lt;IRepository&gt;()), sp.GetRequiredService&lt;ILogger&gt;()))</code>. Works but gets messy with multiple layers.</li>
-          <li><strong>Scrutor (recommended):</strong> <code>services.AddScoped&lt;IOrderService, OrderService&gt;(); services.Decorate&lt;IOrderService, LoggingDecorator&gt;(); services.Decorate&lt;IOrderService, CachingDecorator&gt;();</code> Last <code>Decorate</code> call = outermost layer.</li>
+          <li><strong>Manual factory (built-in DI):</strong> Register a factory lambda that resolves the inner service and wraps it.</li>
+          <li><strong>Scrutor (recommended):</strong> Clean, readable, automatically handles all dependencies.</li>
         </ol>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DI Registration</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Option 1: Manual factory (messy with multiple layers)
+services.AddScoped&lt;IOrderService&gt;(sp =&gt;
+    new LoggingDecorator(
+        new CachingDecorator(
+            new OrderService(sp.GetRequiredService&lt;IRepository&gt;()),
+            sp.GetRequiredService&lt;IMemoryCache&gt;()),
+        sp.GetRequiredService&lt;ILogger&lt;LoggingDecorator&gt;&gt;()));
+
+// Option 2: Scrutor (clean and composable)
+services.AddScoped&lt;IOrderService, OrderService&gt;();
+services.Decorate&lt;IOrderService, CachingDecorator&gt;();  // inner
+services.Decorate&lt;IOrderService, LoggingDecorator&gt;();  // outer (last = outermost)</code></pre>
+          </div>
+        </div>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Scrutor&apos;s Decorate works by replacing the existing registration with a new one that takes the previous implementation as a constructor parameter. It&apos;s not magic &mdash; it&apos;s just automating the factory lambda approach."</div>
     </div></div>
@@ -3307,14 +3870,16 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If a behavior is always needed and never optional, does Decorator add value?</div>
       <div class="body-text">
+        <p>Decorator is great for adding optional, combinable behaviors — but it's not always the right tool. Think of it like gift wrapping: wrapping a present in nice paper makes sense. But wrapping a single sticky note in three layers of paper, tape, and ribbon? Overkill. Here are the situations where Decorator causes more pain than it solves:</p>
         <p class="mb-sm">Avoid Decorator when:</p>
         <ul class="qa-list">
-          <li>There&apos;s only one behavior that&apos;s always applied &mdash; just put it in the class directly</li>
-          <li>You need access to private members of the wrapped class &mdash; decorators only see the public interface</li>
-          <li>The interface is very large (20+ methods) &mdash; forwarding boilerplate becomes painful even with a base decorator</li>
-          <li>Performance is critical and you&apos;re adding layers to a hot path called millions of times</li>
-          <li>Decoration order is fragile and swapping layers causes bugs &mdash; consider a Pipeline pattern instead</li>
+          <li><strong>There's only one behavior that's always applied</strong> — if logging is always on and never optional, just put it in the class. Decorator adds indirection for zero benefit when there's no "mix and match" happening.</li>
+          <li><strong>You need access to private members</strong> — decorators only see the public interface. If the behavior you're adding needs to read internal state, Decorator can't help. Use inheritance or modify the class directly.</li>
+          <li><strong>The interface is huge (20+ methods)</strong> — even with a base decorator, forwarding 20 methods is noisy. If your interface is that big, it probably violates Interface Segregation Principle (ISP). Split it first, then consider Decorator.</li>
+          <li><strong>Performance-critical hot paths</strong> — each layer adds a virtual method dispatch (~2-5ns). For a database call, that's irrelevant. For a math function called 100 million times per second in a game engine, those nanoseconds add up.</li>
+          <li><strong>Decoration order is fragile</strong> — if swapping two decorators causes bugs and the "correct" order isn't obvious, consider a Pipeline pattern (like MediatR behaviors) where order is explicit and documented.</li>
         </ul>
+        <p>The smell test: if you always apply the same decorators in the same order to every implementation, you probably don't need Decorator. Its power is in <em>optional, combinable</em> behaviors — if nothing is optional, you're adding complexity for no reason.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The smell test: if you always apply the same decorators in the same order to every implementation, you might not need Decorator at all. Decorator&apos;s power is in optional, combinable behaviors."</div>
     </div></div>
@@ -3330,6 +3895,36 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> In ASP.NET middleware, each middleware calls <code>next()</code> to invoke the next one. How does this relate to a decorator calling <code>_inner.Method()</code>?</div>
       <div class="body-text">
         <p>ASP.NET Core middleware is essentially Decorator applied to HTTP request processing. Each middleware wraps the next one via the <code>RequestDelegate next</code> parameter. It can run code before calling <code>next(context)</code> (decorating the request) and after (decorating the response). The "base component" is the endpoint handler at the center. Just like Decorator, middleware is composable, order matters, and each layer does one thing (auth, logging, compression, CORS).</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Side by side comparison</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// MIDDLEWARE: wraps HTTP pipeline via RequestDelegate
+public class LoggingMiddleware
+{
+    private readonly RequestDelegate _next; // "inner" component
+    public async Task Invoke(HttpContext ctx)
+    {
+        Log("Before");
+        await _next(ctx);  // forward to next layer
+        Log("After");
+    }
+}
+
+// DECORATOR: wraps specific interface via constructor injection
+public class LoggingDecorator : IOrderService
+{
+    private readonly IOrderService _inner; // "inner" component
+    public async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
+    {
+        Log("Before");
+        var result = await _inner.CreateAsync(req); // forward to inner
+        Log("After");
+        return result;
+    }
+}
+// Same concept. Different abstraction level.</code></pre>
+          </div>
+        </div>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The difference is that middleware uses a delegate chain (functional style) while classic Decorator uses object wrapping (OOP style). The concept is identical &mdash; the implementation style differs. Middleware can also short-circuit (return without calling next), which is more like Chain of Responsibility."</div>
     </div></div>
@@ -3344,9 +3939,34 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Both wrap an object behind the same interface. What&apos;s different about their intent?</div>
       <div class="body-text">
-        <p>Structurally they&apos;re almost identical &mdash; both implement the same interface and hold a reference to the wrapped object. The difference is <strong>intent</strong>. Decorator adds new behavior (logging, caching, retry). Proxy controls access (lazy loading, remote calls, permission checks). Decorators are designed to stack (multiple layers). Proxies typically stand alone (one proxy per object). In practice, a caching wrapper could be called either &mdash; the naming tells you the developer&apos;s intent.</p>
+        <p>This is one of the most common interview questions because the two patterns look almost identical in code. Both implement the same interface. Both hold a reference to the wrapped object. Both delegate calls to it. If you showed someone the code without class names, they might not be able to tell them apart.</p>
+        <p>The difference is <strong>intent</strong> — what you&apos;re trying to achieve:</p>
+        <ul class="qa-list">
+          <li><strong>Decorator:</strong> "I want to <em>add</em> behavior." Logging, caching, retry, metrics — the real service still runs, but extra behavior is layered around it. Decorators are designed to <strong>stack</strong> (multiple layers).</li>
+          <li><strong>Proxy:</strong> "I want to <em>control access</em>." Lazy loading (create the object only when needed), security checks (verify permissions before calling), remote proxy (the object lives on another server). Proxies typically <strong>stand alone</strong> (one proxy, not stacked).</li>
+        </ul>
+        <!-- SVG: Decorator vs Proxy intent comparison -->
+        <svg viewBox="0 0 700 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Decorator adds behavior, Proxy controls access">
+          <!-- Decorator -->
+          <rect x="10" y="10" width="330" height="150" rx="10" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+          <text x="175" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#6d28d9">Decorator</text>
+          <text x="175" y="55" text-anchor="middle" font-family="system-ui" font-size="11" fill="#6d28d9">Intent: ADD behavior</text>
+          <text x="30" y="80" font-family="system-ui" font-size="10" fill="#6d28d9">✅ Stacks (Logging → Retry → Cache)</text>
+          <text x="30" y="98" font-family="system-ui" font-size="10" fill="#6d28d9">✅ Real service always runs</text>
+          <text x="30" y="116" font-family="system-ui" font-size="10" fill="#6d28d9">✅ Multiple decorators common</text>
+          <text x="30" y="140" font-family="system-ui" font-size="10" fill="#8b5cf6">Examples: LoggingDecorator, CachingDecorator</text>
+          <!-- Proxy -->
+          <rect x="360" y="10" width="330" height="150" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+          <text x="525" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#2563eb">Proxy</text>
+          <text x="525" y="55" text-anchor="middle" font-family="system-ui" font-size="11" fill="#2563eb">Intent: CONTROL access</text>
+          <text x="380" y="80" font-family="system-ui" font-size="10" fill="#2563eb">✅ Stands alone (one proxy)</text>
+          <text x="380" y="98" font-family="system-ui" font-size="10" fill="#2563eb">✅ May prevent service from running</text>
+          <text x="380" y="116" font-family="system-ui" font-size="10" fill="#2563eb">✅ Controls when/if object is created</text>
+          <text x="380" y="140" font-family="system-ui" font-size="10" fill="#3b82f6">Examples: LazyProxy, SecurityProxy</text>
+        </svg>
+        <p>In practice, some wrappers blur the line. A caching wrapper could be called either — it "adds" caching behavior (Decorator) but also "controls access" by deciding whether to call the real service (Proxy). The naming you choose tells other developers your <em>intent</em>.</p>
       </div>
-      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In .NET, a clean example: HttpClientHandler is the real component. DelegatingHandler is the base decorator. LoggingHandler, RetryHandler are decorators. A LazyHttpClient that creates the HttpClient only on first use would be a Proxy."</div>
+      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In .NET, a clean example: HttpClientHandler is the real component. DelegatingHandler is the base decorator. LoggingHandler, RetryHandler are decorators. A LazyHttpClient that creates the HttpClient only on first use would be a Proxy. The code structure is identical — the intent and naming differ."</div>
     </div></div>
   </div>
 
@@ -3359,7 +3979,38 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If a CachingDecorator is registered as a singleton and multiple threads hit it simultaneously, what could go wrong?</div>
       <div class="body-text">
-        <p>If the decorator is stateless (like a pure logging decorator), thread safety is free &mdash; no shared mutable state. If the decorator has state (like a caching decorator with a Dictionary), you need synchronization. Options: use <code>ConcurrentDictionary</code> instead of <code>Dictionary</code>, use <code>IMemoryCache</code> (thread-safe by default), or use <code>SemaphoreSlim</code> for async locking. The rule: match your decorator&apos;s DI lifetime to its thread-safety guarantees. Singleton = must be thread-safe. Scoped = one per request, usually safe.</p>
+        <p>The answer depends on whether your decorator has <em>state</em> (data it remembers between calls) or is <em>stateless</em> (just passes things through with some logic).</p>
+        <p><strong>Stateless decorators</strong> (like a pure logging decorator) are automatically thread-safe — they don't store anything, so there's nothing for threads to fight over. Multiple threads can call them simultaneously with zero risk.</p>
+        <p><strong>Stateful decorators</strong> (like a caching decorator that remembers previous results) need protection. If two threads try to update the same cache simultaneously, you get race conditions — corrupted data, duplicate computations, or crashes.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ThreadSafeCaching.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ NOT thread-safe — Dictionary is not designed for concurrent access
+public class CachingDecorator : IOrderService
+{
+    private readonly Dictionary&lt;int, Order&gt; _cache = new();  // 💥 race condition
+    private readonly IOrderService _inner;
+
+    public Order GetOrder(int id)
+    {
+        if (!_cache.ContainsKey(id))          // Thread A checks: not cached
+            _cache[id] = _inner.GetOrder(id); // Thread B also checks: not cached → duplicate call!
+        return _cache[id];
+    }
+}
+
+// ✅ Thread-safe — ConcurrentDictionary handles locking internally
+public class CachingDecorator : IOrderService
+{
+    private readonly ConcurrentDictionary&lt;int, Order&gt; _cache = new();
+    private readonly IOrderService _inner;
+
+    public Order GetOrder(int id) =>
+        _cache.GetOrAdd(id, key => _inner.GetOrder(key));  // atomic check-and-add
+}</code></pre>
+          </div>
+        </div>
+        <p>The golden rule: <strong>match your decorator's DI lifetime to its thread-safety guarantees.</strong> A Singleton decorator must be thread-safe (multiple threads share it). A Scoped decorator gets one instance per HTTP request — usually safe because web requests are single-threaded within a scope.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "A common gotcha: a singleton CachingDecorator wrapping a scoped OrderService. The scoped service gets captured by the singleton and lives forever &mdash; this is the captive dependency anti-pattern. The DI container should warn about this."</div>
     </div></div>
@@ -3374,7 +4025,41 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when the interface gets a new method and you have 6 decorators?</div>
       <div class="body-text">
-        <p>Without a base decorator, every concrete decorator must manually implement and forward every interface method. If <code>IOrderService</code> has 5 methods and you have 6 decorators, that&apos;s 30 forwarding methods to maintain. Add a new method to the interface? Update all 6 decorators. Miss one? Silent bug. A base decorator class forwards everything by default. Concrete decorators override only what they enhance. New interface method? Add it to the base once. All decorators auto-forward it.</p>
+        <p>Imagine you have 6 decorators (logging, caching, retry, metrics, auth, validation), and your <code>IOrderService</code> interface has 5 methods. Without a base decorator, each of those 6 decorators must manually forward all 5 methods — that's 30 forwarding methods to write and maintain. Now add a new method to the interface? You need to update all 6 decorators. Miss one? The compiler catches it (it won't compile), but now you're doing the same copy-paste forwarding in 6 files.</p>
+        <p>A <strong>base decorator class</strong> solves this by forwarding everything by default. Your concrete decorators inherit from it and override <em>only the methods they care about</em>:</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BaseDecorator.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Base decorator — forwards everything to inner by default
+public abstract class OrderServiceDecorator : IOrderService
+{
+    protected readonly IOrderService _inner;
+    protected OrderServiceDecorator(IOrderService inner) => _inner = inner;
+
+    public virtual Order GetOrder(int id)         => _inner.GetOrder(id);
+    public virtual IList&lt;Order&gt; GetAll()          => _inner.GetAll();
+    public virtual void PlaceOrder(Order order)    => _inner.PlaceOrder(order);
+    public virtual void CancelOrder(int id)        => _inner.CancelOrder(id);
+    public virtual OrderStats GetStats()           => _inner.GetStats();
+}
+
+// Concrete decorator — only overrides what it enhances (2 methods, not 5!)
+public class LoggingOrderDecorator : OrderServiceDecorator
+{
+    private readonly ILogger _log;
+    public LoggingOrderDecorator(IOrderService inner, ILogger log)
+        : base(inner) => _log = log;
+
+    public override Order GetOrder(int id)
+    {
+        _log.LogInformation("Getting order {Id}", id);
+        return base.GetOrder(id);  // forwards to inner automatically
+    }
+    // GetAll, PlaceOrder, CancelOrder, GetStats — auto-forwarded by base!
+}</code></pre>
+          </div>
+        </div>
+        <p>When a new method is added to <code>IOrderService</code>, you add it once in the base decorator — all 6 concrete decorators inherit the forwarding automatically. Zero maintenance overhead.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In .NET, you can use source generators to auto-generate the base decorator class from the interface. Scrutor and some community libraries already do this. It eliminates the forwarding boilerplate entirely."</div>
     </div></div>
@@ -3391,24 +4076,66 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What&apos;s the difference between <code>Thread.Sleep()</code> and <code>Task.Delay()</code> in an async context? Why does it matter for decorators?</div>
       <div class="body-text">
-        <p class="mb-sm">Key requirements for a production retry decorator:</p>
+        <p>A retry decorator re-attempts a failed operation a configurable number of times before giving up. It&apos;s one of the most useful decorators in production, especially for services that call external APIs (payment gateways, email providers, third-party integrations) where transient failures are common.</p>
+        <p class="mb-sm">Key requirements for a production-grade retry decorator:</p>
         <ul class="qa-list">
-          <li>Async all the way &mdash; <code>await</code> inner calls, <code>await Task.Delay()</code> for backoff</li>
-          <li>Configurable retry count and delay strategy (fixed, exponential, jittered)</li>
-          <li>Only retry on specific exception types (not all exceptions)</li>
-          <li>Log each retry attempt for observability</li>
-          <li>Re-throw the last exception if all retries fail</li>
+          <li><strong>Async all the way</strong> &mdash; use <code>await</code> for inner calls and <code>await Task.Delay()</code> for backoff. Never <code>.Result</code> or <code>Thread.Sleep()</code> (see Bug Study #5)</li>
+          <li><strong>Configurable retry count and delay strategy</strong> &mdash; fixed delay, exponential backoff, or jittered backoff to avoid thundering herd</li>
+          <li><strong>Only retry specific exceptions</strong> &mdash; retry on <code>HttpRequestException</code> (network failure), not on <code>ValidationException</code> (bad input won&apos;t fix itself)</li>
+          <li><strong>Log each attempt</strong> &mdash; so you can see "attempt 1 failed, retrying... attempt 2 failed, retrying... attempt 3 succeeded"</li>
+          <li><strong>Re-throw the last exception</strong> &mdash; if all retries fail, don&apos;t swallow the error. The caller needs to know something went wrong.</li>
         </ul>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RetryDecorator.cs</span></div>
           <div class="macos-body">
-<pre><code class="language-csharp">public class RetryDecorator&lt;TService&gt; where TService : class
+<pre><code class="language-csharp">public class RetryPaymentDecorator : IPaymentGateway
 {
-    // See Exercise 3 for full implementation
-    // Key: await _inner.Method(), await Task.Delay(), catch specific exceptions
+    private readonly IPaymentGateway _inner;
+    private readonly ILogger _logger;
+    private readonly int _maxRetries;
+
+    public RetryPaymentDecorator(IPaymentGateway inner, ILogger logger,
+        int maxRetries = 3)
+    {
+        _inner = inner;
+        _logger = logger;
+        _maxRetries = maxRetries;
+    }
+
+    public async Task&lt;PaymentResult&gt; ChargeAsync(PaymentRequest request)
+    {
+        Exception? lastException = null;
+
+        for (int attempt = 1; attempt &lt;= _maxRetries; attempt++)
+        {
+            try
+            {
+                return await _inner.ChargeAsync(request); // ✅ await, not .Result
+            }
+            catch (HttpRequestException ex) // ✅ only retry network errors
+            {
+                lastException = ex;
+                _logger.LogWarning("Attempt {Attempt}/{Max} failed: {Error}",
+                    attempt, _maxRetries, ex.Message);
+
+                if (attempt &lt; _maxRetries)
+                {
+                    // ✅ Exponential backoff with jitter
+                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt))
+                        + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000));
+                    await Task.Delay(delay); // ✅ non-blocking wait
+                }
+            }
+            // ❌ Don't catch ValidationException, ArgumentException, etc.
+            // Those won't fix themselves on retry
+        }
+
+        throw lastException!; // ✅ re-throw — caller needs to know we failed
+    }
 }</code></pre>
           </div>
         </div>
+        <p class="mt-sm"><strong>Walking through the code:</strong> The decorator wraps the inner payment gateway and tries calling it up to <code>_maxRetries</code> times. If the call succeeds, it returns immediately. If it throws an <code>HttpRequestException</code> (network/server error), it logs the failure, waits using exponential backoff (2s, 4s, 8s) with random jitter (to prevent all retries hitting the server at the same instant), and tries again. If all retries fail, it throws the last exception so the caller can handle it. Notice: it only catches network errors — a <code>ValidationException</code> means the input is wrong, and retrying won&apos;t fix bad data.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In production, I&apos;d use Polly instead of hand-rolling retry. But understanding how to build one is important &mdash; Polly itself uses the Decorator pattern internally. Its RetryPolicy wraps your delegate with retry logic."</div>
     </div></div>
@@ -3423,7 +4150,44 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> When you call <code>services.Decorate&lt;IService, Decorator&gt;()</code>, what happens to the existing IService registration?</div>
       <div class="body-text">
-        <p>Scrutor finds the existing <code>ServiceDescriptor</code> for <code>IService</code>, removes it, and replaces it with a new registration. The new registration is a factory that resolves the <em>original</em> implementation (captured in a closure) and passes it as a constructor parameter to the decorator, along with any other dependencies. The decorator&apos;s constructor receives <code>IService inner</code> (the previous registration) plus its own deps (ILogger, ICache, etc.). Chaining multiple <code>Decorate</code> calls nests the factories.</p>
+        <p>When you call <code>services.Decorate&lt;IOrderService, LoggingDecorator&gt;()</code>, Scrutor does something clever behind the scenes. It doesn't just "add" your decorator — it performs a <strong>registration replacement</strong>:</p>
+        <ol class="qa-list">
+          <li><strong>Find</strong> the existing <code>ServiceDescriptor</code> for <code>IOrderService</code> in the service collection</li>
+          <li><strong>Remove</strong> that registration</li>
+          <li><strong>Create a new registration</strong> — a factory lambda that first resolves the <em>original</em> implementation (captured in a closure), then passes it as the <code>inner</code> constructor parameter to your decorator</li>
+          <li><strong>Preserve the lifetime</strong> — if <code>OrderService</code> was registered as Scoped, the decorator is also Scoped</li>
+        </ol>
+        <!-- SVG: Scrutor registration replacement flow -->
+        <svg viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="How Scrutor replaces service registrations to insert a decorator">
+          <defs><marker id="q14-arr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6"/></marker></defs>
+          <text x="350" y="20" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="700" fill="#334155">services.Decorate&lt;IOrderService, LoggingDecorator&gt;()</text>
+          <!-- Before -->
+          <rect x="20" y="35" width="280" height="80" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+          <text x="160" y="55" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#475569">Before: Service Collection</text>
+          <rect x="40" y="65" width="240" height="38" rx="6" fill="#fff" stroke="#94a3b8" stroke-width="1"/>
+          <text x="160" y="83" text-anchor="middle" font-family="system-ui" font-size="10" fill="#475569">IOrderService → OrderService</text>
+          <text x="160" y="97" text-anchor="middle" font-family="system-ui" font-size="9" fill="#94a3b8">(Scoped)</text>
+          <!-- Arrow -->
+          <line x1="310" y1="75" x2="388" y2="75" stroke="#8b5cf6" stroke-width="2" marker-end="url(#q14-arr)"/>
+          <text x="350" y="68" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#8b5cf6">Decorate()</text>
+          <!-- After -->
+          <rect x="400" y="35" width="280" height="80" rx="8" fill="#faf5ff" stroke="#8b5cf6" stroke-width="1.5"/>
+          <text x="540" y="55" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#6d28d9">After: Service Collection</text>
+          <rect x="420" y="65" width="240" height="38" rx="6" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="540" y="83" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6d28d9">IOrderService → Factory Lambda</text>
+          <text x="540" y="97" text-anchor="middle" font-family="system-ui" font-size="9" fill="#8b5cf6">(Scoped — lifetime preserved)</text>
+          <!-- Resolution flow -->
+          <text x="350" y="145" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#334155">At resolution time, the factory does:</text>
+          <rect x="80" y="160" width="180" height="40" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="170" y="184" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">① Resolve OrderService</text>
+          <line x1="265" y1="180" x2="298" y2="180" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#q14-arr)"/>
+          <rect x="310" y="160" width="200" height="40" rx="6" fill="#faf5ff" stroke="#8b5cf6" stroke-width="1.5"/>
+          <text x="410" y="184" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6d28d9">② new LoggingDecorator(inner)</text>
+          <line x1="515" y1="180" x2="548" y2="180" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#q14-arr)"/>
+          <rect x="560" y="160" width="120" height="40" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="620" y="184" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">③ Return</text>
+        </svg>
+        <p>When you chain multiple <code>Decorate</code> calls, each one wraps around the previous result. So <code>Decorate&lt;A&gt;()</code> then <code>Decorate&lt;B&gt;()</code> means the factory creates: <code>B(A(RealService))</code>. The last one registered is outermost.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The tricky part is preserving the original service&apos;s lifetime. If OrderService was scoped, the decorator should also be scoped. Scrutor handles this by copying the lifetime from the original ServiceDescriptor to the new one."</div>
     </div></div>
@@ -3439,6 +4203,42 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If you register decorators in order A, B, C with Scrutor, which one is outermost?</div>
       <div class="body-text">
         <p>With Scrutor, the <strong>last registered decorator is outermost</strong>. If you do <code>Decorate&lt;A&gt;()</code> then <code>Decorate&lt;B&gt;()</code> then <code>Decorate&lt;C&gt;()</code>, the chain is C &rarr; B &rarr; A &rarr; RealService. C runs first, then delegates to B, and so on. The recommended order: outermost = observability (logging, metrics), middle = resilience (retry, circuit breaker), innermost = data (caching, validation). Document the order with comments in your DI setup.</p>
+        <!-- SVG: Decorator ordering diagram -->
+        <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Recommended decorator ordering from outermost to innermost">
+          <defs><marker id="q15-arr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/></marker></defs>
+          <text x="20" y="22" font-family="system-ui" font-size="12" font-weight="700" fill="#334155">Registration order → Last registered = Outermost (runs first)</text>
+          <!-- Boxes -->
+          <rect x="10" y="35" width="130" height="50" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="2"/>
+          <text x="75" y="55" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#15803d">Logging</text>
+          <text x="75" y="73" text-anchor="middle" font-family="system-ui" font-size="9" fill="#15803d">(sees everything)</text>
+
+          <rect x="155" y="35" width="130" height="50" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+          <text x="220" y="55" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#2563eb">Metrics</text>
+          <text x="220" y="73" text-anchor="middle" font-family="system-ui" font-size="9" fill="#2563eb">(counts calls)</text>
+
+          <rect x="300" y="35" width="130" height="50" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="2"/>
+          <text x="365" y="55" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#a16207">Retry</text>
+          <text x="365" y="73" text-anchor="middle" font-family="system-ui" font-size="9" fill="#a16207">(handles failures)</text>
+
+          <rect x="445" y="35" width="130" height="50" rx="8" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+          <text x="510" y="55" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#6d28d9">Caching</text>
+          <text x="510" y="73" text-anchor="middle" font-family="system-ui" font-size="9" fill="#6d28d9">(avoids work)</text>
+
+          <rect x="590" y="35" width="100" height="50" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+          <text x="640" y="60" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="#334155">Service</text>
+
+          <!-- Arrows -->
+          <line x1="140" y1="60" x2="153" y2="60" stroke="#64748b" stroke-width="1.5" marker-end="url(#q15-arr)"/>
+          <line x1="285" y1="60" x2="298" y2="60" stroke="#64748b" stroke-width="1.5" marker-end="url(#q15-arr)"/>
+          <line x1="430" y1="60" x2="443" y2="60" stroke="#64748b" stroke-width="1.5" marker-end="url(#q15-arr)"/>
+          <line x1="575" y1="60" x2="588" y2="60" stroke="#64748b" stroke-width="1.5" marker-end="url(#q15-arr)"/>
+
+          <!-- Labels -->
+          <text x="75" y="110" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">Outermost</text>
+          <text x="75" y="125" text-anchor="middle" font-family="system-ui" font-size="10" fill="#15803d">↑ registered LAST</text>
+          <text x="640" y="110" text-anchor="middle" font-family="system-ui" font-size="10" fill="#64748b">Innermost</text>
+          <text x="640" y="125" text-anchor="middle" font-family="system-ui" font-size="10" fill="#64748b">↑ registered FIRST</text>
+        </svg>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "To make order explicit and prevent accidental reordering, I create an extension method like AddOrderServiceWithDecorators() that registers everything in the correct order with inline comments. This also prevents the duplicate-registration bug."</div>
     </div></div>
@@ -3453,7 +4253,15 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Each decorator layer adds a virtual method call. How many nanoseconds does a virtual call take? Does it matter for a method that hits a database?</div>
       <div class="body-text">
-        <p>Each decorator layer adds approximately 2-5 nanoseconds of virtual dispatch overhead. For a method that does any I/O (database query: ~1-10ms, HTTP call: ~50-500ms), this is less than 0.001% overhead &mdash; completely irrelevant. Even 10 decorator layers add only ~50ns. The real cost is object allocation if decorators are created per-request (transient). Fix: register as singleton or scoped. The only time decorator overhead matters is in tight computational loops called millions of times per second with zero I/O.</p>
+        <p>Let's put real numbers on this. Each decorator layer adds one virtual method call — approximately <strong>2-5 nanoseconds</strong> on modern hardware. To put that in perspective:</p>
+        <ul class="qa-list">
+          <li>A database query takes ~1-10 <strong>milliseconds</strong> (1,000,000+ nanoseconds)</li>
+          <li>An HTTP call takes ~50-500 <strong>milliseconds</strong></li>
+          <li>Even 10 decorator layers add only ~50 nanoseconds total</li>
+        </ul>
+        <p>So for any method that does I/O (which is almost every real service method), decorator overhead is less than 0.001% of the total time — completely invisible.</p>
+        <p>The <strong>real performance concern</strong> isn't the virtual dispatch — it's <strong>object allocation</strong>. If decorators are registered as Transient (new instance per request), a 5-layer chain creates 5 objects per request. At 10,000 requests/second, that's 50,000 small objects entering Gen 0 garbage collection every second. The fix is simple: register decorators as Singleton or Scoped. Singletons are allocated once and shared. Scoped decorators are allocated once per request scope and reused within it.</p>
+        <p>The only scenario where decorator overhead truly matters is in <strong>tight computational loops</strong> — math functions called 100 million times per second with zero I/O. In those cases, every nanosecond counts and you should inline the logic. But if your method touches a database, file system, or network? Add as many decorators as you need. The maintainability benefit dwarfs the nanosecond cost.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I benchmark with BenchmarkDotNet before and after adding decorators. In every real-world case I&apos;ve measured, the decorator overhead was invisible compared to the business logic and I/O time. The maintainability benefit far outweighs the nanosecond cost."</div>
     </div></div>
@@ -3468,7 +4276,27 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can an interceptor add behavior without implementing the target&apos;s interface?</div>
       <div class="body-text">
-        <p>Decorators are <strong>compile-time, explicit</strong> &mdash; you write a class that implements the interface and wraps the inner object. Interceptors are <strong>runtime, implicit</strong> &mdash; a framework (Castle DynamicProxy, DispatchProxy) generates a proxy at runtime that intercepts method calls. Interceptors don&apos;t need to implement the interface manually; they work via reflection/IL generation. Decorators are more explicit and debuggable. Interceptors are more flexible (apply to any interface without writing wrapper code) but harder to debug and have higher runtime overhead.</p>
+        <p>Both achieve the same goal — adding behavior around method calls — but they work completely differently under the hood.</p>
+        <p><strong>Decorators</strong> are <strong>compile-time, explicit</strong>. You write a real class that implements the interface. You can see the code, step through it in the debugger, and test it like any other class. The downside: you must write a decorator class for each interface you want to wrap, and forward all methods you don&apos;t override.</p>
+        <p><strong>Interceptors</strong> are <strong>runtime, implicit</strong>. A framework (Castle DynamicProxy, <code>DispatchProxy</code>) generates a proxy class at runtime using reflection or IL generation. You write one interceptor method that handles <em>all</em> method calls on <em>any</em> interface. No forwarding boilerplate, no interface-specific code. The downside: harder to debug (you&apos;re stepping through framework-generated code), higher runtime overhead, and the "magic" is invisible in your codebase.</p>
+        <!-- SVG: Decorator vs Interceptor comparison -->
+        <svg viewBox="0 0 700 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Decorator (explicit, compile-time) vs Interceptor (implicit, runtime)">
+          <rect x="10" y="10" width="330" height="150" rx="10" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+          <text x="175" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#6d28d9">Decorator</text>
+          <text x="30" y="58" font-family="system-ui" font-size="10" fill="#6d28d9">📝 You write the wrapper class</text>
+          <text x="30" y="76" font-family="system-ui" font-size="10" fill="#6d28d9">🔍 Fully debuggable (step through)</text>
+          <text x="30" y="94" font-family="system-ui" font-size="10" fill="#6d28d9">⚡ Zero runtime overhead</text>
+          <text x="30" y="112" font-family="system-ui" font-size="10" fill="#6d28d9">📋 One class per interface</text>
+          <text x="30" y="138" font-family="system-ui" font-size="10" font-weight="600" fill="#6d28d9">Best for: specific services (3-5)</text>
+          <rect x="360" y="10" width="330" height="150" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+          <text x="525" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#2563eb">Interceptor</text>
+          <text x="380" y="58" font-family="system-ui" font-size="10" fill="#2563eb">🤖 Framework generates proxy</text>
+          <text x="380" y="76" font-family="system-ui" font-size="10" fill="#2563eb">🔮 Harder to debug (magic code)</text>
+          <text x="380" y="94" font-family="system-ui" font-size="10" fill="#2563eb">⏱️ Reflection/IL overhead</text>
+          <text x="380" y="112" font-family="system-ui" font-size="10" fill="#2563eb">✨ One interceptor for ALL interfaces</text>
+          <text x="380" y="138" font-family="system-ui" font-size="10" font-weight="600" fill="#2563eb">Best for: many services (50+)</text>
+        </svg>
+        <p><strong>When to use which:</strong> If the concern applies to 3-5 specific services and you want full control, use explicit Decorators. If the same concern applies uniformly to 50+ services (like adding trace logging to everything), Interceptors save massive boilerplate.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In .NET, Castle DynamicProxy is the most popular interception library. Libraries like MediatR&apos;s IPipelineBehavior use a form of interception. I prefer explicit decorators for domain services and interceptors for infrastructure concerns that apply uniformly across many services."</div>
     </div></div>
@@ -3483,7 +4311,42 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you write one <code>LoggingDecorator&lt;T&gt;</code> that works for <code>IRepository&lt;Order&gt;</code>, <code>IRepository&lt;Customer&gt;</code>, and any other entity?</div>
       <div class="body-text">
-        <p>Yes, and it&apos;s one of Decorator&apos;s most powerful features. Define <code>IRepository&lt;T&gt;</code>. Write <code>LoggingRepositoryDecorator&lt;T&gt; : IRepository&lt;T&gt;</code>. The decorator wraps <code>IRepository&lt;T&gt;</code> and adds logging for any entity type. With Scrutor, register it as: <code>services.Decorate(typeof(IRepository&lt;&gt;), typeof(LoggingRepositoryDecorator&lt;&gt;))</code>. The open generic registration means every <code>IRepository&lt;Whatever&gt;</code> gets automatically decorated.</p>
+        <p>Yes — and this is one of Decorator's most powerful features. Instead of writing a separate logging decorator for <code>IOrderRepository</code>, <code>ICustomerRepository</code>, <code>IProductRepository</code>, you write <strong>one generic decorator</strong> that works for all of them. Think of it like a universal gift wrapper that fits any box size — you write the wrapping logic once, and it adapts to whatever's inside.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GenericDecorator.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// The generic interface
+public interface IRepository&lt;T&gt; where T : class
+{
+    Task&lt;T?&gt; GetByIdAsync(int id);
+    Task&lt;IList&lt;T&gt;&gt; GetAllAsync();
+    Task SaveAsync(T entity);
+}
+
+// ONE decorator that works for ALL entity types
+public class LoggingRepository&lt;T&gt; : IRepository&lt;T&gt; where T : class
+{
+    private readonly IRepository&lt;T&gt; _inner;
+    private readonly ILogger&lt;LoggingRepository&lt;T&gt;&gt; _log;
+
+    public LoggingRepository(IRepository&lt;T&gt; inner, ILogger&lt;LoggingRepository&lt;T&gt;&gt; log)
+        =&gt; (_inner, _log) = (inner, log);
+
+    public async Task&lt;T?&gt; GetByIdAsync(int id)
+    {
+        _log.LogInformation("Getting {Type} with ID {Id}", typeof(T).Name, id);
+        return await _inner.GetByIdAsync(id);
+    }
+    // ... same pattern for GetAllAsync and SaveAsync
+}
+
+// Register with Scrutor — open generic means it applies to ALL repositories
+services.Decorate(typeof(IRepository&lt;&gt;), typeof(LoggingRepository&lt;&gt;));
+// Now IRepository&lt;Order&gt;, IRepository&lt;Customer&gt;, IRepository&lt;Product&gt;
+// ALL get automatic logging — zero extra code per entity!</code></pre>
+          </div>
+        </div>
+        <p>This is exactly how MediatR's pipeline behaviors work. <code>IPipelineBehavior&lt;TRequest, TResponse&gt;</code> is a generic decorator around <code>IRequestHandler&lt;TRequest, TResponse&gt;</code>. You write one validation behavior and it applies to every handler in your app.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Open generic decoration is how MediatR&apos;s pipeline behaviors work. IPipelineBehavior&lt;TRequest, TResponse&gt; is essentially a generic decorator around IRequestHandler&lt;TRequest, TResponse&gt;. You write one behavior class and it applies to every handler."</div>
     </div></div>
@@ -3498,7 +4361,24 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Logging, caching, authorization &mdash; these apply to many services. Is Decorator or AOP (Aspect-Oriented Programming) better?</div>
       <div class="body-text">
-        <p>Decorator is explicit AOP. Traditional AOP (PostSharp, Fody) uses compile-time weaving or runtime proxies to inject behavior via attributes. Decorator does the same thing manually &mdash; you write the cross-cutting logic in a wrapper class. Decorator pros: explicit, debuggable, no magic, works with any DI container. AOP pros: less code per concern, applies to many classes at once via attributes. In .NET Core, the trend has moved toward explicit Decorator + DI over magic AOP. MediatR behaviors, HttpClient DelegatingHandlers, and middleware are all Decorator-style.</p>
+        <p>Cross-cutting concerns are behaviors that apply to many services but aren't part of the core business logic — things like logging, caching, authorization, retry. The question is: how do you apply them without copy-pasting the same code into 50 services?</p>
+        <p><strong>Decorator approach:</strong> You manually write a wrapper class for each concern. <code>LoggingDecorator</code> wraps <code>IOrderService</code> and adds logging. It's explicit — you can see exactly what happens, set breakpoints, and debug normally. The trade-off: you write more code, and each service that needs decoration must be explicitly wrapped.</p>
+        <p><strong>AOP approach (PostSharp, Fody, Castle DynamicProxy):</strong> You add an attribute like <code>[Log]</code> to a method, and the framework automatically injects logging behavior — either at compile time (PostSharp weaves IL into your assembly) or at runtime (DynamicProxy creates a subclass on-the-fly). Less code to write, but the behavior is "magic" — harder to debug because the injected code isn't visible in your source.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DecoratorVsAOP.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Decorator approach — explicit, debuggable
+services.AddScoped&lt;IOrderService, OrderService&gt;();
+services.Decorate&lt;IOrderService, LoggingDecorator&gt;();    // visible in code
+services.Decorate&lt;IOrderService, CachingDecorator&gt;();    // you control the order
+
+// AOP approach — attribute-based, less code
+[Log]        // ← PostSharp weaves logging at compile time
+[Cache(60)]  // ← you don't see HOW it's implemented
+public Order GetOrder(int id) => _db.Orders.Find(id);</code></pre>
+          </div>
+        </div>
+        <p>In modern .NET, the trend has strongly moved toward <strong>explicit Decorator + DI</strong> over magic AOP. MediatR pipeline behaviors, HttpClient DelegatingHandlers, and ASP.NET middleware are all Decorator-style patterns. The community consensus: if the concern applies to 3-5 services, use explicit decorators. If it applies to 50+ services identically, consider source generators to reduce boilerplate.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "My rule: if the concern applies to 3-5 services, use explicit decorators. If it applies to 50+ services identically, consider interceptors or source generators to avoid boilerplate. I avoid PostSharp-style compile-time weaving because it makes debugging difficult."</div>
     </div></div>
@@ -3513,12 +4393,53 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Should you test each decorator with the real service or with a mock?</div>
       <div class="body-text">
-        <p class="mb-sm">Three-layer testing strategy:</p>
+        <p>Decorators are one of the <em>easiest</em> patterns to test, because each decorator takes an interface in its constructor — which means you can pass in a mock. No special test infrastructure needed. Just "new up" the decorator with a mock inner, call the method, and assert.</p>
+        <p class="mb-sm">Use a <strong>three-layer testing strategy</strong>:</p>
         <ol class="qa-list">
-          <li><strong>Unit test each decorator in isolation</strong> &mdash; mock the inner service, verify the decorator adds its specific behavior (logged, cached, retried). This is the most important layer.</li>
-          <li><strong>Integration test the full chain</strong> &mdash; stack all decorators on a real (or in-memory) service, verify end-to-end behavior.</li>
-          <li><strong>DI configuration test</strong> &mdash; resolve the service from the real container, verify the decorator chain is wired correctly.</li>
+          <li><strong>Unit test each decorator in isolation</strong> — mock the inner service, verify the decorator adds its specific behavior. This is the most important layer.</li>
+          <li><strong>Integration test the full chain</strong> — stack all decorators on a real (or in-memory) service, verify end-to-end behavior.</li>
+          <li><strong>DI configuration test</strong> — resolve the service from the real container, verify the chain is wired correctly.</li>
         </ol>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DecoratorTests.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Layer 1: Unit test — test the CachingDecorator in isolation
+[Fact]
+public async Task CachingDecorator_SecondCall_ReturnsCached()
+{
+    var mockInner = new Mock&lt;IOrderService&gt;();
+    mockInner.Setup(s => s.GetOrder(42)).Returns(new Order { Id = 42 });
+    var decorator = new CachingDecorator(mockInner.Object);
+
+    var first  = decorator.GetOrder(42);  // calls inner
+    var second = decorator.GetOrder(42);  // should return cached
+
+    mockInner.Verify(s => s.GetOrder(42), Times.Once()); // inner called ONCE, not twice
+    Assert.Same(first, second);  // same cached object returned
+}
+
+// Layer 2: Integration test — verify full chain works together
+[Fact]
+public async Task FullChain_LogsCachesAndReturnsOrder()
+{
+    var realService = new InMemoryOrderService();
+    var cached  = new CachingDecorator(realService);
+    var logged  = new LoggingDecorator(cached, testLogger);
+    var result  = logged.GetOrder(1);
+    Assert.NotNull(result);
+    Assert.Contains("Getting order", testLogger.Messages);
+}
+
+// Layer 3: DI test — verify chain is wired correctly
+[Fact]
+public void DI_ResolvesDecoratorChain()
+{
+    var provider = CreateServiceProvider(); // your real DI setup
+    var service  = provider.GetRequiredService&lt;IOrderService&gt;();
+    Assert.IsType&lt;LoggingDecorator&gt;(service);   // outermost = logging
+}</code></pre>
+          </div>
+        </div>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The beauty of Decorator for testing: because each decorator takes an interface in its constructor, it&apos;s naturally mockable. You don&apos;t need any special test infrastructure &mdash; just new up the decorator with a mock inner, call the method, and assert."</div>
     </div></div>
@@ -3533,7 +4454,16 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Each decorator is an object on the heap. How much memory does an object with one field (the inner reference) consume in .NET?</div>
       <div class="body-text">
-        <p>Each decorator object in .NET has a minimum size of 24 bytes (x64: 8-byte object header + 8-byte method table pointer + 8-byte inner reference). Add fields for injected dependencies (ILogger, ICache) &mdash; typically 8 bytes each. A 5-layer decorator chain uses roughly 200-300 bytes total. For singleton/scoped registration, this is allocated once and shared. The concern is only when creating decorator chains per-request at high RPS. At 10K RPS with 5 transient decorators, that&apos;s 50K small objects per second entering Gen 0.</p>
+        <p>Let's break down the actual numbers. In .NET on a 64-bit system, every object has a fixed overhead:</p>
+        <ul class="qa-list">
+          <li><strong>8 bytes</strong> — object header (used by GC and locking)</li>
+          <li><strong>8 bytes</strong> — method table pointer (how .NET knows the object's type)</li>
+          <li><strong>8 bytes</strong> — the <code>_inner</code> field (reference to the wrapped service)</li>
+        </ul>
+        <p>That's <strong>24 bytes minimum</strong> per decorator. Add fields for injected dependencies (<code>ILogger</code> = 8 bytes, <code>IMemoryCache</code> = 8 bytes), and a typical decorator uses 32-48 bytes. A 5-layer chain? About <strong>200-300 bytes total</strong> — less than a single string like <code>"Hello, World!"</code> takes in memory.</p>
+        <p>For <strong>Singleton or Scoped</strong> registration, this memory is allocated once and shared across all callers. Memory impact: effectively zero.</p>
+        <p>The concern arises only with <strong>Transient</strong> registration at high throughput. If every request creates a fresh 5-layer chain, at 10,000 requests/second that's 50,000 short-lived objects per second entering Gen 0 garbage collection. Gen 0 collections are fast (~1ms), but at extreme scale this adds GC pressure. The fix: register decorators as Scoped (one per request scope, reused within it) or Singleton (one for the entire application lifetime).</p>
+        <p>In practice, decorator memory has never been a production issue in any real-world project. The internal state of decorators (caches holding thousands of entries, buffers holding MB of data) dwarfs the wrapper objects themselves.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In practice, I&apos;ve never seen decorator memory be a production issue. The total memory for a decorator chain is less than a single string allocation. Focus on the decorators&apos; internal state (caches, buffers) rather than the wrapper objects themselves."</div>
     </div></div>
@@ -3548,7 +4478,46 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If the outermost decorator is disposed, should it dispose the inner one? What if the inner is shared?</div>
       <div class="body-text">
-        <p>The rule: the <strong>owner disposes</strong>. If the decorator created the inner object, it should dispose it. If the DI container provided the inner object, the container manages its lifetime &mdash; the decorator should NOT dispose it. In .NET&apos;s Stream model, the <code>leaveOpen</code> parameter controls this explicitly. For DI-managed decorators, the container disposes each layer independently at scope end. For manual chains, implement <code>IDisposable</code> and propagate Dispose through the chain with try/finally to ensure the inner is always cleaned up.</p>
+        <p>Disposal in a decorator chain is about answering one question: <strong>who created it, who cleans it up?</strong> This is the "ownership" rule — the object that created a resource is responsible for destroying it.</p>
+        <p>There are two scenarios:</p>
+        <p><strong>DI-managed chains</strong> (most common): The DI container created each layer, so the container disposes each layer independently when the scope ends. Your decorators do NOT need to dispose the inner service — the container handles it. If you dispose the inner yourself, you might cause a double-dispose crash.</p>
+        <p><strong>Manually-built chains</strong> (like .NET Streams): You created the chain, so you must clean it up. Each decorator should implement <code>IDisposable</code> and propagate <code>Dispose</code> to the inner object:</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DisposalChain.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// For manual chains: propagate Dispose with try/finally
+public class EncryptingStream : Stream, IDisposable
+{
+    private readonly Stream _inner;
+    private readonly bool _leaveOpen;  // ← the escape hatch
+
+    public EncryptingStream(Stream inner, bool leaveOpen = false)
+        => (_inner, _leaveOpen) = (inner, leaveOpen);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && !_leaveOpen)
+            _inner.Dispose();  // only dispose inner if we OWN it
+        base.Dispose(disposing);
+    }
+}
+
+// Usage — leaveOpen controls ownership:
+using var fileStream = File.OpenRead("data.bin");
+using var buffered   = new BufferedStream(fileStream);
+using var encrypted  = new EncryptingStream(buffered);
+// When 'encrypted' disposes, it disposes 'buffered',
+// which disposes 'fileStream'. Clean chain.
+
+// For DI-managed chains — do NOT dispose inner:
+public class LoggingDecorator : IOrderService  // no IDisposable needed
+{
+    private readonly IOrderService _inner;  // DI container owns this
+    // ... just delegate calls, don't touch disposal
+}</code></pre>
+          </div>
+        </div>
+        <p>A subtle gotcha: if a <code>CachingDecorator</code> caches results containing <code>IDisposable</code> objects, who disposes the cached items when they're evicted? Use <code>IMemoryCache</code>'s <code>PostEvictionCallback</code> to handle this — otherwise you'll leak resources silently.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "A subtle issue: if a CachingDecorator caches results that contain IDisposable objects, who disposes the cached items? The cache eviction callback should handle disposal. Use IMemoryCache&apos;s PostEvictionCallback for this."</div>
     </div></div>
@@ -3564,6 +4533,39 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> When Service A calls Service B over HTTP, where would decorators fit?</div>
       <div class="body-text">
         <p>Decorators wrap the <strong>client-side service abstraction</strong>. Define <code>IPaymentGateway</code> as an interface. The concrete implementation makes HTTP calls to the payment service. Wrap it with decorators: <code>RetryDecorator</code> (handles transient failures), <code>CircuitBreakerDecorator</code> (stops calling when service is down), <code>CachingDecorator</code> (caches idempotent responses), <code>MetricsDecorator</code> (records latency and error rates). In .NET, <code>HttpClient</code>&apos;s <code>DelegatingHandler</code> chain is Decorator at the HTTP level &mdash; Polly integrates here via <code>AddPolicyHandler()</code>.</p>
+        <!-- SVG: Microservice client-side decorator chain -->
+        <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Client-side decorator chain wrapping a microservice call">
+          <defs><marker id="q23-arr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#8b5cf6"/></marker></defs>
+          <!-- Your Service -->
+          <rect x="10" y="40" width="100" height="100" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="60" y="65" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#15803d">Your</text>
+          <text x="60" y="80" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#15803d">Service</text>
+          <text x="60" y="120" text-anchor="middle" font-family="system-ui" font-size="9" fill="#15803d">calls IPayment</text>
+          <text x="60" y="132" text-anchor="middle" font-family="system-ui" font-size="9" fill="#15803d">Gateway</text>
+          <!-- Decorator chain -->
+          <rect x="130" y="15" width="380" height="155" rx="10" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="6,4"/>
+          <text x="320" y="38" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="700" fill="#6d28d9">Decorator Chain (in your service)</text>
+          <rect x="145" y="50" width="80" height="40" rx="6" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="185" y="75" text-anchor="middle" font-family="system-ui" font-size="9" fill="#6d28d9">Metrics</text>
+          <rect x="235" y="50" width="80" height="40" rx="6" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="275" y="75" text-anchor="middle" font-family="system-ui" font-size="9" fill="#6d28d9">Retry</text>
+          <rect x="325" y="50" width="80" height="40" rx="6" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="365" y="75" text-anchor="middle" font-family="system-ui" font-size="9" fill="#6d28d9">Breaker</text>
+          <rect x="415" y="50" width="80" height="40" rx="6" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="455" y="75" text-anchor="middle" font-family="system-ui" font-size="9" fill="#6d28d9">Cache</text>
+          <!-- HTTP Client -->
+          <rect x="145" y="105" width="350" height="50" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
+          <text x="320" y="128" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#2563eb">PaymentGatewayHttpClient (makes HTTP call)</text>
+          <text x="320" y="145" text-anchor="middle" font-family="system-ui" font-size="9" fill="#2563eb">+ DelegatingHandler chain for HTTP concerns</text>
+          <!-- Remote service -->
+          <rect x="560" y="40" width="130" height="100" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+          <text x="625" y="75" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#a16207">Payment</text>
+          <text x="625" y="92" text-anchor="middle" font-family="system-ui" font-size="11" font-weight="600" fill="#a16207">Service</text>
+          <text x="625" y="120" text-anchor="middle" font-family="system-ui" font-size="9" fill="#a16207">(remote)</text>
+          <!-- Arrows -->
+          <line x1="110" y1="90" x2="128" y2="90" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#q23-arr)"/>
+          <line x1="510" y1="130" x2="558" y2="100" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#q23-arr)"/>
+        </svg>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I use both levels: DelegatingHandlers for HTTP-level concerns (retry, timeout, correlation ID headers) and service-level decorators for business concerns (caching domain objects, logging business events). They compose independently."</div>
     </div></div>
@@ -3578,7 +4580,48 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What&apos;s the main boilerplate problem with Decorator? Could a source generator solve it?</div>
       <div class="body-text">
-        <p>Yes. The biggest pain point with Decorator is writing the base decorator class that forwards every method. A <span class="tooltip-trigger">source generator<span class="tooltip-content">Source generators are a C# compiler feature that generates additional source code at compile time based on your existing code. They analyze your types via Roslyn and emit new .cs files that become part of your compilation. No runtime reflection, no IL weaving &mdash; just generated code that&apos;s visible and debuggable.</span></span> can analyze an interface at compile time, generate the forwarding base class automatically, and you just write the override for the method you want to decorate. Libraries like <code>AutoDecorator</code> do this. The generated code has zero runtime overhead (no reflection, no proxies) and is fully debuggable because it&apos;s just generated C# source.</p>
+        <p>The biggest pain point with Decorator is the forwarding boilerplate — if your interface has 10 methods, your base decorator must forward all 10, even though most concrete decorators only override 1-2 of them. <span class="tooltip-trigger">Source generators<span class="tooltip-content">Source generators are a C# compiler feature that generates additional source code at compile time based on your existing code. They analyze your types via Roslyn and emit new .cs files that become part of your compilation. No runtime reflection, no IL weaving — just generated code that's visible and debuggable.</span></span> eliminate this entirely.</p>
+        <p>A source generator reads your interface at compile time, generates the forwarding base class automatically, and you just write the override for the methods you want to enhance:</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SourceGenDecorator.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Step 1: Mark your interface for generation
+[GenerateDecorator]  // ← source generator attribute
+public interface IOrderService
+{
+    Task&lt;Order&gt; GetOrderAsync(int id);
+    Task&lt;IList&lt;Order&gt;&gt; GetAllAsync();
+    Task PlaceOrderAsync(Order order);
+    Task CancelOrderAsync(int id);
+    Task&lt;OrderStats&gt; GetStatsAsync();
+}
+
+// Step 2: The source generator auto-creates this at compile time:
+// (you never write this — it's generated into obj/Generated/)
+public abstract partial class OrderServiceDecoratorBase : IOrderService
+{
+    protected readonly IOrderService _inner;
+    protected OrderServiceDecoratorBase(IOrderService inner) => _inner = inner;
+    public virtual Task&lt;Order&gt; GetOrderAsync(int id) => _inner.GetOrderAsync(id);
+    public virtual Task&lt;IList&lt;Order&gt;&gt; GetAllAsync() => _inner.GetAllAsync();
+    // ... all 5 methods auto-forwarded
+}
+
+// Step 3: You write only the override you care about
+public class LoggingDecorator : OrderServiceDecoratorBase
+{
+    public LoggingDecorator(IOrderService inner, ILogger log) : base(inner) { }
+
+    public override async Task&lt;Order&gt; GetOrderAsync(int id)
+    {
+        _log.LogInformation("Getting order {Id}", id);
+        return await base.GetOrderAsync(id);
+    }
+    // Other 4 methods: auto-forwarded by the generated base class!
+}</code></pre>
+          </div>
+        </div>
+        <p>The generated code has <strong>zero runtime overhead</strong> — no reflection, no proxies, no IL weaving. It's just plain C# that the compiler produces. You can inspect it in the <code>obj/Generated/</code> folder, set breakpoints in it, and debug it normally. If the interface changes (method added/removed), the generator updates the base class automatically at compile time.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Source generators eliminate the two main Decorator complaints: forwarding boilerplate and the risk of missing a method. The generated base class always matches the interface &mdash; if the interface changes, the generator updates the base automatically at compile time."</div>
     </div></div>
@@ -3593,7 +4636,48 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How would you add distributed tracing spans around every service call using Decorator?</div>
       <div class="body-text">
-        <p>Create a <code>TracingDecorator</code> that wraps the service interface and creates an <code>Activity</code> (the .NET API for OpenTelemetry spans) around each method call. The decorator starts an Activity before calling the inner service, adds relevant tags (method name, parameters), records the duration, and marks success/failure. Register it as the outermost decorator so it traces the full chain including other decorators&apos; behavior (retry attempts, cache hits, etc.).</p>
+        <p>OpenTelemetry gives you distributed tracing — the ability to follow a single request across services and see exactly where time is spent. A <code>TracingDecorator</code> wraps your service and creates a "span" (a timed block) around each method call, recording what happened, how long it took, and whether it succeeded.</p>
+        <p>In .NET, spans are represented by the <code>Activity</code> class (from <code>System.Diagnostics</code>). Your TracingDecorator creates an Activity before calling the inner service, adds tags with useful context, and marks success or failure when the call completes:</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TracingDecorator.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">public class TracingOrderDecorator : IOrderService
+{
+    private static readonly ActivitySource Source = new("MyApp.Orders");
+    private readonly IOrderService _inner;
+
+    public TracingOrderDecorator(IOrderService inner) => _inner = inner;
+
+    public async Task&lt;Order&gt; GetOrderAsync(int id)
+    {
+        using var activity = Source.StartActivity("GetOrder");
+        activity?.SetTag("order.id", id);  // searchable in Jaeger/Zipkin
+
+        try
+        {
+            var result = await _inner.GetOrderAsync(id);
+            activity?.SetTag("order.found", result != null);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.RecordException(ex);  // exception details in the trace
+            throw;
+        }
+    }
+}
+
+// Register as OUTERMOST decorator — so it traces the full chain
+// (including retry attempts, cache hits, etc.)
+services.AddScoped&lt;IOrderService, OrderService&gt;();
+services.Decorate&lt;IOrderService, CachingDecorator&gt;();
+services.Decorate&lt;IOrderService, RetryDecorator&gt;();
+services.Decorate&lt;IOrderService, TracingOrderDecorator&gt;(); // outermost = registered last</code></pre>
+          </div>
+        </div>
+        <p>Pair this with a <code>MetricsDecorator</code> that records histograms (latency percentiles) and counters (success/failure rates), and you get full observability without touching any business logic — pure Decorator benefit.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I combine the TracingDecorator with a MetricsDecorator that records histograms (latency) and counters (success/failure). Both are registered as outermost decorators. This gives me full observability without touching any business logic &mdash; pure Decorator benefit."</div>
     </div></div>
@@ -3608,16 +4692,16 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Beyond logging and caching, what other real-world concerns can be handled with Decorator?</div>
       <div class="body-text">
-        <p class="mb-sm">Production decorator patterns I&apos;ve implemented:</p>
+        <p>Here are decorator patterns that I've used (or seen used) in real production .NET systems. The common thread: each concern is <strong>optional, independently toggleable</strong>, and has nothing to do with core business logic — exactly what Decorator is designed for:</p>
         <ul class="qa-list">
-          <li><strong>Retry + exponential backoff</strong> with jitter &mdash; wraps any service, configurable per-endpoint</li>
-          <li><strong>Circuit breaker</strong> &mdash; opens after N failures, half-opens after timeout, closes on success</li>
-          <li><strong>Distributed cache</strong> &mdash; Redis-backed decorator with configurable TTL per method</li>
-          <li><strong>Rate limiting</strong> &mdash; per-tenant throttling decorator for multi-tenant SaaS</li>
-          <li><strong>Audit logging</strong> &mdash; records who called what when, with before/after snapshots</li>
-          <li><strong>Tenant context injection</strong> &mdash; decorator that injects tenant ID from HttpContext into service calls</li>
-          <li><strong>Feature flags</strong> &mdash; decorator that short-circuits to a fallback when a feature is disabled</li>
+          <li><strong>Retry + exponential backoff</strong> with jitter — wraps any service that calls external APIs. Configurable max retries and delay per endpoint. Handles transient HTTP 500s, timeouts, and network blips without the caller knowing.</li>
+          <li><strong>Circuit breaker</strong> — tracks failure rate. After N consecutive failures, it "opens" and immediately returns an error (or fallback) instead of calling the failing service. After a timeout, it "half-opens" and lets one request through to test if the service recovered. Prevents cascade failures in microservices.</li>
+          <li><strong>Distributed cache (Redis-backed)</strong> — caches responses with configurable TTL per method. The decorator checks Redis first; if there's a hit, returns cached data without calling the inner service. Cache misses go through to the real service and cache the result.</li>
+          <li><strong>Rate limiting</strong> — per-tenant throttling for multi-tenant SaaS. If Tenant A exceeds their quota, the decorator returns HTTP 429 without touching the service. Other tenants are unaffected.</li>
+          <li><strong>Audit logging</strong> — records who called what, when, with before/after snapshots of the data. Critical for compliance (GDPR, SOX). The decorator captures the state before the inner call, then the state after, and writes both to an audit trail.</li>
+          <li><strong>Feature flags</strong> — decorator that checks a feature flag service. If the feature is disabled, it short-circuits to a fallback behavior instead of calling the new implementation. Enables safe gradual rollouts.</li>
         </ul>
+        <p>In a typical production service, you might stack 3-4 of these: <code>TracingDecorator → RetryDecorator → CachingDecorator → RealService</code>. Each one is independently testable, independently removable, and none knows about the others.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The common thread: each of these is optional, independently toggleable, and has nothing to do with the core business logic. That&apos;s the Decorator sweet spot &mdash; orthogonal concerns that compose."</div>
     </div></div>
@@ -3638,6 +4722,42 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
           <li><strong>Middleware:</strong> wraps a generic request/response pipeline. Runs for ALL requests. Best for: infrastructure concerns (auth, CORS, compression, request logging)</li>
           <li><strong>Pipeline (MediatR behaviors):</strong> wraps a generic handler with typed request/response. Best for: cross-cutting concerns across all handlers (validation, logging, transaction management)</li>
         </ul>
+        <!-- SVG: Comparison of three patterns -->
+        <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Comparison: Decorator vs Middleware vs Pipeline">
+          <!-- Decorator -->
+          <rect x="10" y="10" width="210" height="180" rx="10" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2"/>
+          <text x="115" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#6d28d9">Decorator</text>
+          <text x="115" y="55" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6d28d9">Wraps: specific interface</text>
+          <text x="115" y="72" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6d28d9">Scope: per-service</text>
+          <rect x="30" y="82" width="170" height="30" rx="5" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="115" y="101" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6d28d9">LoggingDecorator</text>
+          <rect x="45" y="118" width="140" height="25" rx="5" fill="#fff" stroke="#8b5cf6" stroke-width="1"/>
+          <text x="115" y="135" text-anchor="middle" font-family="system-ui" font-size="10" fill="#6d28d9">CachingDecorator</text>
+          <rect x="60" y="149" width="110" height="25" rx="5" fill="#f0fdf4" stroke="#22c55e" stroke-width="1"/>
+          <text x="115" y="166" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="600" fill="#15803d">OrderService</text>
+          <!-- Middleware -->
+          <rect x="245" y="10" width="210" height="180" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+          <text x="350" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#2563eb">Middleware</text>
+          <text x="350" y="55" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">Wraps: HTTP pipeline</text>
+          <text x="350" y="72" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">Scope: ALL requests</text>
+          <rect x="265" y="82" width="170" height="25" rx="5" fill="#fff" stroke="#3b82f6" stroke-width="1"/>
+          <text x="350" y="99" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">AuthMiddleware</text>
+          <rect x="265" y="112" width="170" height="25" rx="5" fill="#fff" stroke="#3b82f6" stroke-width="1"/>
+          <text x="350" y="129" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">CorsMiddleware</text>
+          <rect x="265" y="142" width="170" height="25" rx="5" fill="#fff" stroke="#3b82f6" stroke-width="1"/>
+          <text x="350" y="159" text-anchor="middle" font-family="system-ui" font-size="10" fill="#2563eb">CompressionMiddleware</text>
+          <!-- Pipeline -->
+          <rect x="480" y="10" width="210" height="180" rx="10" fill="#fefce8" stroke="#eab308" stroke-width="2"/>
+          <text x="585" y="35" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#a16207">Pipeline</text>
+          <text x="585" y="55" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">Wraps: typed handlers</text>
+          <text x="585" y="72" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">Scope: per-handler type</text>
+          <rect x="500" y="82" width="170" height="25" rx="5" fill="#fff" stroke="#eab308" stroke-width="1"/>
+          <text x="585" y="99" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">ValidationBehavior</text>
+          <rect x="500" y="112" width="170" height="25" rx="5" fill="#fff" stroke="#eab308" stroke-width="1"/>
+          <text x="585" y="129" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">LoggingBehavior</text>
+          <rect x="500" y="142" width="170" height="25" rx="5" fill="#fff" stroke="#eab308" stroke-width="1"/>
+          <text x="585" y="159" text-anchor="middle" font-family="system-ui" font-size="10" fill="#a16207">TransactionBehavior</text>
+        </svg>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I use all three in the same application. ASP.NET middleware for HTTP concerns, MediatR pipeline behaviors for CQRS concerns, and explicit decorators for specific service concerns. They operate at different abstraction levels and compose independently."</div>
     </div></div>
@@ -3652,13 +4772,40 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> A method call goes through 5 decorator layers and the result is wrong. How do you figure out which layer caused the issue?</div>
       <div class="body-text">
-        <p class="mb-sm">Debugging strategies:</p>
+        <p>When a method call goes through 5 decorator layers and the result is wrong, the challenge is figuring out <em>which layer</em> caused the problem. Is the caching decorator returning stale data? Is the retry decorator masking an error? Is the real service returning bad data? Here's a systematic approach:</p>
+        <p class="mb-sm"><strong>Four debugging strategies:</strong></p>
         <ol class="qa-list">
-          <li><strong>Structured logging in every decorator</strong> &mdash; each logs entry/exit with its class name. The log sequence tells you exactly which layers ran and in what order.</li>
-          <li><strong>Correlation IDs</strong> &mdash; pass a unique ID through the chain so you can filter logs for one specific call.</li>
-          <li><strong>Bypass decorators</strong> &mdash; in development, resolve the concrete service directly (skip DI decoration) to test if the issue is in a decorator or the real service.</li>
-          <li><strong>Unit tests per decorator</strong> &mdash; if each decorator passes its isolated tests, the bug is likely in the interaction between layers (ordering, state sharing).</li>
+          <li><strong>Structured logging in every decorator</strong> — each decorator logs entry/exit with its class name. The log sequence tells you exactly which layers ran and in what order. If the logs show "CachingDecorator: returning cached result" when you expected a fresh DB call, you've found the culprit.</li>
+          <li><strong>Correlation IDs</strong> — pass a unique ID through the chain so you can filter logs for one specific call across all layers. Without this, high-traffic logs become impossible to follow.</li>
+          <li><strong>Bypass decorators</strong> — in development, resolve the concrete service directly (skip DI decoration) to test if the issue is in a decorator or the real service.</li>
+          <li><strong>Unit tests per decorator</strong> — if each decorator passes its isolated tests, the bug is likely in the interaction between layers (ordering, state sharing).</li>
         </ol>
+        <p>A powerful diagnostic technique: add a startup log that dumps the full chain structure so you never have to guess:</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ChainDiagnostic.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Log the full decorator chain at startup
+public static void LogDecoratorChain&lt;T&gt;(IServiceProvider sp, ILogger log)
+{
+    var service = sp.GetRequiredService&lt;T&gt;();
+    var chain = new List&lt;string&gt;();
+    var current = service as object;
+
+    while (current != null)
+    {
+        chain.Add(current.GetType().Name);
+        // Try to read the "_inner" field via reflection (dev only!)
+        var innerField = current.GetType()
+            .GetField("_inner", BindingFlags.NonPublic | BindingFlags.Instance);
+        current = innerField?.GetValue(current);
+    }
+
+    log.LogInformation("IOrderService chain: {Chain}", string.Join(" → ", chain));
+    // Output: "IOrderService chain: LoggingDecorator → RetryDecorator →
+    //          CachingDecorator → OrderService"
+}</code></pre>
+          </div>
+        </div>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I add a diagnostic middleware/decorator that logs the full chain at startup: &apos;IOrderService resolved as: Logging → Retry → Caching → OrderService&apos;. This immediately tells me the chain structure without debugger inspection."</div>
     </div></div>
@@ -3683,6 +4830,31 @@ services.Decorate&lt;IOrderService, TenantContextDecorator&gt;();
           <li><strong>RetryDecorator</strong> &mdash; 3 retries with exponential backoff + jitter</li>
           <li><strong>PaymentGatewayHttpClient</strong> (innermost, concrete) &mdash; makes the actual HTTP call</li>
         </ol>
+
+        <!-- SVG: Full payment gateway decorator chain -->
+        <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Full decorator chain for a payment gateway">
+          <defs><marker id="q29-arr" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/></marker></defs>
+          <text x="350" y="20" text-anchor="middle" font-family="system-ui" font-size="13" font-weight="700" fill="#334155">IPaymentGateway — Full Production Chain</text>
+          <!-- Layer boxes - nested -->
+          <rect x="10" y="30" width="680" height="240" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="25" y="50" font-family="system-ui" font-size="10" font-weight="600" fill="#15803d">1. Tracing (sees everything)</text>
+          <rect x="25" y="58" width="650" height="200" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="40" y="76" font-family="system-ui" font-size="10" font-weight="600" fill="#2563eb">2. Metrics (counts calls)</text>
+          <rect x="40" y="84" width="620" height="164" rx="8" fill="#faf5ff" stroke="#8b5cf6" stroke-width="1.5"/>
+          <text x="55" y="102" font-family="system-ui" font-size="10" font-weight="600" fill="#6d28d9">3. Logging (records details)</text>
+          <rect x="55" y="110" width="590" height="128" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+          <text x="70" y="128" font-family="system-ui" font-size="10" font-weight="600" fill="#a16207">4. Rate Limiting (per-tenant throttle)</text>
+          <rect x="70" y="136" width="560" height="92" rx="8" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="85" y="154" font-family="system-ui" font-size="10" font-weight="600" fill="#dc2626">5. Circuit Breaker (stops calling dead services)</text>
+          <rect x="85" y="162" width="530" height="56" rx="8" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+          <text x="100" y="180" font-family="system-ui" font-size="10" font-weight="600" fill="#ea580c">6. Retry (3× with backoff)</text>
+          <rect x="100" y="188" width="300" height="22" rx="5" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+          <text x="250" y="203" text-anchor="middle" font-family="system-ui" font-size="10" font-weight="700" fill="#334155">7. PaymentGatewayHttpClient → HTTP</text>
+          <!-- Request label -->
+          <text x="500" y="198" font-family="system-ui" font-size="10" fill="#64748b">Request flows IN →</text>
+          <text x="500" y="214" font-family="system-ui" font-size="10" fill="#64748b">Response flows OUT ←</text>
+        </svg>
+
         <p>Why this order? Tracing sees everything including retries. Metrics count at the business level (one charge attempt = one metric even if retried). Logging captures the full story. Rate limiting stops excessive calls before they hit retry logic. Circuit breaker prevents calling a dead service. Retry handles transient failures closest to the actual call.</p>
       </div>
       <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In production, I&apos;d implement Retry and Circuit Breaker via Polly (wrapped as decorators or DelegatingHandlers) rather than hand-rolling. The tracing, metrics, and logging decorators are custom because they need business-specific context. Registration: one extension method, AddPaymentGateway(), that wires the entire chain with comments documenting the order and rationale."</div>

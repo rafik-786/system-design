@@ -1057,7 +1057,6 @@ builder.Services.AddHostedService&lt;EmailSenderWorker&gt;();</code></pre>
 
         <!-- Q1: Need exactly ONE shared instance? — Diamond at top center -->
         <g transform="translate(360, 52)">
-          <rect x="-90" y="-38" width="180" height="76" rx="0" transform="rotate(45)" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" style="transform-origin:0 0;transform:rotate(45deg) scale(0.56);" />
           <polygon points="0,-52 100,0 0,52 -100,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
           <text x="0" y="-8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Need exactly ONE</text>
           <text x="0" y="8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">shared instance?</text>
@@ -1283,10 +1282,68 @@ builder.Services.AddHostedService&lt;EmailSenderWorker&gt;();</code></pre>
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Friday, 5:47 PM.</strong> A fintech app goes live after a marketing campaign drives 10x normal traffic. Within 3 minutes, the database connection pool is exhausted. All API calls return 500. The on-call engineer sees 47 <code>DbConnectionManager</code> instances in the memory dump — there should be exactly 1.</p>
-          <p class="body-text">The Singleton wasn't thread-safe. Two threads raced during the first millisecond of traffic, both saw <code>_instance == null</code>, both created a new instance. Each instance opened its own connection pool. Under load, 47 threads hit the race window.</p>
+          <p class="body-text">Here's how it unfolded. The development team built a Singleton to manage database connections. It worked perfectly in local testing because only one request comes in at a time on your laptop. But in production, the marketing campaign drove a surge of traffic right when the app booted up. Dozens of threads tried to get the database connection manager at the exact same millisecond.</p>
+          <p class="body-text">Each thread asked the same question: "Does an instance exist yet?" And because no instance existed yet, every single thread answered "Nope!" and went ahead to create its own. Imagine 47 people all arriving at an empty parking spot at the same time — each one starts pulling in because they all see it's open. The result? Each of those 47 instances opened its own pool of 10 database connections. That's 470 connections hitting a database that can only handle 100.</p>
+          <p class="body-text">The database started rejecting connections. API calls started returning 500 errors. The on-call engineer spent the first hour blaming the database — "Maybe it needs more connections?" Scaling the database didn't help because the problem wasn't the database. It was the application creating 47 copies of something that should only exist once.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours. The bug was intermittent — it only appeared under concurrent load, never in single-threaded local testing. The engineer initially blamed the database.</p>
+
+        <!-- SVG: Thread Race Timeline -->
+        <svg viewBox="0 0 720 280" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing two threads racing to create a Singleton instance simultaneously, resulting in duplicate instances">
+          <defs>
+            <marker id="bug1-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <!-- Background -->
+          <rect width="720" height="280" rx="12" fill="#1e293b"/>
+          <text x="360" y="28" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">What Went Wrong: Two Threads Race to Create the Singleton</text>
+          <!-- Timeline -->
+          <line x1="60" y1="60" x2="60" y2="260" stroke="#475569" stroke-width="2"/>
+          <text x="55" y="52" text-anchor="end" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Time</text>
+          <!-- Thread A column -->
+          <rect x="100" y="48" width="130" height="24" rx="6" fill="#3b82f6"/>
+          <text x="165" y="64" text-anchor="middle" fill="#fff" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Thread A</text>
+          <!-- Thread B column -->
+          <rect x="280" y="48" width="130" height="24" rx="6" fill="#8b5cf6"/>
+          <text x="345" y="64" text-anchor="middle" fill="#fff" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Thread B</text>
+          <!-- Result column -->
+          <rect x="490" y="48" width="200" height="24" rx="6" fill="#475569"/>
+          <text x="590" y="64" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">_instance field</text>
+
+          <!-- T1: Both check null -->
+          <text x="72" y="105" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">T1</text>
+          <rect x="100" y="90" width="130" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="165" y="105" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10">_instance == null? YES</text>
+          <rect x="280" y="90" width="130" height="22" rx="4" fill="#2e1065"/>
+          <text x="345" y="105" text-anchor="middle" fill="#c4b5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10">_instance == null? YES</text>
+          <rect x="490" y="90" width="200" height="22" rx="4" fill="#292524"/>
+          <text x="590" y="105" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">null</text>
+
+          <!-- T2: Thread A creates -->
+          <text x="72" y="140" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">T2</text>
+          <rect x="100" y="125" width="130" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="165" y="140" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10">new Instance() + 10 conns</text>
+          <rect x="280" y="125" width="130" height="22" rx="4" fill="#2e1065"/>
+          <text x="345" y="140" text-anchor="middle" fill="#c4b5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10">new Instance() + 10 conns</text>
+          <rect x="490" y="125" width="200" height="22" rx="4" fill="#292524"/>
+          <text x="590" y="140" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance A (overwritten by B)</text>
+
+          <!-- T3: 47 threads -->
+          <text x="72" y="175" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">T3</text>
+          <rect x="100" y="160" width="310" height="22" rx="4" fill="#7f1d1d"/>
+          <text x="255" y="175" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">47 threads all pass null-check in same millisecond</text>
+          <rect x="490" y="160" width="200" height="22" rx="4" fill="#7f1d1d"/>
+          <text x="590" y="175" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">47 different instances!</text>
+
+          <!-- Result -->
+          <rect x="100" y="200" width="310" height="22" rx="4" fill="#7f1d1d"/>
+          <text x="255" y="215" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">47 instances x 10 connections = 470 connections</text>
+          <rect x="490" y="200" width="200" height="22" rx="4" fill="#991b1b"/>
+          <text x="590" y="215" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">DB limit: 100. CRASH.</text>
+
+          <!-- Bottom note -->
+          <text x="360" y="255" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-style="italic">The null-check has no lock — every thread passes it simultaneously during the first millisecond</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1331,6 +1388,7 @@ public class DbConnectionManager
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the <code>if (_instance == null)</code> check on line 10. This is where everything goes wrong. The check and the assignment on line 14 are two separate operations — they're not atomic (not done as a single step). Between the moment Thread A checks "is it null?" and the moment it finishes creating the new instance, Thread B can also check "is it null?" and get the same answer: yes. There's no lock, no gate, nothing stopping both threads from walking right through that door at the same time. In the constructor, each instance opens 10 database connections. Multiply that by 47 threads, and you've blown past the database's connection limit before anyone knows what happened.</p>
           </div>
           <div class="tab-panel" id="sbug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1356,7 +1414,13 @@ public class DbConnectionManager
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> <code>Lazy&lt;T&gt;</code> wraps the creation logic in an internal lock. When the first thread calls <code>.Value</code>, it acquires the lock and runs the factory function (the <code>() =&gt; new DbConnectionManager()</code> part). Every other thread that calls <code>.Value</code> at the same time just waits. Once the first thread finishes, the instance is cached. From that point on, accessing <code>.Value</code> is essentially free — it's just reading a pre-computed value, no lock involved. This is why <code>Lazy&lt;T&gt;</code> is the gold standard: it gives you thread safety during creation and zero overhead afterward.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for <code>if (_instance == null)</code> or <code>if (instance == null)</code> followed by <code>new</code>. If there's no <code>lock</code> statement or <code>Lazy&lt;T&gt;</code> wrapping it, you have this bug. It will work perfectly on your laptop and fail catastrophically under real traffic. Another red flag: any Singleton class that uses a <code>private static</code> field assigned via a manual null check instead of <code>Lazy&lt;T&gt;</code> or a <code>static readonly</code> initializer.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1373,10 +1437,56 @@ public class DbConnectionManager
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Monday morning, 9:02 AM.</strong> A new notification feature shipped on Friday passes all tests in staging. First user triggers a notification — works perfectly. Second user, 30 seconds later — <code>ObjectDisposedException: Cannot access a disposed context instance</code>. Every subsequent notification fails. The team rolls back, confused — "it worked in staging because staging only had one tester hitting it at a time."</p>
-          <p class="body-text">The singleton <code>NotificationService</code> captured a scoped <code>DbContext</code>. After request 1 ended, the DbContext was disposed. The singleton still held the dead reference.</p>
+          <p class="body-text">Here's the story. The team built a <code>NotificationService</code> that needed to look up user email addresses in the database, then send notifications. A developer registered it as a Singleton (makes sense — it's a service, you only need one). The service needed a <code>DbContext</code> to query the database, so they injected it through the constructor. Standard stuff, right?</p>
+          <p class="body-text">The problem is about <strong>lifetimes</strong>. Think of it like this: a Singleton lives for the entire life of your application — like a permanent employee who never leaves the building. A Scoped service (like <code>DbContext</code>) lives for the duration of one HTTP request — like a visitor who comes in, does their thing, and leaves. When the Singleton grabbed that <code>DbContext</code> through its constructor, it was like the permanent employee grabbing the visitor's badge and keeping it. When the visitor left (request 1 ended), their badge was deactivated (DbContext disposed). But the permanent employee is still holding that dead badge and trying to use it for every future visitor.</p>
+          <p class="body-text">Request 1 worked because the DbContext was still alive during that request. But the moment request 1 ended, the DI container cleaned up all scoped services — including that DbContext. Request 2 came in, the Singleton tried to use the same DbContext, and <strong>boom</strong> — <code>ObjectDisposedException</code>. The Singleton was holding a reference to a dead object.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">45 minutes. The stack trace was clear, but understanding <em>why</em> a DbContext was disposed while code was still using it took investigation. The term "<span class="tooltip-trigger">captive dependency<span class="tooltip-content">A scoped or transient service accidentally captured by a singleton, causing it to live far longer than intended.</span></span>" wasn't known to the team.</p>
+
+        <!-- SVG: Captive Dependency Lifecycle -->
+        <svg viewBox="0 0 720 300" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how a Singleton captures a Scoped DbContext, which gets disposed after the first request, leaving the Singleton with a dead reference">
+          <rect width="720" height="300" rx="12" fill="#1e293b"/>
+          <text x="360" y="28" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">What Went Wrong: Singleton Captures a Scoped Dependency</text>
+
+          <!-- Singleton box (lives forever) -->
+          <rect x="30" y="50" width="180" height="230" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="120" y="72" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">NotificationService</text>
+          <text x="120" y="88" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">(Singleton — lives forever)</text>
+          <rect x="50" y="100" width="140" height="30" rx="4" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="120" y="120" text-anchor="middle" fill="#a8a29e" font-family="system-ui, -apple-system, sans-serif" font-size="11">_db = DbContext</text>
+
+          <!-- Arrow from Singleton to Request 1 -->
+          <line x1="210" y1="115" x2="260" y2="115" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+
+          <!-- Request 1 scope (alive) -->
+          <rect x="265" y="50" width="190" height="100" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+          <text x="360" y="72" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Request 1 Scope</text>
+          <rect x="285" y="85" width="150" height="26" rx="4" fill="#052e16"/>
+          <text x="360" y="103" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">DbContext ALIVE</text>
+          <text x="360" y="140" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Works perfectly!</text>
+
+          <!-- Disposed marker -->
+          <text x="360" y="172" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Request 1 ends. DbContext DISPOSED.</text>
+
+          <!-- Arrow from Singleton to Request 2 -->
+          <line x1="210" y1="115" x2="260" y2="220" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#bug1-arrow)"/>
+
+          <!-- Request 2 scope (broken) -->
+          <rect x="265" y="190" width="190" height="80" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="212" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Request 2 Scope</text>
+          <text x="360" y="235" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">Singleton uses DEAD DbContext</text>
+          <text x="360" y="258" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">ObjectDisposedException!</text>
+
+          <!-- Explanation on right -->
+          <rect x="480" y="60" width="220" height="50" rx="6" fill="#1e3a5f"/>
+          <text x="590" y="78" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10">The Singleton grabbed DbContext</text>
+          <text x="590" y="93" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10">at construction time and HELD ON.</text>
+
+          <rect x="480" y="200" width="220" height="50" rx="6" fill="#450a0a"/>
+          <text x="590" y="218" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">DbContext was disposed with Request 1.</text>
+          <text x="590" y="233" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Singleton still holds the dead ref.</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1414,6 +1524,7 @@ builder.Services.AddSingleton&lt;NotificationService&gt;(); // Singleton
 // The Singleton holds onto it forever — past the scope's lifetime</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the constructor: <code>public NotificationService(AppDbContext db) =&gt; _db = db;</code>. This stores the DbContext as a field. The problem is that <code>AddDbContext</code> registers DbContext as Scoped by default — it's designed to live for one request and then be thrown away. But the Singleton lives forever. So the Singleton receives a DbContext that was created during the first request's scope, stores it as <code>_db</code>, and keeps using it for every future request. After that first request ends and the scope is cleaned up, <code>_db</code> points to a disposed (dead) object.</p>
           </div>
           <div class="tab-panel" id="sbug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1443,7 +1554,13 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
 });</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of capturing a DbContext directly, the Singleton now holds an <code>IServiceScopeFactory</code> — which is itself a Singleton, so there's no lifetime mismatch. Every time <code>SendAsync</code> is called, it creates a brand new scope and gets a fresh DbContext from that scope. When the method finishes, the <code>using</code> block disposes the scope and its DbContext cleanly. Each operation gets its own fresh database connection, and nothing stale hangs around. The <code>ValidateScopes = true</code> line is your safety net — it makes the DI container check at startup whether any Singleton is trying to capture a Scoped service, and throws an exception before the app even starts.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for any class registered as <code>AddSingleton</code> that takes a <code>DbContext</code>, <code>IDbConnection</code>, or any scoped service in its constructor. The rule of thumb: a Singleton should <strong>never</strong> accept a Scoped or Transient dependency directly. If it needs one, it should inject <code>IServiceScopeFactory</code> or <code>IServiceProvider</code> and create a scope per operation. The easiest preventive measure: set <code>ValidateScopes = true</code> in your development configuration and the DI container will catch it for you automatically.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1460,10 +1577,58 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2:15 AM, deployment pipeline.</strong> A zero-downtime deployment rotates containers. For 200ms, the new container starts before the config volume is mounted. The <code>ConfigManager</code> singleton's constructor fires, can't find <code>appsettings.json</code>, and throws <code>FileNotFoundException</code>. <code>Lazy&lt;T&gt;</code> caches the exception. The config file appears 200ms later — but it doesn't matter.</p>
-          <p class="body-text">Every call to <code>ConfigManager.Instance</code> now re-throws the cached exception. The container passes health checks (they don't use ConfigManager) but every real request fails. Engineers spend 90 minutes investigating before someone suggests "have you tried restarting it?" — which works because it re-initializes the <code>Lazy&lt;T&gt;</code>.</p>
+          <p class="body-text">To understand what happened, imagine a vending machine that jams on the first coin. Even after you fix the jam, the machine refuses to accept coins because it "remembers" it's broken. That's exactly what <code>Lazy&lt;T&gt;</code> does by default when the creation logic fails. It enters a "faulted" state and never tries again — it just replays the same error over and over.</p>
+          <p class="body-text">Here's the timeline: At 2:15:00.000 AM, the new container starts. The first request comes in and tries to access <code>ConfigManager.Instance</code>. The <code>Lazy&lt;T&gt;</code> runs the factory function, which tries to load <code>appsettings.json</code>. The file isn't there yet (the config volume takes 200ms to mount), so it throws <code>FileNotFoundException</code>. <code>Lazy&lt;T&gt;</code> catches this exception and <strong>remembers it permanently</strong>.</p>
+          <p class="body-text">At 2:15:00.200 AM — just 200 milliseconds later — the config volume is mounted and the file is on disk. But it's too late. The <code>Lazy&lt;T&gt;</code> has already decided "I tried, it failed, I'm done." Every subsequent call to <code>ConfigManager.Instance</code> gets the cached <code>FileNotFoundException</code>. The irony: the engineers can see the file on disk, but the exception keeps saying it's missing. It took 90 minutes and a "have you tried restarting it?" suggestion before someone realized the error was being <em>replayed from memory</em>, not happening in real-time.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">90 minutes. The misleading part: the config file existed on disk. The exception said it didn't. No one suspected the exception was being <em>replayed from cache</em>.</p>
+
+        <!-- SVG: Lazy<T> Exception Caching Timeline -->
+        <svg viewBox="0 0 720 260" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Timeline showing how Lazy T caches the first exception and replays it forever, even after the underlying problem is fixed">
+          <rect width="720" height="260" rx="12" fill="#1e293b"/>
+          <text x="360" y="28" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">What Went Wrong: Lazy&lt;T&gt; Caches Exceptions Forever</text>
+
+          <!-- Timeline arrow -->
+          <line x1="50" y1="70" x2="690" y2="70" stroke="#475569" stroke-width="2" marker-end="url(#bug1-arrow)"/>
+          <text x="700" y="74" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Time</text>
+
+          <!-- Event 1: Container starts -->
+          <circle cx="120" cy="70" r="6" fill="#3b82f6"/>
+          <text x="120" y="58" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">2:15:00.000</text>
+          <rect x="60" y="85" width="120" height="42" rx="4" fill="#7f1d1d"/>
+          <text x="120" y="100" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">Factory runs.</text>
+          <text x="120" y="115" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">FileNotFound! CACHED.</text>
+
+          <!-- Event 2: File appears -->
+          <circle cx="270" cy="70" r="6" fill="#22c55e"/>
+          <text x="270" y="58" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">2:15:00.200</text>
+          <rect x="210" y="85" width="120" height="42" rx="4" fill="#14532d"/>
+          <text x="270" y="100" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">Config file NOW EXISTS</text>
+          <text x="270" y="115" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">on disk. Too late!</text>
+
+          <!-- Event 3: Next call -->
+          <circle cx="420" cy="70" r="6" fill="#ef4444"/>
+          <text x="420" y="58" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">2:15:00.201</text>
+          <rect x="360" y="85" width="120" height="42" rx="4" fill="#7f1d1d"/>
+          <text x="420" y="100" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">Call .Value again.</text>
+          <text x="420" y="115" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">REPLAYS cached error.</text>
+
+          <!-- Event 4: Forever broken -->
+          <circle cx="570" cy="70" r="6" fill="#ef4444"/>
+          <text x="570" y="58" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">Every future call</text>
+          <rect x="510" y="85" width="120" height="42" rx="4" fill="#7f1d1d"/>
+          <text x="570" y="100" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">Same cached error.</text>
+          <text x="570" y="115" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">FOREVER.</text>
+
+          <!-- Lazy<T> state box at bottom -->
+          <rect x="80" y="150" width="560" height="44" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="360" y="168" text-anchor="middle" fill="#a8a29e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Lazy&lt;T&gt; internal state: FAULTED (ExecutionAndPublication mode)</text>
+          <text x="360" y="184" text-anchor="middle" fill="#78716c" font-family="system-ui, -apple-system, sans-serif" font-size="10">The factory never runs again. The cached exception is the permanent answer.</text>
+
+          <!-- Bottom note -->
+          <text x="360" y="225" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-style="italic">The file existed after 200ms, but Lazy&lt;T&gt; already made its decision. Only a process restart clears the faulted state.</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1502,6 +1667,7 @@ public class ConfigManager
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>Lazy&lt;T&gt;</code> is created with the default mode (<code>ExecutionAndPublication</code>). This mode has a specific behavior: if the factory function throws an exception, that exception is cached permanently. Look at the constructor — it calls <code>AddJsonFile("appsettings.json", optional: false)</code>. That <code>optional: false</code> means "throw an exception if the file doesn't exist." During the 200ms deployment window, the file truly doesn't exist. The constructor throws. <code>Lazy&lt;T&gt;</code> stores that exception in its internal state and marks itself as "faulted." From that point on, every call to <code>.Value</code> just re-throws the stored exception without ever trying to run the factory again.</p>
           </div>
           <div class="tab-panel" id="sbug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1532,7 +1698,13 @@ public static ConfigManager Instance
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Option A switches the <code>Lazy&lt;T&gt;</code> to <code>PublicationOnly</code> mode. In this mode, if the factory throws, the <code>Lazy&lt;T&gt;</code> does NOT cache the exception. The next time someone calls <code>.Value</code>, it tries the factory again. The trade-off is that multiple threads might run the factory at the same time (only one result wins), but that's a small price to pay for resilience. Option B skips <code>Lazy&lt;T&gt;</code> entirely and uses <code>Interlocked.CompareExchange</code> for manual control. If the constructor throws, <code>_instance</code> stays null and the next call tries again. Both approaches give you the retry behavior you need for environments where resources might not be ready immediately on startup.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>new Lazy&lt;</code> without a second parameter. If you see <code>new Lazy&lt;T&gt;(() =&gt; ...)</code> without specifying <code>LazyThreadSafetyMode</code>, the default is <code>ExecutionAndPublication</code>, which caches exceptions. Ask yourself: "Can this constructor ever fail?" If it touches the network, file system, database, or any external resource, the answer is yes. Switch to <code>PublicationOnly</code> for anything that might have transient failures.</p>
         </div>
       </div>
     </div>
@@ -1544,10 +1716,73 @@ public static ConfigManager Instance
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Black Friday, 11:30 AM.</strong> An e-commerce payment service starts intermittently failing. <code>SocketException: Address already in use</code>. The ops team scales from 3 to 10 pods — makes it <em>worse</em>. Running <code>netstat</code> shows 64,000 sockets in <span class="tooltip-trigger"><code>TIME_WAIT</code><span class="tooltip-content">A TCP socket state lasting ~240 seconds after connection close, during which the port cannot be reused.</span></span> state.</p>
-          <p class="body-text">The <code>PaymentService</code> (a singleton) was creating a <code>new HttpClient()</code> for every payment call and disposing it with a <code>using</code> block. "But I disposed it!" the developer said. Disposing <code>HttpClient</code> doesn't release the TCP socket immediately — sockets linger in <code>TIME_WAIT</code> for ~240 seconds. At 300 payments/second, the OS socket pool was exhausted in under 4 minutes.</p>
+          <p class="body-text">This bug is sneaky because the developer did everything they were taught to do: use a <code>using</code> block to dispose of resources when done. That's usually the right pattern! But <code>HttpClient</code> is special. Here's why.</p>
+          <p class="body-text">When you create a new <code>HttpClient</code>, it opens a TCP connection to the server. When you dispose it, the <code>HttpClient</code> object gets cleaned up — but the underlying TCP socket doesn't close immediately. The operating system keeps the socket in a state called <code>TIME_WAIT</code> for about 240 seconds (4 minutes). This is a safety feature in TCP — it prevents old packets from a previous connection from being confused with a new one. You can't disable it; it's baked into the TCP protocol.</p>
+          <p class="body-text">Now do the math: 300 payments per second, each creating a new socket that hangs around for 240 seconds. That's 300 x 240 = 72,000 sockets sitting in <code>TIME_WAIT</code>. Most operating systems cap the number of available sockets at around 64,000. So within about 3.5 minutes, the app runs out of sockets entirely. New connections fail with <code>SocketException</code>. And here's the cruel irony: scaling to more pods makes it <em>worse</em> because each pod creates its own sockets, accelerating the exhaustion.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours. The misleading part: the code looked correct — it used <code>using</code> blocks, which is normally the right pattern. The team initially blamed the payment gateway for being slow.</p>
+
+        <!-- SVG: Socket Exhaustion Diagram -->
+        <svg viewBox="0 0 720 280" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how creating new HttpClient instances leads to socket exhaustion via TIME_WAIT accumulation">
+          <rect width="720" height="280" rx="12" fill="#1e293b"/>
+          <text x="360" y="28" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">What Went Wrong: Socket Exhaustion from new HttpClient()</text>
+
+          <!-- PaymentService box -->
+          <rect x="30" y="50" width="140" height="60" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="100" y="75" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">PaymentService</text>
+          <text x="100" y="95" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">(Singleton)</text>
+
+          <!-- Arrows to multiple HttpClients -->
+          <line x1="170" y1="70" x2="210" y2="55" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="170" y1="80" x2="210" y2="80" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="170" y1="90" x2="210" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+
+          <!-- HttpClient instances -->
+          <rect x="215" y="42" width="95" height="22" rx="3" fill="#7f1d1d"/>
+          <text x="262" y="57" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">new HttpClient()</text>
+          <rect x="215" y="69" width="95" height="22" rx="3" fill="#7f1d1d"/>
+          <text x="262" y="84" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">new HttpClient()</text>
+          <rect x="215" y="96" width="95" height="22" rx="3" fill="#7f1d1d"/>
+          <text x="262" y="111" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">new HttpClient()</text>
+          <text x="262" y="135" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">x300 per second</text>
+
+          <!-- Arrows to sockets -->
+          <line x1="310" y1="80" x2="350" y2="80" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+
+          <!-- TIME_WAIT socket pile-up -->
+          <rect x="355" y="42" width="180" height="100" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="445" y="62" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Sockets in TIME_WAIT</text>
+          <text x="445" y="80" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">After Dispose(): socket lingers</text>
+          <text x="445" y="95" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">for ~240 seconds (TCP rule)</text>
+          <text x="445" y="115" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">300/s x 240s = 72,000!</text>
+          <text x="445" y="132" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">OS limit: 64,000. CRASH.</text>
+
+          <!-- The fix side -->
+          <rect x="30" y="165" width="140" height="60" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+          <text x="100" y="190" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">PaymentService</text>
+          <text x="100" y="210" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">(with IHttpClientFactory)</text>
+
+          <line x1="170" y1="195" x2="210" y2="195" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+
+          <rect x="215" y="175" width="130" height="40" rx="6" fill="#052e16"/>
+          <text x="280" y="193" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Pooled Handler</text>
+          <text x="280" y="207" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">(reused, rotated every 2min)</text>
+
+          <line x1="345" y1="195" x2="385" y2="195" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+
+          <rect x="390" y="175" width="145" height="40" rx="6" fill="#052e16"/>
+          <text x="462" y="193" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">1 socket serves 1000s</text>
+          <text x="462" y="207" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">of requests. No leak.</text>
+
+          <!-- Labels -->
+          <rect x="570" y="52" width="120" height="28" rx="4" fill="#7f1d1d"/>
+          <text x="630" y="71" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">BAD: new per call</text>
+          <rect x="570" y="180" width="120" height="28" rx="4" fill="#14532d"/>
+          <text x="630" y="199" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">GOOD: pooled handler</text>
+
+          <text x="360" y="260" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-style="italic">Scaling to more pods makes the BAD approach worse — each pod exhausts sockets independently</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1581,6 +1816,7 @@ public class PaymentService
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at <code>using var client = new HttpClient();</code> inside the method. Every call to <code>ChargeAsync</code> creates a brand new <code>HttpClient</code>. The <code>using</code> keyword means it gets disposed at the end of the method. That sounds responsible, right? The problem is that <code>HttpClient.Dispose()</code> only closes the HTTP layer — the underlying TCP socket doesn't go away. The operating system keeps it in <code>TIME_WAIT</code> state for 240 seconds as a safety measure. At high volume, sockets accumulate faster than the OS can reclaim them, and you run out of available network ports.</p>
           </div>
           <div class="tab-panel" id="sbug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1609,7 +1845,13 @@ public class PaymentService
 // One handler serves thousands of requests — no socket exhaustion</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> <code>IHttpClientFactory</code> manages a pool of <code>HttpMessageHandler</code> instances behind the scenes. When you call <code>AddHttpClient&lt;PaymentService&gt;</code>, the factory creates a handler that can be reused across thousands of requests. One handler = one TCP connection = one socket, serving thousands of requests through that same socket. The factory also rotates handlers every 2 minutes to prevent stale DNS problems (if a server's IP address changes). This gives you the best of both worlds: efficient socket reuse and fresh DNS resolution.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>new HttpClient()</code> anywhere in your codebase. If it appears inside a method (especially one called frequently), you have this bug. Also watch for <code>using var client = new HttpClient()</code> — the <code>using</code> block makes it look correct, but that's exactly the pattern that causes socket exhaustion. The fix is always the same: use <code>IHttpClientFactory</code> via <code>AddHttpClient</code> in your DI registration.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1626,10 +1868,51 @@ public class PaymentService
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Wednesday, discovered by the finance team — 3 days after going live.</strong> "Why did 4,200 non-VIP customers get the 20% VIP discount?" A singleton <code>PricingEngine</code> stored <code>_currentDiscount</code> as an instance field. When a VIP customer's request called <code>SetDiscount(0.20m)</code>, that value stuck in the singleton. The next 4,200 requests — regardless of customer type — all got the VIP price. Revenue impact: $38,000.</p>
-          <p class="body-text">The bug was invisible in testing because tests ran sequentially with one user at a time. In production, thousands of concurrent requests shared the same mutable field.</p>
+          <p class="body-text">Think of it like a restaurant where one waiter serves every table. A VIP guest tells the waiter "apply my 20% discount." The waiter writes it on a sticky note and sticks it to themselves. Now every guest who comes after gets the same discount — the waiter doesn't know the discount was only meant for that one VIP guest. The sticky note (the mutable field) is shared across all customers because there's only one waiter (one Singleton instance).</p>
+          <p class="body-text">The developer thought of the pricing engine as a calculator — set a discount, then calculate prices. That logic makes sense for a single-user desktop app. But in a web server, hundreds of users are hitting the same Singleton simultaneously. One user's <code>SetDiscount()</code> call changes the field for <em>everyone</em>. The bug was invisible in testing because unit tests run one at a time. In production, 4,200 regular customers got VIP pricing over the course of 3 days before the finance team noticed revenue was mysteriously down.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">3 days to detect (finance caught the anomaly in revenue reports), 20 minutes to fix once the developer saw the code. The hardest part wasn't the fix — it was calculating the refund impact across 4,200 orders.</p>
+
+        <!-- SVG: Mutable State Leak -->
+        <svg viewBox="0 0 720 260" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how a mutable field in a Singleton causes one user's discount to leak to all subsequent users">
+          <rect width="720" height="260" rx="12" fill="#1e293b"/>
+          <text x="360" y="28" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">What Went Wrong: One User's Data Leaks to Everyone</text>
+
+          <!-- Singleton PricingEngine in center -->
+          <rect x="260" y="50" width="200" height="70" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="360" y="72" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">PricingEngine (Singleton)</text>
+          <rect x="280" y="85" width="160" height="24" rx="4" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="360" y="102" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">_currentDiscount = ???</text>
+
+          <!-- VIP request -->
+          <rect x="30" y="140" width="150" height="50" rx="6" fill="#854d0e"/>
+          <text x="105" y="160" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">VIP Customer</text>
+          <text x="105" y="178" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="10">SetDiscount(0.20)</text>
+          <line x1="180" y1="165" x2="258" y2="100" stroke="#eab308" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+
+          <!-- Regular users -->
+          <rect x="30" y="200" width="150" height="45" rx="6" fill="#450a0a"/>
+          <text x="105" y="218" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">4,200 Regular Users</text>
+          <text x="105" y="234" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">GetPrice(100) = $80 !</text>
+          <line x1="180" y1="215" x2="258" y2="110" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#bug1-arrow)"/>
+
+          <!-- State box on right showing what happened -->
+          <rect x="490" y="50" width="200" height="42" rx="4" fill="#14532d"/>
+          <text x="590" y="67" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Before VIP:</text>
+          <text x="590" y="82" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">_currentDiscount = 0.00</text>
+
+          <rect x="490" y="100" width="200" height="42" rx="4" fill="#854d0e"/>
+          <text x="590" y="117" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="10">VIP calls SetDiscount:</text>
+          <text x="590" y="132" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="10">_currentDiscount = 0.20</text>
+
+          <rect x="490" y="150" width="200" height="48" rx="4" fill="#7f1d1d"/>
+          <text x="590" y="167" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">All future requests:</text>
+          <text x="590" y="182" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_currentDiscount STILL 0.20</text>
+          <text x="590" y="193" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">$38,000 revenue loss</text>
+
+          <text x="360" y="250" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-style="italic">The Singleton's field is shared by ALL requests — one user's change affects everyone</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1662,6 +1945,7 @@ public class PricingEngine
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The critical problem is <code>private decimal _currentDiscount;</code> — a mutable instance field on a Singleton. When a VIP request calls <code>SetDiscount(0.20m)</code>, it changes this field. Since there's only one instance of the Singleton, that change is visible to every single request from that point forward. The <code>GetPrice</code> method uses <code>_currentDiscount</code> to calculate prices — and every user now sees the VIP discount. It's not a race condition or a thread-safety issue — the code works exactly as written. The design is simply wrong: per-user data should never live on a Singleton.</p>
           </div>
           <div class="tab-panel" id="sbug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -1690,7 +1974,13 @@ builder.Services.AddSingleton&lt;PricingEngine&gt;();  // stateless logic
 builder.Services.AddScoped&lt;PricingContext&gt;();      // per-request state</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The fixed version makes the Singleton stateless — it has no mutable fields at all. Instead of storing the discount as a field and hoping callers call <code>SetDiscount</code> before <code>GetPrice</code>, the method takes a <code>UserContext</code> parameter. Each call computes the correct discount for <em>that specific user</em>. Nothing is stored between calls, nothing leaks. The alternative approach separates concerns: stateless logic stays on the Singleton, per-request data lives on a Scoped service. This is the golden rule: <strong>Singletons should be stateless or only hold immutable/thread-safe data. Per-request data belongs on Scoped services.</strong></p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look at any class registered as <code>AddSingleton</code> and check for non-readonly, non-static fields. If you see a Singleton with <code>public void SetX()</code> or <code>public X Property { get; set; }</code>, that's a red flag. Singletons should ideally have only <code>readonly</code> fields set in the constructor. If the Singleton needs to work with per-user or per-request data, that data should be passed as a method parameter, not stored as a field.</p>
         </div>
       </div>
     </div>
@@ -1702,9 +1992,65 @@ builder.Services.AddScoped&lt;PricingContext&gt;();      // per-request state</c
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2024, e-commerce platform, .NET 8.</strong> The <code>NotificationService</code> singleton exposed an <code>event Action&lt;OrderEvent&gt; OnOrderPlaced</code>. Each HTTP request created a scoped <code>OrderHandler</code> that subscribed to the event in its constructor. The handler processed the order and was supposed to be GC'd after the request. Memory grew 2 MB/hour in production.</p>
+          <p class="body-text">Here's an analogy: imagine a bulletin board (the Singleton event) where people pin their phone numbers. Every time a customer walks in (new request), a clerk (OrderHandler) pins their phone number on the board. When the customer leaves, the clerk is supposed to leave too — but their phone number stays pinned. The board grows and grows. Nobody removes old numbers. After a few days, the board has 847,000 phone numbers on it, each one keeping a reference to a clerk who should have left long ago.</p>
+          <p class="body-text">In C#, when you do <code>event += handler</code>, the event's internal delegate chain holds a <strong>strong reference</strong> to the subscriber. As long as that reference exists, the garbage collector cannot collect the subscriber, even if nothing else in the program uses it. The Singleton lives forever, so its delegate chain lives forever, which means every single handler ever subscribed stays alive in memory forever — unless you explicitly unsubscribe with <code>-=</code>.</p>
+          <p class="body-text">The memory dump told the story: 847,000 <code>OrderHandler</code> instances, all alive, all reachable from the Singleton's event delegate. At 2 MB/hour, production eventually ran out of memory during weekend low-traffic periods when GC pressure was lower and the memory kept climbing without any natural cleanup.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours. <code>dotnet-dump</code> showed 847,000 live <code>OrderHandler</code> instances — all reachable via the Singleton's event <span class="tooltip-trigger">delegate chain<span class="tooltip-content">A multicast delegate holding references to multiple subscriber methods — if not cleaned up, prevents garbage collection.</span></span>.</p>
+
+        <!-- SVG: Event Memory Leak -->
+        <svg viewBox="0 0 720 280" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how the Singleton event delegate chain accumulates strong references to every subscriber, preventing garbage collection">
+          <rect width="720" height="280" rx="12" fill="#1e293b"/>
+          <text x="360" y="28" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">What Went Wrong: Event Delegate Chain Prevents Garbage Collection</text>
+
+          <!-- Singleton box -->
+          <rect x="30" y="55" width="200" height="110" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="130" y="77" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">NotificationService</text>
+          <text x="130" y="93" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">(Singleton — lives forever)</text>
+          <rect x="45" y="105" width="170" height="28" rx="4" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="130" y="123" text-anchor="middle" fill="#a8a29e" font-family="system-ui, -apple-system, sans-serif" font-size="10">OnOrderPlaced (delegate chain)</text>
+          <text x="130" y="153" text-anchor="middle" fill="#3b82f6" font-family="system-ui, -apple-system, sans-serif" font-size="10">Never goes away.</text>
+
+          <!-- Arrows to handlers -->
+          <line x1="230" y1="105" x2="285" y2="70" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <line x1="230" y1="115" x2="285" y2="110" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <line x1="230" y1="125" x2="285" y2="150" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <line x1="230" y1="135" x2="285" y2="190" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+
+          <text x="260" y="228" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Strong refs</text>
+
+          <!-- Handler chain (accumulating) -->
+          <rect x="290" y="55" width="150" height="28" rx="4" fill="#7f1d1d"/>
+          <text x="365" y="74" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">OrderHandler #1 (Req 1)</text>
+
+          <rect x="290" y="95" width="150" height="28" rx="4" fill="#7f1d1d"/>
+          <text x="365" y="114" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">OrderHandler #2 (Req 2)</text>
+
+          <rect x="290" y="135" width="150" height="28" rx="4" fill="#7f1d1d"/>
+          <text x="365" y="154" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">OrderHandler #3 (Req 3)</text>
+
+          <rect x="290" y="175" width="150" height="28" rx="4" fill="#991b1b"/>
+          <text x="365" y="194" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">... #847,000</text>
+
+          <!-- GC crossed out -->
+          <rect x="475" y="55" width="220" height="50" rx="6" fill="#292524"/>
+          <text x="585" y="76" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">GC cannot collect ANY of them.</text>
+          <text x="585" y="94" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Delegate chain = strong reference.</text>
+
+          <!-- Memory growth -->
+          <rect x="475" y="120" width="220" height="70" rx="6" fill="#7f1d1d"/>
+          <text x="585" y="140" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Memory growth: 2 MB/hour</text>
+          <text x="585" y="158" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Each handler: ~2.5 KB</text>
+          <text x="585" y="176" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">847K handlers = ~2 GB leaked</text>
+
+          <!-- Fix note -->
+          <rect x="475" y="205" width="220" height="42" rx="6" fill="#14532d"/>
+          <text x="585" y="223" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Fix: -= in Dispose()</text>
+          <text x="585" y="238" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">or use MediatR / IObservable&lt;T&gt;</text>
+
+          <text x="360" y="268" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-style="italic">Every += without a matching -= is a memory leak when the publisher outlives the subscriber</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1744,6 +2090,7 @@ public class OrderHandler : IDisposable
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> In the constructor, <code>_notifier.OnOrderPlaced += HandleOrder;</code> adds this handler to the Singleton's event delegate chain. Every HTTP request creates a new <code>OrderHandler</code>, and each one subscribes. Now look at <code>Dispose()</code> — it's empty. It never calls <code>-= HandleOrder</code>. When the request ends, the DI container calls <code>Dispose()</code>, but the Singleton's delegate chain still has a reference to this handler. The garbage collector looks at the handler, sees "the Singleton is still referencing this object," and decides it's still alive. After 100,000 requests, the chain has 100,000 handlers — none of them collectable.</p>
           </div>
           <div class="tab-panel" id="sbug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -1782,7 +2129,13 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
 // Or use IObservable&lt;T&gt; where subscription returns IDisposable</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Adding <code>_notifier.OnOrderPlaced -= HandleOrder;</code> in <code>Dispose()</code> removes this handler from the delegate chain. Once removed, the Singleton no longer holds a reference to the handler, so GC can collect it normally. The "even better" approach uses MediatR or <code>IObservable&lt;T&gt;</code> where subscription management is built into the framework — you never have to remember to unsubscribe manually. With <code>IObservable&lt;T&gt;</code>, subscribing returns an <code>IDisposable</code> that you dispose to unsubscribe, making it impossible to forget.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>+= </code> in any class that implements <code>IDisposable</code>. For every <code>+=</code> you find, check if the corresponding <code>-=</code> exists in <code>Dispose()</code>. If not, you have a potential memory leak. This is especially dangerous when the event publisher is a Singleton and the subscriber is a Scoped or Transient service. Use <code>dotnet-counters</code> or <code>dotnet-dump</code> to monitor for growing object counts in production.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1812,8 +2165,38 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Stuffing unrelated state into a singleton: user session, app config, feature flags, cache — all in one class.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Violates SRP. Creates a "<span class="tooltip-trigger">god object<span class="tooltip-content">A class that knows too much or does too much — violates Single Responsibility by accumulating unrelated responsibilities.</span></span>" that everything depends on. Changes ripple everywhere.</p>
-          <p class="body-text"><strong>Fix:</strong> Create separate singletons per responsibility. Register each via DI.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You might think "well, I only need one of these, so let me put everything in one place." It feels convenient — one class to hold all your app-wide stuff. This is especially tempting early in a project when you're moving fast and don't want to create multiple classes. The thought process goes: "It's a Singleton, it lives forever, it's accessible everywhere — perfect place to dump all my global state!"</p>
+          <p class="body-text">But this creates a "<span class="tooltip-trigger">god object<span class="tooltip-content">A class that knows too much or does too much — violates Single Responsibility by accumulating unrelated responsibilities.</span></span>" — a class that knows too much and does too much. Every part of your application depends on it. When you change the caching logic, you risk breaking the config logic. When you test the feature flags, you're dragging along the session state. It's like putting your wallet, keys, groceries, and pet hamster all in one bag — technically it works, but good luck finding your keys when you need them.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodSingleton.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ One Singleton to rule them all — god object
+public sealed class AppState
+{
+    private static readonly Lazy&lt;AppState&gt; _instance = new();
+    public static AppState Instance =&gt; _instance.Value;
+
+    // Unrelated responsibilities crammed into one class
+    public IConfiguration Config { get; set; }
+    public Dictionary&lt;string, bool&gt; FeatureFlags { get; set; }
+    public IMemoryCache Cache { get; set; }
+    public UserSession CurrentSession { get; set; }
+    public string ConnectionString { get; set; }
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SeparateServices.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Separate Singleton per responsibility
+builder.Services.AddSingleton&lt;IConfiguration&gt;(config);
+builder.Services.AddSingleton&lt;IFeatureFlagService, LaunchDarklyService&gt;();
+builder.Services.AddSingleton&lt;IMemoryCache, MemoryCache&gt;();
+builder.Services.AddScoped&lt;IUserSession, HttpUserSession&gt;();
+// Each service has ONE job. Testable. Swappable. Independent.</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Create separate singletons per responsibility. Register each via DI. Each class should do one thing — that's the Single Responsibility Principle in action.</p>
         </div>
       </div>
     </div>
@@ -1827,8 +2210,38 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Storing per-request data (current user, tenant ID) in a singleton.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Thread A's data leaks into Thread B's response. Security vulnerability + data corruption.</p>
-          <p class="body-text"><strong>Fix:</strong> Use <code>AddScoped</code> for per-request state. Singletons should only hold immutable or thread-safe data.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You might think "I need to know who the current user is from anywhere in my code, so I'll just set it on the Singleton at the start of each request." This feels natural if you're coming from desktop or mobile development, where there's only one user at a time. In a web server, though, dozens or hundreds of requests are being processed simultaneously, and they all share the same Singleton instance.</p>
+          <p class="body-text">The result is a security nightmare: User A's data leaks into User B's response. Imagine a multi-tenant SaaS app where one company sees another company's data because the tenant ID was stored on a Singleton and got overwritten between requests. This isn't just a bug — it's a data breach.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MutableStateBad.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Per-request data stored on a Singleton — data leak!
+public sealed class RequestContext
+{
+    private static readonly Lazy&lt;RequestContext&gt; _i = new();
+    public static RequestContext Instance =&gt; _i.Value;
+
+    public int CurrentUserId { get; set; }    // ❌ Shared across ALL threads
+    public string TenantId { get; set; }       // ❌ User A's tenant leaks to User B
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MutableStateGood.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Per-request data belongs on a Scoped service
+public class RequestContext
+{
+    public int CurrentUserId { get; set; }
+    public string TenantId { get; set; }
+}
+
+// Registration — Scoped = one instance per HTTP request, isolated
+builder.Services.AddScoped&lt;RequestContext&gt;();
+// Each request gets its own RequestContext. No leaking between users.</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Use <code>AddScoped</code> for per-request state. Singletons should only hold immutable or thread-safe data — like configuration, caches with proper eviction, or stateless logic.</p>
         </div>
       </div>
     </div>
@@ -1842,8 +2255,46 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Sprinkling <code>Logger.Instance.Log(...)</code> throughout your codebase instead of injecting <code>ILogger</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Creates hidden dependencies — classes don't declare what they need in their constructors. Unit tests can't substitute fakes. Violates DIP — every consumer couples directly to the concrete singleton class.</p>
-          <p class="body-text"><strong>Fix:</strong> Register via <code>services.AddSingleton&lt;ILogger, FileLogger&gt;()</code> and inject through constructors. Same single instance, zero coupling.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It's incredibly convenient. <code>Logger.Instance.Log("something")</code> works from anywhere — no constructor parameters, no DI setup, no interfaces. You might think "why bother with all that ceremony when I can just call <code>.Instance</code>?" This shortcut feels productive at first, but it's creating invisible wires throughout your codebase.</p>
+          <p class="body-text">The problem is that when you read a class's constructor, you should be able to see everything it depends on. With <code>Logger.Instance</code>, the dependency is hidden inside the method body. Unit tests can't swap it for a fake because there's no injection point — the class is hardwired to the concrete Singleton. When you later want to change the logger implementation, you have to find and update every single call site.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DirectAccess.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Hidden dependency — can't see it from the constructor
+public class OrderService
+{
+    public void PlaceOrder(Order order)
+    {
+        // Where does this come from? No constructor, no injection.
+        // How do you test this without writing to a real log file?
+        Logger.Instance.Log($"Order {order.Id} placed");
+        // Hardcoded to Logger class — can't swap for a fake in tests
+    }
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DIInjection.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Explicit dependency — visible, testable, swappable
+public class OrderService
+{
+    private readonly ILogger _logger;
+    public OrderService(ILogger logger) =&gt; _logger = logger;
+
+    public void PlaceOrder(Order order)
+    {
+        _logger.Log($"Order {order.Id} placed");
+        // In production: FileLogger (Singleton via DI)
+        // In tests: FakeLogger that captures messages
+    }
+}
+
+// Registration — same single instance, no .Instance calls needed
+builder.Services.AddSingleton&lt;ILogger, FileLogger&gt;();</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Register via <code>services.AddSingleton&lt;ILogger, FileLogger&gt;()</code> and inject through constructors. Same single instance, zero coupling. Your constructor becomes a menu of what the class needs.</p>
         </div>
       </div>
     </div>
@@ -1857,8 +2308,39 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Forgetting the <code>sealed</code> keyword on the singleton class.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Without <code>sealed</code>, a developer could change the constructor from <code>private</code> to <code>protected</code> to enable inheritance — allowing subclasses to create their own instances and completely breaking the "single instance" guarantee. Even without that, an unsealed class signals to other developers that inheritance is expected.</p>
-          <p class="body-text"><strong>Fix:</strong> Always mark singleton classes as <code>sealed</code>. This prevents inheritance and signals intent clearly.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Honestly, most developers just forget. The <code>sealed</code> keyword isn't required for the code to compile and work. But without it, you've left a door open. Another developer on your team might think "I need a special version of this Singleton" and try to inherit from it. To make inheritance work, they'd change the constructor from <code>private</code> to <code>protected</code> — and suddenly the whole "only one instance" guarantee is broken because the subclass can create its own instances.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">UnsealedSingleton.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Not sealed — someone can subclass and break the pattern
+public class Logger  // Missing: sealed
+{
+    private static readonly Lazy&lt;Logger&gt; _instance = new();
+    public static Logger Instance =&gt; _instance.Value;
+    private Logger() { }
+}
+
+// Later, a developer "extends" it:
+public class SpecialLogger : Logger  // Constructor must be protected for this
+{
+    // Now there's Logger.Instance AND new SpecialLogger() = 2 instances!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SealedSingleton.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Sealed — cannot be subclassed, intent is clear
+public sealed class Logger
+{
+    private static readonly Lazy&lt;Logger&gt; _instance = new();
+    public static Logger Instance =&gt; _instance.Value;
+    private Logger() { }  // private stays private — no subclass can change this
+}
+// Bonus: sealed enables JIT devirtualization — method calls are slightly faster</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Always mark singleton classes as <code>sealed</code>. This prevents inheritance and signals intent clearly. As a bonus, the JIT compiler can optimize method calls on sealed types (devirtualization).</p>
         </div>
       </div>
     </div>
@@ -1872,8 +2354,48 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Doing heavy work (loading large files, network calls, database migrations) inside the singleton constructor, and using eager initialization.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Application startup stalls for seconds or minutes. Health checks fail. Kubernetes kills the pod thinking it's dead. In serverless, cold starts become unacceptably slow.</p>
-          <p class="body-text"><strong>Fix:</strong> Use <code>Lazy&lt;T&gt;</code> for deferred initialization. Or move heavy setup to an <code>async InitializeAsync()</code> method called during the startup pipeline, not in the constructor.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The constructor feels like the natural place to set things up. You think "the Singleton needs a warmed cache and a database connection, so let me load everything in the constructor." This works fine when the loading takes 50ms. But what about when it takes 30 seconds? The DI container creates all Singletons before the app starts accepting requests. If your constructor blocks, the entire startup stalls.</p>
+          <p class="body-text">Kubernetes health checks have a timeout. If your app doesn't respond within that window, Kubernetes kills the pod and starts a new one — which also stalls on the same constructor, gets killed, and the cycle repeats forever. In serverless environments (AWS Lambda, Azure Functions), this directly adds to your cold-start latency and can push you past timeout limits.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SlowConstructor.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Heavy work in constructor blocks app startup
+public sealed class CacheManager
+{
+    public CacheManager()
+    {
+        // ❌ This runs DURING startup — blocks everything
+        var data = File.ReadAllBytes("catalog.dat");  // 500 MB file!
+        Thread.Sleep(5000); // Simulating slow network call
+        _cache = DeserializeAndBuild(data);  // Takes 30 seconds
+    }
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DeferredInit.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Lightweight constructor + async warmup via IHostedService
+public sealed class CacheManager
+{
+    public CacheManager() { }  // Instant — no heavy work
+
+    public async Task InitializeAsync(CancellationToken ct)
+    {
+        var data = await File.ReadAllBytesAsync("catalog.dat", ct);
+        _cache = DeserializeAndBuild(data);
+    }
+}
+
+// Warmup runs during startup pipeline (not in constructor)
+public class CacheWarmup(CacheManager cache) : IHostedService
+{
+    public Task StartAsync(CancellationToken ct) =&gt; cache.InitializeAsync(ct);
+    public Task StopAsync(CancellationToken ct) =&gt; Task.CompletedTask;
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Keep constructors lightweight. Move heavy setup to an <code>async InitializeAsync()</code> method triggered by <code>IHostedService</code> during the startup pipeline. Or use <code>Lazy&lt;T&gt;</code> so initialization happens on first use rather than at app start.</p>
         </div>
       </div>
     </div>
@@ -1887,8 +2409,46 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> A singleton holds file handles, database connections, or unmanaged resources but never implements <code>IDisposable</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Resources leak until the process exits. In long-running services, file handles or connections accumulate. The OS eventually refuses to open more files.</p>
-          <p class="body-text"><strong>Fix:</strong> Implement <code>IDisposable</code>. When registered via DI (<code>AddSingleton</code>), the container calls <code>Dispose</code> automatically on shutdown. For manual singletons, hook into <code>AppDomain.ProcessExit</code> or <code>IHostApplicationLifetime.ApplicationStopping</code>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You might think "Singletons live forever, so cleanup doesn't matter — it'll all get cleaned up when the process exits." That's partially true for simple cases, but in long-running services (web servers, background workers), resources that aren't explicitly cleaned up can accumulate. File handles have OS-level limits. Database connections have pool limits. If your Singleton opens a file on startup and the app restarts 100 times during a deployment, that's 100 unclosed file handles. Eventually the OS says "no more."</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">NoDispose.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Holds resources but no cleanup mechanism
+public sealed class AuditLogger
+{
+    private readonly StreamWriter _file;
+    public AuditLogger()
+    {
+        _file = new StreamWriter("audit.log", append: true);
+    }
+    // Where does _file get closed? Nowhere. Resource leak.
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WithDispose.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Implements IDisposable — DI container calls Dispose on shutdown
+public sealed class AuditLogger : IDisposable
+{
+    private readonly StreamWriter _file;
+    public AuditLogger()
+    {
+        _file = new StreamWriter("audit.log", append: true);
+    }
+
+    public void Dispose()
+    {
+        _file.Flush();
+        _file.Dispose(); // Clean shutdown — file handle released
+    }
+}
+
+// When registered via AddSingleton, the DI container auto-disposes on shutdown
+builder.Services.AddSingleton&lt;AuditLogger&gt;();</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Implement <code>IDisposable</code> (or <code>IAsyncDisposable</code> for async cleanup). When registered via DI (<code>AddSingleton</code>), the container calls <code>Dispose</code> automatically on shutdown. For manual singletons, hook into <code>IHostApplicationLifetime.ApplicationStopping</code>.</p>
         </div>
       </div>
     </div>
@@ -1902,8 +2462,46 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> One singleton <code>CacheManager</code> for all tenants. Tenant A caches product data, Tenant B sees Tenant A's prices.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Data leaks between tenants — a security and compliance nightmare. Violates data isolation requirements.</p>
-          <p class="body-text"><strong>Fix:</strong> Use a <code>ConcurrentDictionary&lt;string, TenantCache&gt;</code> keyed by tenant ID. Or register one singleton per tenant using keyed services in .NET 8: <code>services.AddKeyedSingleton&lt;ICache&gt;(tenantId, ...)</code>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Multi-tenancy is often added later in a product's life. The original code was built for a single tenant and worked fine. When multi-tenant support was added, the Singleton cache was left untouched. The developer thought "caching is caching, it doesn't matter who the data belongs to." But in a multi-tenant SaaS app, Tenant A's product catalog with premium prices should never be visible to Tenant B who has different pricing. A shared Singleton cache without tenant isolation is a data breach waiting to happen.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MultiTenantBad.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Shared cache without tenant isolation
+public sealed class CacheManager
+{
+    private readonly ConcurrentDictionary&lt;string, object&gt; _cache = new();
+    public void Set(string key, object val) =&gt; _cache[key] = val;
+    public object? Get(string key) =&gt; _cache.GetValueOrDefault(key);
+}
+// Tenant A: cache.Set("products", tenantAProducts)
+// Tenant B: cache.Get("products") → gets Tenant A's data!</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MultiTenantGood.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Tenant-isolated cache — keyed by tenant ID
+public sealed class CacheManager
+{
+    private readonly ConcurrentDictionary&lt;string, ConcurrentDictionary&lt;string, object&gt;&gt;
+        _tenantCaches = new();
+
+    public void Set(string tenantId, string key, object val)
+    {
+        var cache = _tenantCaches.GetOrAdd(tenantId, _ =&gt; new());
+        cache[key] = val;
+    }
+
+    public object? Get(string tenantId, string key)
+    {
+        return _tenantCaches.TryGetValue(tenantId, out var cache)
+            ? cache.GetValueOrDefault(key) : null;
+    }
+}
+// Tenant A's data is completely isolated from Tenant B.</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Fix:</strong> Use a <code>ConcurrentDictionary&lt;string, TenantCache&gt;</code> keyed by tenant ID. Or use .NET 8 keyed services: <code>services.AddKeyedSingleton&lt;ICache&gt;(tenantId, ...)</code>. The key rule: every piece of data in a multi-tenant Singleton must include tenant context.</p>
         </div>
       </div>
     </div>
@@ -1917,7 +2515,44 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Singleton A depends on Singleton B, and Singleton B depends on Singleton A — either directly or through a chain.</p>
-          <p class="body-text"><strong>Why Bad:</strong> DI container throws at startup. With manual singletons, you get a stack overflow or <span class="tooltip-trigger">deadlock<span class="tooltip-content">A state where two or more threads are each waiting for the other to release a resource, so none can proceed.</span></span> during initialization. Classic symptom: "A circular dependency was detected for service 'X'."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It usually starts innocently. You build <code>OrderService</code> and it needs <code>InventoryService</code> to check stock. Later, someone adds a feature to <code>InventoryService</code> that needs to look up order history — so they inject <code>OrderService</code>. Now you have a circle: OrderService needs InventoryService, and InventoryService needs OrderService. Neither can be created without the other already existing. The DI container detects this and throws at startup with a message like "A circular dependency was detected."</p>
+          <p class="body-text">With manual singletons (using <code>Lazy&lt;T&gt;</code> or static fields), the symptom is worse: a stack overflow during initialization, or a deadlock where both singletons wait for the other to finish constructing.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CircularDep.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ OrderService needs InventoryService, which needs OrderService
+public class OrderService
+{
+    public OrderService(InventoryService inv) { }  // needs Inventory
+}
+public class InventoryService
+{
+    public InventoryService(OrderService orders) { } // needs Order — circular!
+}
+// DI container: "I can't create OrderService without InventoryService,
+// but I can't create InventoryService without OrderService. CRASH."</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BreakCycle.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Break the cycle with Lazy&lt;T&gt; injection
+public class InventoryService
+{
+    private readonly Lazy&lt;OrderService&gt; _orders;
+    public InventoryService(Lazy&lt;OrderService&gt; orders) =&gt; _orders = orders;
+    // OrderService is NOT resolved during construction — only on first use
+    // This breaks the circular initialization
+}
+
+// ✅ Better: Extract shared logic into a third service
+public class OrderHistoryQuery { /* reads order data */ }
+public class InventoryService
+{
+    public InventoryService(OrderHistoryQuery query) { }  // no circular dep
+}</code></pre>
+            </div>
+          </div>
           <p class="body-text"><strong>Fix:</strong> Break the cycle with <code>Lazy&lt;T&gt;</code> injection, an intermediary interface, or the Mediator pattern. If two singletons both need each other, they probably belong in one class or need an event-based decoupling.</p>
         </div>
       </div>
@@ -2331,6 +2966,34 @@ public sealed class MetricsCollector
             <li>Can be serialized and passed around as an object</li>
           </ul>
         </div>
+        <!-- SVG: Singleton vs Static Class -->
+        <svg viewBox="0 0 720 220" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Side-by-side comparison showing the key differences between a Singleton and a static class">
+          <rect width="720" height="220" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Singleton vs Static Class — Key Differences</text>
+
+          <!-- Static Class column -->
+          <rect x="30" y="40" width="310" height="165" rx="8" fill="#292524" stroke="#78716c" stroke-width="1.5"/>
+          <text x="185" y="60" text-anchor="middle" fill="#a8a29e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">static class Helper { }</text>
+          <text x="50" y="82" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot implement interfaces</text>
+          <text x="50" y="100" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot be injected via DI</text>
+          <text x="50" y="118" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot be mocked in tests</text>
+          <text x="50" y="136" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; No lazy loading control</text>
+          <text x="50" y="154" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot be serialized/passed around</text>
+          <text x="50" y="178" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">Good for: pure utility functions (Math, Path)</text>
+          <text x="50" y="194" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">No state, no dependencies, no polymorphism</text>
+
+          <!-- Singleton column -->
+          <rect x="380" y="40" width="310" height="165" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="535" y="60" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">sealed class Service : IService { }</text>
+          <text x="400" y="82" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Implements interfaces</text>
+          <text x="400" y="100" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Full DI support</text>
+          <text x="400" y="118" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Easily mocked for testing</text>
+          <text x="400" y="136" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Lazy or eager initialization</text>
+          <text x="400" y="154" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Can be serialized/passed as parameter</text>
+          <text x="400" y="178" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">Good for: services with state or dependencies</text>
+          <text x="400" y="194" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">Config, caches, connection pools, loggers</text>
+        </svg>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In modern .NET, I'd register the class as <code>AddSingleton&lt;IService, Service&gt;()</code> — the container handles the single-instance guarantee, and I can inject a mock in tests. Static classes can't do that."</div>
       </div></div>
     </div>
@@ -2353,6 +3016,34 @@ public sealed class MetricsCollector
             <li><strong>Double-checked locking</strong> with <code>volatile</code> — classic pattern but verbose and error-prone</li>
             <li><strong>Static initializer</strong> — CLR guarantees thread safety for static constructors</li>
           </ol>
+          <p class="mt-md">Here's what each approach looks like in code:</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ThreeApproaches.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// 1. Lazy&lt;T&gt; — recommended (1 line!)
+private static readonly Lazy&lt;MyService&gt; _instance = new(() =&gt; new MyService());
+public static MyService Instance =&gt; _instance.Value;
+
+// 2. Double-checked locking — classic but verbose
+private static volatile MyService? _instance;
+private static readonly object _lock = new();
+public static MyService Instance
+{
+    get
+    {
+        if (_instance is null)
+            lock (_lock)
+                _instance ??= new MyService();
+        return _instance;
+    }
+}
+
+// 3. Static initializer — CLR handles thread safety
+private static readonly MyService _instance = new();
+public static MyService Instance =&gt; _instance;</code></pre>
+            </div>
+          </div>
+          <p class="body-text">The first approach (<code>Lazy&lt;T&gt;</code>) is the clear winner: it's one line, handles all the thread-safety mechanics internally, and the intent is immediately obvious to anyone reading the code. The second approach (double-checked locking) requires you to get <code>volatile</code>, the lock, and the null-check ordering exactly right — it's easy to introduce subtle bugs. The third approach (static initializer) is simple but eager — the instance is created when the class is first accessed, even if you never use <code>Instance</code>.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I prefer <code>Lazy&lt;T&gt;</code> because it's a single line, handles thread safety, and the intent is clear. Double-check locking is a red flag in code reviews — it's easy to get wrong and <code>Lazy&lt;T&gt;</code> exists for exactly this reason."</div>
       </div></div>
@@ -2426,6 +3117,58 @@ public sealed class MetricsCollector
           </ol>
           <p class="mt-md">If the factory throws, <code>Lazy&lt;T&gt;</code> enters a faulted state and re-throws the same exception on every subsequent <code>.Value</code> call — it does NOT retry.</p>
         </div>
+
+        <!-- SVG: Lazy<T> State Machine -->
+        <svg viewBox="0 0 720 200" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="State machine diagram showing the four states of Lazy T: Not Created, Creating (locked), Created (fast path), and Faulted (exception cached)">
+          <rect width="720" height="200" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Lazy&lt;T&gt; Internal State Machine</text>
+
+          <!-- State 1: Not Created -->
+          <rect x="30" y="55" width="130" height="50" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="95" y="77" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Not Created</text>
+          <text x="95" y="95" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Initial state</text>
+
+          <!-- Arrow: .Value called -->
+          <line x1="160" y1="80" x2="210" y2="80" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <text x="185" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">.Value</text>
+
+          <!-- State 2: Creating -->
+          <rect x="215" y="55" width="130" height="50" rx="8" fill="#854d0e" stroke="#eab308" stroke-width="2"/>
+          <text x="280" y="77" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Creating</text>
+          <text x="280" y="95" text-anchor="middle" fill="#a16207" font-family="system-ui, -apple-system, sans-serif" font-size="9">Lock held. Others wait.</text>
+
+          <!-- Arrow: Success -->
+          <line x1="345" y1="68" x2="410" y2="68" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <text x="377" y="62" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">Success</text>
+
+          <!-- State 3: Created (happy path) -->
+          <rect x="415" y="45" width="150" height="50" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+          <text x="490" y="67" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Created</text>
+          <text x="490" y="85" text-anchor="middle" fill="#15803d" font-family="system-ui, -apple-system, sans-serif" font-size="9">Fast path: no lock!</text>
+
+          <!-- Loop arrow on Created -->
+          <path d="M565 70 Q590 50 565 45" fill="none" stroke="#22c55e" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <text x="605" y="60" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">.Value</text>
+          <text x="605" y="72" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">(cached)</text>
+
+          <!-- Arrow: Factory throws -->
+          <line x1="345" y1="92" x2="410" y2="125" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <text x="378" y="115" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">Throws</text>
+
+          <!-- State 4: Faulted -->
+          <rect x="415" y="110" width="150" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+          <text x="490" y="132" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Faulted</text>
+          <text x="490" y="150" text-anchor="middle" fill="#991b1b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Exception cached forever</text>
+
+          <!-- Loop arrow on Faulted -->
+          <path d="M565 135 Q590 115 565 110" fill="none" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <text x="605" y="122" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">.Value</text>
+          <text x="605" y="134" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">(re-throws)</text>
+
+          <!-- Bottom note -->
+          <text x="360" y="186" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">After creation: .Value is just a volatile read (sub-nanosecond). After fault: same exception replayed.</text>
+        </svg>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "If you need retry-on-failure semantics, you'd use <code>LazyThreadSafetyMode.PublicationOnly</code> — multiple threads can race to create, but only one value wins. Or better, wrap the factory in a resilience policy like <span class="tooltip-trigger">Polly<span class="tooltip-content">A .NET resilience library providing retry, circuit-breaker, timeout, and fallback policies for transient fault handling.</span></span>."</div>
       </div></div>
     </div>
@@ -2448,6 +3191,52 @@ public sealed class MetricsCollector
             <li><code>AddTransient</code> — <strong>new instance every time</strong> it's injected. No sharing at all</li>
           </ol>
         </div>
+
+        <!-- SVG: DI Lifetime Comparison -->
+        <svg viewBox="0 0 720 250" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Visual comparison of Singleton, Scoped, and Transient service lifetimes across multiple HTTP requests">
+          <rect width="720" height="250" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Service Lifetimes: Singleton vs Scoped vs Transient</text>
+
+          <!-- Timeline labels -->
+          <text x="200" y="48" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 1</text>
+          <text x="400" y="48" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 2</text>
+          <text x="600" y="48" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 3</text>
+
+          <!-- Singleton row -->
+          <text x="55" y="82" text-anchor="middle" fill="#3b82f6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Singleton</text>
+          <rect x="120" y="65" width="560" height="28" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="400" y="84" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11">Instance A (same for ALL requests)</text>
+
+          <!-- Scoped row -->
+          <text x="55" y="128" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Scoped</text>
+          <rect x="120" y="110" width="170" height="28" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="205" y="129" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance B</text>
+          <rect x="310" y="110" width="170" height="28" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="395" y="129" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance C</text>
+          <rect x="500" y="110" width="180" height="28" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="590" y="129" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance D</text>
+
+          <!-- Transient row -->
+          <text x="55" y="172" text-anchor="middle" fill="#eab308" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Transient</text>
+          <rect x="120" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="157" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">E</text>
+          <rect x="205" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="242" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">F</text>
+          <rect x="310" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="347" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">G</text>
+          <rect x="395" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="432" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">H</text>
+          <rect x="500" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="537" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">I</text>
+          <rect x="585" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="622" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">J</text>
+
+          <!-- Key insight -->
+          <rect x="120" y="200" width="560" height="36" rx="6" fill="#292524"/>
+          <text x="400" y="215" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Singleton: 1 instance total | Scoped: 1 per request | Transient: 1 per injection</text>
+          <text x="400" y="229" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Danger: Singleton capturing Scoped = "captive dependency" (ObjectDisposedException)</text>
+        </svg>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "A common bug is injecting a Scoped service into a Singleton — the Scoped service gets captured and lives forever, essentially becoming a Singleton with stale data. ASP.NET Core's <code>ValidateScopes</code> option catches this in development."</div>
       </div></div>
     </div>
@@ -2471,6 +3260,30 @@ public sealed class MetricsCollector
             <li><strong>Cloning</strong> — if the class implements <code>ICloneable</code>, <code>Clone()</code> creates a duplicate. Fix: don't implement <code>ICloneable</code> on singletons</li>
             <li><strong>Multiple <code>AssemblyLoadContext</code>s</strong> — in .NET Core, each <code>AssemblyLoadContext</code> that loads the assembly gets its own set of static fields, so each context gets a separate Singleton instance. This is relevant in plugin architectures using <code>AssemblyLoadContext.Default</code> vs custom contexts</li>
           </ol>
+          <p class="mt-md">Here's how reflection breaks a Singleton, and how to defend against it:</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BreakAndDefend.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Breaking it via reflection:
+var sneakyInstance = (MySingleton)Activator.CreateInstance(
+    typeof(MySingleton),
+    nonPublic: true  // bypasses the private constructor!
+);
+// sneakyInstance != MySingleton.Instance — pattern broken!
+
+// Defending against it:
+public sealed class MySingleton
+{
+    private static int _instanceCount;
+    private MySingleton()
+    {
+        if (Interlocked.Increment(ref _instanceCount) &gt; 1)
+            throw new InvalidOperationException(
+                "Only one instance allowed. Use MySingleton.Instance.");
+    }
+}</code></pre>
+            </div>
+          </div>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "To defend against reflection, throw an <code>InvalidOperationException</code> in the constructor if an instance already exists. For serialization, implement a custom <code>JsonConverter&lt;T&gt;</code> that returns the existing instance. But honestly, DI-managed singletons sidestep all of this — the container controls instantiation, so reflection and serialization aren't vectors."</div>
       </div></div>
@@ -2542,6 +3355,61 @@ public sealed class MetricsCollector
             <li>Testability is built in — swap the registration in test configuration</li>
           </ol>
         </div>
+
+        <!-- SVG: Classic vs DI Singleton -->
+        <svg viewBox="0 0 720 240" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Comparison showing classic Singleton with static Instance vs DI-managed Singleton with container injection">
+          <rect width="720" height="240" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Classic Singleton vs DI-Managed Singleton</text>
+
+          <!-- Classic side -->
+          <rect x="20" y="40" width="320" height="185" rx="8" fill="#292524" stroke="#78716c" stroke-width="1.5"/>
+          <text x="180" y="60" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Classic Pattern</text>
+
+          <rect x="40" y="72" width="130" height="34" rx="4" fill="#7f1d1d"/>
+          <text x="105" y="85" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">OrderService</text>
+          <text x="105" y="98" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">Logger.Instance.Log()</text>
+
+          <rect x="40" y="115" width="130" height="34" rx="4" fill="#7f1d1d"/>
+          <text x="105" y="128" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">UserService</text>
+          <text x="105" y="141" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">Logger.Instance.Log()</text>
+
+          <line x1="170" y1="89" x2="200" y2="89" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="170" y1="132" x2="200" y2="132" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+
+          <rect x="205" y="80" width="120" height="70" rx="6" fill="#450a0a"/>
+          <text x="265" y="100" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Logger</text>
+          <text x="265" y="115" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">static Instance</text>
+          <text x="265" y="130" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">private ctor</text>
+          <text x="265" y="143" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="8">hardcoded coupling</text>
+
+          <text x="180" y="180" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Hidden dependency. Can't mock.</text>
+          <text x="180" y="195" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Class knows it's a Singleton.</text>
+
+          <!-- DI side -->
+          <rect x="380" y="40" width="320" height="185" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="540" y="60" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">DI-Managed</text>
+
+          <rect x="400" y="72" width="130" height="34" rx="4" fill="#052e16"/>
+          <text x="465" y="85" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">OrderService</text>
+          <text x="465" y="98" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">ctor(ILogger logger)</text>
+
+          <rect x="400" y="115" width="130" height="34" rx="4" fill="#052e16"/>
+          <text x="465" y="128" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">UserService</text>
+          <text x="465" y="141" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">ctor(ILogger logger)</text>
+
+          <line x1="530" y1="89" x2="560" y2="89" stroke="#22c55e" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="530" y1="132" x2="560" y2="132" stroke="#22c55e" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+
+          <rect x="565" y="80" width="120" height="70" rx="6" fill="#14532d"/>
+          <text x="625" y="100" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">FileLogger</text>
+          <text x="625" y="115" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">: ILogger</text>
+          <text x="625" y="130" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">normal ctor</text>
+          <text x="625" y="143" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="8">container manages</text>
+
+          <text x="540" y="180" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Explicit dependency. Testable.</text>
+          <text x="540" y="195" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Class doesn't know it's a Singleton.</text>
+        </svg>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "DI Singleton separates two concerns the classic pattern conflates: the 'single instance' policy and the class's own logic. The container handles the policy; the class focuses on its job. That's SRP in action."</div>
       </div></div>
     </div>
@@ -2565,6 +3433,7 @@ public sealed class MetricsCollector
             <li><strong>Static constructor</strong> — CLR marks the type as <strong>permanently broken</strong>. Any access throws <code>TypeInitializationException</code> forever</li>
             <li><strong>DI container</strong> — depends on the container. ASP.NET Core's default will throw on first resolve and <strong>retry</strong> on subsequent requests</li>
           </ol>
+          <p class="mt-md">This is one of the most important distinctions to know. Each approach has a completely different failure mode, and picking the wrong one can mean the difference between a transient glitch and a permanent outage. The takeaway: if your constructor touches anything external (file system, network, database), either use <code>PublicationOnly</code> mode or move the risky work out of the constructor entirely.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is why Singleton constructors should be lightweight. If initialization can fail (database, network), do it in a separate <code>Initialize()</code> method with retry logic, not in the constructor."</div>
       </div></div>
@@ -2619,6 +3488,49 @@ public sealed class MetricsCollector
             <li><strong>Memory pressure</strong> — Singletons live for the entire app lifetime, so any data they accumulate never gets GC'd</li>
           </ol>
         </div>
+
+        <!-- SVG: Singleton in Multi-threaded Web Server -->
+        <svg viewBox="0 0 720 240" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing multiple concurrent HTTP requests all accessing the same Singleton instance simultaneously on different threads">
+          <rect width="720" height="240" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">100 Concurrent Requests, 1 Singleton Instance</text>
+
+          <!-- Thread pool threads on left -->
+          <rect x="30" y="45" width="100" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="80" y="60" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread 1 (Req A)</text>
+          <rect x="30" y="72" width="100" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="80" y="87" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread 2 (Req B)</text>
+          <rect x="30" y="99" width="100" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="80" y="114" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread 3 (Req C)</text>
+          <text x="80" y="142" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">... Thread 100</text>
+
+          <!-- Arrows to Singleton -->
+          <line x1="130" y1="56" x2="200" y2="90" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="130" y1="83" x2="200" y2="95" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="130" y1="110" x2="200" y2="100" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+
+          <!-- Singleton in center -->
+          <rect x="205" y="55" width="190" height="90" rx="8" fill="#292524" stroke="#eab308" stroke-width="2"/>
+          <text x="300" y="77" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">PricingEngine (Singleton)</text>
+          <text x="300" y="97" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_discount field</text>
+          <text x="300" y="112" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_cache dictionary</text>
+          <text x="300" y="127" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_dbContext (if captured)</text>
+
+          <!-- Danger boxes on right -->
+          <rect x="420" y="48" width="275" height="30" rx="4" fill="#7f1d1d"/>
+          <text x="557" y="68" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Mutable field: Thread A writes, B reads stale</text>
+
+          <rect x="420" y="85" width="275" height="30" rx="4" fill="#7f1d1d"/>
+          <text x="557" y="105" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Dictionary: concurrent writes corrupt data</text>
+
+          <rect x="420" y="122" width="275" height="30" rx="4" fill="#7f1d1d"/>
+          <text x="557" y="142" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Captured DbContext: disposed after Req 1 ends</text>
+
+          <!-- Safe approach -->
+          <rect x="30" y="170" width="660" height="52" rx="6" fill="#14532d"/>
+          <text x="360" y="190" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Safe Singleton: immutable data + ConcurrentDictionary + no captured Scoped services</text>
+          <text x="360" y="208" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Config (immutable), IMemoryCache (thread-safe), stateless logic (pass context as params)</text>
+        </svg>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I always ask: does this Singleton hold immutable data or mutable state? Immutable (config, routing tables) is safe. Mutable needs <code>ConcurrentDictionary</code>, <code>lock</code>, or better yet — don't make it a Singleton."</div>
       </div></div>
     </div>
@@ -2694,6 +3606,33 @@ public sealed class MetricsCollector
             <li>All subsequent requests use the <strong>disposed DbContext</strong> → <code>ObjectDisposedException</code></li>
             <li>Even if it doesn't throw immediately, the data is stale — you're reading from a disconnected context</li>
           </ol>
+          <p class="mt-md">The term "captive" is perfect — the Scoped service is <em>held captive</em> by the Singleton, forced to live far longer than it was designed for. Think of it like a temp employee (Scoped) whose badge gets cloned by a permanent employee (Singleton). When the temp's contract ends, their access is revoked — but the permanent employee is still walking around with the cloned badge, trying to use it. Here's how to fix it:</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CaptiveDependencyFix.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Singleton captures Scoped service directly
+public class ReportService  // AddSingleton
+{
+    private readonly AppDbContext _db;  // Scoped — dies after request 1
+    public ReportService(AppDbContext db) =&gt; _db = db;
+}
+
+// ✅ GOOD: Singleton creates fresh scope per operation
+public class ReportService  // AddSingleton
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    public ReportService(IServiceScopeFactory sf) =&gt; _scopeFactory = sf;
+
+    public async Task&lt;Report&gt; GenerateAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;();
+        return await db.Reports.ToListAsync();
+        // scope.Dispose() cleans up the DbContext
+    }
+}</code></pre>
+            </div>
+          </div>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Fix this by injecting <code>IServiceScopeFactory</code> into the Singleton, then creating a scope per operation: <code>using var scope = _scopeFactory.CreateScope(); var db = scope.ServiceProvider.GetRequiredService&lt;DbContext&gt;();</code>"</div>
       </div></div>
@@ -2743,8 +3682,65 @@ public sealed class MetricsCollector
             <li>Rate limiters counting in a Singleton will be <strong>per-server</strong>, not global</li>
             <li>Session data stored in a Singleton is <strong>lost</strong> if the next request hits a different server</li>
           </ol>
-          <p class="mt-md"><strong>Solution:</strong> Use a distributed store (<span class="tooltip-trigger">Redis<span class="tooltip-content">An in-memory data store used as a cache, message broker, or distributed lock provider.</span></span>, database) for shared state. The Singleton becomes a <strong>local proxy</strong> to the distributed system.</p>
         </div>
+
+        <!-- SVG: Singleton Across Multiple Servers -->
+        <svg viewBox="0 0 720 260" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how deploying to 5 servers creates 5 separate Singleton instances, each with independent state">
+          <rect width="720" height="260" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Singleton is Per-Process — Not Per-Cluster</text>
+
+          <!-- Load Balancer -->
+          <rect x="280" y="40" width="160" height="34" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="360" y="62" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Load Balancer</text>
+
+          <!-- Arrows to servers -->
+          <line x1="310" y1="74" x2="80" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="340" y1="74" x2="230" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="360" y1="74" x2="360" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="380" y1="74" x2="490" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="410" y1="74" x2="640" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+
+          <!-- 5 Server pods -->
+          <rect x="30" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="82" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 1</text>
+          <text x="82" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton A</text>
+          <text x="82" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 1}</text>
+
+          <rect x="160" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="212" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 2</text>
+          <text x="212" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton B</text>
+          <text x="212" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 2}</text>
+
+          <rect x="290" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="342" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 3</text>
+          <text x="342" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton C</text>
+          <text x="342" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 3}</text>
+
+          <rect x="420" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="472" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 4</text>
+          <text x="472" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton D</text>
+          <text x="472" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 1}</text>
+
+          <rect x="550" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="602" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 5</text>
+          <text x="602" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton E</text>
+          <text x="602" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {}</text>
+
+          <!-- Problem callout -->
+          <rect x="30" y="180" width="290" height="65" rx="6" fill="#7f1d1d"/>
+          <text x="175" y="198" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">5 pods = 5 DIFFERENT Singletons</text>
+          <text x="175" y="215" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Each has its own cache, counters, state.</text>
+          <text x="175" y="232" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">User hits Pod 1, then Pod 3 = cache miss!</text>
+
+          <!-- Solution callout -->
+          <rect x="340" y="180" width="345" height="65" rx="6" fill="#14532d"/>
+          <text x="512" y="198" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Fix: Distributed state (Redis, DB)</text>
+          <text x="512" y="215" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Singleton becomes a local PROXY to shared store.</text>
+          <text x="512" y="232" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">All pods read/write to the same Redis instance.</text>
+        </svg>
+
+        <p class="body-text"><strong>Solution:</strong> Use a distributed store (<span class="tooltip-trigger">Redis<span class="tooltip-content">An in-memory data store used as a cache, message broker, or distributed lock provider.</span></span>, database) for shared state. The Singleton becomes a <strong>local proxy</strong> to the distributed system.</p>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is why I always clarify scope. A DI Singleton gives you one instance per process. For true global uniqueness in a distributed system, you need a coordination layer — Redis for cache, a database for state, or a distributed lock for mutual exclusion."</div>
       </div></div>
     </div>
