@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 14 complete pages (Singleton, Factory Method, Abstract Factory, Builder, Prototype, SRP, OCP, LSP, ISP, DIP, Strategy, Observer, Parking Lot), 96 coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 15 complete pages (Singleton, Factory Method, Abstract Factory, Builder, Prototype, SRP, OCP, LSP, ISP, DIP, Strategy, Observer, Decorator, Parking Lot), 95 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -92,6 +92,9 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │       └── design-patterns/
 │           └── observer/
 │               ├── csharp.html             — COMPLETE (5827 lines, 24 sections, 60 tooltips, favicon: 👁️)
+│               └── java.html               — COMING SOON placeholder
+│           └── decorator/
+│               ├── csharp.html             — COMPLETE (5775 lines, 24 sections, 50 tooltips, favicon: 🎁)
 │               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
