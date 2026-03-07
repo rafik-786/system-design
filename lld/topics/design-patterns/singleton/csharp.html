@@ -1043,9 +1043,84 @@ builder.Services.AddHostedService&lt;EmailSenderWorker&gt;();</code></pre>
       </div>
     </div>
 
-    <div class="callout callout-purple mt-md">
-      <div class="callout-title"><i class="fa-solid fa-lightbulb"></i> Decision Framework</div>
-      <p class="body-text">Ask yourself: <strong>"If I accidentally created two instances, would it break the system?"</strong> If yes (database connection pool, license manager) — Singleton is appropriate. If no (formatter, validator) — use Transient or Scoped instead.</p>
+    <div class="uml-diagram-wrapper mt-md">
+      <svg class="uml-svg" viewBox="0 0 720 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="singleton-decision-title">
+        <title id="singleton-decision-title">Singleton Decision Tree — Should you use the Singleton pattern?</title>
+        <defs>
+          <marker id="s9-sing-arrow-yes" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent-primary, #14b8a6)" />
+          </marker>
+          <marker id="s9-sing-arrow-no" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto-start-reverse">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- Q1: Need exactly ONE shared instance? — Diamond at top center -->
+        <g transform="translate(360, 52)">
+          <rect x="-90" y="-38" width="180" height="76" rx="0" transform="rotate(45)" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" style="transform-origin:0 0;transform:rotate(45deg) scale(0.56);" />
+          <polygon points="0,-52 100,0 0,52 -100,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text x="0" y="-8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Need exactly ONE</text>
+          <text x="0" y="8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">shared instance?</text>
+        </g>
+
+        <!-- Q1 — NO arrow (left) -->
+        <line x1="260" y1="52" x2="142" y2="52" stroke="#ef4444" stroke-width="2" marker-end="url(#s9-sing-arrow-no)" />
+        <text x="200" y="44" text-anchor="middle" fill="#ef4444" font-family="'Inter', sans-serif" font-size="11" font-weight="700">NO</text>
+
+        <!-- T1: Don't use Singleton — Rounded rect left -->
+        <rect x="10" y="28" width="120" height="48" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5" />
+        <text x="70" y="48" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Don't use Singleton.</text>
+        <text x="70" y="64" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'JetBrains Mono', monospace" font-size="9">Transient / Scoped</text>
+
+        <!-- Q1 — YES arrow (down) -->
+        <line x1="360" y1="104" x2="360" y2="152" stroke="var(--accent-primary, #14b8a6)" stroke-width="2" marker-end="url(#s9-sing-arrow-yes)" />
+        <text x="374" y="134" text-anchor="start" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="11" font-weight="700">YES</text>
+
+        <!-- Q2: Would TWO instances break the system? — Diamond -->
+        <g transform="translate(360, 205)">
+          <polygon points="0,-52 100,0 0,52 -100,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text x="0" y="-8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Would TWO instances</text>
+          <text x="0" y="8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">break the system?</text>
+        </g>
+
+        <!-- Q2 — NO arrow (left) -->
+        <line x1="260" y1="205" x2="142" y2="205" stroke="#ef4444" stroke-width="2" marker-end="url(#s9-sing-arrow-no)" />
+        <text x="200" y="197" text-anchor="middle" fill="#ef4444" font-family="'Inter', sans-serif" font-size="11" font-weight="700">NO</text>
+
+        <!-- T2: Static class or Scoped — Rounded rect left -->
+        <rect x="10" y="181" width="120" height="48" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5" />
+        <text x="70" y="201" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Static class or</text>
+        <text x="70" y="217" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'JetBrains Mono', monospace" font-size="9">Scoped is enough</text>
+
+        <!-- Q2 — YES arrow (down) -->
+        <line x1="360" y1="257" x2="360" y2="305" stroke="var(--accent-primary, #14b8a6)" stroke-width="2" marker-end="url(#s9-sing-arrow-yes)" />
+        <text x="374" y="287" text-anchor="start" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="11" font-weight="700">YES</text>
+
+        <!-- Q3: Need testability & DI? — Diamond -->
+        <g transform="translate(360, 358)">
+          <polygon points="0,-52 100,0 0,52 -100,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text x="0" y="-8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">Need testability</text>
+          <text x="0" y="8" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="11" font-weight="600">& DI?</text>
+        </g>
+
+        <!-- Q3 — NO arrow (left) -->
+        <line x1="260" y1="358" x2="142" y2="358" stroke="#ef4444" stroke-width="2" marker-end="url(#s9-sing-arrow-no)" />
+        <text x="200" y="350" text-anchor="middle" fill="#ef4444" font-family="'Inter', sans-serif" font-size="11" font-weight="700">NO</text>
+
+        <!-- T3: Classic Singleton — Rounded rect left -->
+        <rect x="10" y="334" width="120" height="48" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5" />
+        <text x="70" y="352" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Classic Singleton</text>
+        <text x="70" y="368" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'JetBrains Mono', monospace" font-size="9">Lazy&lt;T&gt;</text>
+
+        <!-- Q3 — YES arrow (right) -->
+        <line x1="460" y1="358" x2="538" y2="358" stroke="var(--accent-primary, #14b8a6)" stroke-width="2" marker-end="url(#s9-sing-arrow-yes)" />
+        <text x="500" y="350" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="11" font-weight="700">YES</text>
+
+        <!-- T4: AddSingleton — Rounded rect right (highlighted) -->
+        <rect x="550" y="334" width="160" height="48" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="2.5" />
+        <text x="630" y="354" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700">AddSingleton&lt;&gt;</text>
+        <text x="630" y="370" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="16">&#x2713;</text>
+      </svg>
     </div>
   </div>
 

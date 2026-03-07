@@ -1283,39 +1283,113 @@ app.UseMiddleware&lt;TenantMiddleware&gt;();
       </div>
     </div>
 
-    <div class="callout callout-purple mt-md">
-      <div class="callout-title"><i class="fa-solid fa-route"></i> Decision Flowchart</div>
-      <div class="macos-window mt-sm">
-        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">do-i-need-a-factory.txt</span></div>
-        <div class="macos-body">
-<pre><code>Q1: Does a RUNTIME value decide which type to create?
- │
- ├─ NO → Just register in DI: services.AddTransient&lt;IService, MyService&gt;()
- │       You don't need a factory.
- │
- └─ YES → Q2: Is it a simple key → type mapping (enum/string)?
-           │
-           ├─ YES → Q3: Is creation logic simple (no params, no async, no cross-cutting)?
-           │         │
-           │         ├─ YES → Use Keyed Services (.NET 8+)
-           │         │         AddKeyedTransient&lt;IExporter, PdfExporter&gt;("pdf")
-           │         │
-           │         └─ NO  → Custom factory class with IFactory&lt;T&gt; interface
-           │                   (parameterized creation, async init, logging/metrics)
-           │
-           └─ NO  → Q4: Do you need FAMILIES of related objects?
-                     │
-                     ├─ YES → Abstract Factory (creates Button+TextBox+Dialog together)
-                     │
-                     └─ NO  → Q5: Is construction multi-step?
-                               │
-                               ├─ YES → Builder pattern
-                               │
-                               └─ NO  → Factory Method with Func&lt;T&gt; delegate
-                                         services.AddTransient&lt;Func&lt;IExporter&gt;&gt;(
-                                           sp =&gt; () =&gt; sp.GetRequiredService&lt;IExporter&gt;())</code></pre>
-        </div>
-      </div>
+    <div class="uml-diagram-wrapper mt-md">
+      <div class="uml-diagram-title"><i class="fa-solid fa-route"></i> Decision Flowchart — Do I Need a Factory?</div>
+      <svg class="uml-svg" viewBox="0 0 720 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Factory Method decision flowchart">
+        <defs>
+          <marker id="s9-fm-arrow-yes" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #14b8a6)" />
+          </marker>
+          <marker id="s9-fm-arrow-no" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- ===== Q1: Runtime value decides which type? (center top) ===== -->
+        <g transform="translate(390, 48)">
+          <polygon points="0,-32 80,0 0,32 -80,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text text-anchor="middle" y="-5" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Runtime value decides</text>
+          <text text-anchor="middle" y="9" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">which type?</text>
+        </g>
+
+        <!-- Q1 → NO → Just use DI (left) -->
+        <line x1="310" y1="48" x2="210" y2="48" stroke="#ef4444" stroke-width="1.5" marker-end="url(#s9-fm-arrow-no)" />
+        <text x="263" y="42" fill="#ef4444" font-family="'Inter', sans-serif" font-size="9" font-weight="700">NO</text>
+        <rect x="80" y="30" width="125" height="36" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5" />
+        <text x="142" y="45" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Just use DI</text>
+        <text x="142" y="58" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'JetBrains Mono', monospace" font-size="8">AddTransient&lt;I, T&gt;()</text>
+
+        <!-- Q1 → YES → Q2 (down) -->
+        <line x1="390" y1="80" x2="390" y2="118" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" marker-end="url(#s9-fm-arrow-yes)" />
+        <text x="398" y="103" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="9" font-weight="700">YES</text>
+
+        <!-- ===== Q2: Simple key→type mapping? ===== -->
+        <g transform="translate(390, 150)">
+          <polygon points="0,-32 80,0 0,32 -80,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text text-anchor="middle" y="-5" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Simple key→type</text>
+          <text text-anchor="middle" y="9" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">mapping?</text>
+        </g>
+
+        <!-- Q2 → NO → Q4 (left, then down) -->
+        <line x1="310" y1="150" x2="248" y2="150" stroke="#ef4444" stroke-width="1.5" />
+        <line x1="248" y1="150" x2="248" y2="218" stroke="#ef4444" stroke-width="1.5" marker-end="url(#s9-fm-arrow-no)" />
+        <text x="282" y="144" fill="#ef4444" font-family="'Inter', sans-serif" font-size="9" font-weight="700">NO</text>
+
+        <!-- Q2 → YES → Q3 (down) -->
+        <line x1="390" y1="182" x2="390" y2="218" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" marker-end="url(#s9-fm-arrow-yes)" />
+        <text x="398" y="205" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="9" font-weight="700">YES</text>
+
+        <!-- ===== Q3: Creation logic simple? ===== -->
+        <g transform="translate(390, 250)">
+          <polygon points="0,-32 80,0 0,32 -80,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text text-anchor="middle" y="-5" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Creation logic</text>
+          <text text-anchor="middle" y="9" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">simple?</text>
+        </g>
+
+        <!-- Q3 → YES → Keyed Services (down) -->
+        <line x1="390" y1="282" x2="390" y2="318" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" marker-end="url(#s9-fm-arrow-yes)" />
+        <text x="398" y="305" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="9" font-weight="700">YES</text>
+        <rect x="325" y="323" width="130" height="36" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+        <text x="390" y="338" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="10" font-weight="700">Keyed Services</text>
+        <text x="390" y="352" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">.NET 8+ ✓</text>
+
+        <!-- Q3 → NO → Custom IFactory<T> (right) -->
+        <line x1="470" y1="250" x2="558" y2="250" stroke="#ef4444" stroke-width="1.5" marker-end="url(#s9-fm-arrow-no)" />
+        <text x="510" y="244" fill="#ef4444" font-family="'Inter', sans-serif" font-size="9" font-weight="700">NO</text>
+        <rect x="563" y="232" width="138" height="36" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5" />
+        <text x="632" y="247" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Custom Factory</text>
+        <text x="632" y="261" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'JetBrains Mono', monospace" font-size="9">IFactory&lt;T&gt;</text>
+
+        <!-- ===== Q4: Need product families? ===== -->
+        <g transform="translate(248, 250)">
+          <polygon points="0,-32 80,0 0,32 -80,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text text-anchor="middle" y="-5" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Need product</text>
+          <text text-anchor="middle" y="9" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">families?</text>
+        </g>
+
+        <!-- Q4 → YES → Abstract Factory (down) -->
+        <line x1="248" y1="282" x2="248" y2="318" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" marker-end="url(#s9-fm-arrow-yes)" />
+        <text x="256" y="305" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="9" font-weight="700">YES</text>
+        <rect x="178" y="323" width="140" height="36" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+        <text x="248" y="338" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="10" font-weight="700">Abstract Factory</text>
+        <text x="248" y="352" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">related object families</text>
+
+        <!-- Q4 → NO → Q5 (left, then down) -->
+        <line x1="168" y1="250" x2="115" y2="250" stroke="#ef4444" stroke-width="1.5" />
+        <line x1="115" y1="250" x2="115" y2="368" stroke="#ef4444" stroke-width="1.5" marker-end="url(#s9-fm-arrow-no)" />
+        <text x="143" y="244" fill="#ef4444" font-family="'Inter', sans-serif" font-size="9" font-weight="700">NO</text>
+
+        <!-- ===== Q5: Multi-step construction? ===== -->
+        <g transform="translate(115, 400)">
+          <polygon points="0,-32 80,0 0,32 -80,0" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+          <text text-anchor="middle" y="-5" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Multi-step</text>
+          <text text-anchor="middle" y="9" fill="var(--text-primary, #e2e8f0)" font-family="'Inter', sans-serif" font-size="10" font-weight="600">construction?</text>
+        </g>
+
+        <!-- Q5 → YES → Builder (down) -->
+        <line x1="115" y1="432" x2="115" y2="465" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" marker-end="url(#s9-fm-arrow-yes)" />
+        <text x="123" y="453" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="9" font-weight="700">YES</text>
+        <rect x="50" y="470" width="130" height="36" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+        <text x="115" y="485" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="10" font-weight="700">Builder Pattern</text>
+        <text x="115" y="499" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">step-by-step build</text>
+
+        <!-- Q5 → NO → Factory Method (right) -->
+        <line x1="195" y1="400" x2="268" y2="400" stroke="#ef4444" stroke-width="1.5" marker-end="url(#s9-fm-arrow-no)" />
+        <text x="228" y="394" fill="#ef4444" font-family="'Inter', sans-serif" font-size="9" font-weight="700">NO</text>
+        <rect x="273" y="382" width="150" height="36" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #14b8a6)" stroke-width="1.5" />
+        <text x="348" y="397" text-anchor="middle" fill="var(--accent-primary, #14b8a6)" font-family="'Inter', sans-serif" font-size="10" font-weight="700">Factory Method ✓</text>
+        <text x="348" y="411" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'JetBrains Mono', monospace" font-size="8">Func&lt;T&gt; or IFactory</text>
+      </svg>
     </div>
 
   </div>
