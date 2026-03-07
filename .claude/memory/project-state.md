@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 8 complete pages (Singleton, Factory Method, Abstract Factory, Builder, SRP, OCP, LSP, Parking Lot), 102 coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 14 complete pages (Singleton, Factory Method, Abstract Factory, Builder, Prototype, SRP, OCP, LSP, ISP, DIP, Strategy, Observer, Parking Lot), 96 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -28,6 +28,21 @@
 - No arbitrary limits on content
 - Code windows: scrollable + tabbed, never long blocks
 - **Tone: friendly learning, NOT stiff professional** — jokes, casual remarks, personality welcome
+- **CRITICAL — Beginner-first writing (USER MANDATE):**
+  - **WHY this project exists:** Books are too hard to understand (dense academic language), YouTube videos don't cover everything (surface-level). System Guide = textbook depth + YouTube clarity. If our content is hard to read, we've failed at the project's core purpose.
+  - If a layperson/non-technical person can't understand it, the content is BAD
+  - ALWAYS explain core concepts in plain English FIRST, then code
+  - Code is just an illustration of the concept, NOT the concept itself
+  - Never jump to C#/.NET implementation without building understanding first
+  - A reader should understand the pattern as an IDEA even without knowing C#
+  - Progression: Plain English → Analogy → Visual/Diagram → Then code
+  - Test: "Would a smart 15-year-old understand the first paragraph?"
+  - **Jargon is NOT banned** — technical terms ARE needed for career growth
+  - **But warm up first** — introduce with plain English, THEN give the jargon name
+  - **Never use jargon before explaining it in main text** — tooltips are bonus, not substitute
+  - **One new term per paragraph** in early sections — don't dump 5 terms in one sentence
+  - **"Explain to a friend" test** — if it sounds like a textbook, rewrite it
+  - **Page structure is GOOD** (24 sections, tabs, cards) — language within is the problem
 - **Never add Co-Authored-By in commits**
 - Git email: rafikulalam2000@gmail.com
 - User is a .NET Core developer (not legacy .NET Framework)
@@ -72,7 +87,11 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │               └── java.html               — COMING SOON placeholder
 │       └── case-studies/
 │           └── parking-lot/
-│               ├── csharp.html             — COMPLETE (4902 lines, 24 sections, 60 tooltips, 13 SVGs, favicon: 🅿️) ← ENRICHED
+│               ├── csharp.html             — COMPLETE (5862 lines, 24 sections, 107 tooltips, 23 SVGs, favicon: 🅿️) ← RE-ENRICHED
+│               └── java.html               — COMING SOON placeholder
+│       └── design-patterns/
+│           └── observer/
+│               ├── csharp.html             — COMPLETE (5827 lines, 24 sections, 60 tooltips, favicon: 👁️)
 │               └── java.html               — COMING SOON placeholder
 └── hld/                                    — Coming soon
 ```
@@ -108,7 +127,11 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy — ALL Coming Soon
 
 ### Behavioral Patterns (11)
-Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor — ALL Coming Soon
+| Pattern | Status | Accent |
+|---------|--------|--------|
+| Observer | COMPLETE | green |
+| Strategy | COMPLETE | purple |
+Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, State, Template Method, Visitor — ALL Coming Soon
 
 ### SOLID Principles (5)
 | Principle | Status | Accent |
@@ -235,32 +258,32 @@ Phase 1: SOLID Principles (5) → Phase 2: Tier 1 Gateway (Strategy, Singleton, 
 
 ## 5. 24-SECTION ORDER (MANDATORY FOR ALL TOPIC PAGES)
 
-| # | Section | HTML id | Icon Color |
-|---|---------|---------|------------|
-| 1 | TL;DR | `tldr` | blue |
-| 2 | Prerequisites | `prereqs` | purple |
-| 3 | Real-World Analogies | `analogies` | yellow |
-| 4 | Core Pattern & UML | `uml` | purple |
-| 5 | Code Implementations | `code` | green |
-| 6 | Jr vs Sr Implementation | `jr-sr` | red/green |
-| 7 | Evolution Timeline | `evolution` | cyan |
-| 8 | Pattern in .NET Core | `dotnet-examples` | blue |
-| 9 | When To Use / When Not To | `when` | green |
-| 10 | Comparisons | `comparison` | purple |
-| 11 | SOLID Mapping | `solid` | purple |
-| 12 | Bug Case Studies | `bugs` | red |
-| 13 | Pitfalls & Anti-Patterns | `pitfalls` | yellow |
-| 14 | Testing Strategies | `testing` | green |
-| 15 | Performance Considerations | `performance` | cyan |
-| 16 | How to Explain in Interview | `pitch` | cyan |
-| 17 | Interview Q&As | `qa` | blue |
-| 18 | Practice Exercises | `exercises` | yellow |
-| 19 | Cheat Sheet | `cheatsheet` | green |
-| 20 | Deep Dive (topic-specific) | `deep-dive` | purple |
-| 21 | Real-World Mini-Project | `mini-project` | purple |
-| 22 | Migration Guide | `migration` | cyan |
-| 23 | Code Review Checklist | `code-review` | yellow |
-| 24 | Related Topics | `related` | blue |
+| # | Section | HTML id | Icon Color | Icon |
+|---|---------|---------|------------|------|
+| 1 | TL;DR | `tldr` | blue | `fa-bolt` |
+| 2 | Prerequisites | `prereqs` | yellow | `fa-book-open` |
+| 3 | Real-World Analogies | `analogies` | purple | `fa-lightbulb` |
+| 4 | Core Pattern & UML | `uml` | blue | `fa-diagram-project` |
+| 5 | Code Implementations | `code` | green | `fa-code` |
+| 6 | Jr vs Sr Implementation | `jr-sr` | cyan | `fa-users` |
+| 7 | Evolution of [Pattern] in .NET | `evolution` | green | `fa-timeline` |
+| 8 | [Pattern] in the .NET Framework | `dotnet-examples` | blue | `fa-cube` |
+| 9 | When To Use / When Not To | `when` | green | `fa-check-double` |
+| 10 | Comparisons | `comparison` | purple | `fa-scale-balanced` |
+| 11 | SOLID Mapping | `solid` | purple | `fa-scale-balanced` |
+| 12 | Bug Case Studies | `bugs` | red | `fa-bug` |
+| 13 | Pitfalls & Anti-Patterns | `pitfalls` | yellow | `fa-triangle-exclamation` |
+| 14 | Testing Strategies | `testing` | green | `fa-flask-vial` |
+| 15 | Performance Considerations | `performance` | yellow | `fa-gauge-high` |
+| 16 | How to Explain in an Interview | `pitch` | cyan | `fa-microphone` |
+| 17 | Interview Q&As | `qa` | blue | `fa-comments` |
+| 18 | Practice Exercises | `exercises` | cyan | `fa-dumbbell` |
+| 19 | Cheat Sheet | `cheatsheet` | green | `fa-table-cells` |
+| 20 | Deep Dive (topic-specific) | varies | red | `fa-shield-halved` (varies) |
+| 21 | Real-World Mini-Project | `mini-project` | purple | `fa-rocket` |
+| 22 | Migration Guide | `migration` | cyan | `fa-right-left` |
+| 23 | Code Review Checklist | `code-review` | green | `fa-clipboard-check` |
+| 24 | Related Topics / What to Study Next | `related` | blue | `fa-arrow-right` |
 
 ---
 
@@ -409,6 +432,66 @@ Reads localStorage before any paint — prevents white flash on theme-enabled pa
 ### When To Use Grid
 - `when-use-grid` > two divs (Use When + Don't Use When)
 - `when-item` > `when-icon-yes` / `when-icon-no` + text span
+
+### Cheat Cards
+- Container: `grid-3` > multiple `cheat-card`
+- Each: `cheat-card-title` + `cheat-card-body` > `pre` (monospace content)
+
+### Related Topics Section (S24) — UPDATED from Singleton (ground truth)
+- Uses `related-grid` > `related-card` pattern (NOT grid-3 + callouts):
+  ```html
+  <div class="related-grid">
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-[icon]"></i></div>
+      <div class="related-card-text">
+        <h4>[Topic Name]</h4>
+        <p>[Brief relationship description]</p>
+      </div>
+    </div>
+  </div>
+  ```
+- **OLD/WRONG pattern** (Observer has this — needs fixing): `grid-3` + `<a class="card">` callouts / plain callouts with `opacity:0.6`
+
+### CRITICAL: Section → Component Pattern Rules (verified from Singleton PDF)
+1. **S6 (Jr vs Sr)**: `callout-info` (Problem Statement) → `tab-container` (Junior | Senior tabs) → Junior has `problem-card` + `solution-btn[data-popup]` → Senior has nested file tabs + `concept-card`. Popup overlays placed outside `<main>` before footer.
+2. **S9 (When To Use)**: `when-use-grid` + `when-item` + `when-icon-yes`/`when-icon-no` (NOT `grid-2` with cards)
+3. **S10 (Comparisons)**: `comparison-grid` + `comparison-panel` + `vs-badge` (NOT `grid-2` side-by-side)
+4. **S12 (Bug Case Studies)**: `card` accordion → `callout-danger` (Incident) → `tab-container` with "Buggy Code" | "Fix" tabs → `callout-info` (Lesson Learned). **NOT** grid-2 side-by-side code.
+5. **S13 (Pitfalls)**: `collapsible` elements with Mistake/Why Bad/Fix format. **NOT** `card` accordion.
+6. **S18 (Exercises)**: `exercise-card` + nested `collapsible` for Hints/Solution (NOT nested `card`)
+7. **S19 (Cheat Sheet)**: `cheat-card` in `grid-3` (NOT plain cards)
+8. **S24 (Related)**: `related-grid` + `related-card` (NOT `grid-3` + callout cards)
+9. **Tabs**: `tab-header` + `tab-btn[data-tab]` + `tab-panel` (NEVER `tab-nav`, `data-target`, `tab-content`)
+
+### CRITICAL: Standard Section Titles (from Singleton — the ground truth)
+| # | Correct Title |
+|---|--------------|
+| 1 | TL;DR |
+| 2 | Prerequisites |
+| 3 | Real-World Analogies |
+| 4 | Core Pattern & UML |
+| 5 | Code Implementations |
+| 6 | Jr vs Sr Implementation |
+| 7 | Evolution of [Pattern] in .NET |
+| 8 | [Pattern] in the .NET Framework |
+| 9 | When To Use / When Not To |
+| 10 | Comparisons |
+| 11 | SOLID Mapping |
+| 12 | Bug Case Studies |
+| 13 | Pitfalls & Anti-Patterns |
+| 14 | Testing Strategies |
+| 15 | Performance Considerations |
+| 16 | How to Explain in an Interview |
+| 17 | Interview Q&As |
+| 18 | Practice Exercises |
+| 19 | Cheat Sheet |
+| 20 | [Topic] Deep Dive |
+| 21 | Real-World Mini-Project: [Name] |
+| 22 | Migration Guide: [From → To] |
+| 23 | Code Review Checklist |
+| 24 | Related Topics / What to Study Next |
+
+### Full design reference: See `memory/design-reference.md` for complete section-by-section HTML patterns
 
 ---
 
@@ -764,41 +847,41 @@ These were caught during multi-round content reviews:
 
 ## 17. SECTION ICON CONVENTIONS
 
-### Section Header Colors Used
-| Color Class | Icon Color | Used For |
-|-------------|-----------|----------|
-| `blue` | Blue | TL;DR, .NET Core, Q&As, Related Topics |
-| `purple` | Purple | Prerequisites, UML, Comparisons, SOLID, Deep Dive, Mini-Project |
-| `green` | Green | Code, When To Use, Testing, Cheat Sheet |
-| `yellow` | Yellow | Analogies, Pitfalls, Exercises, Checklist |
-| `red` | Red | Bugs |
-| `cyan` | Cyan | Evolution, Performance, Pitch, Migration |
+### Section Header Colors Used (verified from Singleton HTML — ground truth)
+| Color Class | Used For |
+|-------------|----------|
+| `blue` | S1 TL;DR, S4 UML, S8 .NET Framework, S17 Q&As, S24 Related |
+| `purple` | S3 Analogies, S10 Comparisons, S11 SOLID, S21 Mini-Project |
+| `green` | S5 Code, S7 Evolution, S9 When To Use, S14 Testing, S19 Cheat Sheet, S23 Checklist |
+| `yellow` | S2 Prerequisites, S13 Pitfalls, S15 Performance |
+| `red` | S12 Bugs, S20 Deep Dive |
+| `cyan` | S6 Jr vs Sr, S16 Pitch, S18 Exercises, S22 Migration |
 
-### Common Font Awesome Icons
-- TL;DR: `fa-bolt`
-- Prerequisites: `fa-list-check`
-- Analogies: `fa-lightbulb`
-- UML: `fa-diagram-project`
-- Code: `fa-code`
-- Jr vs Sr: `fa-graduation-cap`
-- Evolution: `fa-clock-rotate-left`
-- .NET Core: `fa-cube`
-- When To Use: `fa-check-double`
-- Comparisons: `fa-scale-balanced`
-- SOLID: `fa-scale-balanced`
-- Bugs: `fa-bug`
-- Pitfalls: `fa-triangle-exclamation`
-- Testing: `fa-flask-vial`
-- Performance: `fa-gauge-high`
-- Pitch: `fa-microphone`
-- Q&As: `fa-comments`
-- Exercises: `fa-dumbbell`
-- Cheat Sheet: `fa-rectangle-list`
-- Deep Dive: `fa-microscope`
-- Mini-Project: `fa-rocket`
-- Migration: `fa-right-left`
-- Checklist: `fa-clipboard-check`
-- Related: `fa-signs-post`
+### Font Awesome Icons (verified from Singleton HTML)
+- S1 TL;DR: `fa-bolt`
+- S2 Prerequisites: `fa-book-open`
+- S3 Analogies: `fa-lightbulb`
+- S4 UML: `fa-diagram-project`
+- S5 Code: `fa-code`
+- S6 Jr vs Sr: `fa-users`
+- S7 Evolution: `fa-timeline`
+- S8 .NET Framework: `fa-cube`
+- S9 When To Use: `fa-check-double`
+- S10 Comparisons: `fa-scale-balanced`
+- S11 SOLID: `fa-scale-balanced`
+- S12 Bugs: `fa-bug`
+- S13 Pitfalls: `fa-triangle-exclamation`
+- S14 Testing: `fa-flask-vial`
+- S15 Performance: `fa-gauge-high`
+- S16 Pitch: `fa-microphone`
+- S17 Q&As: `fa-comments`
+- S18 Exercises: `fa-dumbbell`
+- S19 Cheat Sheet: `fa-table-cells`
+- S20 Deep Dive: `fa-shield-halved` (varies per topic)
+- S21 Mini-Project: `fa-rocket`
+- S22 Migration: `fa-right-left`
+- S23 Checklist: `fa-clipboard-check`
+- S24 Related: `fa-arrow-right`
 
 ---
 
@@ -933,7 +1016,76 @@ These were caught during multi-round content reviews:
 
 ---
 
-## 24. PATTERNS TO FOLLOW FOR NEXT PAGES
+## 24. DESIGN STRUCTURAL FIX (2026-03-07)
+
+**Observer page restructured** to match Singleton ground-truth design. 7 sections fixed:
+
+| Section | Before (WRONG) | After (CORRECT) |
+|---------|---------------|-----------------|
+| S8 (.NET Framework) | `grid-2` wrapping 6 cards | Flow-based cards (no grid) + `<p>` intro |
+| S11 (SOLID Mapping) | `grid-2` with 5 `card open` + code | `table-wrapper` > `<table>` with badges |
+| S14 (Testing) | `tab-container` with 4 tabs | 4 `card` accordion elements |
+| S15 (Performance) | `tab-container` with 4 tabs | 4 `card` accordion elements |
+| S16 (Pitch) | `grid-2` + nested callouts + cards | Single `callout callout-purple` prose |
+| S20 (Deep Dive) | `tab-container` with 4 tabs | 4 `card` accordion elements |
+| S21 (Mini-Project) | `tab-container` for 3 attempts | 3 `card` accordion + nested tabs in Attempt 3 |
+
+Also fixed: `table-wrap` → `table-wrapper` across entire file (5 occurrences).
+
+**Design-reference.md updated** with extensive ground-truth patterns + critical rules + common mistakes to never repeat.
+
+**Key rule added to memory:** Components MAY be added if needed, but the structural component TYPE for each section MUST NOT deviate from Singleton's design. Extra content = OK; changing card→tab or table→cards = NOT OK.
+
+---
+
+## 25. CONTENT LAYOUT & FORMATTING FIX (2026-03-07)
+
+**Rule**: Content-heavy cards (paragraphs + lists) should be full-width — do NOT wrap in `grid-2`/`grid-3`. Small callout-info cards and cheat-cards CAN stay in grids.
+
+**Observer layout fixes:**
+- S3 (Real-World Analogies): Removed `grid-3` wrapper — 3 analogy cards now full-width
+- S4 (Core Concepts): Removed `grid-2` wrapper — Four Roles + Push vs Pull cards now full-width
+- S3 metadata converted from `<ul>` to `<p class="mb-sm">` blocks with `<hr>` dividers
+
+**Observer encoding fixes (219 broken UTF-8 chars):**
+- 164x `â€"` → `—` (em dash)
+- 50x `â†'` → `→` (right arrow)
+- 5x `â†` → `←` (left arrow)
+- Multiple `â"€` → `─`, `âœ"` → `✓`, `âœ—` → `✗`
+
+**Observer bug fixes:**
+- Hero-meta: `25 Q&As` → `29 Q&As`
+- `class="table-wrapperper"` → `class="table-wrapper"` typo
+
+**Strategy structural fixes:**
+- S12 title: "Bug Studies" → "Bug Case Studies"
+- S13 title: "Pitfalls" → "Pitfalls &amp; Anti-Patterns"
+- S18 title: "Exercises" → "Practice Exercises"
+- S24 title: "Related Topics" → "Related Topics / What to Study Next"
+- S24 component: `grid-3` + `callout callout-info` → `related-grid` + `related-card`
+
+**Builder structural fixes:**
+- S9: Plain `table` → `when-use-grid` with 14 `when-item` elements
+- S10: Plain `table` → `comparison-grid` with 3 `comparison-panel` + `vs-badge`
+- S13: `card` accordion → `collapsible` elements with Mistake/Why Bad/Fix
+- S24 title: "Related Topics" → "Related Topics / What to Study Next"
+
+**page-spec.md updates:**
+- Added SVG Diagram Requirements table (9 recommended SVG locations, 5+ minimum)
+- S24 title corrected in section order table
+- Content formatting rules (no grid on heavy cards, metadata format)
+
+**Structural compliance — ALL PAGES VERIFIED:**
+- Singleton: Ground truth (reference page)
+- Observer: Fixed S8/S11/S14/S15/S16/S20/S21 (session 24)
+- Strategy: Fixed S12/S13/S18/S24 titles + S24 component (this session)
+- Builder: Fixed S9/S10/S13/S24 (this session)
+- Factory Method: All 4 sections compliant — no changes needed
+- Abstract Factory: S9/S10/S13 compliant, S24 title fixed ("Related Topics" → "Related Topics / What to Study Next")
+
+---
+
+## 26. PATTERNS TO FOLLOW FOR NEXT PAGES
 
 When building the next topic page (Builder, Prototype, etc.):
 

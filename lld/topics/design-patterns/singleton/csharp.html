@@ -36,7 +36,7 @@
   <div class="relative z-1">
     <div class="hero-badge"><i class="fa-solid fa-gem"></i> GoF Creational Pattern</div>
     <h1>Singleton Pattern</h1>
-    <p class="hero-subtitle">Ensures a class has only one instance and provides a global access point to it</p>
+    <p class="hero-subtitle">One instance, shared by everyone. No duplicates allowed — and everyone knows where to find it.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-comments"></i> 29 Q&As</span>
       <span><i class="fa-solid fa-bug"></i> 6 Bug Studies</span>
@@ -61,13 +61,13 @@
 
     <div class="callout callout-red mb-md">
       <i class="fa-solid fa-triangle-exclamation icon-gap"></i>
-      <strong>Modern .NET stance:</strong> In <span class="tooltip-trigger">ASP.NET Core<span class="tooltip-content">Microsoft's cross-platform web framework for building modern web apps and APIs using C#.</span></span>, prefer <code>services.AddSingleton&lt;T&gt;()</code> via <span class="tooltip-trigger">DI<span class="tooltip-content">Dependency Injection — a technique where an object receives its dependencies from an external source rather than creating them itself.</span></span> over the classic <code>static Instance</code> pattern. The manual Singleton is a <strong>legacy pattern</strong> — useful to understand, but DI-managed singletons are testable, swappable, and properly disposed. This page teaches both so you can ace interviews and maintain legacy code.
+      <strong>Heads up:</strong> In modern .NET, you usually don't build Singletons by hand. Instead, you tell the framework "make one of these and share it everywhere" using <code>services.AddSingleton&lt;T&gt;()</code>. The classic hand-built Singleton is still worth learning — you'll see it in interviews, legacy code, and it teaches important concepts. This page covers both approaches.
     </div>
 
     <div class="tldr-card">
-      <p><strong>What:</strong> Singleton ensures only one instance of a class exists throughout the application's lifetime.</p>
-      <p><strong>When:</strong> Use when you need exactly one shared resource — like a configuration manager, <span class="tooltip-trigger">connection pool<span class="tooltip-content">A cache of reusable database connections that avoids the overhead of opening a new connection for every request</span></span>, or logger.</p>
-      <p><strong>Modern .NET:</strong> Register via <code>builder.Services.AddSingleton&lt;IMyService, MyService&gt;()</code> — the DI container manages the single instance for you.</p>
+      <p><strong>What:</strong> Some things should only exist once in your entire application. A configuration manager, a database connection pool, a logger — you don't want five different copies floating around, each with different settings. Singleton guarantees: one instance, shared by everyone who needs it.</p>
+      <p><strong>When:</strong> Use it whenever creating multiple instances of something would cause problems — duplicate connections, inconsistent settings, wasted memory, or conflicting state.</p>
+      <p><strong>In C# / .NET:</strong> The modern way is simple: <code>builder.Services.AddSingleton&lt;IMyService, MyService&gt;()</code> — the framework creates one instance and hands it to everyone who asks for it. No manual locking, no static properties.</p>
       <p><strong>Quick Code:</strong></p>
       <div class="macos-window mt-sm">
         <div class="macos-titlebar">
@@ -100,13 +100,13 @@
     </div>
 
     <div class="prereq-card">
-      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before reading this, you should understand:</div>
+      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before diving in:</div>
       <div class="prereq-list">
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Interfaces</span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Static Members</span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <span class="tooltip-trigger">Thread Safety<span class="tooltip-content">Code that functions correctly when accessed by multiple threads simultaneously, typically achieved via locks, Lazy&lt;T&gt;, or immutable data.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <span class="tooltip-trigger">Lazy&lt;T&gt;<span class="tooltip-content">A .NET class that defers object creation until first access, providing built-in thread safety and exception caching.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <span class="tooltip-trigger">Dependency Injection<span class="tooltip-content">A design principle where a class receives its dependencies from an external source (typically a DI container) rather than creating them itself.</span></span></span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Interfaces</strong> — Singleton classes should implement an interface so they can be swapped in tests. If "programming to an interface" feels unfamiliar, review that first.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Static Members</strong> — The classic Singleton uses a <code>static</code> property to hold the single instance. Know the difference between instance members (one per object) and static members (one per class).</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Thread Safety</strong> — What happens when two threads try to create the Singleton at the same time? Understanding <span class="tooltip-trigger">race conditions<span class="tooltip-content">When two threads access shared data simultaneously and the outcome depends on timing. For Singleton, if Thread A and Thread B both check "does instance exist?" at the same time, both see "no" and both create one — now you have two instances.</span></span> helps you understand why the Singleton implementations look the way they do.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Lazy&lt;T&gt;</strong> — A .NET helper that says "don't create this object until someone actually asks for it, and make sure it's created only once even if multiple threads ask at the same time." This is the <span class="tooltip-trigger">modern way<span class="tooltip-content">Lazy&lt;T&gt; handles all the thread-safety complexity for you. Instead of writing lock statements and double-check patterns, you just write new Lazy&lt;T&gt;(() => new MyClass()) and access .Value when needed.</span></span> to build Singletons.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Dependency Injection</strong> — The modern approach to Singleton in .NET. Instead of the class enforcing "I'm a Singleton," you tell the DI container "create one of these and share it." This makes testing much easier since you can swap in a fake version.</span>
       </div>
     </div>
   </div>
@@ -127,13 +127,13 @@
         <p class="body-text">A country has exactly one president at any time. You can't just "create" a new president — there's a formal process. Everyone in the country refers to the same person when they say "the president."</p>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Real World</th><th>Code Concept</th></tr></thead>
+            <thead><tr><th>Real World</th><th>What it means</th><th>In code</th></tr></thead>
             <tbody>
-              <tr><td>The country</td><td>Your application</td></tr>
-              <tr><td>The president</td><td>The single instance</td></tr>
-              <tr><td>"You can't just create one"</td><td>Private constructor</td></tr>
-              <tr><td>Official channel to reach the president</td><td><code>Instance</code> property</td></tr>
-              <tr><td>Only one at a time</td><td>Thread-safe <span class="tooltip-trigger">lazy initialization<span class="tooltip-content">Deferring the creation of an object until the first time it is needed, saving memory and startup time.</span></span></td></tr>
+              <tr><td>The country</td><td>The whole system</td><td>Your application</td></tr>
+              <tr><td>The president</td><td>The one and only instance</td><td>The Singleton object</td></tr>
+              <tr><td>"You can't just create one"</td><td>Only the system decides when it's created</td><td>Private constructor</td></tr>
+              <tr><td>Official channel to reach the president</td><td>Everyone uses the same access point</td><td><code>Instance</code> property</td></tr>
+              <tr><td>Only one at a time</td><td>Even if many people ask simultaneously</td><td>Thread-safe creation</td></tr>
             </tbody>
           </table>
         </div>
@@ -740,7 +740,8 @@ public class ProductService(
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-clock-rotate-left text-cyan" aria-hidden="true"></i> .NET 9 (2024+): HybridCache &amp; Source Generators</h3>
       <div class="card-body">
-        <p class="body-text">.NET 9 introduced <strong><span class="tooltip-trigger">HybridCache<span class="tooltip-content">A .NET 9+ caching API that combines in-memory (L1) and distributed (L2) caching with stampede protection built in.</span></span></strong> — a Singleton-registered service that combines L1 (in-memory) + L2 (distributed) caching with <span class="tooltip-trigger">stampede protection<span class="tooltip-content">Preventing multiple threads from simultaneously computing the same expensive value when a cache entry expires.</span></span> built in. Also, <span class="tooltip-trigger">source-generated<span class="tooltip-content">Source generators — a C# compiler feature that generates additional source code at compile time, enabling zero-reflection patterns.</span></span> DI registration reduces reflection overhead at startup.</p>
+        <p class="body-text">.NET 9 introduced <strong><span class="tooltip-trigger">HybridCache<span class="tooltip-content">A .NET 9+ caching API that combines in-memory (L1) and distributed (L2) caching with stampede protection built in.</span></span></strong> — a Singleton-registered service that combines L1 (in-memory) + L2 (distributed) caching with <span class="tooltip-trigger">stampede protection<span class="tooltip-content">Preventing multiple threads from simultaneously computing the same expensive value when a cache entry expires.</span></span> built in.<br><br>
+        Also, <span class="tooltip-trigger">source-generated<span class="tooltip-content">Source generators — a C# compiler feature that generates additional source code at compile time, enabling zero-reflection patterns.</span></span> DI registration reduces reflection overhead at startup.</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HybridCache.cs</span></div>
           <div class="macos-body">
@@ -1206,7 +1207,8 @@ builder.Services.AddHostedService&lt;EmailSenderWorker&gt;();</code></pre>
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Friday, 5:47 PM.</strong> A fintech app goes live after a marketing campaign drives 10x normal traffic. Within 3 minutes, the database connection pool is exhausted. All API calls return 500. The on-call engineer sees 47 <code>DbConnectionManager</code> instances in the memory dump — there should be exactly 1. The Singleton wasn't thread-safe. Two threads raced during the first millisecond of traffic, both saw <code>_instance == null</code>, both created a new instance. Each instance opened its own connection pool. Under load, 47 threads hit the race window.</p>
+          <p class="body-text"><strong>Friday, 5:47 PM.</strong> A fintech app goes live after a marketing campaign drives 10x normal traffic. Within 3 minutes, the database connection pool is exhausted. All API calls return 500. The on-call engineer sees 47 <code>DbConnectionManager</code> instances in the memory dump — there should be exactly 1.</p>
+          <p class="body-text">The Singleton wasn't thread-safe. Two threads raced during the first millisecond of traffic, both saw <code>_instance == null</code>, both created a new instance. Each instance opened its own connection pool. Under load, 47 threads hit the race window.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours. The bug was intermittent — it only appeared under concurrent load, never in single-threaded local testing. The engineer initially blamed the database.</p>
@@ -1295,7 +1297,8 @@ public class DbConnectionManager
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Monday morning, 9:02 AM.</strong> A new notification feature shipped on Friday passes all tests in staging. First user triggers a notification — works perfectly. Second user, 30 seconds later — <code>ObjectDisposedException: Cannot access a disposed context instance</code>. Every subsequent notification fails. The team rolls back, confused — "it worked in staging because staging only had one tester hitting it at a time." The singleton <code>NotificationService</code> captured a scoped <code>DbContext</code>. After request 1 ended, the DbContext was disposed. The singleton still held the dead reference.</p>
+          <p class="body-text"><strong>Monday morning, 9:02 AM.</strong> A new notification feature shipped on Friday passes all tests in staging. First user triggers a notification — works perfectly. Second user, 30 seconds later — <code>ObjectDisposedException: Cannot access a disposed context instance</code>. Every subsequent notification fails. The team rolls back, confused — "it worked in staging because staging only had one tester hitting it at a time."</p>
+          <p class="body-text">The singleton <code>NotificationService</code> captured a scoped <code>DbContext</code>. After request 1 ended, the DbContext was disposed. The singleton still held the dead reference.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">45 minutes. The stack trace was clear, but understanding <em>why</em> a DbContext was disposed while code was still using it took investigation. The term "<span class="tooltip-trigger">captive dependency<span class="tooltip-content">A scoped or transient service accidentally captured by a singleton, causing it to live far longer than intended.</span></span>" wasn't known to the team.</p>
@@ -1381,7 +1384,8 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2:15 AM, deployment pipeline.</strong> A zero-downtime deployment rotates containers. For 200ms, the new container starts before the config volume is mounted. The <code>ConfigManager</code> singleton's constructor fires, can't find <code>appsettings.json</code>, and throws <code>FileNotFoundException</code>. <code>Lazy&lt;T&gt;</code> caches the exception. The config file appears 200ms later — but it doesn't matter. Every call to <code>ConfigManager.Instance</code> now re-throws the cached exception. The container passes health checks (they don't use ConfigManager) but every real request fails. Engineers spend 90 minutes investigating before someone suggests "have you tried restarting it?" — which works because it re-initializes the <code>Lazy&lt;T&gt;</code>.</p>
+          <p class="body-text"><strong>2:15 AM, deployment pipeline.</strong> A zero-downtime deployment rotates containers. For 200ms, the new container starts before the config volume is mounted. The <code>ConfigManager</code> singleton's constructor fires, can't find <code>appsettings.json</code>, and throws <code>FileNotFoundException</code>. <code>Lazy&lt;T&gt;</code> caches the exception. The config file appears 200ms later — but it doesn't matter.</p>
+          <p class="body-text">Every call to <code>ConfigManager.Instance</code> now re-throws the cached exception. The container passes health checks (they don't use ConfigManager) but every real request fails. Engineers spend 90 minutes investigating before someone suggests "have you tried restarting it?" — which works because it re-initializes the <code>Lazy&lt;T&gt;</code>.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">90 minutes. The misleading part: the config file existed on disk. The exception said it didn't. No one suspected the exception was being <em>replayed from cache</em>.</p>
@@ -1464,7 +1468,8 @@ public static ConfigManager Instance
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Black Friday, 11:30 AM.</strong> An e-commerce payment service starts intermittently failing. <code>SocketException: Address already in use</code>. The ops team scales from 3 to 10 pods — makes it <em>worse</em>. Running <code>netstat</code> shows 64,000 sockets in <span class="tooltip-trigger"><code>TIME_WAIT</code><span class="tooltip-content">A TCP socket state lasting ~240 seconds after connection close, during which the port cannot be reused.</span></span> state. The <code>PaymentService</code> (a singleton) was creating a <code>new HttpClient()</code> for every payment call and disposing it with a <code>using</code> block. "But I disposed it!" the developer said. Disposing <code>HttpClient</code> doesn't release the TCP socket immediately — sockets linger in <code>TIME_WAIT</code> for ~240 seconds. At 300 payments/second, the OS socket pool was exhausted in under 4 minutes.</p>
+          <p class="body-text"><strong>Black Friday, 11:30 AM.</strong> An e-commerce payment service starts intermittently failing. <code>SocketException: Address already in use</code>. The ops team scales from 3 to 10 pods — makes it <em>worse</em>. Running <code>netstat</code> shows 64,000 sockets in <span class="tooltip-trigger"><code>TIME_WAIT</code><span class="tooltip-content">A TCP socket state lasting ~240 seconds after connection close, during which the port cannot be reused.</span></span> state.</p>
+          <p class="body-text">The <code>PaymentService</code> (a singleton) was creating a <code>new HttpClient()</code> for every payment call and disposing it with a <code>using</code> block. "But I disposed it!" the developer said. Disposing <code>HttpClient</code> doesn't release the TCP socket immediately — sockets linger in <code>TIME_WAIT</code> for ~240 seconds. At 300 payments/second, the OS socket pool was exhausted in under 4 minutes.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours. The misleading part: the code looked correct — it used <code>using</code> blocks, which is normally the right pattern. The team initially blamed the payment gateway for being slow.</p>
@@ -1545,7 +1550,8 @@ public class PaymentService
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Wednesday, discovered by the finance team — 3 days after going live.</strong> "Why did 4,200 non-VIP customers get the 20% VIP discount?" A singleton <code>PricingEngine</code> stored <code>_currentDiscount</code> as an instance field. When a VIP customer's request called <code>SetDiscount(0.20m)</code>, that value stuck in the singleton. The next 4,200 requests — regardless of customer type — all got the VIP price. Revenue impact: $38,000. The bug was invisible in testing because tests ran sequentially with one user at a time. In production, thousands of concurrent requests shared the same mutable field.</p>
+          <p class="body-text"><strong>Wednesday, discovered by the finance team — 3 days after going live.</strong> "Why did 4,200 non-VIP customers get the 20% VIP discount?" A singleton <code>PricingEngine</code> stored <code>_currentDiscount</code> as an instance field. When a VIP customer's request called <code>SetDiscount(0.20m)</code>, that value stuck in the singleton. The next 4,200 requests — regardless of customer type — all got the VIP price. Revenue impact: $38,000.</p>
+          <p class="body-text">The bug was invisible in testing because tests ran sequentially with one user at a time. In production, thousands of concurrent requests shared the same mutable field.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">3 days to detect (finance caught the anomaly in revenue reports), 20 minutes to fix once the developer saw the code. The hardest part wasn't the fix — it was calculating the refund impact across 4,200 orders.</p>
@@ -1761,7 +1767,7 @@ public class OrderPlacedHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Sprinkling <code>Logger.Instance.Log(...)</code> throughout your codebase instead of injecting <code>ILogger</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Creates hidden dependencies. Classes don't declare what they need in their constructors. Unit tests can't substitute fakes. Violates DIP — every consumer couples directly to the concrete singleton class.</p>
+          <p class="body-text"><strong>Why Bad:</strong> Creates hidden dependencies — classes don't declare what they need in their constructors. Unit tests can't substitute fakes. Violates DIP — every consumer couples directly to the concrete singleton class.</p>
           <p class="body-text"><strong>Fix:</strong> Register via <code>services.AddSingleton&lt;ILogger, FileLogger&gt;()</code> and inject through constructors. Same single instance, zero coupling.</p>
         </div>
       </div>
@@ -1864,7 +1870,7 @@ public abstract class Singleton&lt;T&gt; where T : class, new()
 public class Logger : Singleton&lt;Logger&gt; { } // Looks clean, right?</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> The <code>new()</code> constraint forces a <strong>public parameterless constructor</strong> — completely defeating the pattern's core guarantee. Anyone can write <code>new Logger()</code>. It also couples every consumer to a concrete base class, making DI migration painful, and pollutes the inheritance hierarchy (what if <code>Logger</code> needs to extend something else?).</p>
+          <p class="body-text"><strong>Why Bad:</strong> The <code>new()</code> constraint forces a <strong>public parameterless constructor</strong> — completely defeating the pattern's core guarantee. Anyone can write <code>new Logger()</code>. It also couples every consumer to a concrete base class, making DI migration painful. And it pollutes the inheritance hierarchy (what if <code>Logger</code> needs to extend something else?).</p>
           <p class="body-text"><strong>Fix:</strong> Either use <code>Lazy&lt;T&gt;</code> directly in each class with a private constructor, or (better) use <code>AddSingleton&lt;T&gt;()</code> via DI. There's no value in a generic base class when the DI container already manages singleton lifetime.</p>
         </div>
       </div>
@@ -2106,11 +2112,21 @@ public class LegacyConfigTests : IDisposable
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-memory text-blue" aria-hidden="true"></i> Memory Impact: Lives Forever</h3>
       <div class="card-body">
         <p class="body-text">Singletons are never garbage collected. This is by design — but has implications:</p>
-        <ul class="styled">
-          <li><strong>GC <span class="tooltip-trigger">Gen 2<span class="tooltip-content">The long-lived generation in .NET's garbage collector. Objects surviving Gen 0 and Gen 1 are promoted here and collected less frequently.</span></span> promotion</strong> — the Singleton object and everything it references moves to Gen 2 (long-lived heap), where GC runs less frequently</li>
-          <li><strong>Memory anchoring</strong> — if the Singleton holds a reference to a large collection, that collection is also pinned forever</li>
-          <li><strong>Cache growth</strong> — a Singleton <code>ConcurrentDictionary</code> without eviction policy will grow unbounded until OOM</li>
-        </ul>
+        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">
+        <p class="mb-sm">
+          <strong>GC <span class="tooltip-trigger">Gen 2<span class="tooltip-content">The long-lived generation in .NET's garbage collector. Objects surviving Gen 0 and Gen 1 are promoted here and collected less frequently.</span></span> promotion:</strong><br>
+          The Singleton object and everything it references moves to Gen 2 (long-lived heap), where GC runs less frequently.
+        </p>
+        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">
+        <p class="mb-sm">
+          <strong>Memory anchoring:</strong><br>
+          If the Singleton holds a reference to a large collection, that collection is also pinned forever.
+        </p>
+        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">
+        <p class="mb-sm">
+          <strong>Cache growth:</strong><br>
+          A Singleton <code>ConcurrentDictionary</code> without eviction policy will grow unbounded until OOM.
+        </p>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Mitigation</div>
           <p class="body-text">For caches: use <code>IMemoryCache</code> with size limits and expiration. For data stores: use weak references or periodic cleanup. Monitor with <code>dotnet-counters</code> for Gen 2 heap size.</p>
@@ -3396,7 +3412,7 @@ DI-managed:
     <div class="card open">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="true"><i class="fa-solid fa-microchip text-blue" aria-hidden="true"></i> The CPU Memory Model Problem</h3>
       <div class="card-body">
-        <p class="body-text">Modern CPUs don't read/write main memory directly. Each core has its own L1/L2 cache. Without explicit <span class="tooltip-trigger">memory barriers<span class="tooltip-content">CPU instructions that enforce ordering constraints on memory operations, preventing the processor from reordering reads and writes</span></span>, Core 1 might write a value that Core 2 never sees.</p>
+        <p class="body-text">Modern CPUs don't read/write main memory directly — each core has its own L1/L2 cache. Without explicit <span class="tooltip-trigger">memory barriers<span class="tooltip-content">CPU instructions that enforce ordering constraints on memory operations, preventing the processor from reordering reads and writes</span></span>, Core 1 might write a value that Core 2 never sees.</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MemoryModelProblem.cs</span></div>
           <div class="macos-body">
@@ -3547,7 +3563,12 @@ public class RateLimiter
         </div>
         <div class="callout callout-danger mt-sm">
           <div class="callout-title"><i class="fa-solid fa-skull-crossbones"></i> 6 Critical Bugs</div>
-          <p class="body-text"><strong>1.</strong> Not thread-safe — <code>Dictionary</code> corrupts under concurrent access. <strong>2.</strong> Public constructor — anyone can create a second instance. <strong>3.</strong> <code>DateTime.Now</code> — uses local time, breaks on DST changes. <strong>4.</strong> Unbounded memory — expired entries only cleaned on access, idle clients never cleaned. <strong>5.</strong> No interface — untestable. <strong>6.</strong> Not sealed — can be subclassed.</p>
+          <p class="body-text"><strong>1.</strong> Not thread-safe — <code>Dictionary</code> corrupts under concurrent access.<br>
+          <strong>2.</strong> Public constructor — anyone can create a second instance.<br>
+          <strong>3.</strong> <code>DateTime.Now</code> — uses local time, breaks on DST changes.<br>
+          <strong>4.</strong> Unbounded memory — expired entries only cleaned on access, idle clients never cleaned.<br>
+          <strong>5.</strong> No interface — untestable.<br>
+          <strong>6.</strong> Not sealed — can be subclassed.</p>
         </div>
       </div>
     </div>
@@ -3588,7 +3609,10 @@ public sealed class RateLimiter
         </div>
         <div class="callout callout-warning mt-sm">
           <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> Remaining Issues</div>
-          <p class="body-text"><strong>1.</strong> Race condition between <code>Count</code> check and <code>Enqueue</code> — two threads can both see count=99 and both add, exceeding the limit. <strong>2.</strong> No memory cleanup for idle clients. <strong>3.</strong> Static Instance — not testable, not DI-friendly. <strong>4.</strong> Policy is hardcoded per call — should be configurable.</p>
+          <p class="body-text"><strong>1.</strong> Race condition between <code>Count</code> check and <code>Enqueue</code> — two threads can both see count=99 and both add, exceeding the limit.<br>
+          <strong>2.</strong> No memory cleanup for idle clients.<br>
+          <strong>3.</strong> Static Instance — not testable, not DI-friendly.<br>
+          <strong>4.</strong> Policy is hardcoded per call — should be configurable.</p>
         </div>
       </div>
     </div>

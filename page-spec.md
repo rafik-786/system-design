@@ -1488,11 +1488,16 @@ Dictionary&lt;string, List&lt;int&gt;&gt; // all brackets escaped</code></pre>
 | 21 | Real-World Mini-Project | `mini-project` |
 | 22 | Migration Guide | `migration` |
 | 23 | Code Review Checklist | `code-review` |
-| 24 | Related Topics | `related` |
+| 24 | Related Topics / What to Study Next | `related` |
 
 ---
 
 ## 9. Style Rules
+
+### Content Formatting (Readability)
+- **No grid wrappers on content-heavy cards** — if a card has a paragraph + metadata list, it should be full-width (one per row). Only use `grid-2`/`grid-3` for small callout-info cards (1-2 sentences) or cheat-cards.
+- **Convert metadata bullet lists to `<p>` blocks** — where cards have Subject/Observer/Pattern Role mappings, use `<p class="mb-sm"><strong>Label:</strong> Value</p>` separated by subtle `<hr>` dividers instead of `<ul><li>` bullets.
+- **Multi-concept lists** — where `<ul class="list-spaced">` has items with bold titles + multi-sentence explanations, convert each `<li>` to a `<p class="mb-sm">` block separated by `<hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">`.
 
 - **Tone:** Friendly learning — jokes welcome, casual remarks, personality. NOT stiff professional.
 - **Tattoo joke** in Checklist section intro: "Print it, bookmark it, tattoo it on your forearm."
@@ -1554,6 +1559,25 @@ Every topic page must meet these minimum thresholds:
 | Evolution cards with code | 5-6 (all with code) | 5 |
 | .NET Core examples with code | 5+ (all with code) | 7 |
 | Pitfalls with code examples | 8+ of 10 should have code | ~8 |
+| SVG diagrams (beyond UML) | 5+ | target 8 |
+
+### SVG Diagram Requirements Per Section
+
+Every page MUST have at least **5 SVG diagrams** beyond the S4 UML class diagram. SVGs are what separate "textbook depth + YouTube clarity" from walls of text. Below are the recommended SVG locations — not every one is required, but aim for 5+ across the page:
+
+| Section | SVG Type | Purpose | Priority |
+|---------|----------|---------|----------|
+| S4 Core UML | Class diagram | Show pattern structure | **Required** (already exists) |
+| S4 Core UML | Sequence/flow diagram | Show runtime notification/creation flow | High |
+| S7 Evolution | Timeline bar/infographic | Visual progression of API eras | Medium |
+| S8 .NET Core | Category grouping diagram | Show how pattern manifests across framework | Low |
+| S9 When To Use | Decision flowchart | "Do you need X? → Yes → Pattern" tree | High |
+| S15 Performance | Benchmark chart/bar graph | Visualize performance numbers from table | Medium |
+| S20 Deep Dive | Concept visualization | Topic-specific (e.g., hot/cold streams, thread-safety levels) | Medium |
+| S21 Mini-Project | Architecture diagram | Show data flow in the production solution | Medium |
+| S22 Migration | Before/after dependency graph | Show coupling reduction visually | Low |
+
+**SVG rules reminder:** All SVGs must use CSS variables for theme compatibility (see §5.9). Use `viewBox` for responsive sizing. Include `<title>` for accessibility.
 
 ### Section Depth Requirements
 

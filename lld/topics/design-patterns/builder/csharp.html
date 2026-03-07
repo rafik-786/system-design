@@ -36,7 +36,7 @@
   <div class="relative z-1">
     <div class="hero-badge"><i class="fa-solid fa-gem"></i> GoF Creational Pattern</div>
     <h1>Builder</h1>
-    <p class="hero-subtitle">Separate the construction of a complex object from its representation so that the same construction process can create different representations</p>
+    <p class="hero-subtitle">Build complex objects step by step, without a monster constructor. Configure only what you need, skip what you don't.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-comments"></i> 26 Q&amp;As</span>
       <span><i class="fa-solid fa-bug"></i> 6 Bug Studies</span>
@@ -61,13 +61,13 @@
 
     <div class="callout callout-danger mb-md">
       <i class="fa-solid fa-triangle-exclamation icon-gap"></i>
-      <strong>You already use Builder every day — you just don't call it that.</strong> That <code>WebApplication.CreateBuilder(args)</code> in your Program.cs? Builder pattern. That <span class="tooltip-trigger">StringBuilder<span class="tooltip-content">System.Text.StringBuilder — a mutable string buffer that avoids allocating new string objects on every concatenation.</span></span> in your loops? Builder. The <span class="tooltip-trigger">IHostBuilder<span class="tooltip-content">The interface that configures a host for an application — setting up DI, logging, configuration, and hosted services.</span></span> configuring your background services? Builder. The question isn't <em>whether</em> to use it — it's whether you're using it <strong>correctly</strong>. The <span class="tooltip-trigger">GoF<span class="tooltip-content">Gang of Four — the four authors of "Design Patterns: Elements of Reusable Object-Oriented Software" (1994), the foundational catalog of 23 design patterns.</span></span> version with a formal Director is rare in modern .NET — but the traps (<span class="tooltip-trigger">mutable products<span class="tooltip-content">A common Builder bug: the product exposes mutable collections, allowing callers to corrupt its state after construction. Always use IReadOnlyList/IReadOnlyDictionary.</span></span>, forgotten <code>Build()</code> calls, <span class="tooltip-trigger">shared builder state<span class="tooltip-content">When a builder registered as Singleton or Scoped in DI accumulates state across requests — User A's data leaks into User B's product. Always use Transient or new.</span></span>) catch teams constantly.
+      <strong>You already use Builder every day — you just don't call it that.</strong> Every time you write <code>WebApplication.CreateBuilder(args)</code> in Program.cs, or use <code>StringBuilder</code> to assemble a string piece by piece, or chain methods like <code>.AddLogging().AddDatabase().Build()</code> — that's the Builder pattern. It's one of the most common patterns in .NET.
     </div>
 
     <div class="tldr-card">
-      <p><strong>What:</strong> Builder separates <em>how</em> you construct a complex object from <em>what</em> the final object looks like. You configure it step by step, then call <code>Build()</code> to get the finished product — immutable and validated.</p>
-      <p><strong>When:</strong> Use when an object has many <span class="tooltip-trigger">optional parameters<span class="tooltip-content">Constructor parameters with default values or nullable types that callers can omit — Builder names them explicitly, eliminating the "which null is which?" problem.</span></span>, multiple valid configurations, or the construction process involves several steps that may vary independently.</p>
-      <p><strong>Modern .NET:</strong> Use <span class="tooltip-trigger">fluent builders<span class="tooltip-content">Builder implementations where each configuration method returns the builder itself, enabling method chaining like builder.WithName("x").WithAge(25).Build().</span></span> with <code>Build()</code> for <span class="tooltip-trigger">domain objects<span class="tooltip-content">Objects that represent concepts from the business domain (Order, Invoice, User) as opposed to technical infrastructure (HttpClient, DbContext).</span></span>, leverage <code>WebApplicationBuilder</code> for app setup, and use <code>StringBuilder</code> for efficient string assembly. The formal <span class="tooltip-trigger">Director<span class="tooltip-content">In the GoF Builder pattern, the Director object that orchestrates the sequence of build steps. It knows the recipe; the Builder knows the ingredients.</span></span> role is typically absorbed into the client or a <span class="tooltip-trigger">factory method<span class="tooltip-content">A creational pattern where a method creates and returns objects — in this context, a static method like Order.CreateDefault() that internally uses a builder.</span></span>.</p>
+      <p><strong>What:</strong> Ever had a class that needs 10+ things configured, but most of them are optional? Without Builder, you'd end up with a monster constructor — <code>new Pizza(true, false, true, null, "large", null, true)</code> — where nobody knows what each <code>true</code> means. Builder fixes this: you create the object step by step, setting only what you need with clearly named methods. When you're done, call <code>Build()</code> to get the finished product.</p>
+      <p><strong>When:</strong> Use it whenever an object has many optional settings, multiple valid configurations, or the setup involves several steps. Classic examples: building an HTTP request (URL, headers, body, method), configuring an email (to, cc, bcc, subject, body, attachments), or assembling a complex order.</p>
+      <p><strong>In C# / .NET:</strong> The most popular approach is the <span class="tooltip-trigger">fluent builder<span class="tooltip-content">A builder where each method returns the builder itself, so you can chain calls: builder.SetName("x").SetAge(25).Build(). Reads almost like English and makes the construction process very clear.</span></span> — methods that chain together, ending with <code>.Build()</code>. The framework uses this everywhere: <code>WebApplicationBuilder</code>, <code>IHostBuilder</code>, <code>StringBuilder</code>. For your own code, build fluent builders for <span class="tooltip-trigger">domain objects<span class="tooltip-content">Objects representing business concepts — Order, Invoice, User. These often have complex construction rules (required fields, validation, optional extras) that builders handle cleanly.</span></span> that have complex construction rules.</p>
       <p><strong>Quick Code:</strong></p>
       <div class="macos-window mt-sm">
         <div class="macos-titlebar">
@@ -144,12 +144,12 @@ var request = new HttpRequestBuilder()
     </div>
 
     <div class="prereq-card">
-      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before reading this, you should understand:</div>
+      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before diving in:</div>
       <div class="prereq-list">
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Interfaces &amp; abstract classes</strong> — the Builder interface defines the step-by-step <span class="tooltip-trigger">contract<span class="tooltip-content">A set of method signatures that a class promises to implement, enabling polymorphism and loose coupling between components.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Method chaining</strong> — fluent builders return <code>this</code> from each method so calls can be <span class="tooltip-trigger">chained<span class="tooltip-content">Calling multiple methods in sequence on the same object: obj.A().B().C(). Each method returns the object itself to enable the chain.</span></span> — also known as a <span class="tooltip-trigger">fluent API<span class="tooltip-content">API design style coined by Martin Fowler where method calls read like natural language: email.From("a").To("b").Subject("x"). Extremely popular in .NET.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Immutability basics</strong> — products should be <span class="tooltip-trigger">immutable<span class="tooltip-content">An object whose state cannot change after construction. In C#, achieved with readonly fields, init-only properties, or records.</span></span> once built — <code>readonly</code> fields, <code>init</code> properties, or <code>record</code> types</span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Constructor overloads</strong> — understanding why <span class="tooltip-trigger">telescoping constructors<span class="tooltip-content">An anti-pattern where a class has multiple constructors with increasing parameter counts: Foo(a), Foo(a,b), Foo(a,b,c)... making code unreadable.</span></span> become painful is the motivation for Builder</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Interfaces &amp; abstract classes</strong> — Builders often follow a contract (interface) so different builders can construct different products using the same set of steps.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Method chaining</strong> — Fluent builders return <code>this</code> from each method, so you can write <code>builder.SetA().SetB().Build()</code> in one flowing line. If you've used LINQ (<code>.Where().Select().ToList()</code>), you already know this style.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Immutability basics</strong> — The whole point of Builder is to end up with a <span class="tooltip-trigger">finished, unchangeable product<span class="tooltip-content">Once Build() returns the object, nobody should be able to modify it. This is achieved with readonly fields, init-only properties, or record types in C#. The builder is mutable (you configure it step by step), but the product is immutable (locked down after construction).</span></span>. The builder is mutable while you're configuring it, but the final product should be locked down.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>The problem with big constructors</strong> — Ever seen <code>new Pizza(true, false, true, null, "large", null)</code>? That's called a <span class="tooltip-trigger">telescoping constructor<span class="tooltip-content">When a class has constructors like Foo(a), Foo(a,b), Foo(a,b,c), Foo(a,b,c,d)... each adding one more parameter. It's unreadable and error-prone — was that true for cheese or pepperoni? Builder eliminates this by using named methods instead.</span></span> and it's the main reason Builder exists. Understanding why that's painful is the motivation.</span>
       </div>
     </div>
   </div>
@@ -169,16 +169,16 @@ var request = new HttpRequestBuilder()
         <i class="fa-solid fa-pizza-slice text-purple" aria-hidden="true"></i> Subway Sandwich Order
       </h3>
       <div class="card-body">
-        <p class="body-text">Walk into Subway and the "sandwich artist" (Director) asks you to choose step by step — bread type, protein, cheese, veggies, sauce, size. You don't hand them a 12-parameter order form. Each step is independent: skip cheese, double meat, extra sauce. The final sandwich (Product) is assembled only after all choices are made. Two customers using the same steps in different order or with different choices get completely different sandwiches from the same process.</p>
+        <p class="body-text">Walk into Subway. The sandwich artist asks you step by step — bread type, protein, cheese, veggies, sauce, size. You don't hand them a 12-item order form all at once. Each choice is independent: skip cheese, double meat, extra sauce. The sandwich is assembled only after all your choices are made. Two customers making different choices in the same process get completely different sandwiches.</p>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Real World</th><th>Code Concept</th></tr></thead>
+            <thead><tr><th>Subway</th><th>What it means</th><th>In code</th></tr></thead>
             <tbody>
-              <tr><td>Sandwich artist</td><td><code>Director</code> (orchestrates build steps)</td></tr>
-              <tr><td>Order process</td><td><code>ISandwichBuilder</code> (Builder interface)</td></tr>
-              <tr><td>"Italian BMT" recipe</td><td><code>ItalianBmtBuilder</code> (ConcreteBuilder)</td></tr>
-              <tr><td>Finished sandwich</td><td><code>Sandwich</code> (Product)</td></tr>
-              <tr><td>Each topping choice</td><td><code>.AddCheese()</code>, <code>.AddSauce()</code> (Build steps)</td></tr>
+              <tr><td>Sandwich artist</td><td>The one who guides the build process</td><td>Director</td></tr>
+              <tr><td>The order process itself</td><td>The steps you can configure</td><td>Builder interface</td></tr>
+              <tr><td>"Italian BMT" recipe</td><td>One specific configuration</td><td>Concrete Builder</td></tr>
+              <tr><td>Finished sandwich</td><td>The final, ready-to-eat result</td><td>Product</td></tr>
+              <tr><td>Each topping choice</td><td>One step in the build</td><td><code>.AddCheese()</code>, <code>.AddSauce()</code></td></tr>
             </tbody>
           </table>
         </div>
@@ -1273,19 +1273,63 @@ await host.RunAsync();</code></pre>
       </div>
     </div>
 
-    <div class="table-wrapper">
-      <table>
-        <thead><tr><th style="width:50%"><i class="fa-solid fa-check text-green"></i> Use Builder When</th><th><i class="fa-solid fa-xmark text-red"></i> Don't Use When</th></tr></thead>
-        <tbody>
-          <tr><td>Object has 4+ optional parameters</td><td>Object has 1-3 simple constructor params</td></tr>
-          <tr><td>Construction requires validation across fields</td><td>No cross-field validation needed</td></tr>
-          <tr><td>Product must be <span class="tooltip-trigger">immutable<span class="tooltip-content">Once created, the object's state cannot change. Immutability prevents bugs from shared mutable state and makes objects thread-safe.</span></span></td><td>Object is inherently mutable (DTOs, ViewModels)</td></tr>
-          <tr><td>Same construction process, different representations</td><td>Only one representation exists</td></tr>
-          <tr><td>Construction has an order or multi-step process</td><td>All properties are independent</td></tr>
-          <tr><td>You want a fluent API for developer experience</td><td><span class="tooltip-trigger">Object initializers<span class="tooltip-content">C# syntax: new Foo { Prop1 = x, Prop2 = y }. Simple and readable for mutable DTOs but offers no validation or required-field enforcement.</span></span> suffice (simple DTOs)</td></tr>
-          <tr><td>Object creation is complex enough to be error-prone</td><td>Simple <code>new</code> with named params works fine</td></tr>
-        </tbody>
-      </table>
+    <div class="when-use-grid">
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>Object has 4+ optional parameters</strong><br>When a constructor would need many optional arguments, a Builder gives each one a clear, named method.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>Construction requires validation across fields</strong><br>Builder can check that related fields are consistent before creating the product.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>Product must be <span class="tooltip-trigger">immutable<span class="tooltip-content">Once created, the object's state cannot change. Immutability prevents bugs from shared mutable state and makes objects thread-safe.</span></span></strong><br>Builder accumulates state mutably, then produces an immutable product at the end.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>Same construction process, different representations</strong><br>One Director, multiple builders — same steps produce HTML, PDF, or Markdown output.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>Construction has an order or multi-step process</strong><br>Steps must happen in sequence, and Builder enforces that order naturally.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>You want a fluent API for developer experience</strong><br>Method chaining makes configuration readable and discoverable via IntelliSense.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-yes"><i class="fa-solid fa-check"></i></div>
+        <div><strong>Object creation is complex enough to be error-prone</strong><br>Builder guides the developer through the process, reducing the chance of mistakes.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong>Object has 1-3 simple constructor params</strong><br>A plain constructor with well-named parameters is simpler and sufficient.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong>No cross-field validation needed</strong><br>If fields are independent, there's nothing for Builder to validate.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong>Object is inherently mutable (DTOs, ViewModels)</strong><br>If the object will be mutated after creation, immutability guarantees don't apply.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong>Only one representation exists</strong><br>No need for the abstraction if there's only one way to build the product.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong>All properties are independent</strong><br>No ordering or cross-field logic means a constructor or initializer works fine.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong><span class="tooltip-trigger">Object initializers<span class="tooltip-content">C# syntax: new Foo { Prop1 = x, Prop2 = y }. Simple and readable for mutable DTOs but offers no validation or required-field enforcement.</span></span> suffice (simple DTOs)</strong><br>For straightforward data objects, C# initializer syntax is simpler and has zero overhead.</div>
+      </div>
+      <div class="when-item">
+        <div class="when-icon-no"><i class="fa-solid fa-xmark"></i></div>
+        <div><strong>Simple <code>new</code> with named params works fine</strong><br>Named arguments already provide clarity without the extra Builder class.</div>
+      </div>
     </div>
 
     <div class="callout callout-warning mt-sm">
@@ -1304,54 +1348,46 @@ await host.RunAsync();</code></pre>
       </div>
     </div>
 
-    <h3 class="sub">Builder vs Other Creational Patterns</h3>
-    <div class="table-wrapper">
-      <table>
-        <thead><tr><th>Aspect</th><th>Builder</th><th>Abstract Factory</th><th>Factory Method</th></tr></thead>
-        <tbody>
-          <tr><td><strong>Focus</strong></td><td>Complex object construction step by step</td><td>Families of related products</td><td>Single product via subclass override</td></tr>
-          <tr><td><strong>Result</strong></td><td>One complex object</td><td>Multiple coordinated products</td><td>One product</td></tr>
-          <tr><td><strong>Complexity</strong></td><td>Steps + validation + immutable product</td><td>Multiple factory methods in one interface</td><td>One virtual create method</td></tr>
-          <tr><td><strong>When</strong></td><td>Many optional params, multi-step construction</td><td>Product families must be consistent</td><td>Subclass decides which class to create</td></tr>
-          <tr><td><strong>.NET example</strong></td><td><code>WebApplicationBuilder</code></td><td><code>DbProviderFactory</code></td><td><code>ILoggerFactory.CreateLogger()</code></td></tr>
-        </tbody>
-      </table>
+    <div class="comparison-grid">
+      <div class="comparison-panel">
+        <h4><span class="vs-badge">Builder</span> vs <span class="vs-badge">Abstract Factory</span> vs <span class="vs-badge">Factory Method</span></h4>
+        <ul class="styled">
+          <li><strong>Builder:</strong> Constructs one complex object step by step, with validation and optional immutability. .NET example: <code>WebApplicationBuilder</code>.</li>
+          <li><strong>Abstract Factory:</strong> Creates families of related products that must be used together. .NET example: <code>DbProviderFactory</code>.</li>
+          <li><strong>Factory Method:</strong> Creates a single product via subclass override — one virtual method, one product. .NET example: <code>ILoggerFactory.CreateLogger()</code>.</li>
+          <li><strong>Use Builder when:</strong> many optional params, multi-step construction, or cross-field validation.</li>
+          <li><strong>Use Abstract Factory when:</strong> product families must be consistent (e.g., SQL Server connection + command + adapter).</li>
+          <li><strong>Use Factory Method when:</strong> subclass decides which class to create, and creation is a single step.</li>
+        </ul>
+      </div>
+
+      <div class="comparison-panel">
+        <h4><span class="vs-badge">Builder</span> vs <span class="vs-badge">Object Initializer</span> vs <span class="vs-badge">Telescoping Constructor</span></h4>
+        <ul class="styled">
+          <li><strong>Builder:</strong> Excellent readability (named fluent methods), full cross-field validation in <code>Build()</code>, product is immutable, adding params means adding a method with no breaking changes. Overhead: extra class + allocation.</li>
+          <li><strong>Object Initializer:</strong> Good readability (named properties), no validation, object is mutable, required fields not enforced (C# 11 <code>required</code> helps). Zero overhead.</li>
+          <li><strong>Telescoping Constructor:</strong> Poor readability (positional params), limited validation, can be immutable, but adding params means new overloads that affect all callers. Zero overhead.</li>
+          <li><strong>Use Builder when:</strong> complex objects with validation and immutability requirements.</li>
+          <li><strong>Use Object Initializer when:</strong> simple DTOs or config objects with no validation rules.</li>
+          <li><strong>Use Telescoping Constructor when:</strong> few required params and no optional configuration.</li>
+        </ul>
+      </div>
+
+      <div class="comparison-panel">
+        <h4><span class="vs-badge">Builder</span> vs <span class="vs-badge"><code>with</code>-Expression</span></h4>
+        <ul class="styled">
+          <li><strong>Builder:</strong> Creates new instances from scratch via <code>Build()</code>, with full cross-field validation and multi-step intermediate state. IntelliSense shows all builder methods.</li>
+          <li><strong><code>with</code>-Expression:</strong> Creates a modified copy of an existing record via <code>with { }</code>. No validation — any property can be overridden. Single-shot property overrides only.</li>
+          <li><strong>Use Builder when:</strong> constructing from scratch with rules, defaults, and multi-step logic.</li>
+          <li><strong>Use <code>with</code> when:</strong> modifying an existing record instance (e.g., changing one field on a copy).</li>
+        </ul>
+      </div>
     </div>
 
     <div class="callout callout-info mt-sm">
       <div class="callout-title"><i class="fa-solid fa-circle-info"></i> When to Choose Which</div>
       <p class="body-text"><strong>Builder + Abstract Factory:</strong> They often work together. Abstract Factory selects <em>which family</em> (SQL Server vs PostgreSQL), then Builder constructs <em>how</em> (connection string, command, etc.). Example: <code>DbProviderFactory</code> creates a <code>DbConnectionStringBuilder</code> — factory picks the provider, builder configures the connection.</p>
       <p class="body-text"><strong>Builder vs Factory Method:</strong> Factory Method creates in <em>one shot</em> — you get the product immediately. Builder creates in <em>multiple steps</em> with intermediate configuration. If your object needs zero or minimal configuration, use Factory Method. If it needs 5+ configurable options, reach for Builder.</p>
-    </div>
-
-    <h3 class="sub mt-md">Builder vs Object Initializer vs Constructor</h3>
-    <div class="table-wrapper">
-      <table>
-        <thead><tr><th>Feature</th><th>Builder</th><th>Object Initializer</th><th>Telescoping Constructor</th></tr></thead>
-        <tbody>
-          <tr><td>Readability</td><td>Excellent (named fluent methods)</td><td>Good (named properties)</td><td>Poor (positional params)</td></tr>
-          <tr><td>Validation</td><td>In <code>Build()</code> — cross-field</td><td>None</td><td>In constructor — limited</td></tr>
-          <tr><td>Immutability</td><td>Product is immutable</td><td>Object is mutable</td><td>Can be immutable</td></tr>
-          <tr><td>Required fields</td><td>Enforced in <code>Build()</code></td><td>Not enforced (C# 11 <code>required</code> helps)</td><td>Enforced by compiler</td></tr>
-          <tr><td>Adding params</td><td>Add method — no breaking changes</td><td>Add property — no breaking changes</td><td>New overload — all callers affected</td></tr>
-          <tr><td>Overhead</td><td>Extra class + allocation</td><td>None</td><td>None</td></tr>
-          <tr><td>Best for</td><td>Complex objects with validation</td><td>Simple DTOs / config objects</td><td>Few required params</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3 class="sub mt-md">Builder vs <code>with</code>-Expression (C# 9+ Records)</h3>
-    <div class="table-wrapper">
-      <table>
-        <thead><tr><th>Feature</th><th>Builder</th><th><code>with</code>-Expression</th></tr></thead>
-        <tbody>
-          <tr><td>Creates new instance?</td><td>Yes — <code>Build()</code> returns new product</td><td>Yes — <code>with { }</code> returns modified copy</td></tr>
-          <tr><td>Validation</td><td>Full cross-field validation in <code>Build()</code></td><td>None — any property can be overridden</td></tr>
-          <tr><td>Discoverability</td><td>IntelliSense shows all builder methods</td><td>IntelliSense shows all properties (noisy)</td></tr>
-          <tr><td>Complex construction</td><td>Multi-step with intermediate state</td><td>Single-shot property overrides only</td></tr>
-          <tr><td>Best for</td><td>Creating from scratch with rules</td><td>Modifying an existing record instance</td></tr>
-        </tbody>
-      </table>
     </div>
 
     <div class="callout callout-info mt-sm">
@@ -1843,93 +1879,143 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       </div>
     </div>
 
-    <div class="card open">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
-        <i class="fa-solid fa-1 text-red" aria-hidden="true"></i> God Builder
-      </h3>
-      <div class="card-body">
-        <p class="body-text">A single builder that constructs 15 different types of objects with 50+ configuration methods. If your builder has more methods than the Product has properties, it's doing too much. Split into focused builders — one per Product type.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> God Builder</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> A single builder that constructs 15 different types of objects with 50+ configuration methods.</p>
+          <p><strong>Why Bad:</strong> If your builder has more methods than the Product has properties, it's doing too much — it becomes impossible to maintain and test.</p>
+          <p><strong>Fix:</strong> Split into focused builders — one per Product type. Each builder should have a clear, single responsibility.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-2 text-red" aria-hidden="true"></i> Builder for Simple Objects
-      </h3>
-      <div class="card-body">
-        <p class="body-text">Creating a <code>PointBuilder</code> for <code>new Point(x, y)</code>. If the constructor has 2-3 well-named params, Builder is <span class="tooltip-trigger">over-engineering<span class="tooltip-content">Adding unnecessary complexity for problems that don't exist — a Builder for a 2-property class adds a class, allocation, and cognitive overhead for zero benefit.</span></span>. The rule of thumb: Builder earns its keep at 4+ optional parameters or when cross-field validation is needed.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Builder for Simple Objects</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> Creating a <code>PointBuilder</code> for <code>new Point(x, y)</code> — using Builder when a simple constructor works fine.</p>
+          <p><strong>Why Bad:</strong> Builder adds a class, an allocation, and cognitive overhead for zero benefit. It's <span class="tooltip-trigger">over-engineering<span class="tooltip-content">Adding unnecessary complexity for problems that don't exist — a Builder for a 2-property class adds a class, allocation, and cognitive overhead for zero benefit.</span></span> at its worst.</p>
+          <p><strong>Fix:</strong> Only reach for Builder at 4+ optional parameters or when cross-field validation is needed. If the constructor has 2-3 well-named params, skip it.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-3 text-red" aria-hidden="true"></i> No Build Validation
-      </h3>
-      <div class="card-body">
-        <p class="body-text">A <code>Build()</code> that blindly assembles the product without checking required fields or invariants. The whole point of Builder is to validate <em>before</em> creating — if <code>Build()</code> doesn't validate, you just have a fancy constructor wrapper with extra steps.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> No Build Validation</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> A <code>Build()</code> method that blindly assembles the product without checking required fields or invariants.</p>
+          <p><strong>Why Bad:</strong> The whole point of Builder is to validate <em>before</em> creating — without validation, you just have a fancy constructor wrapper with extra steps.</p>
+          <p><strong>Fix:</strong> Always validate required fields and cross-field constraints inside <code>Build()</code> before constructing the product. Throw descriptive exceptions for missing or invalid state.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-4 text-red" aria-hidden="true"></i> Mutable Product
-      </h3>
-      <div class="card-body">
-        <p class="body-text">Exposing public setters on the Product after <code>Build()</code>. If the product can be mutated, the Builder's validation guarantees are worthless — anyone can bypass them. Use <code>init</code>, <code>readonly</code>, <code>record</code>, or <code>internal</code> constructors to lock down the product.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Mutable Product</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> Exposing public setters on the Product after <code>Build()</code>.</p>
+          <p><strong>Why Bad:</strong> If the product can be mutated, the Builder's validation guarantees are worthless — anyone can bypass them by changing properties directly.</p>
+          <p><strong>Fix:</strong> Use <code>init</code>, <code>readonly</code>, <code>record</code>, or <code>internal</code> constructors to lock down the product after creation.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-5 text-red" aria-hidden="true"></i> Shared Builder State
-      </h3>
-      <div class="card-body">
-        <p class="body-text">Registering a Builder as Singleton in <span class="tooltip-trigger">DI<span class="tooltip-content">Dependency Injection — the technique of providing dependencies to a class from outside rather than having the class create them itself.</span></span>. Builders are mutable by design — sharing them across threads or requests guarantees data corruption. Always Transient or just <code>new</code> them up.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Shared Builder State</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> Registering a Builder as Singleton in <span class="tooltip-trigger">DI<span class="tooltip-content">Dependency Injection — the technique of providing dependencies to a class from outside rather than having the class create them itself.</span></span>.</p>
+          <p><strong>Why Bad:</strong> Builders are mutable by design — sharing them across threads or requests guarantees data corruption.</p>
+          <p><strong>Fix:</strong> Always register builders as Transient, or just <code>new</code> them up directly. Each usage needs its own fresh instance.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-6 text-red" aria-hidden="true"></i> Exposing Internal Collections
-      </h3>
-      <div class="card-body">
-        <p class="body-text">The builder's <code>List&lt;T&gt;</code> is directly assigned to the Product without a defensive copy. Callers who keep a reference to the builder can mutate the product's collection after <code>Build()</code>. Always create a new collection: <code>AllowedOrigins = new List&lt;string&gt;(origins)</code> or use <code>.AsReadOnly()</code>.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Exposing Internal Collections</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> The builder's <code>List&lt;T&gt;</code> is directly assigned to the Product without a defensive copy.</p>
+          <p><strong>Why Bad:</strong> Callers who keep a reference to the builder can mutate the product's collection after <code>Build()</code>, breaking immutability.</p>
+          <p><strong>Fix:</strong> Always create a new collection: <code>AllowedOrigins = new List&lt;string&gt;(origins)</code> or use <code>.AsReadOnly()</code>.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-7 text-red" aria-hidden="true"></i> Return Type Loses Fluency
-      </h3>
-      <div class="card-body">
-        <p class="body-text">Builder methods return <code>IBuilder</code> (the interface) instead of the concrete type. This breaks fluency when subclasses add extra methods — the chain loses access to the subclass methods. Use <span class="tooltip-trigger">CRTP<span class="tooltip-content">Curiously Recurring Template Pattern — a C# technique where a base class takes its subclass as a generic parameter: class Builder&lt;T&gt; where T : Builder&lt;T&gt;. Enables fluent method chains that preserve the subclass type.</span></span> (see Q17 in <span class="tooltip-trigger">Interview Q&amp;As<span class="tooltip-content">Section 17 below — covers the generic base Builder implementation with CRTP in detail with code examples.</span></span>) or return the concrete builder type.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Return Type Loses Fluency</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> Builder methods return <code>IBuilder</code> (the interface) instead of the concrete type.</p>
+          <p><strong>Why Bad:</strong> This breaks fluency when subclasses add extra methods — the chain loses access to the subclass methods after calling a base method.</p>
+          <p><strong>Fix:</strong> Use <span class="tooltip-trigger">CRTP<span class="tooltip-content">Curiously Recurring Template Pattern — a C# technique where a base class takes its subclass as a generic parameter: class Builder&lt;T&gt; where T : Builder&lt;T&gt;. Enables fluent method chains that preserve the subclass type.</span></span> (see Q17 in <span class="tooltip-trigger">Interview Q&amp;As<span class="tooltip-content">Section 17 below — covers the generic base Builder implementation with CRTP in detail with code examples.</span></span>) or return the concrete builder type directly.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-8 text-red" aria-hidden="true"></i> Builder With Side Effects
-      </h3>
-      <div class="card-body">
-        <p class="body-text">Build steps that make HTTP calls, write to databases, or send messages. Builder steps should only accumulate configuration — <strong>never</strong> perform I/O. Side effects belong in the Director or in a separate Execute/Run method after Build.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Builder With Side Effects</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> Build steps that make HTTP calls, write to databases, or send messages.</p>
+          <p><strong>Why Bad:</strong> Builder steps should only accumulate configuration. Side effects during construction make builders unpredictable, untestable, and order-dependent.</p>
+          <p><strong>Fix:</strong> Keep build steps pure — <strong>never</strong> perform I/O. Side effects belong in the Director or in a separate Execute/Run method after <code>Build()</code>.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-9 text-red" aria-hidden="true"></i> Build() Called Multiple Times
-      </h3>
-      <div class="card-body">
-        <p class="body-text">A builder that allows <code>Build()</code> to be called repeatedly but produces <em>unpredictable</em> results because internal state mutates between calls (e.g., accumulating collections without Reset). This is confusing. <strong>Two valid approaches:</strong> (1) make the builder single-use (throw on second <code>Build()</code> call), or (2) ensure each <code>Build()</code> produces an independent snapshot by defensively copying all state — which is also the correct way to test immutability (see Testing Strategy 3).</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Build() Called Multiple Times</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> A builder that allows <code>Build()</code> to be called repeatedly but produces <em>unpredictable</em> results because internal state mutates between calls (e.g., accumulating collections without Reset).</p>
+          <p><strong>Why Bad:</strong> Callers expect each <code>Build()</code> to produce a consistent, independent product. Accumulated state leads to subtle, hard-to-debug differences.</p>
+          <p><strong>Fix:</strong> Either (1) make the builder single-use (throw on second <code>Build()</code> call), or (2) ensure each <code>Build()</code> produces an independent snapshot by defensively copying all state.</p>
+        </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <span class="text-red" style="font-weight:800;margin-right:0.3rem" aria-hidden="true">10</span> Using Builder Instead of with-Expression
-      </h3>
-      <div class="card-body">
-        <p class="body-text">In C# 9+, if your Product is a <code>record</code>, you can create modified copies with <span class="tooltip-trigger"><code>with</code>-expression<span class="tooltip-content">C# 9+ syntax for creating a copy of a record with some properties changed: var copy = original with { Name = "new" }. Non-destructive mutation.</span></span>: <code>var updated = original with { Name = "new" }</code>. Don't build a full Builder just to change one field on an existing object — <code>with</code> is built for this.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-triangle-exclamation text-yellow icon-gap"></i> Using Builder Instead of with-Expression</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Mistake:</strong> Building a full Builder just to change one field on an existing record object.</p>
+          <p><strong>Why Bad:</strong> In C# 9+, records support <span class="tooltip-trigger"><code>with</code>-expression<span class="tooltip-content">C# 9+ syntax for creating a copy of a record with some properties changed: var copy = original with { Name = "new" }. Non-destructive mutation.</span></span> for exactly this purpose: <code>var updated = original with { Name = "new" }</code>. A Builder adds unnecessary complexity.</p>
+          <p><strong>Fix:</strong> Use <code>with</code>-expressions for modifying copies of existing records. Reserve Builder for constructing from scratch with validation and multi-step logic.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -4125,7 +4211,7 @@ Console.WriteLine(devJson);
       <div class="section-icon blue"><i class="fa-solid fa-signs-post"></i></div>
       <div>
         <div class="section-num">Section 24</div>
-        <h2 class="section-title">Related Topics</h2>
+        <h2 class="section-title">Related Topics / What to Study Next</h2>
       </div>
     </div>
 

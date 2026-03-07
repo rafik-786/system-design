@@ -36,7 +36,7 @@
   <div class="relative z-1">
     <div class="hero-badge"><i class="fa-solid fa-gem"></i> GoF Creational Pattern</div>
     <h1>Factory Method</h1>
-    <p class="hero-subtitle">Defines an interface for creating an object, but lets subclasses decide which class to instantiate</p>
+    <p class="hero-subtitle">Instead of creating objects yourself, ask a factory to make them for you — and the factory decides which exact type to give back.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-comments"></i> 29 Q&As</span>
       <span><i class="fa-solid fa-bug"></i> 6 Bug Studies</span>
@@ -61,13 +61,13 @@
 
     <div class="callout callout-red mb-md">
       <i class="fa-solid fa-triangle-exclamation icon-gap"></i>
-      <strong>Modern .NET stance:</strong> If you're just wrapping <code>new ConcreteType()</code> behind a method, you probably just need <code>services.AddTransient&lt;IService, ConcreteService&gt;()</code>. Factory Method shines when the <em>choice</em> of which concrete type to create depends on <strong><span class="tooltip-trigger">runtime data<span class="tooltip-content">Data that is only known when the program is executing (e.g., user input, config values, API responses) — not available at compile time.</span></span></strong> — not when there's only one implementation. This page teaches both the <span class="tooltip-trigger">GoF<span class="tooltip-content">Gang of Four — the four authors of "Design Patterns" (1994), the definitive catalog of 23 design patterns.</span></span> pattern and modern .NET idioms so you ace the interview and write production-grade code.
+      <strong>Quick note:</strong> If you only have ONE type to create, you don't need a factory — just register it in DI directly. Factory Method shines when the <em>choice</em> of what to create depends on something you only know at runtime — like user input, a config setting, or which environment you're in. This page teaches both the classic pattern and the modern .NET approach.
     </div>
 
     <div class="tldr-card">
-      <p><strong>What:</strong> Factory Method defines an interface for creating objects, but lets subclasses (or implementations) decide which concrete class to instantiate.</p>
-      <p><strong>When:</strong> Use when a runtime value — user input, config, environment — determines which type to create.</p>
-      <p><strong>Modern .NET:</strong> Use <code>IHttpClientFactory</code>, <code>IDbContextFactory&lt;T&gt;</code>, or register a <code>Func&lt;TKey, IProduct&gt;</code> delegate in <span class="tooltip-trigger">DI<span class="tooltip-content">Dependency Injection — a technique where an object receives its dependencies from an external source rather than creating them itself.</span></span>.</p>
+      <p><strong>What:</strong> Normally when you need an object, you write <code>new SomeClass()</code> directly. But what if you don't know <em>which</em> class to create until the program is running? Maybe the user picked "Email" notification, or the config says "use PostgreSQL." Factory Method solves this: instead of deciding yourself, you ask a factory — and the factory figures out which specific class to create and hand back.</p>
+      <p><strong>When:</strong> Use it whenever the type of object you need depends on something that can change — user choice, configuration, environment, or business rules.</p>
+      <p><strong>In C# / .NET:</strong> The framework already has built-in factories like <code>IHttpClientFactory</code> (creates HTTP clients) and <code>IDbContextFactory&lt;T&gt;</code> (creates database contexts). For your own code, you can build a factory class or register a factory function in DI.</p>
       <p><strong>Quick Code:</strong></p>
       <div class="macos-window mt-sm">
         <div class="macos-titlebar">
@@ -108,13 +108,13 @@ public class NotificationFactory(IServiceProvider sp) : INotificationFactory
     </div>
 
     <div class="prereq-card">
-      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before reading this, you should understand:</div>
+      <div class="prereq-title"><i class="fa-solid fa-circle-exclamation"></i> Before diving in:</div>
       <div class="prereq-list">
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Interfaces &amp; <span class="tooltip-trigger">Polymorphism<span class="tooltip-content">The ability of objects to take many forms — calling the same method on different types produces different behavior via interfaces or inheritance.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Dependency Injection</span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <span class="tooltip-trigger">Generics<span class="tooltip-content">A C# feature allowing type-safe classes and methods that work with any data type, using type parameters like &lt;T&gt;.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <span class="tooltip-trigger">Open/Closed Principle<span class="tooltip-content">Software entities should be open for extension but closed for modification — add new behavior without changing existing code.</span></span></span>
-        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> Singleton Pattern</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Interfaces &amp; Polymorphism</strong> — The factory returns objects through an interface, so your code works with any type the factory gives back. If "programming to an interface" is unfamiliar, review that first.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Dependency Injection</strong> — Modern factories in .NET are wired through DI. Knowing how to register and resolve services will help the examples make sense.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Generics</strong> — Factories often use <code>&lt;T&gt;</code> to work with any type. If you can read <code>IFactory&lt;T&gt;</code> and understand the T is a placeholder, you're good.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Open/Closed Principle</strong> — Adding a new product type should mean adding a new class, not editing the existing factory. Understanding this principle helps you see why Factory Method is designed the way it is.</span>
+        <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Singleton Pattern</strong> — Factories are often registered as singletons since they're stateless. Knowing that pattern helps you follow the DI wiring.</span>
       </div>
     </div>
   </div>
@@ -132,16 +132,16 @@ public class NotificationFactory(IServiceProvider sp) : INotificationFactory
     <div class="card open">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="true"><i class="fa-solid fa-utensils" aria-hidden="true"></i> Restaurant Kitchen</h3>
       <div class="card-body">
-        <p class="body-text">You walk into a restaurant and order "burger" from the menu. You don't walk into the kitchen, pick ingredients, fire up the grill, and cook it yourself. The kitchen (factory) decides which chef handles it, which recipe to use, whether it's grilled or smoked. You just get a burger that satisfies the "burger" interface.</p>
+        <p class="body-text">You walk into a restaurant and order "burger" from the menu. You don't go into the kitchen, pick ingredients, and cook it yourself. The kitchen decides which chef handles it, which recipe to use, whether it's grilled or smoked. You just get a burger — you don't know or care how it was made. You just asked for it, and the kitchen figured out the details.</p>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Real World</th><th>Code Concept</th></tr></thead>
+            <thead><tr><th>Restaurant</th><th>What it means</th><th>In code</th></tr></thead>
             <tbody>
-              <tr><td>The menu</td><td>Factory interface (<code>IExporterFactory</code>)</td></tr>
-              <tr><td>"I want a burger"</td><td><code>factory.Create(FoodType.Burger)</code></td></tr>
-              <tr><td>The kitchen decides which chef/recipe</td><td>Factory picks the concrete class</td></tr>
-              <tr><td>You get a burger (don't care how it was made)</td><td>Returns <code>IFood</code> — caller doesn't know the <span class="tooltip-trigger">concrete type<span class="tooltip-content">A non-abstract class that can be instantiated directly — as opposed to an interface or abstract class.</span></span></td></tr>
-              <tr><td>Adding a new dish = new recipe, menu unchanged</td><td>Adding a new product = new class, factory stays open/closed</td></tr>
+              <tr><td>The menu</td><td>The list of things you can ask for</td><td>Factory interface</td></tr>
+              <tr><td>"I want a burger"</td><td>Asking the factory for a specific product</td><td><code>factory.Create("burger")</code></td></tr>
+              <tr><td>Kitchen picks chef + recipe</td><td>Factory decides which class to create</td><td>Factory implementation logic</td></tr>
+              <tr><td>You get food, don't care how</td><td>Caller gets an object, doesn't know the type</td><td>Returns an interface</td></tr>
+              <tr><td>New dish = new recipe, menu unchanged</td><td>New product type = new class, factory stays the same</td><td>Open/Closed Principle</td></tr>
             </tbody>
           </table>
         </div>
@@ -1087,7 +1087,8 @@ builder.Services.AddAuthentication()
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-arrow-right-arrow-left text-cyan" aria-hidden="true"></i> IServiceScopeFactory — Manual DI Scopes</h3>
       <div class="card-body">
-        <p class="body-text">When a Singleton needs to use Scoped services (like <code>DbContext</code>), it creates a manual scope. The factory pattern prevents the <span class="tooltip-trigger">captive dependency<span class="tooltip-content">A scoped or transient service accidentally captured by a singleton, causing it to live far longer than intended.</span></span> bug.</p>
+        <p class="body-text">When a Singleton needs to use Scoped services (like <code>DbContext</code>), it creates a manual scope.<br>
+        The factory pattern prevents the <span class="tooltip-trigger">captive dependency<span class="tooltip-content">A scoped or transient service accidentally captured by a singleton, causing it to live far longer than intended.</span></span> bug.</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ScopeFactory.cs</span></div>
           <div class="macos-body">
@@ -1117,7 +1118,8 @@ public class OrderCleanupService(
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-gear text-purple" aria-hidden="true"></i> IOptionsFactory&lt;T&gt; — Configuration Object Creation</h3>
       <div class="card-body">
-        <p class="body-text">Every time you use <code>IOptions&lt;T&gt;</code>, the framework's <code>IOptionsFactory&lt;T&gt;</code> creates and validates your settings object. It runs <code>IConfigureOptions&lt;T&gt;</code>, <code>IPostConfigureOptions&lt;T&gt;</code>, and <code>IValidateOptions&lt;T&gt;</code> in order.</p>
+        <p class="body-text">Every time you use <code>IOptions&lt;T&gt;</code>, the framework's <code>IOptionsFactory&lt;T&gt;</code> creates and validates your settings object.<br>
+        It runs <code>IConfigureOptions&lt;T&gt;</code>, <code>IPostConfigureOptions&lt;T&gt;</code>, and <code>IValidateOptions&lt;T&gt;</code> in order.</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OptionsFactory.cs</span></div>
           <div class="macos-body">
@@ -1222,7 +1224,8 @@ app.MapHealthChecks("/health/ready", new() { Predicate = r =&gt; r.Tags.Contains
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-envelope text-yellow" aria-hidden="true"></i> IMiddlewareFactory — Per-Request Middleware Creation</h3>
       <div class="card-body">
-        <p class="body-text">ASP.NET Core's <span class="tooltip-trigger">middleware<span class="tooltip-content">A component in the ASP.NET Core request pipeline that processes HTTP requests and responses.</span></span> pipeline uses <code>IMiddlewareFactory</code> to create middleware instances per request (when using <code>UseMiddleware&lt;T&gt;()</code> with class-based middleware). Convention-based middleware is Singleton; factory-based middleware is per-request.</p>
+        <p class="body-text">ASP.NET Core's <span class="tooltip-trigger">middleware<span class="tooltip-content">A component in the ASP.NET Core request pipeline that processes HTTP requests and responses.</span></span> pipeline uses <code>IMiddlewareFactory</code> to create middleware instances per request (when using <code>UseMiddleware&lt;T&gt;()</code> with class-based middleware).<br>
+        Convention-based middleware is Singleton; factory-based middleware is per-request.</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MiddlewareFactory.cs</span></div>
           <div class="macos-body">
@@ -1572,7 +1575,9 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-          <p class="body-text">If your factory injects <code>IServiceProvider</code>, it's a Service Locator in disguise. Inject specific factory interfaces or <code>IServiceScopeFactory</code> instead. Enable <span class="tooltip-trigger"><code>ValidateScopes = true</code><span class="tooltip-content">A DI container option that detects when scoped services are resolved from the root scope — catches captive dependency bugs.</span></span> in development to catch this at startup.</p>
+          <p class="body-text">If your factory injects <code>IServiceProvider</code>, it's a Service Locator in disguise.<br>
+          Inject specific factory interfaces or <code>IServiceScopeFactory</code> instead.<br>
+          Enable <span class="tooltip-trigger"><code>ValidateScopes = true</code><span class="tooltip-content">A DI container option that detects when scoped services are resolved from the root scope — catches captive dependency bugs.</span></span> in development to catch this at startup.</p>
         </div>
       </div>
     </div>
@@ -1583,7 +1588,10 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, SaaS platform, .NET 8.</strong> <code>ReportFactory</code> was registered as Singleton (for performance). It created <code>ReportGenerator</code> instances that depended on <code>DbContext</code> (Scoped). The generator held a stale DbContext across requests. First report — perfect. Second report — <code>ObjectDisposedException</code>. Third report — returned data from the first request's DbContext cache. Users saw other users' financial reports.</p>
+          <p class="body-text"><strong>2024, SaaS platform, .NET 8.</strong> <code>ReportFactory</code> was registered as Singleton (for performance).<br>
+          It created <code>ReportGenerator</code> instances that depended on <code>DbContext</code> (Scoped). The generator held a stale DbContext across requests.<br>
+          First report — perfect. Second report — <code>ObjectDisposedException</code>.<br><br>
+          Third report — returned data from the first request's DbContext cache. Users saw other users' financial reports.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours. The <code>ObjectDisposedException</code> was the easy clue. The "seeing other users' data" part took longer — it only happened when DbContext's change tracker had cached entities from the previous request.</p>
@@ -1864,7 +1872,9 @@ public IActionResult Export(string format, int reportId)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, microservice, .NET 7.</strong> <code>OrderFactory</code> needed <code>IValidator</code>. <code>ValidatorFactory</code> needed <code>IOrderParser</code>. <code>OrderParserFactory</code> needed <code>IOrderFactory</code>. The DI container threw <code>InvalidOperationException: A circular dependency was detected</code> at startup. The team had refactored three services into factories on the same day — each factory depended on another factory's product.</p>
+          <p class="body-text"><strong>2023, microservice, .NET 7.</strong> <code>OrderFactory</code> needed <code>IValidator</code>. <code>ValidatorFactory</code> needed <code>IOrderParser</code>. <code>OrderParserFactory</code> needed <code>IOrderFactory</code>.<br>
+          The DI container threw <code>InvalidOperationException: A circular dependency was detected</code> at startup.<br><br>
+          The team had refactored three services into factories on the same day — each factory depended on another factory's product.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">20 minutes — the error message was clear. But 3 hours to untangle the circular design.</p>
@@ -2262,8 +2272,10 @@ public class ExporterFactory(IConfiguration config) : IExporterFactory
 }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Renaming a config key breaks the factory silently (<code>null</code> values). Factory shouldn't know config structure — that's the <span class="tooltip-trigger">Options pattern<span class="tooltip-content">A .NET pattern for accessing configuration using strongly-typed classes injected via IOptions&lt;T&gt;.</span></span>'s job.</p>
-          <p class="body-text"><strong>Fix:</strong> Inject <code>IOptions&lt;ExporterSettings&gt;</code> or <code>IOptionsSnapshot&lt;ExporterSettings&gt;</code>. Let the options layer own the config shape, validate with <span class="tooltip-trigger"><code>ValidateOnStart()</code><span class="tooltip-content">A .NET option that validates configuration at app startup, failing fast instead of at the first request.</span></span>, and give the factory a strongly-typed <span class="tooltip-trigger">POCO<span class="tooltip-content">Plain Old CLR Object — a simple class with properties and no framework dependencies.</span></span>.</p>
+          <p class="body-text"><strong>Why Bad:</strong> Renaming a config key breaks the factory silently (<code>null</code> values).<br>
+          Factory shouldn't know config structure — that's the <span class="tooltip-trigger">Options pattern<span class="tooltip-content">A .NET pattern for accessing configuration using strongly-typed classes injected via IOptions&lt;T&gt;.</span></span>'s job.</p>
+          <p class="body-text"><strong>Fix:</strong> Inject <code>IOptions&lt;ExporterSettings&gt;</code> or <code>IOptionsSnapshot&lt;ExporterSettings&gt;</code>.<br>
+          Let the options layer own the config shape, validate with <span class="tooltip-trigger"><code>ValidateOnStart()</code><span class="tooltip-content">A .NET option that validates configuration at app startup, failing fast instead of at the first request.</span></span>, and give the factory a strongly-typed <span class="tooltip-trigger">POCO<span class="tooltip-content">Plain Old CLR Object — a simple class with properties and no framework dependencies.</span></span>.</p>
         </div>
       </div>
     </div>
@@ -2473,7 +2485,8 @@ builder.Services.AddSingleton&lt;Func&lt;ExportFormat, IExporter&gt;&gt;(sp => f
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-recycle text-green" aria-hidden="true"></i> Object Pooling as Factory Pattern</h3>
       <div class="card-body">
-        <p class="body-text"><span class="tooltip-trigger"><code>ObjectPool&lt;T&gt;</code><span class="tooltip-content">A pattern that reuses pre-created objects from a pool instead of allocating new ones, reducing GC pressure.</span></span> (Microsoft.Extensions.ObjectPool) is a factory that <em>reuses</em> instances instead of creating new ones. 10x less <span class="tooltip-trigger">GC pressure<span class="tooltip-content">The rate at which short-lived objects are allocated, forcing frequent garbage collections that pause the application.</span></span> for heavy objects.</p>
+        <p class="body-text"><span class="tooltip-trigger"><code>ObjectPool&lt;T&gt;</code><span class="tooltip-content">A pattern that reuses pre-created objects from a pool instead of allocating new ones, reducing GC pressure.</span></span> (Microsoft.Extensions.ObjectPool) is a factory that <em>reuses</em> instances instead of creating new ones.<br>
+        10x less <span class="tooltip-trigger">GC pressure<span class="tooltip-content">The rate at which short-lived objects are allocated, forcing frequent garbage collections that pause the application.</span></span> for heavy objects.</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ObjectPool.cs</span></div>
           <div class="macos-body">
@@ -2508,7 +2521,8 @@ public string BuildReport(ObjectPool&lt;StringBuilder&gt; pool, ReportData data)
         <p class="body-text">Source generators can produce factory code at compile time — zero reflection, zero runtime cost. The generated code is just a switch statement with direct <code>new</code> calls, but you didn't have to write or maintain it.</p>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> When to Consider</div>
-          <p class="body-text">If you have 10+ factory products and performance matters, a source generator that scans for <code>[FactoryProduct]</code> attributes and generates the switch statement is worth the setup cost. For 3-5 products, manual code is simpler.</p>
+          <p class="body-text">If you have 10+ factory products and performance matters, a source generator that scans for <code>[FactoryProduct]</code> attributes and generates the switch statement is worth the setup cost.<br>
+          For 3-5 products, manual code is simpler.</p>
         </div>
       </div>
     </div>
@@ -2578,7 +2592,9 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
             </tbody>
           </table>
         </div>
-        <p class="body-text mt-sm"><strong>Build once, read forever:</strong> Call <code>.ToFrozenDictionary()</code> in the factory constructor. The construction is ~10x slower than <code>Dictionary</code>, but lookups are 2-3x faster. For a Singleton factory that lives for the app's lifetime and serves millions of requests, this is pure win.</p>
+        <p class="body-text mt-sm"><strong>Build once, read forever:</strong> Call <code>.ToFrozenDictionary()</code> in the factory constructor.<br>
+        The construction is ~10x slower than <code>Dictionary</code>, but lookups are 2-3x faster.<br>
+        For a Singleton factory that lives for the app's lifetime and serves millions of requests, this is pure win.</p>
       </div>
     </div>
   </div>
@@ -3975,7 +3991,9 @@ public class Repository&lt;T&gt;(AppDbContext db) : IRepository&lt;T&gt; where T
         </div>
         <div class="callout callout-warning mt-sm">
           <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> When It Fails</div>
-          <p class="body-text"><strong>Constraint mismatch:</strong> <code>where T : class</code> but you request <code>IRepository&lt;int&gt;</code> → runtime error. <strong>Missing nested generics:</strong> <code>IRepository&lt;Wrapper&lt;T&gt;&gt;</code> doesn't match <code>IRepository&lt;&gt;</code>. <strong>Constructor not resolvable:</strong> <code>Repository&lt;T&gt;</code> has a dependency the container can't fulfill for that specific <code>T</code>.</p>
+          <p class="body-text"><strong>Constraint mismatch:</strong> <code>where T : class</code> but you request <code>IRepository&lt;int&gt;</code> → runtime error.<br>
+          <strong>Missing nested generics:</strong> <code>IRepository&lt;Wrapper&lt;T&gt;&gt;</code> doesn't match <code>IRepository&lt;&gt;</code>.<br>
+          <strong>Constructor not resolvable:</strong> <code>Repository&lt;T&gt;</code> has a dependency the container can't fulfill for that specific <code>T</code>.</p>
         </div>
       </div>
     </div>
@@ -3983,7 +4001,8 @@ public class Repository&lt;T&gt;(AppDbContext db) : IRepository&lt;T&gt; where T
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false"><i class="fa-solid fa-code text-green" aria-hidden="true"></i> Func&lt;T&gt; as Lightweight Factory</h3>
       <div class="card-body">
-        <p class="body-text">Register a <code>Func&lt;T&gt;</code> in DI to create a factory without a separate class. The container doesn't natively support <code>Func&lt;T&gt;</code> — you register it explicitly:</p>
+        <p class="body-text">Register a <code>Func&lt;T&gt;</code> in DI to create a factory without a separate class.<br>
+        The container doesn't natively support <code>Func&lt;T&gt;</code> — you register it explicitly:</p>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FuncFactory.cs</span></div>
           <div class="macos-body">
@@ -4012,7 +4031,8 @@ public class NotificationService(Func&lt;NotificationType, INotification&gt; fac
 }</code></pre>
           </div>
         </div>
-        <p class="body-text mt-md"><strong>When <code>Func&lt;T&gt;</code> is enough:</strong> simple key→type mapping, no complex creation logic, no need to mock in tests. <strong>When you need <code>IFactory&lt;T&gt;</code>:</strong> complex creation, parameterized construction, cross-cutting concerns, or testability requirements.</p>
+        <p class="body-text mt-md"><strong>When <code>Func&lt;T&gt;</code> is enough:</strong> simple key→type mapping, no complex creation logic, no need to mock in tests.<br>
+        <strong>When you need <code>IFactory&lt;T&gt;</code>:</strong> complex creation, parameterized construction, cross-cutting concerns, or testability requirements.</p>
       </div>
     </div>
 

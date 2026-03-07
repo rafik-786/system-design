@@ -36,7 +36,7 @@
   <div class="relative z-1">
     <div class="hero-badge"><i class="fa-solid fa-chess-pawn"></i> GoF Behavioral Pattern</div>
     <h1>Strategy Pattern</h1>
-    <p class="hero-subtitle">Define a family of algorithms, encapsulate each one, and make them interchangeable. Strategy lets the algorithm vary independently from clients that use it — GoF, 1994</p>
+    <p class="hero-subtitle">Same problem, different ways to solve it — and you can swap them without changing anything else. That's Strategy.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-comments"></i> 29 Q&amp;As</span>
       <span><i class="fa-solid fa-bug"></i> 6 Bug Studies</span>
@@ -61,13 +61,13 @@
 
     <div class="callout callout-blue mb-md">
       <i class="fa-solid fa-circle-info icon-gap"></i>
-      <strong>You already use Strategy every day — you just call it "passing a lambda."</strong> That <code>OrderBy(x => x.Name)</code>? Strategy pattern. That <span class="tooltip-trigger">IComparer&lt;T&gt;<span class="tooltip-content">System.Collections.Generic.IComparer&lt;T&gt; — a built-in .NET interface with one method: Compare(T x, T y). Every time you pass a custom comparer to Sort() or OrderBy(), you're using the Strategy pattern. The framework is the Context, and your comparer is the ConcreteStrategy.</span></span> you pass to <code>Sort()</code>? Strategy. The <span class="tooltip-trigger">Func&lt;T, bool&gt;<span class="tooltip-content">A delegate type representing a function that takes a T and returns a bool. When you write .Where(x => x.IsActive), that lambda IS a strategy — it encapsulates a filtering algorithm that can be swapped without changing the LINQ pipeline.</span></span> powering every <code>.Where()</code> call? Strategy. The pattern isn't exotic — it's the backbone of .NET's most-used APIs. The question is whether you're using it <strong>intentionally</strong> to eliminate those 500-line switch statements, or just accidentally through LINQ.
+      <strong>You already use Strategy every day — you just don't call it that.</strong> When you tell Google Maps "avoid highways" or pick "sort by price" on Amazon, you're choosing a strategy. In code, every time you pass a different sorting rule, payment method, or filtering logic — that's the Strategy pattern at work. It's one of the most practical patterns you'll ever learn.
     </div>
 
     <div class="tldr-card">
-      <p><strong>What:</strong> Strategy extracts a <span class="tooltip-trigger">family of algorithms<span class="tooltip-content">A set of interchangeable behaviors that solve the same problem differently. Payment processing (CreditCard, PayPal, Bitcoin), sorting (QuickSort, MergeSort), discount calculation (Percentage, Flat, BOGO) — each family shares a common interface but varies in implementation.</span></span> into separate classes behind a common interface. The client (<span class="tooltip-trigger">Context<span class="tooltip-content">The class that holds a reference to the strategy interface and delegates algorithm execution to it. The Context is the "user" of the strategy — it calls IStrategy.Execute() without knowing which implementation runs. In DI terms, the Context receives the strategy through constructor injection.</span></span>) delegates the work to whichever strategy is injected — it never knows (or cares) which concrete algorithm runs.</p>
-      <p><strong>When:</strong> Use when you have multiple ways to do the same thing and the choice happens at <span class="tooltip-trigger">runtime<span class="tooltip-content">The algorithm selection depends on user input, configuration, feature flags, A/B testing, or business rules that can change without redeployment. If the choice is always the same and known at compile time, Strategy adds unnecessary indirection.</span></span> — payment processing, discount calculation, notification routing, file compression, report generation, or any behavior that varies by user, configuration, or context.</p>
-      <p><strong>Modern .NET:</strong> Use <code>interface</code>-based strategies for complex algorithms with dependencies, <span class="tooltip-trigger">Func&lt;T&gt; delegates<span class="tooltip-content">For simple, stateless strategies (one-liner lambdas), Func&lt;T&gt; or Action&lt;T&gt; is lighter than a full interface + class. But once the strategy needs its own dependencies (ILogger, IOptions, HttpClient), promote it to a proper class behind an interface.</span></span> for simple stateless lambdas, and <span class="tooltip-trigger">.NET 8 Keyed Services<span class="tooltip-content">builder.Services.AddKeyedScoped&lt;IStrategy, ConcreteA&gt;("keyA") lets you register multiple implementations of the same interface with string/enum keys. Resolve with [FromKeyedServices("keyA")] or IServiceProvider.GetKeyedService&lt;IStrategy&gt;("keyA"). Perfect for Strategy pattern — no manual factory needed.</span></span> to resolve the right strategy by key from DI.</p>
+      <p><strong>What:</strong> Imagine you have a problem that can be solved in several different ways. Instead of cramming all those approaches into one big class with a bunch of <code>if/else</code> or <code>switch</code> statements, you pull each approach out into its own class. They all follow the same <span class="tooltip-trigger">contract<span class="tooltip-content">A "contract" in code is an agreement: "any class that implements this interface promises to have these methods." For Strategy, the contract might be "you must have a Process() method that takes an amount and returns a result." Any payment method — credit card, PayPal, Bitcoin — can fulfill that contract in its own way.</span></span> (interface), so you can swap one for another without changing the code that uses them. The class that <em>uses</em> the strategy (called the <span class="tooltip-trigger">Context<span class="tooltip-content">The "user" of the strategy. It holds a reference to the strategy interface and calls it when needed. Think of a checkout page — it doesn't know HOW payment works, it just calls "process payment" and trusts that the right strategy handles it.</span></span>) just says "do the thing" — it doesn't know or care which specific approach is running.</p>
+      <p><strong>When:</strong> Use it whenever you have multiple ways to do the same thing and the choice depends on the situation — the user picks a payment method, the config says which shipping provider to use, a feature flag switches between algorithms. If the behavior can change at <span class="tooltip-trigger">runtime<span class="tooltip-content">Meaning the choice is made while the program is running (based on user input, settings, etc.), not hardcoded into the source. This is what makes Strategy different from just having separate methods — the decision happens dynamically.</span></span>, Strategy is your friend.</p>
+      <p><strong>In C# / .NET:</strong> You can build strategies as full classes behind an interface (best for complex logic), as simple <span class="tooltip-trigger">lambda functions<span class="tooltip-content">Short inline functions like x => x.Price > 100. For simple one-liner strategies, a lambda is lighter than creating a whole class. But once the logic needs its own services (database, logger, HTTP client), promote it to a proper class.</span></span> (best for simple one-liners), or resolve them automatically using .NET 8's <span class="tooltip-trigger">Keyed Services<span class="tooltip-content">A .NET 8 feature that lets you register multiple implementations of the same interface, each with a unique key (like "creditcard" or "paypal"). The framework picks the right one based on the key — no manual factory needed.</span></span> from the dependency injection container.</p>
       <p><strong>Quick Code:</strong></p>
       <div class="macos-window mt-sm">
         <div class="macos-titlebar">
@@ -124,13 +124,13 @@ builder.Services.AddScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;();
 
     <div class="callout callout-blue mb-md">
       <i class="fa-solid fa-circle-info icon-gap"></i>
-      <strong>Before reading this page, make sure you understand:</strong>
+      <strong>Before diving in:</strong> Strategy is one of the simpler patterns to understand, but these foundations will help the C# examples click right away.
     </div>
     <div class="prereq-list">
-      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Interfaces &amp; Polymorphism</strong> — Strategy is built on the idea that you program to an interface. If you don't understand how <code>interface</code> and polymorphic dispatch work in C#, start there.</span>
-      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Dependency Inversion Principle (DIP)</strong> — Strategy is DIP in action: the Context depends on an abstraction (<code>IStrategy</code>), not a concrete algorithm. Understanding <span class="tooltip-trigger">why dependency arrows should point toward abstractions<span class="tooltip-content">DIP says high-level modules (business logic) should not depend on low-level modules (algorithm implementations). Both should depend on abstractions. Strategy enforces this — the Context never references CreditCardStrategy directly, only IPaymentStrategy.</span></span> makes the pattern click instantly.</span>
-      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Dependency Injection basics</strong> — Know how <code>IServiceCollection</code> registers and resolves services. Strategy strategies are typically resolved via DI, so understanding <span class="tooltip-trigger">lifetimes<span class="tooltip-content">Transient (new instance per request), Scoped (one per HTTP request), Singleton (one for app lifetime). Stateless strategies are typically Singleton or Transient. Stateful strategies must be Transient or Scoped to avoid thread-safety bugs.</span></span> (Transient, Scoped, Singleton) is essential.</span>
-      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Delegates &amp; Lambdas</strong> — C# supports lightweight strategies via <code>Func&lt;T&gt;</code> and <code>Action&lt;T&gt;</code>. Understanding <span class="tooltip-trigger">delegate types<span class="tooltip-content">Func&lt;T, TResult&gt; represents a function, Action&lt;T&gt; represents a void-returning method. These are C#'s built-in "single-method interfaces" — perfect for simple strategies that don't need their own dependencies.</span></span> helps you decide when a full interface is overkill.</span>
+      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Interfaces &amp; Polymorphism</strong> — Strategy relies on a key idea: your code talks to a contract (interface), not to a specific class. This is how you swap one strategy for another without changing the code that uses it. If "programming to an interface" feels unfamiliar, review that concept first.</span>
+      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Dependency Inversion Principle (DIP)</strong> — Strategy is a real-world example of DIP: your business logic depends on an abstraction ("process this payment"), not on a specific implementation ("call the Stripe API"). If you understand <span class="tooltip-trigger">why that matters<span class="tooltip-content">Without DIP, changing from Stripe to PayPal means editing your checkout logic. With DIP (and Strategy), your checkout just says "process payment" through the interface — you swap the implementation elsewhere, checkout code never changes.</span></span>, the pattern will click instantly.</span>
+      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Dependency Injection basics</strong> — In .NET, strategies are usually wired up through the DI container. Knowing how to register a service and what <span class="tooltip-trigger">lifetimes<span class="tooltip-content">How long the framework keeps an instance alive. Transient = create a new one every time it's needed. Scoped = one per web request. Singleton = one for the entire app. Most strategies are stateless, so Singleton or Transient work fine.</span></span> mean (Transient, Scoped, Singleton) will help you follow the wiring examples.</span>
+      <span class="prereq-item"><i class="fa-solid fa-arrow-right"></i> <strong>Delegates &amp; Lambdas</strong> — For simple strategies (one-liners), C# lets you skip the full class and just pass a function directly. Understanding <span class="tooltip-trigger">lambdas<span class="tooltip-content">A short inline function like x => x.Price > 100. Think of it as a "mini strategy" — you're passing behavior as a value. Great for simple cases, but when the logic gets complex, promote it to a full class behind an interface.</span></span> helps you decide when a full interface is overkill vs. when a simple function will do.</span>
     </div>
   </div>
 
@@ -149,16 +149,17 @@ builder.Services.AddScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;();
         <i class="fa-solid fa-map-location-dot text-blue" aria-hidden="true"></i> GPS Navigation (Primary)
       </h3>
       <div class="card-body">
-        <p class="body-text">You type a destination into Google Maps. The app asks: <strong>Fastest route? Shortest distance? Avoid highways? Scenic route?</strong> The destination (your goal) doesn't change — but the <em>algorithm</em> for getting there is completely different. The "fastest" strategy takes highways and tolerates tolls. The "shortest" strategy cuts through neighborhoods. The "scenic" strategy follows coastal roads. Google Maps is the <span class="tooltip-trigger">Context<span class="tooltip-content">In the Strategy pattern, the Context is the class that holds a reference to the strategy interface and delegates algorithm execution to it. It doesn't know which concrete strategy runs — it just calls the interface method. Google Maps doesn't care HOW the route is calculated, it just displays the result.</span></span> — it doesn't contain route-calculation logic itself. It delegates to whichever routing strategy you select. Adding a new strategy (e.g., "eco-friendly route") doesn't require rewriting the Maps app — you just plug in a new algorithm.</p>
+        <p class="body-text">You type a destination into Google Maps. The app asks: <strong>Fastest route? Shortest distance? Avoid highways? Scenic route?</strong> Your destination doesn't change — but the <em>way you get there</em> is completely different. "Fastest" takes highways and tolerates tolls. "Shortest" cuts through neighborhoods. "Scenic" follows coastal roads.</p>
+        <p class="body-text">Notice: the Maps app itself doesn't contain any route-calculation logic. It just delegates to whichever routing approach you selected. And if Google wants to add an "eco-friendly route" option tomorrow? They plug in a new algorithm — the Maps app code doesn't change.</p>
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>Real World</th><th>Code Concept</th></tr></thead>
+            <thead><tr><th>Real World</th><th>What it represents</th><th>In code</th></tr></thead>
             <tbody>
-              <tr><td>Google Maps app</td><td><code>NavigationContext</code> (the Context class)</td></tr>
-              <tr><td>"Calculate route" button</td><td><code>IRouteStrategy.CalculateRoute()</code></td></tr>
-              <tr><td>Fastest / Shortest / Scenic</td><td><code>FastestRoute</code>, <code>ShortestRoute</code>, <code>ScenicRoute</code> (ConcreteStrategies)</td></tr>
-              <tr><td>User picks route type</td><td>DI / factory resolves the right strategy at runtime</td></tr>
-              <tr><td>Adding "Eco-friendly" route</td><td>New class implementing <code>IRouteStrategy</code> — zero changes to Context</td></tr>
+              <tr><td>Google Maps app</td><td>The thing that uses a strategy</td><td>Context class</td></tr>
+              <tr><td>"Calculate route" button</td><td>The shared action all strategies perform</td><td><code>IRouteStrategy.CalculateRoute()</code></td></tr>
+              <tr><td>Fastest / Shortest / Scenic</td><td>Different approaches to the same problem</td><td>Concrete strategy classes</td></tr>
+              <tr><td>User picks route type</td><td>Decision made at runtime</td><td>DI or factory resolves the right strategy</td></tr>
+              <tr><td>Adding "Eco-friendly" route</td><td>New approach, zero changes elsewhere</td><td>New class, same interface</td></tr>
             </tbody>
           </table>
         </div>
@@ -191,7 +192,7 @@ builder.Services.AddScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;();
       </div>
     </div>
 
-    <p class="body-text mb-md">The Strategy pattern has three participants: the <strong>Context</strong> (holds a reference to the strategy), the <strong>Strategy interface</strong> (defines the algorithm contract), and <strong>Concrete Strategies</strong> (implement the algorithm). The Context delegates work to whatever strategy is injected — it never knows which concrete class runs.</p>
+    <p class="body-text mb-md">Strategy has just three moving parts. The <strong>Context</strong> is the class that needs something done (like a checkout page). The <strong>Strategy interface</strong> is the agreement — "any approach must have this method." And the <strong>Concrete Strategies</strong> are the actual approaches (CreditCard, PayPal, Bitcoin). The Context says "process this payment" through the interface — it never knows which specific approach is running behind the scenes.</p>
 
     <div class="macos-window">
       <div class="macos-titlebar">
@@ -895,7 +896,7 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
       </div>
     </div>
 
-    <p class="body-text mb-md">Strategy isn't just a pattern you <em>apply</em> in .NET — it's baked into the <span class="tooltip-trigger">framework<span class="tooltip-content">The .NET Base Class Library (BCL) and ASP.NET Core framework use Strategy pattern extensively. IComparer, IEqualityComparer, IAuthorizationHandler, IValidator, middleware delegates — all are strategy interfaces where the framework is the Context and your implementations are the ConcreteStrategies.</span></span> at every level. These are all Strategy pattern in disguise:</p>
+    <p class="body-text mb-md">You don't always need to build Strategy from scratch — .NET already uses it everywhere. Once you recognize the pattern, you'll see it in sorting, authorization, validation, and more. Here are the places Strategy is hiding in plain sight:</p>
 
     <div class="card open">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
@@ -1261,7 +1262,7 @@ public class NotificationService(IServiceProvider sp)
       </div>
     </div>
 
-    <p class="body-text mb-md">Strategy is one of the most SOLID-friendly patterns. It touches every principle:</p>
+    <p class="body-text mb-md">Strategy is a great example of SOLID principles working together in practice. Here's how each principle shows up:</p>
 
     <div class="table-wrapper">
       <table>
@@ -1303,7 +1304,7 @@ public class NotificationService(IServiceProvider sp)
       <div class="section-icon red"><i class="fa-solid fa-bug"></i></div>
       <div>
         <div class="section-num">Section 12</div>
-        <h2 class="section-title">Bug Studies</h2>
+        <h2 class="section-title">Bug Case Studies</h2>
       </div>
     </div>
 
@@ -1811,7 +1812,7 @@ builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
       <div class="section-icon yellow"><i class="fa-solid fa-triangle-exclamation"></i></div>
       <div>
         <div class="section-num">Section 13</div>
-        <h2 class="section-title">Pitfalls</h2>
+        <h2 class="section-title">Pitfalls &amp; Anti-Patterns</h2>
       </div>
     </div>
 
@@ -2167,7 +2168,7 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
       </div>
     </div>
 
-    <p class="body-text mb-md">Strategy pattern has <strong>negligible overhead</strong> in modern .NET. The JIT compiler is excellent at optimizing interface dispatch. Here's what actually matters:</p>
+    <p class="body-text mb-md">Good news: Strategy adds almost zero performance cost in modern .NET. The runtime is smart enough to optimize interface calls extremely well. Here's what you actually need to know:</p>
 
     <div class="table-wrapper">
       <table>
@@ -2243,7 +2244,7 @@ public void DI_KeyedServices_ResolveCorrectStrategy(string key)
       </div>
     </div>
 
-    <p class="body-text mb-md"><strong>6 Easy</strong> · <strong>12 Medium</strong> · <strong>11 Hard</strong> — 29 total.</p>
+    <p class="body-text mb-md">29 questions interviewers actually ask — grouped by difficulty. Each has a "Think First" prompt (try before peeking!) and a "Great Answer" tip to help you stand out. <strong>6 Easy</strong> · <strong>12 Medium</strong> · <strong>11 Hard</strong>.</p>
 
     <!-- EASY -->
     <h3 class="sub text-green">Easy</h3>
@@ -3049,7 +3050,7 @@ builder.Services.Decorate&lt;IPaymentStrategy, LoggingPaymentDecorator&gt;();</c
       <div class="section-icon yellow"><i class="fa-solid fa-dumbbell"></i></div>
       <div>
         <div class="section-num">Section 18</div>
-        <h2 class="section-title">Exercises</h2>
+        <h2 class="section-title">Practice Exercises</h2>
       </div>
     </div>
 
@@ -3520,7 +3521,7 @@ var strategy = sp.GetRequiredKeyedService&lt;IPaymentStrategy&gt;(PaymentType.Cr
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> When You Still Need a Factory</div>
-          <p class="body-text">Keyed Services replaces simple key→strategy mapping. You still need a custom factory when: the key requires <strong>transformation</strong> (user sends "card", factory maps to "CreditCard"), you need <strong>validation</strong> before resolution, or you want to <strong>enumerate all available strategies</strong> for a dropdown. Keyed Services + thin factory is the modern sweet spot.</p>
+          <p class="body-text">Keyed Services replaces simple key-to-strategy mapping. You still need a custom factory when: the key requires <strong>transformation</strong> (user sends "card", factory maps to "CreditCard"), you need <strong>validation</strong> before resolution, or you want to <strong>enumerate all available strategies</strong> for a dropdown. Keyed Services + thin factory is the modern sweet spot.</p>
         </div>
       </div>
     </div>
@@ -3957,7 +3958,7 @@ public async Task EmailChannel_SmtpFailure_ReturnsError()
       </div>
     </div>
 
-    <p class="body-text mb-md">How to migrate a <span class="tooltip-trigger">switch-based algorithm selector<span class="tooltip-content">The classic anti-pattern: a single method with a switch/if-else chain that grows with every new algorithm variant. Each case has different dependencies, error handling, and complexity — all tangled in one method. This is the #1 reason teams adopt Strategy pattern.</span></span> to Strategy pattern, step by step. Each step is a <span class="tooltip-trigger">deployable PR<span class="tooltip-content">Each migration step is safe to deploy independently. If Step 2 causes issues, revert Step 2 — Step 1 is still working in production. This "strangler fig" approach is safer than a big-bang rewrite.</span></span>.</p>
+    <p class="body-text mb-md">Got a big <code>switch</code> statement that keeps growing every time you add a new option? Here's how to refactor it into the Strategy pattern, one safe step at a time. Each step can be deployed independently — no big risky rewrite needed.</p>
 
     <div class="card open">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
@@ -4123,46 +4124,52 @@ public class ProcessingService(IServiceProvider sp)
       <div class="section-icon blue"><i class="fa-solid fa-arrow-right"></i></div>
       <div>
         <div class="section-num">Section 24</div>
-        <h2 class="section-title">Related Topics</h2>
+        <h2 class="section-title">Related Topics / What to Study Next</h2>
       </div>
     </div>
 
-    <div class="grid-3">
-      <a href="../factory-method/csharp.html" class="card">
-        <div class="callout callout-info">
-          <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> Factory Method</div>
-          <p class="body-text">Factory Method decides WHICH strategy to create. Strategy decides WHAT the algorithm does. Together they eliminate both the creation and execution switch statements.</p>
+    <div class="related-grid">
+      <a href="../factory-method/csharp.html" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-industry"></i></div>
+        <div class="related-card-text">
+          <strong>Factory Method</strong>
+          <span>Factory Method decides WHICH strategy to create. Strategy decides WHAT the algorithm does. Together they eliminate both the creation and execution switch statements.</span>
         </div>
       </a>
-      <a href="../singleton/csharp.html" class="card">
-        <div class="callout callout-info">
-          <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> Singleton</div>
-          <p class="body-text">Stateless strategies are often Singletons — one instance, zero GC pressure. Understanding Singleton helps you choose the right DI lifetime for strategies.</p>
+      <a href="../singleton/csharp.html" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-dice-one"></i></div>
+        <div class="related-card-text">
+          <strong>Singleton</strong>
+          <span>Stateless strategies are often Singletons — one instance, zero GC pressure. Understanding Singleton helps you choose the right DI lifetime for strategies.</span>
         </div>
       </a>
-      <a href="../builder/csharp.html" class="card">
-        <div class="callout callout-info">
-          <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> Builder</div>
-          <p class="body-text">Complex strategy configurations can use Builder pattern to construct the strategy step-by-step before injecting it into the Context.</p>
+      <a href="../builder/csharp.html" class="related-card">
+        <div class="related-card-icon"><i class="fa-solid fa-hammer"></i></div>
+        <div class="related-card-text">
+          <strong>Builder</strong>
+          <span>Complex strategy configurations can use Builder pattern to construct the strategy step-by-step before injecting it into the Context.</span>
         </div>
       </a>
-    </div>
-
-    <div class="grid-3 mt-md">
-      <div class="callout callout-info" style="opacity:0.6;">
-        <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> State Pattern</div>
-        <p class="body-text">State is Strategy's twin — same structure, different intent. State manages behavior transitions; Strategy selects one algorithm. Know both to pick the right one.</p>
-        <span class="badge badge-yellow" style="margin-top:0.5rem;display:inline-block;">Coming Soon</span>
+      <div class="related-card" style="opacity:0.6">
+        <div class="related-card-icon"><i class="fa-solid fa-toggle-on"></i></div>
+        <div class="related-card-text">
+          <strong>State Pattern</strong>
+          <span>State is Strategy's twin — same structure, different intent. State manages behavior transitions; Strategy selects one algorithm. Know both to pick the right one. — Coming Soon</span>
+        </div>
       </div>
-      <div class="callout callout-info" style="opacity:0.6;">
-        <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> Template Method</div>
-        <p class="body-text">When algorithms share 80% of their logic, Template Method is more concise. When they're completely different, Strategy is cleaner. Know the tradeoff.</p>
-        <span class="badge badge-yellow" style="margin-top:0.5rem;display:inline-block;">Coming Soon</span>
+      <div class="related-card" style="opacity:0.6">
+        <div class="related-card-icon"><i class="fa-solid fa-list-ol"></i></div>
+        <div class="related-card-text">
+          <strong>Template Method</strong>
+          <span>When algorithms share 80% of their logic, Template Method is more concise. When they're completely different, Strategy is cleaner. Know the tradeoff. — Coming Soon</span>
+        </div>
       </div>
-      <div class="callout callout-info" style="opacity:0.6;">
-        <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> Decorator</div>
-        <p class="body-text">Decorator wraps strategies with cross-cutting concerns (logging, retry, metrics) without modifying the strategies themselves. Strategy + Decorator is a powerful combination.</p>
-        <span class="badge badge-yellow" style="margin-top:0.5rem;display:inline-block;">Coming Soon</span>
+      <div class="related-card" style="opacity:0.6">
+        <div class="related-card-icon"><i class="fa-solid fa-layer-group"></i></div>
+        <div class="related-card-text">
+          <strong>Decorator</strong>
+          <span>Decorator wraps strategies with cross-cutting concerns (logging, retry, metrics) without modifying the strategies themselves. Strategy + Decorator is a powerful combination. — Coming Soon</span>
+        </div>
       </div>
     </div>
   </div>
