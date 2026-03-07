@@ -64,7 +64,7 @@
 
     <div class="tldr-card">
       <p><strong>What:</strong> Imagine you have a plain coffee. You want to add milk, then caramel, then whipped cream. You don't throw away the coffee and make a new "MilkCaramelWhipCoffee" from scratch — instead, you <em>wrap</em> each addition around the previous one. That's the <span class="tooltip-trigger">Decorator pattern<span class="tooltip-content">A structural design pattern that lets you attach new responsibilities to an object by placing it inside a wrapper object. The wrapper has the same interface as the original, so code that uses the original can use the decorated version without knowing the difference. Think of it as adding a phone case — the phone still works the same, but now it has extra protection.</span></span>. You start with a base object, then wrap it inside another object that adds new behavior — and that wrapper looks exactly like the original from the outside. You can stack as many wrappers as you want. The key idea is <span class="tooltip-trigger">composition<span class="tooltip-content">Building complex objects by combining simpler objects rather than inheriting from them. Instead of "a DecoratedCoffee IS A Coffee" (inheritance), you say "a MilkDecorator HAS A Coffee inside it" (composition). This is more flexible because you can mix and match wrappers at runtime.</span></span> over inheritance: instead of creating dozens of subclasses for every combination, you compose behaviors by wrapping objects inside each other.</p>
-      <p><strong>When:</strong> Use it when you need to add responsibilities to objects without creating an explosion of subclasses. Common situations: <span class="tooltip-trigger">cross-cutting concerns<span class="tooltip-content">Behavior that cuts across multiple parts of your application — things like logging, caching, authentication, or retry logic. These aren't part of your core business logic, but they need to be applied in many places. Decorators let you wrap any service with these concerns without modifying the service itself.</span></span> like logging, caching, and validation around any service. Stream processing where you layer <span class="tooltip-trigger">compression<span class="tooltip-content">Reducing data size before writing or transmitting. In .NET, GZipStream and BrotliStream are decorator streams that compress bytes as they flow through. They wrap another stream and add compression transparently.</span></span> on top of <span class="tooltip-trigger">encryption<span class="tooltip-content">Scrambling data so only authorized parties can read it. In .NET, CryptoStream is a decorator that wraps any stream and encrypts/decrypts bytes as they pass through — the code reading or writing doesn't need to know encryption is happening.</span></span> on top of <span class="tooltip-trigger">buffering<span class="tooltip-content">Collecting small reads/writes into larger chunks before passing them to the underlying stream. BufferedStream wraps any stream and adds an in-memory buffer, reducing the number of expensive I/O operations. It's a performance decorator.</span></span>. Middleware pipelines where each layer handles one concern (authentication, then authorization, then routing).</p>
+      <p><strong>When:</strong> Use it when you need to add responsibilities to objects without creating an explosion of subclasses. The most common situation is when you have behavior that needs to be applied across many services — things like logging, caching, and validation. Instead of copy-pasting that logic everywhere, you wrap each service in a decorator. These shared behaviors are called <span class="tooltip-trigger">cross-cutting concerns<span class="tooltip-content">Behavior that cuts across multiple parts of your application — things like logging, caching, authentication, or retry logic. These aren't part of your core business logic, but they need to be applied in many places. Decorators let you wrap any service with these concerns without modifying the service itself.</span></span>. Another classic use is stream processing — layering <span class="tooltip-trigger">compression<span class="tooltip-content">Reducing data size before writing or transmitting. In .NET, GZipStream and BrotliStream are decorator streams that compress bytes as they flow through. They wrap another stream and add compression transparently.</span></span> on top of <span class="tooltip-trigger">encryption<span class="tooltip-content">Scrambling data so only authorized parties can read it. In .NET, CryptoStream is a decorator that wraps any stream and encrypts/decrypts bytes as they pass through — the code reading or writing doesn't need to know encryption is happening.</span></span> on top of <span class="tooltip-trigger">buffering<span class="tooltip-content">Collecting small reads/writes into larger chunks before passing them to the underlying stream. BufferedStream wraps any stream and adds an in-memory buffer, reducing the number of expensive I/O operations. It's a performance decorator.</span></span>. Also middleware pipelines, where each layer handles one concern (authentication, then authorization, then routing).</p>
       <p><strong>In C# / .NET:</strong> The framework uses Decorator <em>everywhere</em>. The <span class="tooltip-trigger"><code>Stream</code> class hierarchy<span class="tooltip-content">In .NET, Stream is the base class for all byte-level I/O. FileStream reads raw bytes from disk. BufferedStream wraps any stream to add a memory buffer. GZipStream wraps any stream to add compression. CryptoStream wraps any stream to add encryption. You stack them like layers — each one IS-A Stream, so they're interchangeable.</span></span> is the textbook example — <code>BufferedStream</code> wraps <code>FileStream</code>, <code>GZipStream</code> wraps that, and <code>CryptoStream</code> wraps <em>that</em>. ASP.NET Core's <span class="tooltip-trigger">middleware pipeline<span class="tooltip-content">The chain of components that handle HTTP requests in ASP.NET Core. Each middleware (authentication, logging, routing, etc.) wraps the next one. A request flows inward through the layers, then the response flows back outward — exactly like a decorator stack.</span></span> is Decorator in action — each <code>Use()</code> call wraps the pipeline in another layer. And libraries like <span class="tooltip-trigger">Scrutor<span class="tooltip-content">A popular .NET library that adds assembly scanning and decoration support to Microsoft's built-in DI container. Its Decorate&lt;TInterface, TDecorator&gt;() method makes it trivial to wrap registered services with decorators — no manual wiring needed.</span></span> make DI-based decoration a one-liner.</p>
       <p><strong>Quick Code:</strong></p>
       <div class="macos-window mt-sm">
@@ -75,14 +75,14 @@
         <div class="macos-body">
 <pre><code class="language-csharp">// .NET's built-in Stream decorators — stacking layers of behavior
 
-using var fileStream   = new FileStream("data.bin", FileMode.Open);
-using var buffered     = new BufferedStream(fileStream);      // adds buffering
-using var compressed   = new GZipStream(buffered,             // adds compression
-                             CompressionMode.Decompress);
-using var reader       = new StreamReader(compressed);        // adds text decoding
+await using var fileStream   = new FileStream("data.bin", FileMode.Open);
+await using var buffered     = new BufferedStream(fileStream);      // adds buffering
+await using var compressed   = new GZipStream(buffered,             // adds compression
+                                   CompressionMode.Decompress);
+using var reader             = new StreamReader(compressed);        // adds text decoding
 
 // Each layer wraps the previous one. The outermost layer
-// (reader) is still just a "stream" to the code that uses it.
+// (reader) still reads from the stream chain transparently.
 string content = await reader.ReadToEndAsync();
 
 // Custom decorator — same idea, any interface:
@@ -302,11 +302,11 @@ notifier.Send("Server is down!");                       // all three fire</code>
 
         <!-- ConcreteDecoratorB (bottom right) -->
         <g filter="url(#uml-glow)">
-          <rect x="690" y="400" width="220" height="100" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-secondary, #94a3b8)" stroke-width="1.5"/>
-          <text x="800" y="435" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="Inter, sans-serif" font-size="14" font-weight="700">ConcreteDecoratorB</text>
-          <line x1="690" y1="448" x2="910" y2="448" stroke="var(--border-primary, #334155)" stroke-width="1"/>
-          <text x="710" y="470" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="11">+ Operation() : void</text>
-          <text x="710" y="488" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="11">+ AddedBehaviorB()</text>
+          <rect x="590" y="400" width="220" height="100" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-secondary, #94a3b8)" stroke-width="1.5"/>
+          <text x="700" y="435" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-family="Inter, sans-serif" font-size="14" font-weight="700">ConcreteDecoratorB</text>
+          <line x1="590" y1="448" x2="810" y2="448" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+          <text x="610" y="470" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="11">+ Operation() : void</text>
+          <text x="610" y="488" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="11">+ AddedBehaviorB()</text>
         </g>
 
         <!-- Arrows: ConcreteComponent --> IComponent (implements) -->
@@ -323,7 +323,7 @@ notifier.Send("Server is down!");                       // all three fire</code>
         <line x1="550" y1="400" x2="630" y2="320" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-inherit)"/>
 
         <!-- Arrows: ConcreteDecoratorB extends BaseDecorator -->
-        <line x1="800" y1="400" x2="710" y2="320" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-inherit)"/>
+        <line x1="700" y1="400" x2="690" y2="320" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrow-inherit)"/>
       </svg>
     </div>
 
@@ -1497,10 +1497,12 @@ await writer.WriteLineAsync("Sensitive data goes here");</code></pre>
             <span class="macos-filename">Custom DelegatingHandler — Retry + Timing</span>
           </div>
           <div class="macos-body">
-<pre><code class="language-csharp">// A retry decorator for HTTP requests
+<pre><code class="language-csharp">// A retry decorator for HTTP requests (GET/HEAD only — safe to retry)
 public class RetryHandler : DelegatingHandler
 {
     private readonly int _maxRetries;
+    private static readonly HashSet&lt;int&gt; TransientCodes = [408, 429, 500, 502, 503, 504];
+
     public RetryHandler(int maxRetries = 3) =&gt; _maxRetries = maxRetries;
 
     protected override async Task&lt;HttpResponseMessage&gt; SendAsync(
@@ -1509,7 +1511,10 @@ public class RetryHandler : DelegatingHandler
         for (int i = 0; i &lt;= _maxRetries; i++)
         {
             var response = await base.SendAsync(request, ct);  // delegate to inner
-            if (response.IsSuccessStatusCode || i == _maxRetries)
+
+            // Only retry on transient failures (5xx, 408, 429)
+            bool isTransient = TransientCodes.Contains((int)response.StatusCode);
+            if (response.IsSuccessStatusCode || !isTransient || i == _maxRetries)
                 return response;
 
             await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, i)), ct);
@@ -1711,91 +1716,6 @@ foreach (var item in report)
     </div>
   </div>
 
-</main>
-
-<!-- ===== POPUP OVERLAYS (outside main, before footer) ===== -->
-
-<div class="popup-overlay" id="popup-dec-combo">
-  <div class="popup-content">
-    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
-    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Combinatorial Explosion</h3>
-    <p class="body-text">Instead of a class for every combination, a senior creates <strong>one class per format</strong>. Each format is a decorator that wraps any <code>ITextComponent</code>. Want Bold + Italic? Wrap Italic around Bold. Want all four? Stack four wrappers. The math changes from exponential to linear: N formats = N classes, not 2<sup>N</sup>. That's the difference between a system that scales and one that collapses under its own weight.</p>
-    <div class="macos-window mt-md">
-      <div class="macos-titlebar">
-        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-        <span class="macos-filename">One class per format — O(N) instead of O(2^N)</span>
-      </div>
-      <div class="macos-body">
-<pre><code class="language-csharp">// 4 formats = 4 classes (not 16)
-ITextComponent text = new PlainText();
-text = new BoldDecorator(text);       // +bold
-text = new ItalicDecorator(text);     // +italic
-text = new UnderlineDecorator(text);  // +underline
-text = new ColorDecorator(text);      // +color
-
-// Any subset, any order — just pick the wrappers you want
-ITextComponent minimal = new ItalicDecorator(new PlainText()); // just italic</code></pre>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="popup-overlay" id="popup-dec-newformat">
-  <div class="popup-content">
-    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
-    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Adding New Formats</h3>
-    <p class="body-text">With the Decorator approach, adding a new format means creating <strong>exactly one new class</strong>. No changes to any existing class — not <code>PlainText</code>, not <code>BoldDecorator</code>, not <code>ItalicDecorator</code>, nothing. The new decorator can wrap anything that implements <code>ITextComponent</code> — including all the existing decorators. This is the <span class="tooltip-trigger">Open/Closed Principle<span class="tooltip-content">Software entities should be open for extension (you can add new behavior) but closed for modification (you don't change existing code). Decorator is the textbook example: you extend behavior by adding new wrapper classes, never by modifying existing ones.</span></span> in its purest form.</p>
-    <div class="macos-window mt-md">
-      <div class="macos-titlebar">
-        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-        <span class="macos-filename">Adding strikethrough — ONE new class, zero changes</span>
-      </div>
-      <div class="macos-body">
-<pre><code class="language-csharp">// New format: just one class
-public class StrikethroughDecorator : ITextComponent
-{
-    private readonly ITextComponent _inner;
-    public StrikethroughDecorator(ITextComponent inner) =&gt; _inner = inner;
-    public string Format(string text) =&gt; $"&lt;s&gt;{_inner.Format(text)}&lt;/s&gt;";
-}
-
-// Instantly works with every existing format
-ITextComponent fancy = new StrikethroughDecorator(
-    new BoldDecorator(
-        new ColorDecorator(new PlainText(), "purple")));</code></pre>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="popup-overlay" id="popup-dec-rigid">
-  <div class="popup-content">
-    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
-    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Runtime Flexibility</h3>
-    <p class="body-text">The junior's approach locks in the formatting choice at compile time — you pick a class and that's what you get. The senior's approach defers the choice to runtime. You can build the wrapper chain based on user preferences, feature flags, configuration files, database settings — whatever you want. The decision of "which formats to apply" is made when the program runs, not when you write the code. Different users can get completely different decorator chains, all using the same small set of classes.</p>
-    <div class="macos-window mt-md">
-      <div class="macos-titlebar">
-        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-        <span class="macos-filename">Runtime composition — driven by user settings</span>
-      </div>
-      <div class="macos-body">
-<pre><code class="language-csharp">// Build decorator chain from user preferences at runtime
-ITextComponent formatter = new PlainText();
-
-if (userSettings.WantsBold)
-    formatter = new BoldDecorator(formatter);
-if (userSettings.WantsItalic)
-    formatter = new ItalicDecorator(formatter);
-if (userSettings.WantsColor)
-    formatter = new ColorDecorator(formatter, userSettings.PreferredColor);
-
-// The formatter object now does exactly what this user wants
-// Different users get different decorator chains — same classes, different composition</code></pre>
-      </div>
-    </div>
-  </div>
-</div>
-
 
 <!-- ========== 9. WHEN TO USE ========== -->
 <div class="section" id="when">
@@ -1816,7 +1736,7 @@ if (userSettings.WantsColor)
       </div>
       <div class="when-item">
         <span class="when-icon-yes"><i class="fa-solid fa-check-circle"></i></span>
-        <span><strong>Cross-cutting concerns</strong> like logging, retry, caching, or authorization need to be applied consistently across multiple services without copy-pasting the same logic everywhere</span>
+        <span>You have <strong>shared behaviors</strong> (logging, retry, caching, authorization) that need to be applied consistently across multiple services &mdash; these are called cross-cutting concerns, and decorators let you add them without copy-pasting logic everywhere</span>
       </div>
       <div class="when-item">
         <span class="when-icon-yes"><i class="fa-solid fa-check-circle"></i></span>
@@ -2273,18 +2193,19 @@ services.Decorate&lt;IOrderService, LoggingOrderDecorator&gt;(); // ❌ duplicat
 <pre><code class="language-csharp">// ✅ Option 1: Extension method that guards against duplicates
 public static class DecoratorGuard
 {
-    private static readonly HashSet&lt;string&gt; _applied = new();
-
     public static IServiceCollection DecorateSafe&lt;TService, TDecorator&gt;(
         this IServiceCollection services)
         where TDecorator : TService
     {
-        var key = $"{typeof(TService).Name}:{typeof(TDecorator).Name}";
-        if (!_applied.Add(key))
-        {
-            // Already registered — log warning and skip
-            return services;
-        }
+        // Check if this decorator type is already wrapping TService
+        var decoratorType = typeof(TDecorator);
+        bool alreadyRegistered = services.Any(d =&gt;
+            d.ServiceType == typeof(TService) &amp;&amp;
+            d.ImplementationType == decoratorType);
+
+        if (alreadyRegistered)
+            return services;  // skip — already decorated
+
         return services.Decorate&lt;TService, TDecorator&gt;();
     }
 }
@@ -4188,6 +4109,8 @@ services.Decorate&lt;IPaymentGateway, CircuitBreakerDecorator&gt;();  // outer</
 public class SmtpEmailSender : IEmailSender, IDisposable
 {
     private readonly SmtpClient _client = new();
+    private readonly IStatusRepository _statusDb;
+    public SmtpEmailSender(IStatusRepository statusDb) =&gt; _statusDb = statusDb;
     public async Task SendAsync(string to, string subject, string body)
         =&gt; await _client.SendMailAsync(new MailMessage("noreply@app.com", to, subject, body));
     public async Task&lt;EmailStatus&gt; GetStatusAsync(Guid emailId)
@@ -4681,7 +4604,7 @@ await file.WriteAsync(footer);
       <div class="card-body">
         <p class="body-text">The best way to understand Stream decorators is to build one. Let's create a <code>MonitoringStream</code> that tracks how many bytes are read and written, and measures throughput. This is genuinely useful for debugging slow I/O in production.</p>
 
-        <p class="body-text mt-sm">The key insight: <code>Stream</code> is an abstract class with many methods, but you only need to override the ones you want to decorate. For everything else, the base class forwards to the inner stream automatically. We inherit from <code>Stream</code> and wrap another stream inside it &mdash; classic Decorator.</p>
+        <p class="body-text mt-sm">The key insight: <code>Stream</code> is an abstract class with many abstract members (<code>Read</code>, <code>Write</code>, <code>CanRead</code>, <code>Seek</code>, <code>Length</code>, etc.) that you must implement yourself. The pattern is straightforward &mdash; delegate each one to the inner stream, then add your monitoring logic on top of the methods you care about. We inherit from <code>Stream</code> and wrap another stream inside it &mdash; classic Decorator.</p>
 
         <div class="macos-window mt-md">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MonitoringStream.cs</span></div>
@@ -4833,7 +4756,10 @@ Console.WriteLine(monitor);
         <div class="macos-window mt-md">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SuperLogger.cs</span></div>
           <div class="macos-body">
-<pre><code class="language-csharp">public class SuperLogger
+<pre><code class="language-csharp">// Custom enum for our logging mini-project (not the built-in Microsoft.Extensions.Logging one)
+public enum LogLevel { Debug, Info, Warning, Error }
+
+public class SuperLogger
 {
     private readonly string _filePath;
     private readonly LogLevel _minLevel;
@@ -5074,12 +5000,11 @@ public interface ILogWriter
 public record LogEntry(
     LogLevel Level,
     string Message,
-    DateTime Timestamp = default,
+    DateTime? Timestamp = null,
     Dictionary&lt;string, object&gt;? Properties = null)
 {
-    // Ensure timestamp has a default
-    public LogEntry(LogLevel level, string message)
-        : this(level, message, DateTime.UtcNow, null) { }
+    // Auto-set timestamp if not provided
+    public DateTime ResolvedTimestamp =&gt; Timestamp ?? DateTime.UtcNow;
 }
 
 /// &lt;summary&gt;
@@ -5256,7 +5181,7 @@ app.MapPost("/orders", async (Order order, ILogWriter log) =&gt;
         _sut.Write(original);
 
         Assert.Equal("original message", original.Message);
-        Assert.Equal(default, original.Timestamp);
+        Assert.Null(original.Timestamp);  // not set — decorators add it via 'with'
     }
 }
 
@@ -5745,7 +5670,87 @@ app.MapGet("/orders/{id}", async (int id, IOrderService orders)
 </main>
 
 <!-- ========== POPUP OVERLAYS (from S6 Jr vs Sr) ========== -->
-<!-- Place all popup-overlay divs here -->
+
+<div class="popup-overlay" id="popup-dec-combo">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Combinatorial Explosion</h3>
+    <p class="body-text">Instead of a class for every combination, a senior creates <strong>one class per format</strong>. Each format is a decorator that wraps any <code>ITextComponent</code>. Want Bold + Italic? Wrap Italic around Bold. Want all four? Stack four wrappers. The math changes from exponential to linear: N formats = N classes, not 2<sup>N</sup>. That's the difference between a system that scales and one that collapses under its own weight.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+        <span class="macos-filename">One class per format — O(N) instead of O(2^N)</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-csharp">// 4 formats = 4 classes (not 16)
+ITextComponent text = new PlainText();
+text = new BoldDecorator(text);       // +bold
+text = new ItalicDecorator(text);     // +italic
+text = new UnderlineDecorator(text);  // +underline
+text = new ColorDecorator(text);      // +color
+
+// Any subset, any order — just pick the wrappers you want
+ITextComponent minimal = new ItalicDecorator(new PlainText()); // just italic</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popup-overlay" id="popup-dec-newformat">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Adding New Formats</h3>
+    <p class="body-text">With the Decorator approach, adding a new format means creating <strong>exactly one new class</strong>. No changes to any existing class — not <code>PlainText</code>, not <code>BoldDecorator</code>, not <code>ItalicDecorator</code>, nothing. The new decorator can wrap anything that implements <code>ITextComponent</code> — including all the existing decorators. This is the <span class="tooltip-trigger">Open/Closed Principle<span class="tooltip-content">Software entities should be open for extension (you can add new behavior) but closed for modification (you don't change existing code). Decorator is the textbook example: you extend behavior by adding new wrapper classes, never by modifying existing ones.</span></span> in its purest form.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+        <span class="macos-filename">Adding strikethrough — ONE new class, zero changes</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-csharp">// New format: just one class
+public class StrikethroughDecorator : ITextComponent
+{
+    private readonly ITextComponent _inner;
+    public StrikethroughDecorator(ITextComponent inner) =&gt; _inner = inner;
+    public string Format(string text) =&gt; $"&lt;s&gt;{_inner.Format(text)}&lt;/s&gt;";
+}
+
+// Instantly works with every existing format
+ITextComponent fancy = new StrikethroughDecorator(
+    new BoldDecorator(
+        new ColorDecorator(new PlainText(), "purple")));</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="popup-overlay" id="popup-dec-rigid">
+  <div class="popup-content">
+    <button class="popup-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    <h3 class="sub text-green"><i class="fa-solid fa-lightbulb"></i> Senior Solution: Runtime Flexibility</h3>
+    <p class="body-text">The junior's approach locks in the formatting choice at compile time — you pick a class and that's what you get. The senior's approach defers the choice to runtime. You can build the wrapper chain based on user preferences, feature flags, configuration files, database settings — whatever you want. The decision of "which formats to apply" is made when the program runs, not when you write the code. Different users can get completely different decorator chains, all using the same small set of classes.</p>
+    <div class="macos-window mt-md">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+        <span class="macos-filename">Runtime composition — driven by user settings</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-csharp">// Build decorator chain from user preferences at runtime
+ITextComponent formatter = new PlainText();
+
+if (userSettings.WantsBold)
+    formatter = new BoldDecorator(formatter);
+if (userSettings.WantsItalic)
+    formatter = new ItalicDecorator(formatter);
+if (userSettings.WantsColor)
+    formatter = new ColorDecorator(formatter, userSettings.PreferredColor);
+
+// The formatter object now does exactly what this user wants
+// Different users get different decorator chains — same classes, different composition</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
 
 <button class="back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
 
