@@ -1615,8 +1615,37 @@ await host.RunAsync();</code></pre>
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, .NET 7 e-commerce app.</strong> Orders were being created with null product IDs. The checkout service stored the builder in an <code>object</code>-typed field (a serialization DTO), then later cast it to <code>dynamic</code> to extract properties. The builder's <code>.ProductId</code> was still null because <code>.Build()</code> was never called — the builder chain was assigned but the final <code>.Build()</code> was missing.</p>
+          <p class="body-text"><strong>2023, .NET 7 e-commerce app.</strong> It started with a simple support ticket: "My order shows no product." The team thought it was a frontend display bug. But when they checked the database, the product ID column was literally <code>NULL</code> for dozens of recent orders.</p>
+          <p class="body-text">Here is what happened step by step. The checkout service used a builder to create order objects. But instead of storing the finished order, the developer stored the <em>builder itself</em> in a variable typed as <code>object</code>. This was part of a serialization DTO that passed data between services.</p>
+          <p class="body-text">Later, a different method received that <code>object</code> and cast it to <code>dynamic</code> to read properties. Because <code>dynamic</code> skips all compile-time checks, the code ran without errors. It happily read <code>.ProductId</code> from the builder object, which returned <code>null</code> because the builder stores configuration internally, not in product-shaped properties.</p>
+          <p class="body-text">The sneaky part? The builder's <code>ToString()</code> output in logs looked almost identical to a real order. The team spent two hours staring at log entries that <em>seemed</em> fine before someone noticed the type was <code>OrderBuilder</code>, not <code>Order</code>.</p>
         </div>
+
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how forgetting Build() causes the builder object to be stored instead of the product" style="width:100%;margin:1rem 0">
+          <defs>
+            <marker id="bld-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+          </defs>
+          <rect x="10" y="60" width="160" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+          <text x="90" y="85" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">OrderBuilder</text>
+          <text x="90" y="105" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">.ForCustomer().ForProduct()</text>
+          <text x="90" y="120" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">No .Build() called!</text>
+          <line x1="170" y1="95" x2="240" y2="95" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b1-arr)"/>
+          <text x="205" y="88" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">stored as</text>
+          <rect x="245" y="60" width="160" height="70" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="325" y="85" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">object orderData</text>
+          <text x="325" y="105" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Actually: OrderBuilder!</text>
+          <text x="325" y="120" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Not an Order</text>
+          <line x1="405" y1="95" x2="475" y2="95" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b1-arr)"/>
+          <text x="440" y="88" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">cast to</text>
+          <rect x="480" y="60" width="160" height="70" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="560" y="85" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">dynamic order</text>
+          <text x="560" y="105" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">.ProductId = null</text>
+          <text x="560" y="120" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">No compile-time check</text>
+          <rect x="200" y="160" width="320" height="40" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="360" y="185" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Database saves NULL product IDs for all orders</text>
+          <line x1="560" y1="130" x2="460" y2="160" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours — the <code>dynamic</code> late binding hid the type mismatch, and the builder's <code>ToString()</code> output in logs looked like a normal order object.</p>
         <div class="tab-container mt-sm">
@@ -1646,6 +1675,7 @@ public void CreateOrder(Cart cart)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the first line inside the method. The developer chains <code>.ForCustomer()</code>, <code>.ForProduct()</code>, and <code>.WithQuantity()</code> but never calls <code>.Build()</code> at the end. Each of those fluent methods returns the builder itself (that is how method chaining works), so <code>orderData</code> is storing an <code>OrderBuilder</code> object, not a finished <code>Order</code>. When the code later does <code>order.ProductId</code>, it is reading a property that exists on the builder but was never populated the way the product would be. The result: <code>null</code> gets saved to the database.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1669,11 +1699,16 @@ public Order CreateOrder(Cart cart)
 //   The compiler catches the mistake if OrderBuilder ≠ Order.</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Two things changed. First, <code>.Build()</code> is now at the end of the chain, which transforms the builder's accumulated state into a real <code>Order</code> object. Second, the return type is <code>Order</code> instead of <code>object</code>. If someone forgets <code>.Build()</code>, the compiler will complain because an <code>OrderBuilder</code> cannot be returned where an <code>Order</code> is expected. Strong typing catches the bug before the code even runs.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Never let a builder implement or inherit from the product type. Keep them as distinct types so the compiler catches the "forgot Build()" mistake. Consider making <code>Build()</code> the only way to get a Product — no public constructor on the Product itself.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-search"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for any place where a builder's return value is assigned to <code>object</code>, <code>dynamic</code>, or <code>var</code> without <code>.Build()</code> at the end. If a variable holds a builder but is used as if it were the product, you have this bug. A quick regex search for <code>new \w+Builder\(</code> that does NOT end with <code>.Build()</code> on the same statement can flag suspects.</p>
         </div>
       </div>
     </div>
@@ -1685,8 +1720,40 @@ public Order CreateOrder(Cart cart)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2022, .NET 6 report service.</strong> Monthly reports contained data from the <em>previous month's</em> report. The builder was reused across calls without calling <code>Reset()</code>, so sections accumulated across builds.</p>
+          <p class="body-text"><strong>2022, .NET 6 report service.</strong> The finance team noticed something strange in their April report: it contained all of March's data <em>plus</em> April's data. Revenue figures were doubled, user counts were inflated, and charts looked absurd.</p>
+          <p class="body-text">The root cause was deceptively simple. The <code>ReportBuilder</code> was registered as "Scoped" in the dependency injection container. In .NET, "Scoped" means one instance per HTTP request. So when a single API call generated reports for multiple months (a common bulk-export feature), the same builder was used for March, then April, then May.</p>
+          <p class="body-text">Here is the problem: the builder kept a <code>List&lt;Section&gt;</code> internally. Each call to <code>AddSection()</code> pushed new items onto that list. But nobody cleared the list between reports. So March's report had 3 sections. April's report had 6 sections (March's 3 + April's 3). May had 9. Each successive report inherited all the data from every previous one.</p>
+          <p class="body-text">The bug was invisible in testing because tests only ever generated one report per request. It took 4 hours to diagnose because the builder's internal state was not logged, and the report titles were correct (only the sections leaked).</p>
         </div>
+
+        <svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how builder state accumulates across multiple Build calls without reset" style="width:100%;margin:1rem 0">
+          <defs>
+            <marker id="bld-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+          </defs>
+          <text x="360" y="20" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Same builder instance reused without reset</text>
+          <!-- Call 1 -->
+          <rect x="20" y="40" width="200" height="80" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="120" y="60" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Build #1: March</text>
+          <text x="120" y="80" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Sections: [Mar-Rev, Mar-Users]</text>
+          <text x="120" y="100" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Result: 2 sections (correct)</text>
+          <line x1="220" y1="80" x2="260" y2="80" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b2-arr)"/>
+          <!-- Call 2 -->
+          <rect x="265" y="40" width="200" height="80" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+          <text x="365" y="60" text-anchor="middle" fill="#eab308" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Build #2: April</text>
+          <text x="365" y="80" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Sections: [Mar + Apr data]</text>
+          <text x="365" y="100" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Result: 4 sections (WRONG!)</text>
+          <line x1="465" y1="80" x2="505" y2="80" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b2-arr)"/>
+          <!-- Call 3 -->
+          <rect x="510" y="40" width="200" height="80" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="610" y="60" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Build #3: May</text>
+          <text x="610" y="80" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Sections: [Mar + Apr + May]</text>
+          <text x="610" y="100" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Result: 6 sections (WRONG!)</text>
+          <!-- Explanation -->
+          <rect x="120" y="150" width="480" height="60" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="360" y="175" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Internal List&lt;Section&gt; keeps growing across calls</text>
+          <text x="360" y="195" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">Each Build() inherits ALL previous data because nobody clears the builder</text>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours — the bug only appeared when generating multiple reports in the same request scope (the builder was registered as Scoped in DI).</p>
         <div class="tab-container mt-sm">
@@ -1715,6 +1782,7 @@ public class ReportService(IReportBuilder builder)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>builder</code> parameter comes from dependency injection. Because it is registered as Scoped, the same instance is shared for the entire HTTP request. The first time <code>GenerateMonthly</code> runs, the builder has an empty section list, so the report is correct. But the second time, those March sections are still sitting in the list. <code>AddSection</code> just keeps appending, and <code>Build()</code> dutifully packages everything it finds into the report.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1742,11 +1810,16 @@ services.AddTransient&lt;IReportBuilder, ReportBuilder&gt;();
 builder.Reset(); // Clear state from previous usage</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Fix 1 is the simplest and safest. By creating a brand new builder with <code>new ReportBuilder()</code> inside the method, you guarantee a completely clean slate every time. There is zero chance of leftover state because the builder did not exist before that line. Fix 2 achieves the same thing through the DI container: Transient means a fresh instance every time it is injected. Fix 3 is the weakest option because it relies on the developer remembering to call <code>Reset()</code>.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Builders should be <strong>Transient</strong> — new instance per use. If a builder must be reused (rare), it needs a <code>Reset()</code> method and the Director should call it before every new build. Better yet, make builders disposable or create a factory that produces fresh builders.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-search"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Check your DI registrations. Search for <code>AddScoped&lt;.*Builder&gt;</code> or <code>AddSingleton&lt;.*Builder&gt;</code>. Any builder registered with a lifetime longer than Transient is a potential ticking time bomb. Also look for builder fields on long-lived service classes — if a builder outlives a single method call, its state might leak.</p>
         </div>
       </div>
     </div>
@@ -1758,8 +1831,40 @@ builder.Reset(); // Clear state from previous usage</code></pre>
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, .NET 8 API.</strong> A cached configuration object was being modified by downstream consumers. The Builder's product exposed <code>List&lt;string&gt;</code> directly, allowing callers to <code>.Add()</code> items after construction — corrupting the shared cache.</p>
+          <p class="body-text"><strong>2023, .NET 8 API.</strong> The security team got an alert: an unknown origin was appearing in the CORS whitelist. Nobody had deployed a config change. The rogue origin, <code>http://evil.com</code>, was being added at runtime by a downstream service that had a reference to the cached configuration object.</p>
+          <p class="body-text">The <code>AppConfig</code> object was built once at startup by a <code>ConfigBuilder</code> and stored in a memory cache. The builder did its job perfectly. But the product it created exposed a plain <code>List&lt;string&gt;</code> for allowed origins. Any code that retrieved the config from the cache could call <code>.Add()</code> on that list, and the change would instantly affect every other consumer sharing the same cached reference.</p>
+          <p class="body-text">Think of it like building a house (the builder) but leaving the front door unlocked (mutable collections). The builder did a great job constructing the house, but anyone can walk in and rearrange the furniture afterwards.</p>
+          <p class="body-text">The team spent 3 hours tracking this down because the mutation happened in a middleware component that only ran for certain request paths. The config looked correct at startup and in health checks, but was silently corrupted during normal traffic.</p>
         </div>
+
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how a mutable product's collection is modified after Build, corrupting shared cache" style="width:100%;margin:1rem 0">
+          <defs>
+            <marker id="bld-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+          </defs>
+          <rect x="20" y="30" width="160" height="60" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="100" y="55" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">ConfigBuilder</text>
+          <text x="100" y="75" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">.Build() creates config</text>
+          <line x1="180" y1="60" x2="240" y2="60" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b3-arr)"/>
+          <rect x="245" y="20" width="200" height="80" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+          <text x="345" y="42" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Cached AppConfig</text>
+          <text x="345" y="60" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">AllowedOrigins: List&lt;string&gt;</text>
+          <text x="345" y="78" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">["app.com", "admin.com"]</text>
+          <!-- Service A reads ok -->
+          <line x1="445" y1="40" x2="530" y2="40" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bld-b3-arr)"/>
+          <rect x="535" y="15" width="170" height="50" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="620" y="36" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Service A: reads list</text>
+          <text x="620" y="52" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Sees correct origins</text>
+          <!-- Service B mutates -->
+          <line x1="445" y1="80" x2="530" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#bld-b3-arr)"/>
+          <rect x="535" y="85" width="170" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+          <text x="620" y="106" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Service B: .Add("evil.com")</text>
+          <text x="620" y="122" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Mutates the shared list!</text>
+          <!-- Result -->
+          <rect x="160" y="140" width="400" height="55" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="360" y="162" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Now ALL services see: ["app.com", "admin.com", "evil.com"]</text>
+          <text x="360" y="182" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">Shared cache is permanently corrupted</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug3-bad" role="tab" aria-selected="true" aria-controls="bug3-bad">Buggy Code</button>
@@ -1784,6 +1889,7 @@ var config = cache.Get&lt;AppConfig&gt;("config");
 config.AllowedOrigins.Add("http://evil.com"); // ✗ Mutates shared cache!</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>AppConfig</code> class uses plain <code>List&lt;string&gt;</code> and <code>Dictionary</code> with public setters. These collections are the same objects in memory that the builder used during construction. When any caller retrieves this config from cache, they get a direct reference to those mutable collections. Calling <code>.Add()</code> modifies the same list that every other consumer is reading. There is no copy, no protection, no barrier.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1813,11 +1919,16 @@ public sealed class AppConfig
 // ((List&lt;string&gt;)config.AllowedOrigins).Add(...) // Runtime error!</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Two layers of protection. First, the properties are typed as <code>IReadOnlyList</code> and <code>IReadOnlyDictionary</code>, so the compiler will not let anyone call <code>.Add()</code>. Second, the constructor creates defensive copies using <code>.AsReadOnly()</code> and <code>new Dictionary&lt;&gt;(flags)</code>. Even if someone holds a reference to the original builder's list, changes to that list will not affect the product's copy. The constructor is <code>internal</code>, so only the builder (in the same assembly) can create instances.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Always expose <code>IReadOnlyList&lt;T&gt;</code> / <code>IReadOnlyDictionary&lt;K,V&gt;</code> on Builder products. Make <strong>defensive copies</strong> in the constructor so the builder's internal collections can't be used to mutate the product after construction.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-search"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for any builder product that has <code>public List&lt;T&gt;</code>, <code>public Dictionary&lt;K,V&gt;</code>, or <code>public string[]</code> properties with setters. If the product is ever cached or shared between components, those mutable collections are a security and correctness risk. Replace them with <code>IReadOnlyList&lt;T&gt;</code> and make defensive copies in the constructor.</p>
         </div>
       </div>
     </div>
@@ -1829,8 +1940,47 @@ public sealed class AppConfig
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, .NET 8 microservice.</strong> Email notifications were sent with empty subject lines and no recipients. The <code>EmailBuilder.Build()</code> had no validation — it happily created emails with null fields. The bug only surfaced when the SMTP server rejected the messages hours later in the queue.</p>
+          <p class="body-text"><strong>2024, .NET 8 microservice.</strong> The notification team got a panicked message from ops: thousands of emails were stuck in the outbound queue, and the SMTP server was rejecting them with "missing recipient" errors. The email service had been happily building and queuing messages for hours before anyone noticed.</p>
+          <p class="body-text">The <code>EmailBuilder</code> had no validation whatsoever. Its <code>Build()</code> method took whatever fields were set (or not set) and created an <code>Email</code> object. Missing subject? Fine. No recipient? No problem. The builder produced the object, the queuing service accepted it, and the problem only surfaced hours later when the SMTP server actually tried to send.</p>
+          <p class="body-text">This is the "delayed explosion" problem. Without validation in <code>Build()</code>, invalid objects travel through your entire system before something finally rejects them. By that point, the stack trace points to the SMTP library, not to the code that forgot to set the recipient. The real bug could be three services away.</p>
+          <p class="body-text">The team had to write a SQL query to identify all the broken emails, figure out which ones were recoverable, and manually re-queue them with correct data. A five-minute validation check in <code>Build()</code> would have prevented six hours of cleanup.</p>
         </div>
+
+        <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how missing Build validation lets invalid objects travel through the system before failing at the SMTP server" style="width:100%;margin:1rem 0">
+          <defs>
+            <marker id="bld-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+          </defs>
+          <text x="360" y="18" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Without Build() validation, invalid objects travel the whole pipeline</text>
+          <!-- Build -->
+          <rect x="15" y="40" width="120" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="75" y="60" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Build()</text>
+          <text x="75" y="78" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">No validation!</text>
+          <line x1="135" y1="67" x2="170" y2="67" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b4-arr)"/>
+          <!-- Queue -->
+          <rect x="175" y="40" width="120" height="55" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="235" y="60" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="11">Queue Service</text>
+          <text x="235" y="78" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Accepts anything</text>
+          <line x1="295" y1="67" x2="330" y2="67" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b4-arr)"/>
+          <!-- Retry -->
+          <rect x="335" y="40" width="120" height="55" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="395" y="60" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="11">Retry Worker</text>
+          <text x="395" y="78" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Processes blindly</text>
+          <line x1="455" y1="67" x2="490" y2="67" stroke="#f97316" stroke-width="2" marker-end="url(#bld-b4-arr)"/>
+          <!-- SMTP fail -->
+          <rect x="495" y="35" width="210" height="65" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+          <text x="600" y="57" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">SMTP Server REJECTS</text>
+          <text x="600" y="75" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">"Missing recipient address"</text>
+          <text x="600" y="90" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Hours later! Wrong stack trace!</text>
+          <!-- Better path -->
+          <rect x="15" y="130" width="120" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="75" y="150" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Build() + validation</text>
+          <text x="75" y="168" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Checks all fields</text>
+          <rect x="195" y="130" width="260" height="55" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="325" y="155" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Fails IMMEDIATELY with clear message</text>
+          <text x="325" y="172" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">"To address is required; Subject is required"</text>
+          <line x1="135" y1="157" x2="190" y2="157" stroke="#22c55e" stroke-width="2" marker-end="url(#bld-b4-arr)"/>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug4-bad" role="tab" aria-selected="true" aria-controls="bug4-bad">Buggy Code</button>
@@ -1850,6 +2000,7 @@ public Email Build()
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> This <code>Build()</code> method is just one line: create a new <code>Email</code> and pass in whatever the builder has. If the caller never called <code>.To()</code>, then <code>_to</code> is <code>null</code>. The method does not care. It constructs the email with a null recipient and hands it off to the queue. The bomb is now traveling through your pipeline, and it will explode at the worst possible time.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1880,11 +2031,16 @@ public Email Build()
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Now <code>Build()</code> checks every required field before creating the email. Notice two important details. First, it collects <em>all</em> errors into a list instead of throwing on the first one. This way the caller can fix everything at once instead of playing whack-a-mole. Second, there is a cross-field rule: HTML emails require a body. This kind of "if A then B is required" logic is impossible with simple constructors but natural in a builder's <code>Build()</code> method.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text"><code>Build()</code> is your <strong>last line of defense</strong>. Validate required fields, cross-field constraints, and business rules. Collect all errors and throw them together — don't make the caller fix one error at a time. <span class="tooltip-trigger">Fail fast<span class="tooltip-content">Design principle: detect and report errors as early as possible, before they propagate through the system and become harder to diagnose.</span></span> with a clear message.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-search"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Open any builder's <code>Build()</code> method. If it goes straight to <code>return new Product(...)</code> without any <code>if</code> checks above it, that is a red flag. Every builder that creates domain objects (not simple DTOs) should validate required fields and cross-field rules in <code>Build()</code>. If there is no validation, you are trusting every caller to always configure the builder correctly, and that trust will eventually be broken.</p>
         </div>
       </div>
     </div>
@@ -1896,8 +2052,42 @@ public Email Build()
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident — Data Leak Under Load</div>
-          <p class="body-text"><strong>2023, .NET 7 API. Production. 2 AM.</strong> Support tickets flood in: "I can see someone else's orders." A <code>QueryBuilder</code> was registered as <strong>Singleton</strong> in DI. Under concurrent load, Request A's <code>.Where("CustomerId", "C-123")</code> was overwritten by Request B's <code>.Where("CustomerId", "C-456")</code> before <code>Build()</code> was called. <strong>User A received User B's data.</strong> This is a <span class="tooltip-trigger">race condition<span class="tooltip-content">A bug where the behavior depends on the timing/ordering of concurrent operations — two threads reading and writing shared state simultaneously.</span></span> that only manifests under concurrent load — it passed all unit tests.</p>
+          <p class="body-text"><strong>2023, .NET 7 API. Production. 2 AM.</strong> Support tickets start flooding in: "I can see someone else's orders." This is one of the scariest bugs you can have: a data leak between users.</p>
+          <p class="body-text">The root cause was a <code>QueryBuilder</code> registered as <strong>Singleton</strong> in the DI container. Singleton means one single instance shared by every request, every thread, every user. The builder stores a <code>_customerId</code> field internally when you call <code>.Where("CustomerId", "C-123")</code>. With a singleton, two requests hitting the server at the same time are writing to the exact same field on the exact same object.</p>
+          <p class="body-text">Here is the timeline of the race condition: Thread A sets <code>CustomerId = "C-123"</code>. A fraction of a millisecond later, Thread B sets <code>CustomerId = "C-456"</code> on the same builder. Thread A then calls <code>Build()</code>, which reads the customer ID. But it now reads "C-456" because Thread B overwrote the value. User A receives User B's order data.</p>
+          <p class="body-text">This bug passed all unit tests because unit tests run single-threaded. It only manifested under concurrent production load when two requests overlapped by milliseconds. The team needed to reproduce the timing with a load test before they could confirm the diagnosis.</p>
         </div>
+
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how two concurrent threads overwrite each other's data on a shared singleton builder" style="width:100%;margin:1rem 0">
+          <defs>
+            <marker id="bld-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+          </defs>
+          <text x="360" y="18" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Race Condition: Two threads, one builder</text>
+          <!-- Shared builder -->
+          <rect x="260" y="35" width="200" height="50" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+          <text x="360" y="55" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Singleton QueryBuilder</text>
+          <text x="360" y="73" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">_customerId = ???</text>
+          <!-- Thread A -->
+          <rect x="30" y="110" width="190" height="45" rx="6" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="125" y="130" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Thread A (User C-123)</text>
+          <text x="125" y="145" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">.Where("CustomerId", "C-123")</text>
+          <line x1="220" y1="120" x2="310" y2="85" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#bld-b5-arr)"/>
+          <!-- Thread B -->
+          <rect x="500" y="110" width="190" height="45" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="595" y="130" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Thread B (User C-456)</text>
+          <text x="595" y="145" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">.Where("CustomerId", "C-456")</text>
+          <line x1="500" y1="120" x2="410" y2="85" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bld-b5-arr)"/>
+          <!-- Time arrow and overwrite -->
+          <text x="360" y="170" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Thread B overwrites Thread A's value!</text>
+          <!-- Result -->
+          <rect x="80" y="190" width="250" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="205" y="210" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Thread A calls Build()</text>
+          <text x="205" y="228" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">Gets C-456's data! DATA LEAK</text>
+          <rect x="390" y="190" width="250" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="515" y="210" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Thread B calls Build()</text>
+          <text x="515" y="228" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11">Gets C-456's data (correct by luck)</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug5-bad" role="tab" aria-selected="true" aria-controls="bug5-bad">Buggy Code</button>
@@ -1914,9 +2104,10 @@ public Email Build()
 builder.Services.AddSingleton&lt;QueryBuilder&gt;();
 // Thread A: builder.Where("CustomerId", "C-123")
 // Thread B: builder.Where("CustomerId", "C-456")  ← overwrites A!
-// Thread A: builder.Build()  → returns C-456's data to C-123's user 💀</code></pre>
+// Thread A: builder.Build()  → returns C-456's data to C-123's user</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The single line <code>AddSingleton&lt;QueryBuilder&gt;()</code> is the entire problem. It tells .NET's DI container: "Create one <code>QueryBuilder</code> and share it with everyone." Since every HTTP request runs on its own thread, two users making requests simultaneously both call <code>.Where()</code> on the same object. There are no locks, no thread safety. The last writer wins, and the other user gets wrong data.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -1938,11 +2129,16 @@ public string BuildQuery(QueryParams p)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Both fixes ensure each thread gets its own private builder instance. With <code>AddTransient</code>, the DI container creates a new builder every time one is requested. With <code>new QueryBuilder()</code>, you bypass DI entirely and create a fresh instance right where you need it. Since no two threads share the same builder, there is no race condition. The "better" approach is often just using <code>new</code> directly, because builders are cheap objects with no dependencies worth injecting.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Builders are <strong>inherently stateful and mutable</strong> — never register them as Singleton or Scoped in DI. Either register as Transient or (better) just <code>new</code> them directly. Builders are cheap to create; shared mutable state is expensive to debug.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-search"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your <code>Program.cs</code> or <code>Startup.cs</code> for <code>AddSingleton</code> and <code>AddScoped</code> registrations. Any class with "Builder" in the name registered as Singleton is almost certainly a bug waiting to happen. A quick code review rule: if a class has mutable fields that change per use (like a builder does), it should never be Singleton.</p>
         </div>
       </div>
     </div>
@@ -1954,8 +2150,42 @@ public string BuildQuery(QueryParams p)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, .NET 8 library.</strong> A generic builder base class had <code>Build()</code> return <code>this</code> instead of a new Product. Callers who modified the builder after calling <code>Build()</code> inadvertently mutated what they thought was a finished, immutable object.</p>
+          <p class="body-text"><strong>2024, .NET 8 library.</strong> A team was building a shared configuration library used across multiple microservices. They made a subtle but devastating mistake: the <code>Build()</code> method returned <code>this</code> instead of creating a new product object.</p>
+          <p class="body-text">For weeks, everything seemed fine. But then a developer on another team did something perfectly reasonable: they called <code>Build()</code>, stored the result as their "config," and later called <code>SetPort(80)</code> on the same variable to test a different scenario. They thought they were modifying a separate test config. In reality, they were mutating the "built" production config because the builder and the product were the same object.</p>
+          <p class="body-text">Think of it this way. Imagine you order a custom cake from a bakery (the builder). The baker takes your order, decorates the cake, and says "here is your cake." But instead of handing you a finished cake, they hand you the entire mixing bowl with all the ingredients still in it. If you stir the bowl, you are changing the recipe for every future cake too.</p>
+          <p class="body-text">The bug was especially hard to track because <code>Build()</code> looked correct at the call site. The code read <code>var config = builder.Build();</code> which looks like it produces a separate object. You would have to read the <code>Build()</code> implementation to realize it just returns <code>this</code>.</p>
         </div>
+
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how Build returning this makes builder and product the same object, allowing mutations" style="width:100%;margin:1rem 0">
+          <defs>
+            <marker id="bld-b6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+          </defs>
+          <!-- Bad: same object -->
+          <text x="180" y="20" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Bad: Build() returns this</text>
+          <rect x="40" y="35" width="140" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="110" y="55" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">builder</text>
+          <text x="110" y="73" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Host, Port, SetHost()...</text>
+          <line x1="180" y1="62" x2="216" y2="62" stroke="#ef4444" stroke-width="2" marker-end="url(#bld-b6-arr)"/>
+          <text x="198" y="55" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="9">Build()</text>
+          <rect x="220" y="35" width="140" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="290" y="55" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">config</text>
+          <text x="290" y="73" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Same object! Still mutable!</text>
+          <text x="200" y="110" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">config.SetPort(80) mutates "built" object</text>
+          <!-- Good: separate objects -->
+          <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Good: Build() returns new object</text>
+          <rect x="420" y="35" width="120" height="55" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+          <text x="480" y="55" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">builder</text>
+          <text x="480" y="73" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Mutable (by design)</text>
+          <line x1="540" y1="62" x2="580" y2="62" stroke="#22c55e" stroke-width="2" marker-end="url(#bld-b6-arr)"/>
+          <text x="560" y="55" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="9">Build()</text>
+          <rect x="585" y="35" width="120" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="645" y="55" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">config (record)</text>
+          <text x="645" y="73" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">Immutable! New object!</text>
+          <text x="560" y="110" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Separate types = compiler catches mistakes</text>
+          <!-- Divider -->
+          <line x1="360" y1="30" x2="360" y2="115" stroke="#475569" stroke-width="1" stroke-dasharray="4 3"/>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug6-bad" role="tab" aria-selected="true" aria-controls="bug6-bad">Buggy Code</button>
@@ -1985,6 +2215,7 @@ var config = new ConfigBuilder().SetHost("prod").SetPort(443).Build();
 config.SetPort(80); // ✗ Mutates the "built" object!</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the <code>Build()</code> method: it says <code>return this</code>. That means calling <code>Build()</code> does absolutely nothing except return the same builder you already had. The variable <code>config</code> is not a finished product; it is the builder pretending to be one. Since the builder has public setters like <code>SetPort()</code>, anyone can keep changing "config" after it was supposedly finalized. The builder and the product are the same mutable object.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -2012,11 +2243,16 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
 // config.Host = "evil"; // ✗ Compile error — record is immutable</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Now there are two completely separate types: <code>ServerConfigBuilder</code> (mutable, has setter methods) and <code>ServerConfig</code> (an immutable <code>record</code>). When <code>Build()</code> runs, it creates a brand new <code>ServerConfig</code> using the builder's current state. The builder and the product are different objects in memory. If someone tries to set <code>config.Host = "evil"</code>, the compiler blocks it because records are immutable by default. The type system now prevents the bug at compile time.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text"><code>Build()</code> must always return a <strong>new, separate, immutable object</strong> — never <code>this</code>. The builder is mutable (that's its job); the product is immutable (that's the whole point). Use C# <code>record</code> types for products to get immutability, value equality, and <code>with</code>-expressions for free.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-search"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Open any builder class and look at the <code>Build()</code> method's return type. If <code>Build()</code> returns the same type as the builder class itself (e.g., <code>public ConfigBuilder Build()</code>), that is a strong red flag. The return type of <code>Build()</code> should always be a different type from the builder. Also check if <code>Build()</code> contains <code>return this</code> instead of <code>return new ...</code>.</p>
         </div>
       </div>
     </div>
@@ -2040,8 +2276,40 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> A single builder that constructs 15 different types of objects with 50+ configuration methods.</p>
-          <p><strong>Why Bad:</strong> If your builder has more methods than the Product has properties, it's doing too much — it becomes impossible to maintain and test.</p>
-          <p><strong>Fix:</strong> Split into focused builders — one per Product type. Each builder should have a clear, single responsibility.</p>
+          <p><strong>Why This Happens:</strong> It usually starts innocently. A developer creates a <code>DocumentBuilder</code> for one type of document. Then the team needs to build reports, so they add report methods. Then invoices. Then receipts. Each time, it is "just one more method." Before long, the builder has 50 methods and nobody can tell which methods go with which product type.</p>
+          <p>The temptation is understandable: having one builder feels simpler than managing five separate ones. But the complexity does not disappear; it just moves inside the builder, where it becomes tangled and untestable. A builder with 50 methods is like a Swiss army knife with 50 tools. Sure, it can do everything, but it is awkward for any specific task.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GodBuilder.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ God Builder — too many responsibilities
+public class DocumentBuilder
+{
+    public DocumentBuilder SetTitle(string t) { ... }
+    public DocumentBuilder AddReportSection(Section s) { ... }
+    public DocumentBuilder SetInvoiceLineItems(List&lt;Item&gt; items) { ... }
+    public DocumentBuilder SetReceiptTotal(decimal total) { ... }
+    // ... 46 more methods mixing reports, invoices, receipts
+    public object Build() { ... } // Returns "object" because it builds anything!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">FocusedBuilders.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Focused builders — one per product type
+public class ReportBuilder { ... }   // Only report methods
+public class InvoiceBuilder { ... }  // Only invoice methods
+public class ReceiptBuilder { ... }  // Only receipt methods
+// Each has 5-10 methods, clear responsibility, easy to test</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version tries to be everything. The good version splits responsibilities so each builder is small, focused, and easy to understand. If a builder has methods that don't all contribute to the same product, it needs to be split.</p>
         </div>
       </div>
     </div>
@@ -2054,8 +2322,32 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> Creating a <code>PointBuilder</code> for <code>new Point(x, y)</code> — using Builder when a simple constructor works fine.</p>
-          <p><strong>Why Bad:</strong> Builder adds a class, an allocation, and cognitive overhead for zero benefit. It's <span class="tooltip-trigger">over-engineering<span class="tooltip-content">Adding unnecessary complexity for problems that don't exist — a Builder for a 2-property class adds a class, allocation, and cognitive overhead for zero benefit.</span></span> at its worst.</p>
-          <p><strong>Fix:</strong> Only reach for Builder at 4+ optional parameters or when cross-field validation is needed. If the constructor has 2-3 well-named params, skip it.</p>
+          <p><strong>Why This Happens:</strong> A developer reads about the Builder pattern and gets excited. They start seeing "construction" everywhere and want to apply the pattern to every class. The thinking goes: "Builder makes code more readable, so let me use it for everything." But readability has a cost. Adding a builder class for a 2-property object means you now have twice as many classes to maintain, and the "readable" version is actually <em>longer</em> and <em>harder</em> to follow than the simple constructor.</p>
+          <p>This is <span class="tooltip-trigger">over-engineering<span class="tooltip-content">Adding unnecessary complexity for problems that don't exist — a Builder for a 2-property class adds a class, allocation, and cognitive overhead for zero benefit.</span></span> at its worst. The cure is worse than the disease. A 2-parameter constructor does not have a "which parameter is which?" problem because you can see both of them at a glance.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">OverEngineered.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Over-engineered — Builder for a trivial class
+var point = new PointBuilder()
+    .WithX(10)
+    .WithY(20)
+    .Build();  // 4 lines to create a Point!</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">JustRight.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Simple constructor — perfectly clear for 2 params
+var point = new Point(x: 10, y: 20);  // 1 line, named params</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The builder version adds a whole extra class, an extra allocation, and 3 extra lines of code for zero benefit. The constructor version uses named parameters which are just as readable. Only reach for Builder at 4+ optional parameters or when cross-field validation is needed.</p>
         </div>
       </div>
     </div>
@@ -2068,8 +2360,41 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> A <code>Build()</code> method that blindly assembles the product without checking required fields or invariants.</p>
-          <p><strong>Why Bad:</strong> The whole point of Builder is to validate <em>before</em> creating — without validation, you just have a fancy constructor wrapper with extra steps.</p>
-          <p><strong>Fix:</strong> Always validate required fields and cross-field constraints inside <code>Build()</code> before constructing the product. Throw descriptive exceptions for missing or invalid state.</p>
+          <p><strong>Why This Happens:</strong> Developers often build the happy path first: "Let me get the builder working, I will add validation later." But "later" never comes. The builder ships without validation, and invalid objects start leaking into the system. The developer assumed callers would always configure the builder correctly. They will not.</p>
+          <p>Without validation in <code>Build()</code>, you just have a fancy constructor wrapper with extra steps. The whole point of the Builder pattern is to be the gatekeeper: it accumulates configuration, then validates everything is correct before creating the product. Remove the validation, and the pattern loses its primary value.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">NoValidation.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Build() with no validation — creates anything, even garbage
+public Order Build() =&gt; new(_customerId, _productId, _quantity);
+// What if _customerId is null? What if _quantity is -5?</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">WithValidation.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Build() validates before creating — catches problems early
+public Order Build()
+{
+    var errors = new List&lt;string&gt;();
+    if (string.IsNullOrWhiteSpace(_customerId))
+        errors.Add("Customer ID is required");
+    if (_quantity &lt;= 0)
+        errors.Add("Quantity must be positive");
+    if (errors.Count &gt; 0)
+        throw new InvalidOperationException(
+            string.Join("; ", errors));
+    return new Order(_customerId!, _productId!, _quantity);
+}</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version trusts every caller to get it right. The good version verifies before constructing. This is the difference between a door with no lock and a door with a deadbolt. Both let authorized people through, but only one stops unauthorized entry.</p>
         </div>
       </div>
     </div>
@@ -2082,8 +2407,36 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> Exposing public setters on the Product after <code>Build()</code>.</p>
-          <p><strong>Why Bad:</strong> If the product can be mutated, the Builder's validation guarantees are worthless — anyone can bypass them by changing properties directly.</p>
-          <p><strong>Fix:</strong> Use <code>init</code>, <code>readonly</code>, <code>record</code>, or <code>internal</code> constructors to lock down the product after creation.</p>
+          <p><strong>Why This Happens:</strong> The developer designs the product class like any other C# class: public get/set properties. It feels natural, especially if they are used to working with DTOs and Entity Framework entities. They do not think about what happens after construction because, in their mind, the builder "handles" the creation. But if the product has public setters, anyone can change any property at any time, completely bypassing the builder's validation.</p>
+          <p>It is like having a security guard at the front door (the builder validates during construction) but leaving every window wide open (public setters after construction). The guard is pointless if people can just climb through the windows.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">MutableProduct.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Product with public setters — anyone can bypass validation
+public class Order
+{
+    public string CustomerId { get; set; }  // Can be nulled after Build!
+    public int Quantity { get; set; }       // Can be set to -1 after Build!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">ImmutableProduct.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Immutable product — locked down after construction
+public sealed record Order(
+    string CustomerId,
+    int Quantity);
+// No setters. Record is immutable. Use "with" for safe copies.</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version exposes <code>set</code>, which means any code anywhere can change the product's state without going through validation. The good version uses a <code>record</code>, which is immutable by default. After <code>Build()</code> creates it, nobody can change it. Use <code>init</code>, <code>readonly</code>, or <code>record</code> to lock down products.</p>
         </div>
       </div>
     </div>
@@ -2096,8 +2449,32 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> Registering a Builder as Singleton in <span class="tooltip-trigger">DI<span class="tooltip-content">Dependency Injection — the technique of providing dependencies to a class from outside rather than having the class create them itself.</span></span>.</p>
-          <p><strong>Why Bad:</strong> Builders are mutable by design — sharing them across threads or requests guarantees data corruption.</p>
-          <p><strong>Fix:</strong> Always register builders as Transient, or just <code>new</code> them up directly. Each usage needs its own fresh instance.</p>
+          <p><strong>Why This Happens:</strong> Developers who are new to DI often default to Singleton because "it sounds efficient." They think: "Why create a new builder every time when I can reuse one?" The answer is that builders are designed to accumulate state from one specific build session. Sharing a builder between sessions (or worse, between threads) means one session's state leaks into another.</p>
+          <p>Think of a builder like a notepad where you write down an order. If the waiter uses the same notepad for Table 1 and Table 2 without tearing off the page, Table 2's order contains Table 1's food. Each table needs its own fresh page.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">SharedState.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Singleton — one builder for all requests
+services.AddSingleton&lt;OrderBuilder&gt;();
+// Request A and B write to the same builder = data leak</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">FreshState.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Transient — fresh builder every time
+services.AddTransient&lt;OrderBuilder&gt;();
+// ✓ Even better — just new it up, no DI needed
+var builder = new OrderBuilder();</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> Singleton shares one instance across all requests, so state leaks between them. Transient creates a fresh instance each time, guaranteeing clean state. For builders, always prefer Transient or just <code>new</code> them directly.</p>
         </div>
       </div>
     </div>
@@ -2110,8 +2487,35 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> The builder's <code>List&lt;T&gt;</code> is directly assigned to the Product without a defensive copy.</p>
-          <p><strong>Why Bad:</strong> Callers who keep a reference to the builder can mutate the product's collection after <code>Build()</code>, breaking immutability.</p>
-          <p><strong>Fix:</strong> Always create a new collection: <code>AllowedOrigins = new List&lt;string&gt;(origins)</code> or use <code>.AsReadOnly()</code>.</p>
+          <p><strong>Why This Happens:</strong> The developer writes <code>AllowedOrigins = _origins</code> in the product's constructor, directly assigning the builder's internal list. It looks correct; the list has the right items. But both the builder and the product now point to the exact same list object in memory. If the builder's list is later modified (for a second build, or by accident), the product's list changes too.</p>
+          <p>It is like giving someone a spare key to your house instead of a photocopy of a document. They can now enter and rearrange things whenever they want. A defensive copy is like giving them a photocopy: their copy is independent from your original.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">ExposedCollection.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Direct assignment — product shares builder's list
+internal Config(List&lt;string&gt; origins)
+{
+    AllowedOrigins = origins; // Same reference! Builder can mutate product!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">DefensiveCopy.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Defensive copy — product has its own independent list
+internal Config(List&lt;string&gt; origins)
+{
+    AllowedOrigins = origins.AsReadOnly(); // New read-only wrapper
+}</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version shares a reference, so changes to the builder's list affect the product. The good version creates an independent read-only copy, so the product is completely isolated from the builder after construction.</p>
         </div>
       </div>
     </div>
@@ -2124,8 +2528,43 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> Builder methods return <code>IBuilder</code> (the interface) instead of the concrete type.</p>
-          <p><strong>Why Bad:</strong> This breaks fluency when subclasses add extra methods — the chain loses access to the subclass methods after calling a base method.</p>
-          <p><strong>Fix:</strong> Use <span class="tooltip-trigger">CRTP<span class="tooltip-content">Curiously Recurring Template Pattern — a C# technique where a base class takes its subclass as a generic parameter: class Builder&lt;T&gt; where T : Builder&lt;T&gt;. Enables fluent method chains that preserve the subclass type.</span></span> (see Q17 in <span class="tooltip-trigger">Interview Q&amp;As<span class="tooltip-content">Section 17 below — covers the generic base Builder implementation with CRTP in detail with code examples.</span></span>) or return the concrete builder type directly.</p>
+          <p><strong>Why This Happens:</strong> The developer follows "program to an interface" advice and makes all builder methods return <code>IBuilder</code>. This is good advice in general, but it breaks fluent chains. If a base method returns <code>IBuilder</code>, and your subclass adds <code>WithAge()</code>, you cannot call <code>builder.WithName("X").WithAge(30)</code> because after <code>WithName()</code> the chain sees <code>IBuilder</code>, which does not have <code>WithAge()</code>.</p>
+          <p>Think of it like a phone menu system. After each selection, you are sent back to the main menu instead of staying in the submenu you were navigating. You lose context and have to start over.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">LostFluency.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Base method returns IBuilder — chain loses derived type
+public interface IBuilder { IBuilder WithName(string n); }
+public class UserBuilder : IBuilder
+{
+    public IBuilder WithName(string n) { ... } // Returns IBuilder
+    public UserBuilder WithAge(int a) { ... }
+}
+// builder.WithName("A").WithAge(30) ← Compile error! IBuilder has no WithAge</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">PreservedFluency.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ CRTP preserves the concrete type through the chain
+public abstract class BaseBuilder&lt;TSelf&gt; where TSelf : BaseBuilder&lt;TSelf&gt;
+{
+    public TSelf WithName(string n) { _name = n; return (TSelf)this; }
+}
+public class UserBuilder : BaseBuilder&lt;UserBuilder&gt;
+{
+    public UserBuilder WithAge(int a) { ... }
+}
+// builder.WithName("A").WithAge(30) ← Works! Chain stays as UserBuilder</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version returns the base interface type, which "forgets" the concrete type and breaks the chain. The good version uses <span class="tooltip-trigger">CRTP<span class="tooltip-content">Curiously Recurring Template Pattern — a C# technique where a base class takes its subclass as a generic parameter: class Builder&lt;T&gt; where T : Builder&lt;T&gt;. Enables fluent method chains that preserve the subclass type.</span></span> so every method in the chain returns the correct subclass type. See Q17 in <span class="tooltip-trigger">Interview Q&amp;As<span class="tooltip-content">Section 17 below — covers the generic base Builder implementation with CRTP in detail with code examples.</span></span> for the full implementation.</p>
         </div>
       </div>
     </div>
@@ -2138,8 +2577,43 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> Build steps that make HTTP calls, write to databases, or send messages.</p>
-          <p><strong>Why Bad:</strong> Builder steps should only accumulate configuration. Side effects during construction make builders unpredictable, untestable, and order-dependent.</p>
-          <p><strong>Fix:</strong> Keep build steps pure — <strong>never</strong> perform I/O. Side effects belong in the Director or in a separate Execute/Run method after <code>Build()</code>.</p>
+          <p><strong>Why This Happens:</strong> A developer thinks: "The builder already knows what to construct, so why not have it also do some setup work while building?" For example, <code>WithTemplate()</code> fetches a template from a remote API during the build step. This seems convenient, but it turns a simple, predictable builder into something that depends on network availability, response times, and error handling.</p>
+          <p>Builder steps should be like filling out a form: you write things down. You do not mail the form between each question. All the "doing" should happen after the form is complete, not during the filling-out process. Side effects during construction make the builder unpredictable, hard to test (you need to mock HTTP calls), and order-dependent (what if the API call fails halfway through?)</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">SideEffects.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Builder step makes an HTTP call — side effect during construction
+public ReportBuilder WithTemplate(string url)
+{
+    _template = _httpClient.GetStringAsync(url).Result; // Blocks! Can fail!
+    return this;
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">PureSteps.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Builder step stores config only — I/O happens in BuildAsync()
+public ReportBuilder WithTemplateUrl(string url)
+{
+    _templateUrl = url; // Just stores the URL. No I/O.
+    return this;
+}
+
+public async Task&lt;Report&gt; BuildAsync()
+{
+    var template = await _httpClient.GetStringAsync(_templateUrl);
+    return new Report(template, _title, _sections);
+}</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version performs I/O during a build step, which can fail, block, or throw. The good version stores configuration during build steps and does all the I/O in a single <code>BuildAsync()</code> method. This keeps steps pure, predictable, and testable.</p>
         </div>
       </div>
     </div>
@@ -2151,9 +2625,43 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p><strong>Mistake:</strong> A builder that allows <code>Build()</code> to be called repeatedly but produces <em>unpredictable</em> results because internal state mutates between calls (e.g., accumulating collections without Reset).</p>
-          <p><strong>Why Bad:</strong> Callers expect each <code>Build()</code> to produce a consistent, independent product. Accumulated state leads to subtle, hard-to-debug differences.</p>
-          <p><strong>Fix:</strong> Either (1) make the builder single-use (throw on second <code>Build()</code> call), or (2) ensure each <code>Build()</code> produces an independent snapshot by defensively copying all state.</p>
+          <p><strong>Mistake:</strong> A builder that allows <code>Build()</code> to be called repeatedly but produces <em>unpredictable</em> results because internal state mutates between calls.</p>
+          <p><strong>Why This Happens:</strong> The developer does not consider whether the builder should be single-use or multi-use. They leave <code>Build()</code> as a simple method with no guards. A caller innocently calls <code>Build()</code> twice, expecting two identical products. But if the builder has internal lists that accumulate (like adding sections), the second product contains more data than the first. Or if <code>Build()</code> clears some state but not all, the second product is subtly different.</p>
+          <p>Imagine a factory assembly line that does not reset between products. The first car gets 4 wheels, and the second car gets 8 because the wheel station just kept adding.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">MultiBuild.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Allows multiple Build() calls with no protection
+var b = new ReportBuilder().SetTitle("Q1");
+b.AddSection("Revenue");
+var report1 = b.Build(); // 1 section
+b.AddSection("Users");
+var report2 = b.Build(); // 2 sections! (Revenue + Users)</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">SingleUseBuild.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Option 1: Single-use — throw on second Build()
+private bool _built;
+public Report Build()
+{
+    if (_built) throw new InvalidOperationException("Already built");
+    _built = true;
+    return new Report(_title, new List&lt;string&gt;(_sections));
+}
+
+// ✓ Option 2: Multi-use safe — defensive copy every time
+public Report Build() =&gt; new(_title, new List&lt;string&gt;(_sections));</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version silently produces different results on each call. The good versions either block the second call entirely (single-use) or make a fresh defensive copy each time (multi-use safe). Pick one strategy and be explicit about it.</p>
         </div>
       </div>
     </div>
@@ -2166,8 +2674,31 @@ var config = new ServerConfigBuilder().SetHost("prod").SetPort(443).Build();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p><strong>Mistake:</strong> Building a full Builder just to change one field on an existing record object.</p>
-          <p><strong>Why Bad:</strong> In C# 9+, records support <span class="tooltip-trigger"><code>with</code>-expression<span class="tooltip-content">C# 9+ syntax for creating a copy of a record with some properties changed: var copy = original with { Name = "new" }. Non-destructive mutation.</span></span> for exactly this purpose: <code>var updated = original with { Name = "new" }</code>. A Builder adds unnecessary complexity.</p>
-          <p><strong>Fix:</strong> Use <code>with</code>-expressions for modifying copies of existing records. Reserve Builder for constructing from scratch with validation and multi-step logic.</p>
+          <p><strong>Why This Happens:</strong> The developer is already using a builder to create objects, so they reach for it whenever they need a "modified copy" too. They write a <code>ToBuilder()</code> method on the product, modify one field, and call <code>Build()</code> again. It works, but it is a lot of ceremony for what should be a one-line operation.</p>
+          <p>In C# 9+, records support <span class="tooltip-trigger"><code>with</code>-expressions<span class="tooltip-content">C# 9+ syntax for creating a copy of a record with some properties changed: var copy = original with { Name = "new" }. Non-destructive mutation.</span></span> for exactly this purpose: <code>var updated = original with { Name = "new" }</code>. This creates a copy with one field changed, no builder needed. A builder adds unnecessary complexity when the record already has this feature built in.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">UnnecessaryBuilder.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Over-engineered — using builder just to change one field
+var updated = original.ToBuilder()
+    .WithName("New Name")
+    .Build();  // 3 lines + ToBuilder() method needed</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">WithExpression.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ with-expression — built into C# records, one clean line
+var updated = original with { Name = "New Name" };</code></pre>
+            </div>
+          </div>
+          <p class="mt-sm"><strong>The connection:</strong> The bad version goes through a builder round-trip to change one field. The good version uses the language's built-in feature for exactly this purpose. Reserve builders for constructing objects from scratch with validation. Use <code>with</code> for creating modified copies of existing records.</p>
         </div>
       </div>
     </div>
@@ -2543,8 +3074,9 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What problem does a 10-parameter constructor create?</div>
           <div class="body-text">
-            <p>Builder is a creational pattern that constructs complex objects step by step. Instead of passing 10 parameters to a constructor (where you forget which null means what), you call named methods like <code>.SetName()</code>, <code>.WithEmail()</code>, then finalize with <code>.Build()</code>.</p>
-            <p>It solves three problems: <strong>(1)</strong> Telescoping constructors — too many overloads. <strong>(2)</strong> No validation — invalid object state isn't caught. <strong>(3)</strong> Mutability — objects can be changed after creation.</p>
+            <p>Think of ordering a custom sandwich at a deli. You do not shout all 10 ingredients at once and hope the person behind the counter remembers them all. Instead, you go step by step: "I want wheat bread, then turkey, then Swiss cheese, then lettuce..." and at the end you say "that's it, make it." That "make it" moment is <code>.Build()</code>.</p>
+            <p>Builder is a creational pattern that constructs complex objects step by step. Instead of passing 10 parameters to a constructor (where you forget which <code>null</code> means what), you call named methods like <code>.SetName()</code>, <code>.WithEmail()</code>, then finalize with <code>.Build()</code>. Each method is self-documenting, so you always know what you are configuring.</p>
+            <p>It solves three problems: <strong>(1)</strong> Telescoping constructors — too many overloads. <strong>(2)</strong> No validation — invalid object state isn't caught until runtime. <strong>(3)</strong> Mutability — objects can be changed after creation. The builder addresses all three: named methods replace positional params, <code>Build()</code> validates before creating, and the product is immutable.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In .NET, WebApplicationBuilder is the most prominent example — it configures DI, logging, and middleware step by step before producing an immutable WebApplication."</div>
         </div>
@@ -2563,8 +3095,9 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you name all four participants and their roles?</div>
           <div class="body-text">
-            <p><strong>Builder</strong> — interface declaring the construction steps. <strong>ConcreteBuilder</strong> — implements the steps, accumulates state, provides <code>Build()</code>. <strong>Director</strong> — orchestrates which steps are called and in what order. <strong>Product</strong> — the complex object being constructed, typically immutable.</p>
-            <p>In modern .NET, the Director is often omitted — the client chains fluent methods directly on the builder.</p>
+            <p>Think of building a house. You have four key roles: the <strong>blueprint</strong> (Builder interface) describes what steps exist (lay foundation, build walls, add roof). The <strong>construction crew</strong> (ConcreteBuilder) actually performs those steps and keeps track of progress. The <strong>architect</strong> (Director) decides the order: "foundation first, then walls, then roof." And the <strong>house</strong> (Product) is the finished result you move into.</p>
+            <p><strong>Builder</strong> — the interface declaring the construction steps. <strong>ConcreteBuilder</strong> — implements the steps, accumulates state, and provides <code>Build()</code>. <strong>Director</strong> — orchestrates which steps are called and in what order. <strong>Product</strong> — the complex object being constructed, typically immutable.</p>
+            <p>In modern .NET, the Director is often omitted — the client chains fluent methods directly on the builder. But the Director role is still useful when you have predefined "recipes" like <code>BuildGamingPC()</code> vs <code>BuildBudgetPC()</code> that call builder methods in specific sequences.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The Director role exists to encapsulate common build sequences — like a BuildMonthlyReport() that always adds the same sections. It's still useful even with fluent builders."</div>
         </div>
@@ -2622,7 +3155,9 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What's the simplest construction scenario where Builder is overkill?</div>
           <div class="body-text">
-            <p>Don't use Builder when: <strong>(1)</strong> the object has 1-3 parameters — a simple constructor is fine. <strong>(2)</strong> No validation is needed — object initializers work. <strong>(3)</strong> The object is a simple DTO with no invariants. <strong>(4)</strong> C# <code>record</code> with <code>required</code> members handles your needs. <strong>(5)</strong> You only need to change one field on an existing object — use <code>with</code>-expression instead.</p>
+            <p>Imagine buying a hammer to hang a single picture frame. You don't need a full carpentry workshop for that. Builder is the same way: it is a powerful tool, but not every construction job needs it.</p>
+            <p>Don't use Builder when: <strong>(1)</strong> the object has 1-3 parameters — a simple constructor is fine, named arguments make it readable. <strong>(2)</strong> No validation is needed — object initializers like <code>new Foo { A = 1 }</code> work great. <strong>(3)</strong> The object is a simple DTO with no invariants or business rules. <strong>(4)</strong> C# <code>record</code> with <code>required</code> members handles your needs. <strong>(5)</strong> You only need to change one field on an existing object — use <code>with</code>-expression instead of round-tripping through a builder.</p>
+            <p>A good rule of thumb: if you can describe the constructor call to a teammate without them getting confused, you do not need a builder. Builders shine when the construction is complex enough that a plain constructor becomes unreadable or error-prone.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The threshold is roughly 4+ optional parameters or any cross-field validation. Below that, Builder adds overhead without enough benefit."</div>
         </div>
@@ -2647,8 +3182,43 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What does each pattern focus on — process or product families?</div>
           <div class="body-text">
+            <p>Think of it with a restaurant analogy. <strong>Builder</strong> is like a custom burger counter: you build one meal step by step (pick the bun, add patty, choose toppings, finalize). <strong>Abstract Factory</strong> is like choosing a cuisine: if you pick "Italian," every dish on the menu is Italian (pasta, wine, tiramisu). The factory ensures everything belongs together; the builder ensures one complex thing is built correctly.</p>
             <p><strong>Builder</strong> focuses on constructing <em>one complex object</em> step by step. <strong>Abstract Factory</strong> focuses on creating <em>families of related objects</em> that must be consistent. Builder is about the construction <em>process</em>; Abstract Factory is about product <em>compatibility</em>.</p>
             <p>Builder often produces one big Product. Abstract Factory produces multiple small Products that belong to the same family. Builder validates at <code>Build()</code> time; Abstract Factory guarantees consistency by restricting which factory creates which products.</p>
+            <svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram comparing Builder (one complex object, step by step) vs Abstract Factory (family of related objects)" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <!-- Builder side -->
+              <text x="180" y="18" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Builder Pattern</text>
+              <rect x="30" y="30" width="100" height="40" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="80" y="55" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">Step 1</text>
+              <line x1="130" y1="50" x2="148" y2="50" stroke="#f97316" stroke-width="1.5" marker-end="url(#bld-q6-arr)"/>
+              <rect x="153" y="30" width="100" height="40" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="203" y="55" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">Step 2</text>
+              <line x1="253" y1="50" x2="271" y2="50" stroke="#f97316" stroke-width="1.5" marker-end="url(#bld-q6-arr)"/>
+              <rect x="276" y="30" width="55" height="40" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="303" y="55" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">Build()</text>
+              <line x1="331" y1="50" x2="348" y2="85" stroke="#f97316" stroke-width="1.5" marker-end="url(#bld-q6-arr)"/>
+              <rect x="100" y="80" width="200" height="40" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+              <text x="200" y="105" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">One Complex Product</text>
+              <!-- Divider -->
+              <line x1="370" y1="15" x2="370" y2="170" stroke="#475569" stroke-width="1" stroke-dasharray="4 3"/>
+              <!-- Abstract Factory side -->
+              <text x="545" y="18" text-anchor="middle" fill="#3b82f6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Abstract Factory Pattern</text>
+              <rect x="470" y="30" width="150" height="40" rx="6" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+              <text x="545" y="55" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11">ItalianFactory</text>
+              <rect x="400" y="90" width="90" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="445" y="112" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Pasta</text>
+              <rect x="500" y="90" width="90" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="545" y="112" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Wine</text>
+              <rect x="600" y="90" width="90" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="645" y="112" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Tiramisu</text>
+              <line x1="505" y1="70" x2="445" y2="90" stroke="#3b82f6" stroke-width="1" marker-end="url(#bld-q6-arr)"/>
+              <line x1="545" y1="70" x2="545" y2="90" stroke="#3b82f6" stroke-width="1" marker-end="url(#bld-q6-arr)"/>
+              <line x1="585" y1="70" x2="645" y2="90" stroke="#3b82f6" stroke-width="1" marker-end="url(#bld-q6-arr)"/>
+              <text x="545" y="145" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Family of Related Products</text>
+            </svg>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "They can work together — an Abstract Factory might use a Builder internally to construct complex products: factory.CreateReport() internally uses a ReportBuilder."</div>
         </div>
@@ -2667,8 +3237,31 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How can the compiler enforce that certain build steps must happen before others?</div>
           <div class="body-text">
-            <p>A <span class="tooltip-trigger">Step Builder<span class="tooltip-content">A Builder variant where each build phase returns a different interface type — the compiler enforces that required steps happen in order and optional steps only appear after required ones.</span></span> uses different interface types for each build phase. Step 1 returns <code>IStep2</code>, which returns <code>IStep3</code>, etc. The compiler won't let you skip steps or call them out of order because each step only exposes the methods for the <em>next</em> step.</p>
-            <p>Use it when: build order matters (can't set WHERE before FROM in SQL), required steps must happen before optional ones, or you want compile-time rather than runtime validation of the build sequence.</p>
+            <p>Imagine a recipe where you absolutely must preheat the oven before putting in the cake batter. If you skip preheating, the cake is ruined. A regular builder lets you call methods in any order, so it cannot prevent someone from adding batter before preheating. A Step Builder fixes this by using the type system as a guard rail.</p>
+            <p>A <span class="tooltip-trigger">Step Builder<span class="tooltip-content">A Builder variant where each build phase returns a different interface type — the compiler enforces that required steps happen in order and optional steps only appear after required ones.</span></span> uses different interface types for each build phase. Step 1 returns <code>IStep2</code>, which returns <code>IStep3</code>, etc. The compiler will not let you skip steps or call them out of order because each step only exposes the methods for the <em>next</em> step. After you call the method on <code>IStep1</code>, your variable's type changes to <code>IStep2</code>, and only <code>IStep2</code>'s methods are visible in IntelliSense.</p>
+            <p>Use it when: build order matters (cannot set WHERE before FROM in SQL), required steps must happen before optional ones, or you want compile-time rather than runtime validation of the build sequence.</p>
+            <svg viewBox="0 0 720 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing Step Builder interface chain: IStep1 returns IStep2 returns IStep3 returns IBuildable" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <rect x="20" y="30" width="130" height="55" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+              <text x="85" y="52" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">IBaseUrlStep</text>
+              <text x="85" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">From(table)</text>
+              <line x1="150" y1="57" x2="180" y2="57" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q7-arr)"/>
+              <rect x="185" y="30" width="130" height="55" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+              <text x="250" y="52" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">IMethodStep</text>
+              <text x="250" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Where(col, val)</text>
+              <line x1="315" y1="57" x2="345" y2="57" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q7-arr)"/>
+              <rect x="350" y="30" width="130" height="55" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+              <text x="415" y="52" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">IOptionalStep</text>
+              <text x="415" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">OrderBy() / Limit()</text>
+              <line x1="480" y1="57" x2="510" y2="57" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q7-arr)"/>
+              <rect x="515" y="30" width="130" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+              <text x="580" y="52" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">IBuildable</text>
+              <text x="580" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Build()</text>
+              <text x="360" y="115" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Each step returns the NEXT interface. Compiler blocks skipping or reordering.</text>
+              <text x="360" y="130" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Calling .Where() before .From() is a COMPILE ERROR, not a runtime crash</text>
+            </svg>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The trade-off is more interfaces — one per step. For complex builders with 10+ steps, this gets verbose. Use it for critical builders where wrong step order causes hard-to-debug issues."</div>
         </div>
@@ -2725,8 +3318,38 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Where does the build "recipe" live if there's no Director?</div>
           <div class="body-text">
-            <p>The Director <span class="tooltip-trigger">encapsulates<span class="tooltip-content">Encapsulation — hiding implementation details behind an interface. The Director hides the construction algorithm so clients don't need to know the step sequence.</span></span> a <em>specific construction sequence</em> — it knows which steps to call and in what order. Without a Director, the client must know the sequence. The Director is still relevant when you have <strong>predefined configurations</strong> (e.g., BuildGamingPC, BuildBudgetPC) that should be reusable.</p>
-            <p>In practice, modern .NET either uses the client as the director (fluent chains) or uses factory methods that encapsulate the build sequence: <code>Order.CreateGiftOrder(...)</code> internally uses a builder.</p>
+            <p>Think of a head chef in a restaurant. The chef does not cook the food directly (that is the cook's job, a.k.a. the builder). But the chef knows the <em>recipe</em>: "For the special, start with the sauce, then sear the steak, then plate with garnish." The recipe is reusable across different cooks (builders). The Director is that head chef: it holds the recipe and tells the builder which steps to perform and in what order.</p>
+            <p>The Director <span class="tooltip-trigger">encapsulates<span class="tooltip-content">Encapsulation — hiding implementation details behind an interface. The Director hides the construction algorithm so clients don't need to know the step sequence.</span></span> a <em>specific construction sequence</em> — it knows which steps to call and in what order. Without a Director, the client must know the sequence. The Director is still relevant when you have <strong>predefined configurations</strong> (e.g., <code>BuildGamingPC</code>, <code>BuildBudgetPC</code>) that should be reusable.</p>
+            <p>In practice, modern .NET either uses the client as the director (fluent chains) or uses factory methods that encapsulate the build sequence: <code>Order.CreateGiftOrder(...)</code> internally uses a builder. The Director is basically a factory method that takes a builder. It is still useful; it just often takes the form of a static method rather than a separate class.</p>
+            <svg viewBox="0 0 720 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing Director orchestrating builder steps: Director calls SetTitle, AddHeader, AddSections on Builder, then Build produces Product" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q10-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <rect x="20" y="40" width="140" height="60" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+              <text x="90" y="65" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Director</text>
+              <text x="90" y="82" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">BuildMonthlyReport()</text>
+              <!-- Arrows from Director to Builder steps -->
+              <line x1="160" y1="55" x2="210" y2="35" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#bld-q10-arr)"/>
+              <line x1="160" y1="65" x2="210" y2="70" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#bld-q10-arr)"/>
+              <line x1="160" y1="80" x2="210" y2="105" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#bld-q10-arr)"/>
+              <!-- Builder steps -->
+              <rect x="215" y="15" width="160" height="35" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="295" y="37" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">1. SetTitle("Monthly")</text>
+              <rect x="215" y="55" width="160" height="35" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="295" y="77" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">2. AddHeader(summary)</text>
+              <rect x="215" y="95" width="160" height="35" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="295" y="117" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">3. AddSections(data)</text>
+              <!-- Build -->
+              <line x1="375" y1="75" x2="430" y2="75" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q10-arr)"/>
+              <rect x="435" y="50" width="80" height="45" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+              <text x="475" y="77" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Build()</text>
+              <line x1="515" y1="75" x2="555" y2="75" stroke="#22c55e" stroke-width="2" marker-end="url(#bld-q10-arr)"/>
+              <!-- Product -->
+              <rect x="560" y="45" width="140" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+              <text x="630" y="68" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Report</text>
+              <text x="630" y="85" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">(immutable product)</text>
+              <text x="360" y="165" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Director knows the recipe. Builder does the work. Product is the result.</text>
+            </svg>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The Director is basically a factory method that takes a Builder. It's still useful — it just often takes the form of a static method rather than a separate class."</div>
         </div>
@@ -2745,8 +3368,9 @@ ImmutableArray&lt;int&gt; result = builder.MoveToImmutable();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What DI lifetime makes sense for a mutable, stateful object?</div>
           <div class="body-text">
-            <p><strong><span class="tooltip-trigger">Transient<span class="tooltip-content">DI lifetime where a new instance is created every time the service is requested. AddTransient&lt;T&gt;() — ideal for stateful, short-lived objects like builders.</span></span></strong> — always. Builders are mutable and stateful. <span class="tooltip-trigger">Singleton<span class="tooltip-content">DI lifetime where one instance is shared across the entire application. AddSingleton&lt;T&gt;() — dangerous for builders because concurrent requests share mutable state.</span></span> = race conditions. <span class="tooltip-trigger">Scoped<span class="tooltip-content">DI lifetime where one instance is created per HTTP request (or scope). AddScoped&lt;T&gt;() — still risky for builders if multiple usages occur within one request.</span></span> = state leaks between usages in the same scope. Better yet, <strong>don't register builders in DI at all</strong> — just <code>new</code> them. Builders are simple, have no dependencies, and are meant to be short-lived.</p>
-            <p>If a builder needs injected dependencies (rare), register a <strong>builder factory</strong> as Singleton that creates fresh builder instances: <code>IBuilderFactory.Create()</code>.</p>
+            <p>This question trips up many candidates because the natural instinct is "I want to reuse objects, so Scoped or Singleton." But builders are the exception. They accumulate mutable state that is specific to one build operation. Sharing them means sharing that state.</p>
+            <p><strong><span class="tooltip-trigger">Transient<span class="tooltip-content">DI lifetime where a new instance is created every time the service is requested. AddTransient&lt;T&gt;() — ideal for stateful, short-lived objects like builders.</span></span></strong> — always. Builders are mutable and stateful. <span class="tooltip-trigger">Singleton<span class="tooltip-content">DI lifetime where one instance is shared across the entire application. AddSingleton&lt;T&gt;() — dangerous for builders because concurrent requests share mutable state.</span></span> = race conditions (two threads writing to the same builder). <span class="tooltip-trigger">Scoped<span class="tooltip-content">DI lifetime where one instance is created per HTTP request (or scope). AddScoped&lt;T&gt;() — still risky for builders if multiple usages occur within one request.</span></span> = state leaks between usages in the same scope (generating two reports in one request means the second inherits the first's data). Better yet, <strong>don't register builders in DI at all</strong> — just <code>new</code> them. Builders are simple, have no dependencies, and are meant to be short-lived.</p>
+            <p>If a builder needs injected dependencies (rare), register a <strong>builder factory</strong> as Singleton that creates fresh builder instances: <code>IBuilderFactory.Create()</code>. The factory lives forever; the builders it creates are disposable and short-lived.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is a common interview trap — candidates register builders as Scoped and then wonder why their second report contains the first report's data."</div>
         </div>
@@ -2920,7 +3544,35 @@ public class CreateUserRequest
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What's the problem with returning a base Builder type from fluent methods?</div>
           <div class="body-text">
-            <p>Problem: If <code>BaseBuilder.WithName()</code> returns <code>BaseBuilder</code>, then <code>DerivedBuilder.WithName().DerivedMethod()</code> won't compile — the chain loses the derived type. CRTP solves this:</p>
+            <p>This is one of the trickier C# patterns, so let's build up to it. Say you have a <code>BaseBuilder</code> with shared methods like <code>WithName()</code>, and a <code>UserBuilder</code> that inherits from it and adds <code>WithAge()</code>. You want fluent chaining: <code>new UserBuilder().WithName("Alice").WithAge(30)</code>.</p>
+            <p>The problem: If <code>WithName()</code> returns <code>BaseBuilder</code>, the chain breaks at <code>.WithAge()</code> because the compiler sees a <code>BaseBuilder</code> at that point, and <code>BaseBuilder</code> does not have a <code>WithAge()</code> method. The solution is called CRTP (Curiously Recurring Template Pattern), where the base class takes its own subclass as a generic parameter: <code>BaseBuilder&lt;TSelf&gt;</code>. Now <code>WithName()</code> returns <code>TSelf</code> (the actual subclass type), and the chain preserves the concrete type.</p>
+            <svg viewBox="0 0 720 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing CRTP: BaseBuilder returns TSelf, so UserBuilder's chain preserves the UserBuilder type" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q17-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <!-- Without CRTP -->
+              <text x="180" y="15" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Without CRTP (broken)</text>
+              <rect x="20" y="25" width="130" height="35" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+              <text x="85" y="47" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">WithName() : BaseBuilder</text>
+              <line x1="150" y1="42" x2="170" y2="42" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bld-q17-arr)"/>
+              <rect x="175" y="25" width="160" height="35" rx="6" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+              <text x="255" y="47" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">.WithAge(30) COMPILE ERROR</text>
+              <!-- With CRTP -->
+              <text x="180" y="90" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">With CRTP (works)</text>
+              <rect x="20" y="100" width="140" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="90" y="122" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">WithName() : UserBuilder</text>
+              <line x1="160" y1="117" x2="180" y2="117" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bld-q17-arr)"/>
+              <rect x="185" y="100" width="140" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="255" y="122" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">WithAge(30) : UserBuilder</text>
+              <line x1="325" y1="117" x2="345" y2="117" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bld-q17-arr)"/>
+              <rect x="350" y="100" width="100" height="35" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="400" y="122" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Build() : User</text>
+              <!-- Key insight -->
+              <rect x="500" y="60" width="200" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="600" y="82" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">CRTP Magic</text>
+              <text x="600" y="100" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">BaseBuilder&lt;TSelf&gt;</text>
+              <text x="600" y="118" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">returns (TSelf)this</text>
+            </svg>
             <div class="macos-window mt-sm">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2962,8 +3614,40 @@ var user = new UserBuilder().WithName("Alice").WithAge(30).Build();</code></pre>
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What does Build() actually do — just create an object, or something more?</div>
           <div class="body-text">
-            <p><code>WebApplication.CreateBuilder()</code> creates a builder that aggregates several sub-builders: <code>ConfigurationManager</code>, <code>IServiceCollection</code>, <code>ILoggingBuilder</code>. Properties like <code>builder.Services</code> let you configure DI; <code>builder.Configuration</code> lets you add config sources.</p>
-            <p><code>Build()</code> does heavy lifting: builds the <code>IServiceProvider</code> (DI container), creates the <code>IConfiguration</code> root, wires up the HTTP pipeline, and returns an immutable <code>WebApplication</code> ready to run. It's a "big bang" operation — everything comes together at Build time.</p>
+            <p>If you have ever written a .NET web app, you have already used the Builder pattern without realizing it. <code>WebApplication.CreateBuilder(args)</code> returns a <code>WebApplicationBuilder</code>, and everything you do between that line and <code>.Build()</code> is configuration. You are using a builder.</p>
+            <p><code>WebApplicationBuilder</code> aggregates several sub-builders internally: <code>ConfigurationManager</code> handles app settings, <code>IServiceCollection</code> handles dependency injection registrations, and <code>ILoggingBuilder</code> handles logging providers. Properties like <code>builder.Services</code> give you direct access to configure DI; <code>builder.Configuration</code> lets you add config sources from JSON files, environment variables, or command-line args.</p>
+            <p>When you call <code>Build()</code>, a lot happens behind the scenes: it compiles all service registrations into an <code>IServiceProvider</code> (the DI container), merges all configuration sources into a single <code>IConfiguration</code> root, sets up the HTTP pipeline, and returns an immutable <code>WebApplication</code> ready to run. This is a "big bang" operation: everything comes together at Build time. After <code>Build()</code>, you cannot add more services or change configuration.</p>
+            <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing WebApplicationBuilder aggregating Services, Configuration, Logging, then Build producing immutable WebApplication" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q18-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <!-- Main builder box -->
+              <rect x="20" y="20" width="400" height="160" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+              <text x="220" y="45" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">WebApplicationBuilder</text>
+              <!-- Sub-builders -->
+              <rect x="40" y="60" width="115" height="45" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+              <text x="97" y="78" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">.Services</text>
+              <text x="97" y="93" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">IServiceCollection</text>
+              <rect x="165" y="60" width="115" height="45" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+              <text x="222" y="78" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">.Configuration</text>
+              <text x="222" y="93" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">ConfigurationManager</text>
+              <rect x="290" y="60" width="115" height="45" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+              <text x="347" y="78" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">.Logging</text>
+              <text x="347" y="93" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">ILoggingBuilder</text>
+              <!-- Build() -->
+              <rect x="130" y="120" width="180" height="40" rx="8" fill="#0f172a" stroke="#f97316" stroke-width="2"/>
+              <text x="220" y="145" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700">.Build()</text>
+              <!-- Arrow to product -->
+              <line x1="420" y1="100" x2="480" y2="100" stroke="#22c55e" stroke-width="2" marker-end="url(#bld-q18-arr)"/>
+              <!-- Product -->
+              <rect x="485" y="40" width="215" height="130" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+              <text x="592" y="65" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700">WebApplication</text>
+              <text x="592" y="85" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">(immutable after Build)</text>
+              <text x="592" y="108" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">IServiceProvider built</text>
+              <text x="592" y="123" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">IConfiguration merged</text>
+              <text x="592" y="138" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">HTTP pipeline wired</text>
+              <text x="592" y="158" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Ready to .Run()</text>
+            </svg>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The interesting architectural choice is that WebApplicationBuilder exposes mutable properties (Services, Configuration) directly rather than fluent methods. This makes it easier to pass to extension methods: builder.Services.AddMyStuff()."</div>
         </div>
@@ -2982,8 +3666,40 @@ var user = new UserBuilder().WithName("Alice").WithAge(30).Build();</code></pre>
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Should you even try, or is there a simpler solution?</div>
           <div class="body-text">
-            <p>The <strong>correct answer</strong> is usually "don't." Builders are inherently mutable and sequential — making them <span class="tooltip-trigger">thread-safe<span class="tooltip-content">Code that works correctly when accessed by multiple threads simultaneously. Achieved through locks, immutability, or thread-local storage.</span></span> defeats their purpose and adds unnecessary complexity. Each thread should get its own builder instance.</p>
-            <p>If you absolutely must (rare): use an <strong>immutable builder</strong> pattern where each method returns a <em>new</em> builder instance (via <code>record</code> + <code>with</code>) instead of mutating <code>this</code>. Each method returns a fresh copy, so no thread can observe partial state. Note: <code>ImmutableArray.CreateBuilder()</code> is a <em>mutable</em> builder for an immutable product — the builder itself isn't thread-safe, only the resulting <code>ImmutableArray</code> is.</p>
+            <p>This is a favorite trick question in interviews. The interviewer wants to see if you reach for locks and synchronization, or if you step back and question the premise. The <strong>correct senior answer</strong> is usually: "don't share builders between threads." Each thread gets its own builder instance. Problem solved without any complexity.</p>
+            <p>Builders are inherently mutable and sequential. That is their whole job: accumulate state, then produce a product. Making them <span class="tooltip-trigger">thread-safe<span class="tooltip-content">Code that works correctly when accessed by multiple threads simultaneously. Achieved through locks, immutability, or thread-local storage.</span></span> with locks defeats their purpose and adds unnecessary complexity. The locks also hurt performance because threads wait for each other, and the error-prone synchronization code is harder to test than the builder itself.</p>
+            <p>If you absolutely must share build state across threads (rare), use an <strong>immutable builder</strong> pattern where each method returns a <em>new</em> builder instance (via <code>record</code> + <code>with</code>) instead of mutating <code>this</code>. Each method returns a fresh copy, so no thread can observe partial state. Think of it like a Google Docs version history: each edit creates a new version, and nobody can corrupt another user's view.</p>
+            <svg viewBox="0 0 720 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram comparing mutable shared builder (dangerous) vs one-builder-per-thread (safe)" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q19-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <!-- Bad: shared -->
+              <text x="175" y="15" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Bad: shared mutable builder</text>
+              <rect x="30" y="30" width="80" height="30" rx="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+              <text x="70" y="50" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread A</text>
+              <rect x="30" y="70" width="80" height="30" rx="5" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+              <text x="70" y="90" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread B</text>
+              <line x1="110" y1="45" x2="160" y2="65" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#bld-q19-arr)"/>
+              <line x1="110" y1="85" x2="160" y2="75" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bld-q19-arr)"/>
+              <rect x="165" y="50" width="130" height="40" rx="6" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+              <text x="230" y="75" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">One Builder (shared)</text>
+              <!-- Divider -->
+              <line x1="360" y1="10" x2="360" y2="160" stroke="#475569" stroke-width="1" stroke-dasharray="4 3"/>
+              <!-- Good: separate -->
+              <text x="540" y="15" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Good: one builder per thread</text>
+              <rect x="400" y="30" width="80" height="30" rx="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+              <text x="440" y="50" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread A</text>
+              <line x1="480" y1="45" x2="520" y2="45" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bld-q19-arr)"/>
+              <rect x="525" y="30" width="110" height="30" rx="5" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="580" y="50" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">Builder A (own)</text>
+              <rect x="400" y="80" width="80" height="30" rx="5" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+              <text x="440" y="100" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread B</text>
+              <line x1="480" y1="95" x2="520" y2="95" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bld-q19-arr)"/>
+              <rect x="525" y="80" width="110" height="30" rx="5" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="580" y="100" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">Builder B (own)</text>
+              <text x="540" y="140" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">No shared state = no race conditions</text>
+            </svg>
+            <p>Note: <code>ImmutableArray.CreateBuilder()</code> is a <em>mutable</em> builder for an immutable product. The builder itself is not thread-safe; only the resulting <code>ImmutableArray</code> is.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is a trick question in interviews. The senior answer is 'don't share builders' — not 'add locks.' Architecture beats synchronization."</div>
         </div>
@@ -3002,7 +3718,8 @@ var user = new UserBuilder().WithName("Alice").WithAge(30).Build();</code></pre>
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How would you create variations of a complex object without rebuilding from scratch?</div>
           <div class="body-text">
-            <p>Build a "template" once with a Builder, then clone it with <span class="tooltip-trigger">Prototype<span class="tooltip-content">GoF creational pattern that creates new objects by copying an existing object (the prototype). In C#, implemented via ICloneable or record with-expressions.</span></span> to create variations. The C# <code>record</code> type + <code>with</code>-expression is essentially Builder + Prototype combined:</p>
+            <p>Sometimes you need to create many similar objects that differ in only one or two fields. Building each one from scratch through the full builder process would be wasteful. Instead, you build a "template" once with a Builder, then create variations by cloning it and tweaking a few fields. This is the <span class="tooltip-trigger">Prototype<span class="tooltip-content">GoF creational pattern that creates new objects by copying an existing object (the prototype). In C#, implemented via ICloneable or record with-expressions.</span></span> pattern combined with Builder.</p>
+            <p>In C#, the <code>record</code> type + <code>with</code>-expression is essentially Builder + Prototype baked into the language. You build the template once (Builder), then use <code>with</code> to create cheap variations (Prototype):</p>
             <div class="macos-window mt-sm">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -3043,7 +3760,8 @@ var gift = template with { GiftWrap = true, GiftMessage = "Hi!" };</code></pre>
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How would Build() ensure the query is parameterized, not concatenated?</div>
           <div class="body-text">
-            <p>The builder should collect parameter <em>values</em> separately from the SQL template. <code>Build()</code> returns both the <span class="tooltip-trigger">parameterized SQL<span class="tooltip-content">SQL queries where user values are passed as @parameters instead of being concatenated into the string. The database engine handles escaping, preventing SQL injection attacks.</span></span> string and a dictionary of parameter values — never interpolating user input directly into the SQL.</p>
+            <p>SQL injection is one of the most dangerous web vulnerabilities, and the Builder pattern is naturally suited to prevent it. The key idea: the builder collects the <em>structure</em> of the query (which table, which columns) separately from the <em>user-provided values</em>. When <code>Build()</code> runs, it produces a parameterized query where user input is never directly concatenated into the SQL string. Instead, values become <code>@p0</code>, <code>@p1</code> parameters that the database engine handles safely.</p>
+            <p>The builder should also validate inputs. Table names are whitelisted (not user-provided). Column names are checked against a regex to prevent injection through column names. The <code>Build()</code> return type is a tuple: the SQL string plus a dictionary of parameters. This forces the caller to use parameterized queries because the values are separate from the SQL.</p>
             <div class="macos-window mt-sm">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -3115,9 +3833,9 @@ var (sql, parms) = new SafeQueryBuilder()
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when a builder step needs to call a database or API?</div>
           <div class="body-text">
-            <p>Some build steps need I/O — fetching a schema from a database, calling an API for validation, reading a file. You can't just make every method <code>async</code> because it breaks fluent chaining (<code>await</code> between each call is ugly).</p>
-            <p><strong>Approach 1 — Async Build() only:</strong> Keep fluent methods synchronous (they just store config), make only <code>BuildAsync()</code> async. All I/O happens during build, not during configuration. This preserves clean chaining.</p>
-            <p><strong>Approach 2 — Async steps with helper:</strong> For steps that truly need async (e.g., loading templates from a remote service), use a callback-registration pattern:</p>
+            <p>This comes up a lot in real projects. What happens when a builder step needs to call a database, read from a remote API, or load a file? You cannot just slap <code>async</code> on every fluent method because that breaks method chaining. With <code>async</code> methods, you would need to <code>await</code> each call individually: <code>var b1 = await builder.StepA(); var b2 = await b1.StepB();</code>. The clean one-liner chain is gone.</p>
+            <p><strong>Approach 1 — Async Build() only (recommended):</strong> Keep all fluent methods synchronous. They just store configuration, URLs, paths, and parameters. No I/O. Then make only <code>BuildAsync()</code> async, and do all the I/O there. This preserves the clean chaining syntax: <code>builder.WithTitle("X").WithTemplateUrl("https://...").BuildAsync()</code>.</p>
+            <p><strong>Approach 2 — Async steps with callback registration:</strong> For cases where you genuinely need interleaved async steps (e.g., step 2 depends on step 1's async result), register each step as a <code>Func&lt;T, Task&lt;T&gt;&gt;</code> callback. The builder stores these callbacks and executes them sequentially in <code>BuildAsync()</code>:</p>
             <div class="macos-window mt-sm">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -3193,7 +3911,48 @@ var (sql, parms) = new SafeQueryBuilder()
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How do you build a tree where parent and children are all immutable?</div>
           <div class="body-text">
-            <p>Building immutable trees is a classic challenge because a parent needs its children before construction, but children might also need their parent. Solution: <strong>bottom-up construction with recursive builders</strong>.</p>
+            <p>Building immutable trees is a classic challenge because of a chicken-and-egg problem: a parent needs its children before it can be constructed (they are part of its <code>IReadOnlyList</code>), but children might also need their parent. The solution is to build bottom-up: construct leaf nodes first, then pass them to their parent's constructor. <strong>Recursive builders</strong> handle this elegantly.</p>
+            <svg viewBox="0 0 720 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing tree builder: Root builder contains child builders A and B. Build() recursively constructs the immutable tree bottom-up." style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q24-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <!-- Builder tree -->
+              <text x="170" y="15" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Builder Tree (mutable)</text>
+              <rect x="120" y="25" width="100" height="30" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="170" y="45" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">Root Builder</text>
+              <line x1="145" y1="55" x2="95" y2="75" stroke="#f97316" stroke-width="1.5"/>
+              <line x1="195" y1="55" x2="245" y2="75" stroke="#f97316" stroke-width="1.5"/>
+              <rect x="45" y="75" width="100" height="30" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="95" y="95" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">A Builder</text>
+              <rect x="195" y="75" width="100" height="30" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+              <text x="245" y="95" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">B Builder</text>
+              <line x1="70" y1="105" x2="45" y2="125" stroke="#f97316" stroke-width="1"/>
+              <line x1="120" y1="105" x2="145" y2="125" stroke="#f97316" stroke-width="1"/>
+              <rect x="15" y="125" width="60" height="25" rx="4" fill="#1e293b" stroke="#f97316" stroke-width="1"/>
+              <text x="45" y="142" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">A1</text>
+              <rect x="115" y="125" width="60" height="25" rx="4" fill="#1e293b" stroke="#f97316" stroke-width="1"/>
+              <text x="145" y="142" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">A2</text>
+              <!-- Arrow Build() -->
+              <line x1="310" y1="75" x2="380" y2="75" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q24-arr)"/>
+              <text x="345" y="68" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Build()</text>
+              <text x="345" y="95" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">recursive, bottom-up</text>
+              <!-- Immutable tree -->
+              <text x="530" y="15" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Immutable Tree (product)</text>
+              <rect x="480" y="25" width="100" height="30" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+              <text x="530" y="45" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Root</text>
+              <line x1="505" y1="55" x2="455" y2="75" stroke="#22c55e" stroke-width="1.5"/>
+              <line x1="555" y1="55" x2="605" y2="75" stroke="#22c55e" stroke-width="1.5"/>
+              <rect x="405" y="75" width="100" height="30" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="455" y="95" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">A</text>
+              <rect x="555" y="75" width="100" height="30" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="605" y="95" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">B</text>
+              <line x1="430" y1="105" x2="405" y2="125" stroke="#22c55e" stroke-width="1"/>
+              <line x1="480" y1="105" x2="505" y2="125" stroke="#22c55e" stroke-width="1"/>
+              <rect x="375" y="125" width="60" height="25" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+              <text x="405" y="142" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">A1</text>
+              <rect x="475" y="125" width="60" height="25" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+              <text x="505" y="142" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">A2</text>
+            </svg>
             <div class="macos-window mt-sm">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -3235,7 +3994,7 @@ var tree = new TreeNodeBuilder()
 // Root → [A → [A1, A2], B]</code></pre>
               </div>
             </div>
-            <p>The <code>Action&lt;TreeNodeBuilder&gt;</code> callback pattern lets you nest builders without exposing child builders externally. Each <code>Build()</code> call recursively builds the entire subtree bottom-up, producing a fully immutable structure.</p>
+            <p><strong>Walking through the code:</strong> The key method is <code>AddChild(Action&lt;TreeNodeBuilder&gt; configure)</code>. Instead of returning a child builder that the caller manages, it creates a child builder internally and lets the caller configure it through a lambda. This keeps the parent in control. When you call <code>Build()</code> on the root, it calls <code>Build()</code> on each child builder, which calls <code>Build()</code> on their children, and so on. The whole tree is constructed recursively from the leaves up. By the time the root's <code>Build()</code> finishes, every node is a fully immutable <code>TreeNode</code> record with a read-only list of children.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is how .NET's IHostBuilder.ConfigureServices() works — you pass an Action&lt;IServiceCollection&gt; callback, not a return value. The framework controls when to 'Build' the entire tree."</div>
         </div>
@@ -3297,7 +4056,27 @@ var order = fixture.Create&lt;Order&gt;();
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What information does a source generator need to emit a builder class?</div>
           <div class="body-text">
-            <p><span class="tooltip-trigger">Roslyn source generators<span class="tooltip-content">A C# compiler feature that runs during compilation and generates additional source files. They inspect your code via syntax/semantic models and emit new classes without reflection or runtime overhead.</span></span> inspect the Product's properties at compile time and emit a complete Builder class — no runtime reflection, no boilerplate.</p>
+            <p>Writing builders by hand is repetitive: for every property, you write a private field, a fluent setter, and include it in <code>Build()</code>. This is exactly the kind of mechanical boilerplate that machines should handle. <span class="tooltip-trigger">Roslyn source generators<span class="tooltip-content">A C# compiler feature that runs during compilation and generates additional source files. They inspect your code via syntax/semantic models and emit new classes without reflection or runtime overhead.</span></span> run during compilation, inspect your Product class, and automatically emit a complete Builder class. No runtime reflection, no performance cost, no maintenance burden.</p>
+            <svg viewBox="0 0 720 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing source generator flow: Product record with attribute goes through Roslyn at compile time, emitting a complete Builder class" style="width:100%;margin:0.75rem 0">
+              <defs>
+                <marker id="bld-q26-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f97316"/></marker>
+              </defs>
+              <rect x="20" y="25" width="170" height="65" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+              <text x="105" y="48" text-anchor="middle" fill="#f97316" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">[GenerateBuilder]</text>
+              <text x="105" y="65" text-anchor="middle" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="10">record Order(...)</text>
+              <text x="105" y="80" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Your code (you write this)</text>
+              <line x1="190" y1="57" x2="250" y2="57" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q26-arr)"/>
+              <rect x="255" y="20" width="180" height="75" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+              <text x="345" y="42" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Roslyn Source Generator</text>
+              <text x="345" y="60" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Reads properties at compile time</text>
+              <text x="345" y="75" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Emits With*() + Build()</text>
+              <text x="345" y="88" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">IIncrementalGenerator</text>
+              <line x1="435" y1="57" x2="495" y2="57" stroke="#f97316" stroke-width="2" marker-end="url(#bld-q26-arr)"/>
+              <rect x="500" y="25" width="200" height="65" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+              <text x="600" y="48" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Generated OrderBuilder</text>
+              <text x="600" y="65" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">WithCustomerId(), WithProduct()</text>
+              <text x="600" y="80" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Auto-generated, zero maintenance</text>
+            </svg>
             <div class="macos-window mt-sm">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>

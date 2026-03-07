@@ -1583,10 +1583,51 @@ app.UseMiddleware&lt;TenantMiddleware&gt;();
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, e-commerce platform, .NET 7.</strong> The <code>PaymentFactory</code> looked clean — it implemented <code>IPaymentProcessorFactory</code> and had a <code>Create()</code> method. But internally, it injected <code>IServiceProvider</code> and called <code>GetRequiredService&lt;T&gt;()</code> directly. Worked fine for months. Then someone registered a payment processor as Scoped (it needed per-request tenant context). The factory was Singleton. Captive dependency — the Scoped processor lived forever, serving stale tenant data across requests. One customer got charged with another customer's payment method.</p>
+          <p class="body-text"><strong>2023, e-commerce platform, .NET 7.</strong> A mid-sized e-commerce company had a <code>PaymentFactory</code> that looked perfectly clean on the surface. It implemented <code>IPaymentProcessorFactory</code>, had a proper <code>Create()</code> method, and was neatly registered in the DI container. Code reviews passed without a single comment.</p>
+          <p class="body-text">But under the hood, there was a problem hiding in plain sight. Instead of injecting specific dependencies, the factory injected the entire DI container — <code>IServiceProvider</code> — and called <code>GetRequiredService&lt;T&gt;()</code> to resolve payment processors. This is what's called a <span class="tooltip-trigger">Service Locator<span class="tooltip-content">An anti-pattern where a class resolves its own dependencies from a global container instead of receiving them via constructor injection.</span></span> — an anti-pattern where a class reaches into the container to grab whatever it needs, instead of declaring its dependencies up front.</p>
+          <p class="body-text">For months, everything worked fine. Then a developer registered <code>StripeProcessor</code> as Scoped — it needed per-request tenant context to know which merchant account to charge. The factory, however, was registered as Singleton. This created a <span class="tooltip-trigger">captive dependency<span class="tooltip-content">When a longer-lived service (e.g., Singleton) captures a shorter-lived service (e.g., Scoped), keeping it alive beyond its intended lifetime.</span></span>: the Scoped processor was resolved once from the root scope and then held forever inside the Singleton factory.</p>
+          <p class="body-text">The result was devastating. Request 1 from Tenant A created a <code>StripeProcessor</code> configured with Tenant A's merchant account. Request 2 from Tenant B got <em>the same processor instance</em> — still configured for Tenant A. One customer was charged using another customer's payment method. The team discovered the bug when a customer called support saying "I don't have a Stripe account, why was I charged through Stripe?"</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">3 hours. The bug only appeared when two tenants used different payment providers within the same app restart. The factory's <code>IServiceProvider</code> injection made it look like a factory, but it was actually a <span class="tooltip-trigger">Service Locator<span class="tooltip-content">An anti-pattern where a class resolves its own dependencies from a global container instead of receiving them via constructor injection.</span></span>.</p>
+        <p class="body-text">3 hours. The bug only appeared when two tenants used different payment providers within the same app restart. The factory's <code>IServiceProvider</code> injection made it look like a proper factory, but it was actually a Service Locator wearing a factory costume.</p>
+
+        <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how a Singleton factory captures a Scoped processor, causing stale tenant data" style="width:100%; max-width:720px; margin:1rem 0;">
+          <defs>
+            <marker id="fm-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <rect x="0" y="0" width="720" height="280" rx="12" fill="#1e293b"/>
+          <!-- Singleton Factory box -->
+          <rect x="30" y="30" width="200" height="60" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="130" y="55" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">PaymentFactory</text>
+          <text x="130" y="75" text-anchor="middle" fill="#64748b" font-size="11" font-family="system-ui, -apple-system, sans-serif">Singleton (lives forever)</text>
+          <!-- IServiceProvider inside -->
+          <rect x="50" y="110" width="160" height="40" rx="6" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+          <text x="130" y="135" text-anchor="middle" fill="#c7d2fe" font-size="11" font-family="system-ui, -apple-system, sans-serif">IServiceProvider (root)</text>
+          <!-- Arrow from factory to SP -->
+          <line x1="130" y1="90" x2="130" y2="110" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-b1-arr)"/>
+          <!-- Request 1 -->
+          <rect x="290" y="30" width="180" height="50" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="380" y="50" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Request 1 — Tenant A</text>
+          <text x="380" y="67" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Creates StripeProcessor</text>
+          <!-- Request 2 -->
+          <rect x="290" y="100" width="180" height="50" rx="8" fill="#3b1318" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="380" y="120" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Request 2 — Tenant B</text>
+          <text x="380" y="137" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Gets SAME processor!</text>
+          <!-- StripeProcessor (cached) -->
+          <rect x="530" y="55" width="160" height="90" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="2"/>
+          <text x="610" y="80" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">StripeProcessor</text>
+          <text x="610" y="97" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">Tenant: A</text>
+          <text x="610" y="115" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Cached in root scope</text>
+          <text x="610" y="132" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">NEVER refreshed!</text>
+          <!-- Arrows -->
+          <line x1="470" y1="55" x2="530" y2="80" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fm-b1-arr)"/>
+          <line x1="470" y1="125" x2="530" y2="115" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#fm-b1-arr)"/>
+          <!-- Bottom label -->
+          <rect x="80" y="190" width="560" height="70" rx="8" fill="#2d1b1b" stroke="#ef4444" stroke-width="1"/>
+          <text x="360" y="212" text-anchor="middle" fill="#fca5a5" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">The Problem: Captive Dependency</text>
+          <text x="360" y="232" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Singleton factory holds IServiceProvider from ROOT scope.</text>
+          <text x="360" y="249" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Scoped services resolved from root live forever — stale data across requests.</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1618,6 +1659,7 @@ public class PaymentFactory(IServiceProvider sp) : IPaymentProcessorFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The factory takes <code>IServiceProvider</code> in its constructor. Since the factory is a Singleton, it gets the <em>root</em> service provider — not the per-request scoped one. When it calls <code>GetRequiredService&lt;StripeProcessor&gt;()</code>, it resolves from the root scope. Scoped services resolved from the root scope are never disposed and never refreshed. They live as long as the application lives. So the first tenant's processor gets cached and every subsequent tenant gets that same stale instance.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1644,14 +1686,18 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
 });</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of injecting the raw container, the factory now injects <code>IServiceScopeFactory</code>. Every time <code>Create()</code> is called, it creates a <em>brand new scope</em>. The processor resolved inside that scope gets a fresh set of Scoped dependencies — including the correct tenant context for the current request. The scope validation flags in <code>Program.cs</code> add a safety net: if anyone accidentally resolves a Scoped service from a Singleton, the app will throw at startup rather than silently serving stale data.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-          <p class="body-text">If your factory injects <code>IServiceProvider</code>, it's a Service Locator in disguise.<br>
-          Inject specific factory interfaces or <code>IServiceScopeFactory</code> instead.<br>
-          Enable <span class="tooltip-trigger"><code>ValidateScopes = true</code><span class="tooltip-content">A DI container option that detects when scoped services are resolved from the root scope — catches captive dependency bugs.</span></span> in development to catch this at startup.</p>
+          <p class="body-text">If your factory injects <code>IServiceProvider</code>, it's a Service Locator in disguise. Inject specific factory interfaces or <code>IServiceScopeFactory</code> instead. Enable <span class="tooltip-trigger"><code>ValidateScopes = true</code><span class="tooltip-content">A DI container option that detects when scoped services are resolved from the root scope — catches captive dependency bugs.</span></span> in development to catch this at startup.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for any factory class that takes <code>IServiceProvider</code> as a constructor parameter. If you find one, check its DI lifetime — if it's Singleton and it resolves Scoped services, you have this bug. Run <code>grep -rn "IServiceProvider" --include="*Factory*.cs"</code> as a quick sanity check. Better yet, enable <code>ValidateScopes</code> in your development environment and let the framework catch it for you.</p>
         </div>
       </div>
     </div>
@@ -1662,13 +1708,45 @@ builder.Host.UseDefaultServiceProvider(opts =&gt;
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, SaaS platform, .NET 8.</strong> <code>ReportFactory</code> was registered as Singleton (for performance).<br>
-          It created <code>ReportGenerator</code> instances that depended on <code>DbContext</code> (Scoped). The generator held a stale DbContext across requests.<br>
-          First report — perfect. Second report — <code>ObjectDisposedException</code>.<br><br>
-          Third report — returned data from the first request's DbContext cache. Users saw other users' financial reports.</p>
+          <p class="body-text"><strong>2024, SaaS platform, .NET 8.</strong> A team building a financial reporting service registered their <code>ReportFactory</code> as a Singleton for performance — they wanted one factory instance shared across all requests, which sounds reasonable.</p>
+          <p class="body-text">The factory created <code>ReportGenerator</code> objects that needed a database connection. In .NET, database connections are typically managed through <code>DbContext</code>, which is registered as Scoped — meaning each HTTP request gets its own fresh connection. But because the factory was a Singleton, the <code>DbContext</code> it received during construction was the <em>only one it would ever see</em>.</p>
+          <p class="body-text">The first user to generate a report got perfect results. The second user hit an <code>ObjectDisposedException</code> — the DbContext from the first request had already been cleaned up when that request ended, but the Singleton factory was still trying to use it. Even worse, in some cases the DbContext survived (no explicit dispose), and its internal cache — called the <span class="tooltip-trigger">change tracker<span class="tooltip-content">An EF Core mechanism that keeps track of all entities loaded in a DbContext, including their original and current values.</span></span> — still held data from the previous user. User B could see User A's financial reports.</p>
+          <p class="body-text">The team spent hours staring at database logs. The database was returning correct data. The bug was in the application layer — the factory was feeding every report generator a dead or stale database connection.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours. The <code>ObjectDisposedException</code> was the easy clue. The "seeing other users' data" part took longer — it only happened when DbContext's change tracker had cached entities from the previous request.</p>
+
+        <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline showing how a Singleton factory's DbContext degrades across three requests" style="width:100%; max-width:720px; margin:1rem 0;">
+          <defs>
+            <marker id="fm-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <rect x="0" y="0" width="720" height="260" rx="12" fill="#1e293b"/>
+          <!-- Timeline arrow -->
+          <line x1="40" y1="60" x2="690" y2="60" stroke="#475569" stroke-width="2" marker-end="url(#fm-b2-arr)"/>
+          <text x="695" y="64" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">time</text>
+          <!-- Request 1 -->
+          <rect x="60" y="30" width="170" height="50" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="145" y="50" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Request 1</text>
+          <text x="145" y="67" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">DbContext alive — works!</text>
+          <!-- Request 2 -->
+          <rect x="270" y="30" width="170" height="50" rx="6" fill="#3b1318" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="355" y="50" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Request 2</text>
+          <text x="355" y="67" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">ObjectDisposedException</text>
+          <!-- Request 3 -->
+          <rect x="480" y="30" width="180" height="50" rx="6" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="570" y="50" text-anchor="middle" fill="#fcd34d" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Request 3</text>
+          <text x="570" y="67" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif">Stale data — User A's report!</text>
+          <!-- Singleton Factory -->
+          <rect x="100" y="110" width="520" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="360" y="128" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Singleton ReportFactory</text>
+          <text x="360" y="146" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">Holds ONE DbContext captured at construction — never refreshed</text>
+          <!-- DbContext box -->
+          <rect x="220" y="180" width="280" height="55" rx="8" fill="#2d1b1b" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="360" y="200" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">AppDbContext (captured once)</text>
+          <text x="360" y="218" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Disposed after Request 1 ends, but factory still holds reference</text>
+          <!-- Arrow from factory to DbContext -->
+          <line x1="360" y1="155" x2="360" y2="180" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fm-b2-arr)"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1699,6 +1777,7 @@ public class ReportFactory(AppDbContext db) : IReportFactory  // ← Singleton!
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The factory's constructor takes <code>AppDbContext</code> directly. Since the factory is a Singleton, the DI container creates it once at app startup and passes it the DbContext from the root scope. That DbContext is now trapped inside the factory forever. When Request 1 ends, the framework tries to dispose all Scoped services — including that DbContext. But the Singleton factory still holds a reference to it. Request 2 comes in, the factory passes the disposed DbContext to a new generator, and the generator crashes.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1733,7 +1812,13 @@ public class ReportFactory(IDbContextFactory&lt;AppDbContext&gt; dbFactory) : IR
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The first approach injects <code>IServiceScopeFactory</code> instead of <code>DbContext</code> directly. Every <code>Create()</code> call builds a new scope with its own fresh DbContext. The product takes ownership of the scope and disposes it when done. The second approach is even cleaner — <code>IDbContextFactory&lt;T&gt;</code> was built by Microsoft specifically for this scenario. It creates independent DbContext instances that aren't tied to any scope, so they work perfectly inside Singleton factories.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for any Singleton-registered class that takes <code>DbContext</code> (or any Scoped service) in its constructor. The compiler won't warn you — the DI container silently satisfies the request from the root scope. Enable <code>ValidateScopes = true</code> during development, and it will throw on startup instead of failing silently in production.</p>
         </div>
       </div>
     </div>
@@ -1744,10 +1829,49 @@ public class ReportFactory(IDbContextFactory&lt;AppDbContext&gt; dbFactory) : IR
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, multi-tenant SaaS, .NET 8.</strong> <code>ReportGeneratorFactory</code> cached instances by tenant ID in a <code>ConcurrentDictionary</code>. Smart optimization — until a tenant updated their configuration (different database connection string). The factory kept returning the cached generator with the old connection string. Stale data served for 6 hours before a customer noticed their reports showed last month's numbers.</p>
+          <p class="body-text"><strong>2024, multi-tenant SaaS, .NET 8.</strong> A developer on the reporting team had a clever idea: cache report generator instances by tenant ID in a <code>ConcurrentDictionary</code>. Creating a report generator was expensive — it loaded templates, initialized PDF rendering engines, and established database connections. Caching seemed like an obvious win.</p>
+          <p class="body-text">And it worked beautifully — until a tenant updated their configuration. Specifically, the tenant "acme" migrated from one database server to another. The admin updated the connection string in the config file. But the factory didn't care. It already had a cached generator for "acme" that was built with the <em>old</em> connection string, and <code>GetOrAdd</code> means "get the existing one if it's there — never create a new one."</p>
+          <p class="body-text">For 6 hours, the factory happily returned the cached generator pointing at the old database. The old database still existed (it was in the process of being decommissioned), but it had last month's data. Customers started calling support: "My reports look outdated. The numbers don't match what I see in the dashboard."</p>
+          <p class="body-text">The team initially blamed the database migration. They checked the database server, verified the new connection string, and everything looked correct. It wasn't until someone examined the factory's in-memory cache and compared its stored connection strings with the current config that they found the real culprit: the factory's cache had no invalidation mechanism whatsoever.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours. The team initially blamed the database. It wasn't until they compared the factory's cached connection string with the current config that they found the mismatch.</p>
+
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing a factory cache returning stale instances after config changes" style="width:100%; max-width:720px; margin:1rem 0;">
+          <defs>
+            <marker id="fm-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <rect x="0" y="0" width="720" height="250" rx="12" fill="#1e293b"/>
+          <!-- Config file -->
+          <rect x="30" y="20" width="160" height="80" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="110" y="42" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">appsettings.json</text>
+          <text x="110" y="60" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif">10 AM: Server=db1</text>
+          <text x="110" y="78" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif">11 AM: Server=db2</text>
+          <text x="110" y="92" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">(updated by admin)</text>
+          <!-- Factory cache -->
+          <rect x="260" y="20" width="200" height="80" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="2"/>
+          <text x="360" y="42" text-anchor="middle" fill="#fbbf24" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Factory Cache</text>
+          <text x="360" y="60" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">ConcurrentDictionary</text>
+          <text x="360" y="78" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">"acme" → Generator(db1)</text>
+          <text x="360" y="92" text-anchor="middle" fill="#f87171" font-size="9" font-family="system-ui, -apple-system, sans-serif">NEVER invalidated!</text>
+          <!-- Arrow config → factory (blocked) -->
+          <line x1="190" y1="60" x2="250" y2="60" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="220" y="52" text-anchor="middle" fill="#f87171" font-size="18" font-family="system-ui, -apple-system, sans-serif">&#x2717;</text>
+          <!-- Requests -->
+          <rect x="530" y="20" width="160" height="80" rx="8" fill="#3b1318" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="610" y="42" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">All requests after 11 AM</text>
+          <text x="610" y="60" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Get cached generator</text>
+          <text x="610" y="78" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Still using db1!</text>
+          <text x="610" y="92" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Stale data for 6 hours</text>
+          <!-- Arrow factory → requests -->
+          <line x1="460" y1="60" x2="530" y2="60" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#fm-b3-arr)"/>
+          <!-- Bottom: the fix summary -->
+          <rect x="80" y="130" width="560" height="100" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+          <text x="360" y="155" text-anchor="middle" fill="#86efac" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">The Fix: IOptionsMonitor + Cache Invalidation</text>
+          <text x="360" y="175" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">IOptionsMonitor&lt;T&gt; fires a callback when config file changes.</text>
+          <text x="360" y="195" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Callback removes the stale entry from the cache.</text>
+          <text x="360" y="215" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Next Create() call builds a fresh generator with the new connection string.</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1785,6 +1909,7 @@ public class ReportGeneratorFactory(IOptions&lt;TenantSettings&gt; options)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The factory uses <code>IOptions&lt;T&gt;</code>, which reads configuration <em>once</em> at startup and never updates. Even if someone edits <code>appsettings.json</code>, the options object keeps the old values. Combine that with <code>GetOrAdd</code> — which only creates a new entry if the key doesn't exist — and you get a cache that will never refresh. The generator for "acme" was built at 10 AM with the old connection string, and every call after that returns the same stale instance.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1821,12 +1946,18 @@ public class ReportGeneratorFactory : IReportGeneratorFactory, IDisposable
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Two changes make this safe. First, <code>IOptionsMonitor&lt;T&gt;</code> replaces <code>IOptions&lt;T&gt;</code> — it actively watches the config file and always returns the latest values through <code>.CurrentValue</code>. Second, the <code>OnChange</code> callback fires whenever the config changes and evicts the affected tenant from the cache. The next time <code>Create()</code> is called for that tenant, <code>GetOrAdd</code> sees no entry and builds a fresh generator with the updated connection string.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Don't cache factory products that depend on mutable configuration. If you must cache, use <code>IOptionsMonitor&lt;T&gt;</code> change callbacks to invalidate. Or better — don't cache at all and let DI handle lifetimes.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>ConcurrentDictionary</code> or <code>Dictionary</code> fields in your factory classes. If they're used for caching and the values depend on configuration or external state, ask: "What happens when the config changes?" If the answer is "nothing — the cache never invalidates," you have this bug. Switch from <code>IOptions&lt;T&gt;</code> to <code>IOptionsMonitor&lt;T&gt;</code> and wire up <code>OnChange</code> callbacks.</p>
         </div>
       </div>
     </div>
@@ -1837,10 +1968,50 @@ public class ReportGeneratorFactory : IReportGeneratorFactory, IDisposable
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, document service, .NET 8.</strong> <code>IExporterFactory.Create()</code> returned <code>PdfExporter</code> instances that held <code>MemoryStream</code> internally. 200K exports per day. Nobody called <code>Dispose()</code> on the returned exporters — the factory created them, the caller used them, garbage collection was "supposed to handle it." Memory grew 500MB/hour. The pod got <span class="tooltip-trigger">OOMKilled<span class="tooltip-content">An operating system or container runtime signal that terminates a process for exceeding its memory limit.</span></span> every 4 hours and Kubernetes restarted it. The team added more memory instead of finding the leak.</p>
+          <p class="body-text"><strong>2024, document service, .NET 8.</strong> A document export service handled about 200,000 exports per day. The <code>IExporterFactory.Create()</code> method returned <code>PdfExporter</code> instances, each of which allocated a <code>MemoryStream</code> and a <code>PdfDocument</code> internally to generate the PDF file.</p>
+          <p class="body-text">Here's the ownership problem: the factory created the exporter, the controller used it, and then... nothing. Nobody called <code>Dispose()</code>. The developers assumed the garbage collector would clean everything up eventually. And technically it can — but "eventually" is the key word. <code>MemoryStream</code> allocates a byte array, and large byte arrays (over 85KB) end up on the <span class="tooltip-trigger">Large Object Heap<span class="tooltip-content">A special memory area in .NET for objects larger than 85KB. The LOH is collected less frequently and can cause memory fragmentation.</span></span>, which the garbage collector collects much less frequently.</p>
+          <p class="body-text">Memory grew at 500MB per hour. The Kubernetes pod running the service hit its memory limit every 4 hours and got OOMKilled (killed for using too much memory). Kubernetes restarted it automatically, and the cycle repeated. The team's first instinct? Increase the memory limit. They doubled it from 2GB to 4GB. The pod lasted 8 hours instead of 4. They doubled it again. Eventually someone asked the right question: "Why is memory growing at all?"</p>
+          <p class="body-text">A <span class="tooltip-trigger">dotMemory<span class="tooltip-content">A .NET memory profiling tool by JetBrains that shows heap snapshots, object allocations, and retention paths.</span></span> snapshot revealed 47,000 undisposed <code>MemoryStream</code> objects — each holding onto its byte array, none being cleaned up in a timely manner. The fix took 10 minutes: add <code>IDisposable</code> to the interface and <code>using</code> to the caller.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 days. The team kept increasing pod memory limits. A dotMemory snapshot finally showed 47,000 undisposed <code>MemoryStream</code> objects.</p>
+
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing factory-created objects piling up in memory because nobody disposes them" style="width:100%; max-width:720px; margin:1rem 0;">
+          <defs>
+            <marker id="fm-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <rect x="0" y="0" width="720" height="250" rx="12" fill="#1e293b"/>
+          <!-- Factory -->
+          <rect x="30" y="40" width="140" height="50" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="100" y="60" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">ExporterFactory</text>
+          <text x="100" y="78" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">Create() called 200K/day</text>
+          <!-- Arrow factory → pile -->
+          <line x1="170" y1="65" x2="230" y2="65" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-b4-arr)"/>
+          <!-- Pile of undisposed objects -->
+          <rect x="240" y="20" width="250" height="100" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="2"/>
+          <text x="365" y="42" text-anchor="middle" fill="#fbbf24" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Undisposed Heap Objects</text>
+          <rect x="255" y="50" width="100" height="22" rx="4" fill="#3b1318" stroke="#ef4444" stroke-width="1"/>
+          <text x="305" y="65" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">MemoryStream #1</text>
+          <rect x="265" y="57" width="100" height="22" rx="4" fill="#3b1318" stroke="#ef4444" stroke-width="1"/>
+          <text x="315" y="72" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">MemoryStream #2</text>
+          <rect x="275" y="64" width="100" height="22" rx="4" fill="#3b1318" stroke="#ef4444" stroke-width="1"/>
+          <text x="325" y="79" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">MemoryStream #3</text>
+          <rect x="375" y="50" width="100" height="22" rx="4" fill="#3b1318" stroke="#ef4444" stroke-width="1"/>
+          <text x="425" y="65" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">PdfDocument #1</text>
+          <rect x="385" y="57" width="100" height="22" rx="4" fill="#3b1318" stroke="#ef4444" stroke-width="1"/>
+          <text x="435" y="72" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">PdfDocument #2</text>
+          <text x="365" y="108" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">47,000 objects — nobody called Dispose()</text>
+          <!-- Memory chart -->
+          <rect x="540" y="20" width="150" height="100" rx="8" fill="#2d1b1b" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="615" y="40" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Memory Usage</text>
+          <polyline points="555,95 575,88 595,75 615,60 635,48 655,35 675,25" stroke="#ef4444" stroke-width="2" fill="none"/>
+          <text x="615" y="110" text-anchor="middle" fill="#f87171" font-size="9" font-family="system-ui, -apple-system, sans-serif">+500MB/hour until OOMKill</text>
+          <!-- Bottom: the rule -->
+          <rect x="120" y="150" width="480" height="80" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+          <text x="360" y="175" text-anchor="middle" fill="#86efac" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">The Rule: Factory creates, caller disposes</text>
+          <text x="360" y="197" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Make IDisposable part of the product interface.</text>
+          <text x="360" y="217" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Caller wraps in "using" — compiler ensures Dispose() is called.</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1888,6 +2059,7 @@ public IActionResult Export(string format, int reportId)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>IExporter</code> interface doesn't extend <code>IDisposable</code>, so there's no signal to callers that they need to clean up. The controller calls <code>Create()</code>, uses the exporter, returns a response, and lets the exporter fall out of scope. The garbage collector will <em>eventually</em> reclaim the memory, but "eventually" means "when it gets around to it" — and for large objects on the LOH, that could be minutes or hours later. With 200K calls per day, the undisposed objects pile up faster than the GC can clean them.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1930,12 +2102,18 @@ public IActionResult Export(string format, int reportId)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Making <code>IExporter</code> extend <code>IDisposable</code> does two things. First, it's documentation — anyone looking at the interface immediately knows "this thing holds resources I need to clean up." Second, the <code>using</code> keyword tells the compiler to generate a <code>try/finally</code> block that calls <code>Dispose()</code> automatically when the variable goes out of scope, even if an exception is thrown. The MemoryStream and PdfDocument get freed immediately after use, not "whenever the GC feels like it."</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text"><strong>Document ownership:</strong> if a factory creates it, someone must dispose it. Make <code>IDisposable</code> part of the product interface so the compiler reminds callers. Rule: "Factory creates, caller disposes."</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Enable Roslyn analyzer rule <code>CA2000</code> — it flags variables that implement <code>IDisposable</code> but aren't disposed before going out of scope. Also search for factory <code>Create()</code> calls that aren't wrapped in <code>using</code>. If the product holds streams, connections, or handles, it almost certainly needs disposal.</p>
         </div>
       </div>
     </div>
@@ -1946,12 +2124,55 @@ public IActionResult Export(string format, int reportId)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, microservice, .NET 7.</strong> <code>OrderFactory</code> needed <code>IValidator</code>. <code>ValidatorFactory</code> needed <code>IOrderParser</code>. <code>OrderParserFactory</code> needed <code>IOrderFactory</code>.<br>
-          The DI container threw <code>InvalidOperationException: A circular dependency was detected</code> at startup.<br><br>
-          The team had refactored three services into factories on the same day — each factory depended on another factory's product.</p>
+          <p class="body-text"><strong>2023, microservice, .NET 7.</strong> A team was doing a big refactor: they converted three services into factory-based designs in a single pull request. The <code>OrderFactory</code> needed an <code>IValidator</code> to validate orders during creation. The <code>ValidatorFactory</code> needed an <code>IOrderParser</code> to parse validation rules. And the <code>OrderParserFactory</code> needed an <code>IOrderFactory</code> to create template orders for testing the parser.</p>
+          <p class="body-text">Each factory innocently depended on the product of another factory. But together, they formed a circle: A depends on B, B depends on C, C depends on A. When the DI container tried to create <code>OrderFactory</code>, it needed <code>IValidator</code>, which needed <code>ValidatorFactory</code>, which needed <code>IOrderParser</code>, which needed <code>OrderParserFactory</code>, which needed <code>IOrderFactory</code> — which is where we started. Infinite loop.</p>
+          <p class="body-text">The DI container detected this at startup and threw a clear error: <code>InvalidOperationException: A circular dependency was detected for the service 'IOrderFactory'</code>. The app wouldn't even start. The error message told them <em>what</em> was wrong, but not <em>how</em> to fix it — untangling three intertwined factories took 3 hours of redesign.</p>
+          <p class="body-text">This is a common pitfall when teams "factory-ify" everything in one go. Each factory individually makes sense, but the dependency graph as a whole forms a cycle. The root cause is usually that the interfaces are too broad — each one does too many things, so it pulls in more dependencies than it really needs.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">20 minutes — the error message was clear. But 3 hours to untangle the circular design.</p>
+
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing three factories forming a circular dependency chain" style="width:100%; max-width:720px; margin:1rem 0;">
+          <defs>
+            <marker id="fm-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+            <marker id="fm-b5-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+          </defs>
+          <rect x="0" y="0" width="720" height="250" rx="12" fill="#1e293b"/>
+          <!-- Title -->
+          <text x="190" y="25" text-anchor="middle" fill="#fca5a5" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Circular Dependency (the bug)</text>
+          <!-- OrderFactory -->
+          <rect x="100" y="40" width="180" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="190" y="58" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">OrderFactory</text>
+          <text x="190" y="75" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">needs IValidator</text>
+          <!-- ValidatorFactory -->
+          <rect x="30" y="130" width="180" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="120" y="148" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">ValidatorFactory</text>
+          <text x="120" y="165" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">needs IOrderParser</text>
+          <!-- OrderParserFactory -->
+          <rect x="170" y="200" width="180" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="260" y="218" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">OrderParserFactory</text>
+          <text x="260" y="235" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">needs IOrderFactory</text>
+          <!-- Arrows forming circle -->
+          <line x1="145" y1="85" x2="120" y2="130" stroke="#ef4444" stroke-width="2" marker-end="url(#fm-b5-arr)"/>
+          <line x1="195" y1="175" x2="225" y2="200" stroke="#ef4444" stroke-width="2" marker-end="url(#fm-b5-arr)"/>
+          <line x1="325" y1="210" x2="280" y2="72" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#fm-b5-arr)"/>
+          <text x="335" y="140" fill="#f87171" font-size="22" font-family="system-ui, -apple-system, sans-serif" font-weight="700">BOOM</text>
+          <!-- Fix side -->
+          <text x="560" y="25" text-anchor="middle" fill="#86efac" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Fix: Focused interfaces</text>
+          <!-- OrderFactory fixed -->
+          <rect x="460" y="40" width="220" height="45" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="570" y="58" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">OrderFactory</text>
+          <text x="570" y="75" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">depends on IValidationRule (small)</text>
+          <!-- ValidatorFactory fixed -->
+          <rect x="460" y="110" width="220" height="45" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="570" y="128" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">ValidatorFactory</text>
+          <text x="570" y="145" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">depends on IParsingRule (small)</text>
+          <!-- No cycle arrows -->
+          <line x1="570" y1="85" x2="570" y2="110" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fm-b5-arr-g)"/>
+          <rect x="475" y="175" width="190" height="55" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+          <text x="570" y="197" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">No cycle!</text>
+          <text x="570" y="217" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Each depends on small, focused interface</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -2004,6 +2225,7 @@ builder.Services.AddSingleton&lt;IOrderParserFactory, OrderParserFactory&gt;();
 // for the service 'IOrderFactory'.</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Follow the chain. To build <code>OrderFactory</code>, the DI container needs <code>IValidator</code>. To build <code>Validator</code>, it needs a <code>ValidatorFactory</code>, which needs <code>IOrderParser</code>. To build a parser, it needs <code>OrderParserFactory</code>, which needs <code>IOrderFactory</code>. And we're back where we started. The DI container can't figure out which one to create first, because every one of them needs another one to already exist.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -2047,12 +2269,18 @@ public class OrderFactory(IEnumerable&lt;IValidationRule&gt; rules) : IOrderFact
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Option 1 uses <code>Lazy&lt;T&gt;</code> to defer resolution — the validator isn't actually resolved until someone calls <code>.Value</code>, which breaks the construction-time cycle. It's a quick patch. Option 2 is the real fix: instead of each factory depending on a big, do-everything interface, you extract small focused interfaces. <code>OrderFactory</code> only needs validation rules, not the full validator. <code>ValidatorFactory</code> only needs parsing rules, not the full order parser. By splitting the responsibilities, you break the cycle naturally without any tricks.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Circular factory dependencies usually mean your abstractions are too coarse. Extract smaller, focused interfaces. <code>Lazy&lt;T&gt;</code> is a band-aid — fixing the design is the real solution.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">The DI container will tell you immediately with a clear error message at startup. The harder part is preventing it. Before refactoring multiple services into factories, sketch the dependency graph on a whiteboard. If you can draw a circle through the dependencies, you need to extract smaller interfaces. A good rule of thumb: if a factory depends on more than 3-4 services, it's probably doing too much.</p>
         </div>
       </div>
     </div>
@@ -2062,10 +2290,57 @@ public class OrderFactory(IEnumerable&lt;IValidationRule&gt; rules) : IOrderFact
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, high-traffic API, .NET 8.</strong> <code>NotificationFactory</code> lazily built its internal <code>Dictionary&lt;string, Func&lt;INotification&gt;&gt;</code> on first call to <code>Create()</code>. Under load, 40 concurrent requests hit the factory simultaneously before the dictionary was populated. Two threads wrote to the <code>Dictionary</code> at the same time — internal bucket array corrupted. Some keys became unreachable, <code>Create("sms")</code> threw <code>KeyNotFoundException</code> sporadically. Took 4 hours to reproduce because it only happened under concurrent first-access conditions.</p>
+          <p class="body-text"><strong>2024, high-traffic API, .NET 8.</strong> A notification service had a <code>NotificationFactory</code> that lazily built its internal lookup dictionary. The developer's reasoning seemed sound: "Why build the dictionary at startup if nobody has called <code>Create()</code> yet? Let's build it on first use." They used a simple null-check pattern: if the dictionary is null, create it and add entries.</p>
+          <p class="body-text">This worked perfectly in development because there's only one developer sending requests. In production, the API handled hundreds of requests per second. Under a traffic spike, 40 concurrent requests hit the factory simultaneously — all before the dictionary had been populated. Multiple threads saw <code>_factories is null</code> at the same time, so multiple threads entered the initialization block at the same time.</p>
+          <p class="body-text">Here's the insidious part: <code>Dictionary&lt;K,V&gt;</code> is not thread-safe. When two threads call <code>.Add()</code> simultaneously, the dictionary's internal bucket array can get corrupted. The dictionary doesn't throw an error — it just silently loses entries. After the corruption, <code>"sms"</code> was in the dictionary but unreachable. <code>TryGetValue("sms")</code> returned false. The factory threw <code>KeyNotFoundException</code> for a channel that was definitely registered.</p>
+          <p class="body-text">The bug was maddeningly sporadic. It only happened when the first batch of requests arrived simultaneously. Once the dictionary was populated (even with corruption), subsequent requests either worked or failed consistently. The team couldn't reproduce it locally and spent 4 hours adding logging, load testing, and finally inspecting the dictionary's internal state with a debugger attached to a staging pod.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours — sporadic <code>KeyNotFoundException</code> only under load. <code>Dictionary</code> corruption doesn't throw on write — it silently loses entries.</p>
+
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing race condition where multiple threads corrupt a Dictionary during lazy initialization" style="width:100%; max-width:720px; margin:1rem 0;">
+          <defs>
+            <marker id="fm-b6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          </defs>
+          <rect x="0" y="0" width="720" height="250" rx="12" fill="#1e293b"/>
+          <!-- Thread 1 -->
+          <rect x="30" y="20" width="120" height="35" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="90" y="42" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif">Thread 1</text>
+          <!-- Thread 2 -->
+          <rect x="30" y="65" width="120" height="35" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="90" y="87" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif">Thread 2</text>
+          <!-- Thread N -->
+          <rect x="30" y="110" width="120" height="35" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="90" y="132" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif">Thread 40</text>
+          <!-- Null check -->
+          <rect x="200" y="40" width="150" height="80" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="275" y="62" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">if (_factories is null)</text>
+          <text x="275" y="82" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">All 40 threads see null!</text>
+          <text x="275" y="100" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">All 40 enter the if block</text>
+          <!-- Arrows threads → null check -->
+          <line x1="150" y1="38" x2="200" y2="60" stroke="#94a3b8" stroke-width="1" marker-end="url(#fm-b6-arr)"/>
+          <line x1="150" y1="82" x2="200" y2="80" stroke="#94a3b8" stroke-width="1" marker-end="url(#fm-b6-arr)"/>
+          <line x1="150" y1="127" x2="200" y2="100" stroke="#94a3b8" stroke-width="1" marker-end="url(#fm-b6-arr)"/>
+          <!-- Dictionary -->
+          <rect x="410" y="40" width="160" height="80" rx="8" fill="#3b1318" stroke="#ef4444" stroke-width="2"/>
+          <text x="490" y="60" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Dictionary</text>
+          <text x="490" y="78" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Concurrent .Add() calls</text>
+          <text x="490" y="94" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">corrupt internal buckets</text>
+          <text x="490" y="110" text-anchor="middle" fill="#ef4444" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Entries silently lost!</text>
+          <!-- Arrow null check → dictionary -->
+          <line x1="350" y1="80" x2="410" y2="80" stroke="#ef4444" stroke-width="2" marker-end="url(#fm-b6-arr)"/>
+          <!-- Result -->
+          <rect x="610" y="50" width="90" height="60" rx="6" fill="#2d1b1b" stroke="#ef4444" stroke-width="1"/>
+          <text x="655" y="72" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">KeyNot</text>
+          <text x="655" y="86" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Found</text>
+          <text x="655" y="100" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">sporadic</text>
+          <line x1="570" y1="80" x2="610" y2="80" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fm-b6-arr)"/>
+          <!-- Fix label at bottom -->
+          <rect x="80" y="160" width="560" height="70" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+          <text x="360" y="183" text-anchor="middle" fill="#86efac" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">The Fix: Eager initialization in constructor</text>
+          <text x="360" y="203" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">DI container runs constructors single-threaded. Build the dictionary there.</text>
+          <text x="360" y="220" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Use FrozenDictionary for immutable, read-optimized lookups.</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -2108,6 +2383,7 @@ public class NotificationFactory : INotificationFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The factory defers dictionary creation to the first <code>Create()</code> call. Under load, many threads reach the <code>if (_factories is null)</code> check before any thread finishes populating the dictionary. They all enter the block. Thread 1 creates a new Dictionary and starts adding entries. Thread 2 also creates a new Dictionary (overwriting Thread 1's reference) and also starts adding. Meanwhile Thread 1 is still adding to the <em>old</em> reference. The result is a corrupted internal state where hash buckets point to the wrong entries — keys are "there" but unreachable through the normal lookup path.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -2148,12 +2424,18 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Moving dictionary creation to the constructor eliminates the race condition entirely. The DI container constructs Singleton services on a single thread — no concurrent access is possible during construction. Marking the field <code>readonly</code> means it can't be reassigned after construction. Using <code>FrozenDictionary</code> goes a step further: it creates an immutable, read-optimized structure that's mathematically incapable of corruption because it can't be modified after creation. All concurrent reads are safe by design.</p>
           </div>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text"><strong>Never lazy-init mutable state in a Singleton.</strong> Build your factory's lookup in the constructor — DI guarantees it runs once. Use <span class="tooltip-trigger"><code>FrozenDictionary</code><span class="tooltip-content">A .NET 8+ read-only dictionary optimized for fast lookups after initial construction.</span></span> (.NET 8+) for read-optimized, <span class="tooltip-trigger">immutable<span class="tooltip-content">An object whose state cannot be changed after creation — inherently thread-safe</span></span> lookups. If you must lazy-init, use <code>Lazy&lt;T&gt;</code> or <code>ConcurrentDictionary</code>.</p>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for nullable <code>Dictionary</code> fields in Singleton classes: <code>Dictionary&lt;...&gt;?</code> with a null check in a method body. If you see <code>if (_dict is null) { _dict = new ...; _dict.Add(...); }</code>, that's a race condition waiting for traffic. Move the initialization to the constructor, or use <code>Lazy&lt;T&gt;</code> which guarantees single-threaded initialization.</p>
         </div>
       </div>
     </div>
@@ -2178,8 +2460,42 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating <code>INotificationFactory</code> when there's only one <code>INotification</code> implementation.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Unnecessary abstraction. A factory that always returns the same type is over-engineering — you've added a class that provides zero runtime decision.</p>
-          <p class="body-text"><strong>Fix:</strong> Just register it directly: <code>services.AddTransient&lt;INotification, EmailNotification&gt;()</code>. Add a factory only when you have 2+ implementations or a runtime decision point.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer reads about Factory Method and thinks "every object creation should go through a factory." They create <code>INotificationFactory</code> even though the only notification type is <code>EmailNotification</code>. It feels like "good architecture" — until you realize the factory always returns the same type. There's no decision point, no runtime choice, no polymorphism. It's a wrapper that does nothing useful.</p>
+          <p class="body-text">The second reason is "future-proofing." Developers think "we might add SMS later." That's a valid thought, but you're paying the complexity cost now for a feature that might never arrive. When you actually need a second type, creating a factory takes 5 minutes. There's no need to pre-build the abstraction.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Unnecessary.cs — ❌ Over-engineering</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Factory for a single type — pointless abstraction
+public interface INotificationFactory
+{
+    INotification Create(); // always returns EmailNotification
+}
+
+public class NotificationFactory : INotificationFactory
+{
+    public INotification Create() => new EmailNotification(); // only one type!
+}
+
+// ❌ Caller has to go through a factory that adds zero value
+var notification = _factory.Create(); // why not just inject INotification?</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Simple.cs — ✅ Direct injection</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Just register it directly — no factory needed
+services.AddTransient&lt;INotification, EmailNotification&gt;();
+
+// ✅ Caller injects the interface directly
+public class OrderService(INotification notification)
+{
+    public void PlaceOrder(Order order) => notification.Send(order.Confirmation);
+}
+
+// When you need a second type later, THEN add a factory. Not before.</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The connection is simple: a factory exists to make a <em>choice</em>. If there's no choice to make, skip the factory and use direct DI injection.</p>
         </div>
       </div>
     </div>
@@ -2193,8 +2509,37 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> One factory that creates 15 different unrelated types — notifications, reports, validators, parsers.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Violates SRP. Every new type means modifying the <span class="tooltip-trigger">God Factory<span class="tooltip-content">A class that knows too much or does too much — violates Single Responsibility by accumulating unrelated responsibilities.</span></span>. It becomes a dumping ground for all creation logic.</p>
-          <p class="body-text"><strong>Fix:</strong> Split into focused factories: <code>INotificationFactory</code>, <code>IReportFactory</code>, <code>IValidatorFactory</code>. Each has one responsibility.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It starts innocently. Someone creates a <code>ServiceFactory</code> to build notifications. Then another developer needs a factory for reports and thinks "we already have a factory — I'll just add a method." A third developer adds validator creation. Before long, one class is responsible for creating everything in the system.</p>
+          <p class="body-text">This violates the <span class="tooltip-trigger">Single Responsibility Principle<span class="tooltip-content">A class should have only one reason to change. If a factory creates 15 types, it has 15 reasons to change.</span></span>. Every time any team member adds a new type, they modify this one class. It becomes a merge conflict magnet, a testing nightmare, and a 500-line file that nobody wants to touch.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodFactory.cs — ❌ Dumping ground</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ One factory for everything — SRP violation
+public class ServiceFactory : IServiceFactory
+{
+    public INotification CreateNotification(string type) => ...;
+    public IReport CreateReport(ReportFormat fmt) => ...;
+    public IValidator CreateValidator(string ruleSet) => ...;
+    public IParser CreateParser(string format) => ...;
+    public IExporter CreateExporter(ExportFormat fmt) => ...;
+    // 15 more methods... every new type = change this class
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FocusedFactories.cs — ✅ Each factory has one job</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Split into focused factories — each has one responsibility
+public class NotificationFactory : INotificationFactory { ... }
+public class ReportFactory : IReportFactory { ... }
+public class ValidatorFactory : IValidatorFactory { ... }
+
+// Adding a new notification type? Only NotificationFactory changes.
+// Adding a new report format? Only ReportFactory changes.
+// No merge conflicts, no giant class, easy to test individually.</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Think of it like a restaurant kitchen: you want a pizza station, a pasta station, and a grill station — not one cook doing everything. Each factory should be focused on one family of related types.</p>
         </div>
       </div>
     </div>
@@ -2208,8 +2553,40 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory returns <code>object</code> and callers cast: <code>var report = (PdfReport)factory.Create("pdf");</code></p>
-          <p class="body-text"><strong>Why Bad:</strong> No compile-time safety. If someone passes "csv", you get a runtime <code>InvalidCastException</code> instead of a compile error.</p>
-          <p class="body-text"><strong>Fix:</strong> Always return a typed interface: <code>IReport</code>, <code>IExporter</code>, etc. Let the generic type system work for you.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer doesn't want to create an interface for the products. It feels like "extra work" to define <code>IReport</code>, so they return <code>object</code> instead. Or they use <code>dynamic</code> to avoid the cast. Either way, the compiler can't help you — all type checking happens at runtime, meaning bugs that could be caught at compile time only show up in production.</p>
+          <p class="body-text">The irony is that the whole point of Factory Method is to decouple the caller from concrete types. But if the caller casts the result back to a concrete type, you've defeated the purpose entirely. The caller now knows exactly what type it's getting, and you've just added a factory layer that provides no benefit.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Untyped.cs — ❌ No compile-time safety</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Returns object — callers must cast blindly
+public object Create(string type) =&gt; type switch
+{
+    "pdf"   =&gt; new PdfReport(),
+    "excel" =&gt; new ExcelReport(),
+    _ =&gt; throw new ArgumentException()
+};
+
+// ❌ Caller must know the concrete type and cast
+var report = (PdfReport)factory.Create("pdf"); // runtime crash if wrong</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Typed.cs — ✅ Type-safe interface</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Returns typed interface — compiler catches misuse
+public IReport Create(ReportFormat format) =&gt; format switch
+{
+    ReportFormat.Pdf   =&gt; new PdfReport(),
+    ReportFormat.Excel =&gt; new ExcelReport(),
+    _ =&gt; throw new ArgumentOutOfRangeException()
+};
+
+// ✅ Caller works with the interface — no casting needed
+IReport report = factory.Create(ReportFormat.Pdf);
+byte[] bytes = report.Generate(data); // type-safe!</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">If you find yourself casting the factory's return value, it's a signal: either the factory's return type is too broad (<code>object</code>), or the interface is missing methods the caller needs.</p>
         </div>
       </div>
     </div>
@@ -2223,8 +2600,53 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> <code>PaymentProcessor.Create("stripe")</code> as a static method.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Untestable — can't mock static calls. Can't inject dependencies into the factory. <span class="tooltip-trigger">Tight coupling<span class="tooltip-content">When components depend directly on concrete implementations rather than abstractions, making changes ripple through the codebase</span></span> everywhere.</p>
-          <p class="body-text"><strong>Fix:</strong> Use instance-based factory with interface. Static methods are fine for <code>int.Parse()</code>, not for business logic factories.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Static methods feel convenient. No need to inject anything, no interface, no DI registration. Just call <code>ClassName.Method()</code> from anywhere. It's the path of least resistance, and for simple utilities like <code>int.Parse()</code> or <code>DateTime.Now</code>, it works fine.</p>
+          <p class="body-text">But for business logic factories — things that create payment processors, report generators, or notification services — static methods are a trap. You can't mock a static method in unit tests. You can't inject dependencies into a static context. Every class that calls <code>PaymentProcessor.Create()</code> is now <span class="tooltip-trigger">tightly coupled<span class="tooltip-content">When components depend directly on concrete implementations rather than abstractions, making changes ripple through the codebase</span></span> to that concrete class. Swapping out the implementation requires changing every call site.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Static.cs — ❌ Untestable</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Static factory — can't mock, can't inject dependencies
+public static class PaymentProcessor
+{
+    public static IPaymentProcessor Create(string provider) =&gt; provider switch
+    {
+        "stripe" =&gt; new StripeProcessor(/* hardcoded API key? */),
+        _ =&gt; throw new ArgumentException()
+    };
+}
+
+// ❌ Every test that touches OrderService hits the real factory
+public class OrderService
+{
+    public void Charge(Order order)
+    {
+        var processor = PaymentProcessor.Create(order.Provider); // can't mock this!
+        processor.Charge(order.Amount);
+    }
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Injectable.cs — ✅ Instance-based, testable</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Instance-based factory — mockable, injectable
+public class PaymentProcessorFactory(IServiceProvider sp) : IPaymentProcessorFactory
+{
+    public IPaymentProcessor Create(string provider) =&gt; ...;
+}
+
+// ✅ OrderService receives factory via DI — easily testable
+public class OrderService(IPaymentProcessorFactory factory)
+{
+    public void Charge(Order order)
+    {
+        var processor = factory.Create(order.Provider); // can mock this!
+        processor.Charge(order.Amount);
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The rule: static methods are fine for pure utilities with no dependencies (parsing, formatting). For business logic that needs configuration, database access, or API keys — always use instance-based factories with DI.</p>
         </div>
       </div>
     </div>
@@ -2238,8 +2660,39 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory returns <code>INotification</code> but callers <span class="tooltip-trigger">downcast<span class="tooltip-content">Casting a base type reference to a derived type — a code smell that often indicates a leaky abstraction</span></span> to <code>EmailNotification</code> to access <code>.AttachmentPath</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> If you're downcasting, the factory's abstraction is leaking. The whole point is the caller shouldn't know the concrete type.</p>
-          <p class="body-text"><strong>Fix:</strong> Add <code>AttachmentPath</code> to <code>INotification</code> (or create <code>IAttachableNotification</code>). Make the interface complete.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The interface was designed before all the requirements were known. Later, someone needs a feature that's specific to one concrete type (like adding an attachment to emails). Instead of updating the interface, they cast the returned object to the concrete type. It's quick, it works, and it quietly undermines the entire factory pattern.</p>
+          <p class="body-text">The problem snowballs. Once one developer downcasts, others copy the pattern. Soon you have 20 places in the codebase doing <code>(EmailNotification)factory.Create("email")</code>. Now you can't change the concrete type without breaking all those cast sites. The factory's abstraction has leaked — callers know exactly what's behind the interface.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Leaky.cs — ❌ Downcasting defeats the factory</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Caller downcasts — knows the concrete type
+INotification notification = _factory.Create("email");
+var email = (EmailNotification)notification; // ❌ cast = leaked abstraction
+email.AttachmentPath = "/reports/q4.pdf";    // this property isn't on INotification</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Complete.cs — ✅ Interface covers all needs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Option 1: Add the capability to the interface
+public interface INotification
+{
+    void Send(string message);
+    void AddAttachment(string path); // throws NotSupportedException for SMS
+}
+
+// ✅ Option 2: Create a focused interface for the capability
+public interface IAttachableNotification : INotification
+{
+    string AttachmentPath { get; set; }
+}
+
+// Caller checks capability without downcasting to concrete type
+if (notification is IAttachableNotification attachable)
+    attachable.AttachmentPath = "/reports/q4.pdf";</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">If callers need features beyond what the interface provides, the interface is incomplete. Enrich the interface or create a focused sub-interface — don't reach past the abstraction.</p>
         </div>
       </div>
     </div>
@@ -2253,8 +2706,44 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory constructor calls database, sends HTTP requests, or pre-loads data during <code>Create()</code>.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Creation should be <strong>cheap</strong>. A factory that takes 2 seconds to create an object blocks DI resolution and slows every request.</p>
-          <p class="body-text"><strong>Fix:</strong> Defer heavy work to the product's own methods. Factory creates the object; the object initializes itself lazily.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer wants the factory product to be "ready to use" the moment it's created. So they put database calls, HTTP requests, or file I/O inside the factory's <code>Create()</code> method. The intent is good — nobody wants to call <code>product.Initialize()</code> separately. But the cost is paid at creation time, which blocks the thread and slows down DI resolution.</p>
+          <p class="body-text">This is especially dangerous when the factory is resolved during startup. If <code>Create()</code> makes a database call and the database is slow (or down), the entire application startup blocks. In Kubernetes, the health check fails, the pod gets killed, Kubernetes restarts it, the database is still slow, and you're in a restart loop.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HeavyCreation.cs — ❌ Slow factory</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Factory does heavy work during Create()
+public IReportGenerator Create(ReportFormat format)
+{
+    var templates = _db.Templates.ToList();        // ❌ database call!
+    var fonts = _httpClient.GetAsync("/fonts");     // ❌ HTTP call!
+    var config = File.ReadAllText("rules.json");    // ❌ file I/O!
+    return new PdfGenerator(templates, fonts, config); // 2 seconds to create!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LazyInit.cs — ✅ Cheap creation, lazy init</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Factory creates cheaply — product initializes lazily
+public IReportGenerator Create(ReportFormat format)
+{
+    return new PdfGenerator(_db, _httpClient); // instant — no I/O
+}
+
+// Product loads resources on first use, not at creation
+public class PdfGenerator(AppDbContext db, HttpClient http) : IReportGenerator
+{
+    private List&lt;Template&gt;? _templates;
+
+    public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken ct)
+    {
+        _templates ??= await db.Templates.ToListAsync(ct); // lazy load
+        // ... generate report using _templates
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The principle: factory creation should be <em>cheap and fast</em> — just wire up dependencies. Heavy work (I/O, network, database) belongs in the product's own methods, not in the factory.</p>
         </div>
       </div>
     </div>
@@ -2268,8 +2757,32 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory creates it, caller uses it, nobody disposes it. 200K exports/day with undisposed <code>MemoryStream</code>s.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Memory grows 500MB/hour. Factory-created objects aren't tracked by DI — container won't dispose them.</p>
-          <p class="body-text"><strong>Fix:</strong> Document ownership: "Factory creates, caller disposes." Have products implement <code>IDisposable</code>. <span class="tooltip-trigger">Roslyn<span class="tooltip-content">The .NET compiler platform providing C# and VB.NET compilers as services, enabling code analysis and source generators.</span></span> <code>CA2000</code> catches missed disposals.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When you resolve a service from the DI container normally, the container tracks it and disposes it at the end of the scope. Developers get used to this — "DI handles disposal." But factory-created objects are different. The factory builds them manually with <code>new</code>, so the DI container doesn't know they exist. Nobody tracks them, nobody disposes them.</p>
+          <p class="body-text">The confusion is understandable: DI-resolved objects are managed by the container, but factory-created objects are unmanaged. It's the caller's responsibility to dispose them, but nothing in the code makes that obvious unless the product interface extends <code>IDisposable</code>.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Leaked.cs — ❌ No disposal</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Factory creates, caller uses, nobody disposes
+var exporter = _factory.Create(format);
+var bytes = exporter.Export(data);
+return File(bytes, "application/pdf");
+// exporter with MemoryStream goes out of scope — leak!</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Disposed.cs — ✅ Using statement</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Product extends IDisposable — compiler reminds you
+public interface IExporter : IDisposable { ... }
+
+// ✅ Caller wraps in 'using' — auto-dispose at end of scope
+using var exporter = _factory.Create(format);
+var bytes = exporter.Export(data);
+return File(bytes, "application/pdf");
+// Dispose() called automatically — MemoryStream freed!</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The golden rule: "Factory creates, caller disposes." Make <code>IDisposable</code> part of the product interface, and enable <span class="tooltip-trigger">Roslyn<span class="tooltip-content">The .NET compiler platform providing C# and VB.NET compilers as services, enabling code analysis and source generators.</span></span> analyzer <code>CA2000</code> to flag missed disposals automatically.</p>
         </div>
       </div>
     </div>
@@ -2283,15 +2796,38 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Adding a new enum value without updating the factory. The switch falls through to <code>default</code> which returns <code>null</code>.</p>
-          <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">.editorconfig</span></div>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer adds <code>ExportFormat.Markdown</code> to the enum, creates a <code>MarkdownExporter</code> class, registers it in DI — and forgets to add the case to the factory's switch statement. The switch falls through to the default case, which returns <code>null</code> (or worse, silently does nothing). The bug doesn't show up until someone actually requests a Markdown export in production.</p>
+          <p class="body-text">C# switch expressions can catch this at compile time, but only if you enable the right analyzer rule. Without it, adding a new enum value is a silent change that can break the factory.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Incomplete.cs — ❌ Silent null return</span></div>
             <div class="macos-body">
-<pre><code class="language-csharp"># Force exhaustive switch expressions
-dotnet_diagnostic.CS8509.severity = error</code></pre>
+<pre><code class="language-csharp">// ❌ default returns null — new enum values silently get nothing
+public IExporter Create(ExportFormat format) =&gt; format switch
+{
+    ExportFormat.Pdf   =&gt; new PdfExporter(),
+    ExportFormat.Excel =&gt; new ExcelExporter(),
+    // Someone adds ExportFormat.Markdown — not handled here!
+    _ =&gt; null  // ❌ silent null — caller gets NullReferenceException later
+};</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> You get a silent <code>null</code> or generic exception instead of a clear compile-time error.</p>
-          <p class="body-text"><strong>Fix:</strong> Always use <code>_ =&gt; throw new ArgumentOutOfRangeException()</code> and enable <code>CS8509</code> at error severity.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Exhaustive.cs — ✅ Fail fast + compile-time check</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ default throws — fail fast with clear message
+public IExporter Create(ExportFormat format) =&gt; format switch
+{
+    ExportFormat.Pdf   =&gt; new PdfExporter(),
+    ExportFormat.Excel =&gt; new ExcelExporter(),
+    _ =&gt; throw new ArgumentOutOfRangeException(nameof(format),
+        $"No exporter for {format}. Did you forget to add a case?")
+};
+
+// ✅ .editorconfig — make the compiler catch unhandled enum values
+// dotnet_diagnostic.CS8509.severity = error</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Always use <code>throw</code> in the default case, and enable <code>CS8509</code> at error severity in your <code>.editorconfig</code>. The compiler will refuse to build if a new enum value isn't handled.</p>
         </div>
       </div>
     </div>
@@ -2305,8 +2841,10 @@ dotnet_diagnostic.CS8509.severity = error</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory catches creation exceptions and returns <code>null</code> or a no-op fallback instead of failing fast.</p>
-          <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DontDoThis.cs</span></div>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer doesn't want the factory to crash the application. They wrap the creation logic in a try/catch and return a "safe" fallback — a no-op implementation that does nothing. The intent is resilience: "if Stripe is down, at least the app doesn't crash." But the side effect is far worse than a crash.</p>
+          <p class="body-text">Imagine a payment factory that catches all exceptions and returns a <code>NoOpProcessor</code>. When Stripe's API is temporarily unreachable, every order goes through without being charged. The customer gets the product for free. Nobody notices until end-of-day reconciliation shows $0 revenue. A 500 error would have been infinitely better — the customer would retry, or customer support would intervene. Silent data loss is always worse than a loud failure.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Swallowed.cs — ❌ Silent failures</span></div>
             <div class="macos-body">
 <pre><code class="language-csharp">// ❌ DON'T — swallowing exceptions
 public IPaymentProcessor Create(string provider)
@@ -2316,8 +2854,24 @@ public IPaymentProcessor Create(string provider)
 }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Silent failures are deadly — a payment factory returning a no-op processor means orders go through without charging anyone. Nobody notices until the end-of-day reconciliation shows $0 revenue.</p>
-          <p class="body-text"><strong>Fix:</strong> Fail fast, fail loud. Let the exception propagate. Better a 500 error than silent financial loss.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FailFast.cs — ✅ Loud failures</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Fail fast — let the exception propagate
+public IPaymentProcessor Create(string provider)
+{
+    return ResolveProcessor(provider);
+    // If this throws, the caller gets a 500 error.
+    // The customer retries. Support gets alerted.
+    // $0 revenue at end of day? Never happens.
+}
+
+// If you need resilience, handle it at a higher level:
+// retry policies (Polly), circuit breakers, fallback queues
+// — NOT a silent no-op in the factory</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Factories should fail fast and fail loud. If creation fails, let the error propagate to the caller. Resilience belongs in dedicated middleware (retry policies, circuit breakers) — not in a catch-all inside the factory.</p>
         </div>
       </div>
     </div>
@@ -2331,8 +2885,10 @@ public IPaymentProcessor Create(string provider)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory reads raw <code>IConfiguration</code> and knows the exact JSON structure — key names, nesting, types.</p>
-          <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DontDoThis.cs</span></div>
+          <p class="body-text"><strong>Why This Happens:</strong> Injecting <code>IConfiguration</code> is easy — it's always available in the DI container, and you can read any key with a string path like <code>config["Exporters:Pdf:StorageConnection"]</code>. No need to create a settings class, no need to set up options binding. It works on the first try.</p>
+          <p class="body-text">But now your factory is tightly coupled to the exact shape of your JSON config file. Rename a key? The factory silently gets <code>null</code>. Move a section to a different nesting level? Same thing. The factory has no way to validate the config at startup — it just reads strings and hopes for the best. This is the exact problem the <span class="tooltip-trigger">Options pattern<span class="tooltip-content">A .NET pattern for accessing configuration using strongly-typed classes injected via IOptions&lt;T&gt;.</span></span> was designed to solve.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MagicStrings.cs — ❌ Coupled to JSON shape</span></div>
             <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Factory knows the exact JSON shape
 public class ExporterFactory(IConfiguration config) : IExporterFactory
@@ -2340,16 +2896,38 @@ public class ExporterFactory(IConfiguration config) : IExporterFactory
     public IExporter Create(string format)
     {
         var connStr = config["Exporters:Pdf:StorageConnection"];  // ❌ magic string
-        var maxSize = config.GetValue&lt;int&gt;("Exporters:Pdf:MaxFileSizeMb"); // ❌ coupled to JSON nesting
+        var maxSize = config.GetValue&lt;int&gt;("Exporters:Pdf:MaxFileSizeMb"); // ❌ coupled
         return new PdfExporter(connStr, maxSize);
+        // If someone renames the key in appsettings.json, connStr is silently null
     }
 }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Renaming a config key breaks the factory silently (<code>null</code> values).<br>
-          Factory shouldn't know config structure — that's the <span class="tooltip-trigger">Options pattern<span class="tooltip-content">A .NET pattern for accessing configuration using strongly-typed classes injected via IOptions&lt;T&gt;.</span></span>'s job.</p>
-          <p class="body-text"><strong>Fix:</strong> Inject <code>IOptions&lt;ExporterSettings&gt;</code> or <code>IOptionsSnapshot&lt;ExporterSettings&gt;</code>.<br>
-          Let the options layer own the config shape, validate with <span class="tooltip-trigger"><code>ValidateOnStart()</code><span class="tooltip-content">A .NET option that validates configuration at app startup, failing fast instead of at the first request.</span></span>, and give the factory a strongly-typed <span class="tooltip-trigger">POCO<span class="tooltip-content">Plain Old CLR Object — a simple class with properties and no framework dependencies.</span></span>.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TypedOptions.cs — ✅ Strongly-typed settings</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Settings class — owns the config shape
+public class ExporterSettings
+{
+    public string StorageConnection { get; init; } = "";
+    public int MaxFileSizeMb { get; init; } = 100;
+}
+
+// ✅ Register with validation
+builder.Services.AddOptions&lt;ExporterSettings&gt;()
+    .BindConfiguration("Exporters:Pdf")
+    .ValidateDataAnnotations()
+    .ValidateOnStart(); // ← fail at startup if config is wrong
+
+// ✅ Factory injects typed settings — no magic strings
+public class ExporterFactory(IOptions&lt;ExporterSettings&gt; opts) : IExporterFactory
+{
+    public IExporter Create(string format) =&gt;
+        new PdfExporter(opts.Value.StorageConnection, opts.Value.MaxFileSizeMb);
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Let the Options layer own the config shape. The factory gets a strongly-typed <span class="tooltip-trigger">POCO<span class="tooltip-content">Plain Old CLR Object — a simple class with properties and no framework dependencies.</span></span> with validated properties. If the config is wrong, the app fails at startup with a clear error — not silently in production with <code>null</code> values.</p>
         </div>
       </div>
     </div>
@@ -2715,13 +3293,14 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What problem does Factory Method solve that plain <code>new</code> doesn't?</div>
         <div class="body-text">
-          <p class="mb-sm">Factory Method is a GoF creational pattern that:</p>
+          <p class="mb-sm">Think of a restaurant where you order "a drink" from the menu. You don't walk into the kitchen and grab a specific bottle yourself — you tell the waiter what you want, and the kitchen decides how to make it. That's Factory Method in a nutshell: you ask for a product through an interface, and a separate component decides which concrete type to create and how to configure it.</p>
+          <p class="mb-sm">More formally, Factory Method is a GoF creational pattern that:</p>
           <ol class="qa-list">
             <li>Defines an <strong>interface</strong> for creating objects</li>
             <li>Lets <strong>subclasses or implementations</strong> decide which concrete class to instantiate</li>
             <li>Decouples the <strong>creator</strong> from the <strong>product</strong> — the caller doesn't know which concrete type it gets</li>
           </ol>
-          <p class="mt-md">Example: <code>IHttpClientFactory.CreateClient("stripe")</code> — the caller gets a configured HttpClient but doesn't know about handler pooling, DNS rotation, or retry policies.</p>
+          <p class="mt-md">A real .NET example: <code>IHttpClientFactory.CreateClient("stripe")</code> — the caller gets a configured HttpClient but doesn't know about handler pooling, DNS rotation, or retry policies. The factory hides all that complexity. If Microsoft changes how HttpClient pooling works internally, your code doesn't change at all.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The key insight is that it's not just about wrapping <code>new</code> — it's about deferring the type decision to a separate component. In modern .NET, the DI container often plays the role of the ConcreteCreator."</div>
       </div></div>
@@ -2739,6 +3318,7 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when you need to support a new payment provider?</div>
         <div class="body-text">
+          <p class="mb-sm">Imagine you're building a house, and instead of hiring a plumber, you install every pipe yourself. If you need to change the plumbing later, <em>you</em> have to do the work again. That's what <code>new StripeProcessor(apiKey, webhookUrl)</code> does in code — you've hardwired the specific type and its configuration directly into the class that uses it.</p>
           <p class="mb-sm">Using <code>new</code> directly creates <span class="tooltip-trigger">tight coupling<span class="tooltip-content">When a class depends directly on a concrete implementation rather than an abstraction, making it hard to change or test.</span></span>:</p>
           <ul class="qa-list">
             <li><strong>Can't swap implementations</strong> without changing the caller</li>
@@ -2746,7 +3326,7 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
             <li><strong>Violates OCP</strong> — adding a new type means modifying existing code</li>
             <li><strong>Hides dependencies</strong> — constructor args like API keys end up hardcoded</li>
           </ul>
-          <p class="mt-md">That said, <code>new</code> is perfectly fine for simple value objects: <code>new Point(x, y)</code>, <code>new List&lt;int&gt;()</code>. Factory Method is for when the <em>choice</em> matters.</p>
+          <p class="mt-md">That said, <code>new</code> is perfectly fine for simple value objects: <code>new Point(x, y)</code>, <code>new List&lt;int&gt;()</code>. The decision rule is: if the <em>choice of type</em> matters at runtime (e.g., Stripe vs PayPal based on user preference), use a factory. If there's only ever one type and no decisions to make, <code>new</code> is simpler and better.</p>
         </div>
       </div></div>
     </div>
@@ -2763,8 +3343,10 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Is Simple Factory even a real design pattern?</div>
         <div class="body-text">
+          <p class="mb-sm">This is a classic "they sound the same but work differently" interview trap. Think of it like ordering food: a <strong>Simple Factory</strong> is like a single cook who takes all orders and uses a big if/else to decide what to make. If you want to add sushi to the menu, the cook has to learn a new recipe — you modify the existing cook (class).</p>
           <p class="mb-sm"><strong>Simple Factory:</strong> A single class with a static method that uses switch/if to create objects. Not a GoF pattern — it's a coding idiom. Adding a new type means modifying the factory class (violates OCP).</p>
-          <p class="mb-sm"><strong>Factory Method:</strong> Uses an interface or virtual method. Each product type can get its own factory implementation. Adding a new type means adding a new class — zero changes to existing code (OCP ✓).</p>
+          <p class="mb-sm"><strong>Factory Method:</strong> Uses an interface or virtual method. Each product type can get its own factory implementation. It's like having specialized chefs — a sushi chef, a pizza chef — each knowing their domain. Adding sushi means hiring a sushi chef (new class). The pizza chef doesn't change at all. Zero changes to existing code (OCP satisfied).</p>
+          <p class="mt-md">In practice, many .NET factories use a dictionary-based approach that sits somewhere in between. The factory itself doesn't change, but new products register themselves via DI. This gives you OCP benefits without needing a separate factory class per product type.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Simple Factory is a stepping stone — it centralizes creation logic but doesn't support extension. Factory Method takes it further with polymorphism. In practice, I'd use a dictionary-based factory registered in DI, which gives OCP benefits without needing separate factory classes per product."</div>
       </div></div>
@@ -2803,13 +3385,15 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
       </div>
       <div class="qa-body"><div class="qa-content">
         <div class="body-text">
+          <p class="mb-sm">Knowing when NOT to use a pattern is just as important as knowing when to use it. Factory Method is powerful, but it adds a layer of indirection. If that layer doesn't earn its keep, it's just complexity for complexity's sake. Here's when to skip the factory:</p>
           <ul class="qa-list">
             <li><strong>Only one implementation</strong> — just register it directly in DI</li>
             <li><strong>No runtime decision</strong> — the type is known at compile time</li>
             <li><strong>Simple value objects</strong> — <code>new Point(x, y)</code> doesn't need a factory</li>
             <li><strong><code>Func&lt;T&gt;</code> is sufficient</strong> — don't create a class just to wrap a lambda</li>
-            <li><strong>Over-abstracting CRUD</strong> — <code>new Order()</code> doesn't need a <code>OrderFactory</code></li>
+            <li><strong>Over-abstracting CRUD</strong> — <code>new Order()</code> doesn't need an <code>OrderFactory</code></li>
           </ul>
+          <p class="mt-md">Think of it this way: a factory exists to make a <em>choice</em> at runtime. If there's no choice to make (only one type, or the type is known at compile time), the factory has no job. DI is already a factory in disguise — it creates instances, manages lifetimes, and injects dependencies. Don't put a factory on top of a factory unless the top one adds real decision logic.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The decision rule is simple: if no runtime value determines the type, you don't need a factory. DI is already a factory — don't add another layer on top of it without a reason."</div>
       </div></div>
@@ -2827,14 +3411,46 @@ public async Task&lt;byte[]&gt; GenerateAsync(ReportData data, CancellationToken
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Why can't you just <code>new HttpClient()</code>? What goes wrong?</div>
         <div class="body-text">
-          <p class="mb-sm"><code>IHttpClientFactory.CreateClient(name)</code> is a classic Factory Method:</p>
+          <p class="mb-sm">This is one of the best real-world examples of Factory Method because most .NET developers have used it, and the "why" is immediately tangible. Let's start with the problem it solves.</p>
+          <p class="mb-sm">If you just <code>new HttpClient()</code> every time you make an HTTP call, each instance opens its own TCP connection. Under load, you burn through all available sockets — that's called <span class="tooltip-trigger">socket exhaustion<span class="tooltip-content">Running out of available TCP sockets because HttpClient instances weren't reused — sockets stay in TIME_WAIT state for ~4 minutes after closing.</span></span>. On the flip side, if you reuse a single <code>HttpClient</code> forever, it caches DNS results and doesn't pick up DNS changes (like when a server IP changes during a deployment).</p>
+          <p class="mb-sm"><code>IHttpClientFactory</code> solves both problems. It maps perfectly to the Factory Method roles:</p>
           <ol class="qa-list">
             <li><strong>Creator:</strong> <code>IHttpClientFactory</code> (the interface)</li>
             <li><strong>ConcreteCreator:</strong> <code>DefaultHttpClientFactory</code> (internal framework class)</li>
             <li><strong>Product:</strong> <code>HttpClient</code></li>
             <li><strong>Factory Method:</strong> <code>CreateClient(string name)</code></li>
           </ol>
-          <p class="mt-md">Internally, it manages an <code>HttpMessageHandler</code> pool with a 2-minute handler lifetime. This prevents both socket exhaustion (too many connections) and DNS staleness (cached DNS entries). The caller just gets a ready-to-use <code>HttpClient</code> — all the pooling is hidden behind the factory.</p>
+
+          <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing IHttpClientFactory managing handler pool and returning configured HttpClient instances" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="220" rx="12" fill="#1e293b"/>
+            <!-- Caller -->
+            <rect x="30" y="60" width="130" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="95" y="78" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Your Code</text>
+            <text x="95" y="94" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">CreateClient("stripe")</text>
+            <!-- Factory -->
+            <rect x="210" y="30" width="200" height="100" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="2"/>
+            <text x="310" y="52" text-anchor="middle" fill="#86efac" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">IHttpClientFactory</text>
+            <text x="310" y="72" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Manages handler pool</text>
+            <text x="310" y="88" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">2-min handler lifetime</text>
+            <text x="310" y="104" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Applies named config</text>
+            <text x="310" y="120" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">(base URL, headers, retries)</text>
+            <!-- HttpClient -->
+            <rect x="460" y="60" width="140" height="45" rx="8" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+            <text x="530" y="78" text-anchor="middle" fill="#c7d2fe" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">HttpClient</text>
+            <text x="530" y="94" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">Ready to use!</text>
+            <!-- Arrows -->
+            <line x1="160" y1="82" x2="210" y2="82" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-q6-arr)"/>
+            <line x1="410" y1="82" x2="460" y2="82" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-q6-arr)"/>
+            <!-- Hidden complexity -->
+            <rect x="210" y="150" width="390" height="50" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="1"/>
+            <text x="405" y="170" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Hidden behind the factory:</text>
+            <text x="405" y="188" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">Handler pooling | DNS rotation | Socket management | Retry policies | Logging</text>
+          </svg>
+
+          <p class="mt-sm">Internally, the factory manages an <code>HttpMessageHandler</code> pool with a 2-minute handler lifetime. This prevents both socket exhaustion (too many connections) and DNS staleness (cached DNS entries). The caller just gets a ready-to-use <code>HttpClient</code> — all the pooling is hidden behind the factory. If Microsoft changes how pooling works in .NET 10, your code doesn't change at all.</p>
         </div>
       </div></div>
     </div>
@@ -2911,9 +3527,48 @@ public class ReportFactory(IServiceProvider sp) : IReportFactory
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Why is injecting <code>IServiceProvider</code> considered an anti-pattern?</div>
         <div class="body-text">
-          <p class="mb-sm"><strong>Service Locator:</strong> Injects the DI container (<code>IServiceProvider</code>) and calls <code>GetService&lt;T&gt;()</code> directly. Dependencies are hidden — you can't tell what a class needs by looking at its constructor.</p>
-          <p class="mb-sm"><strong>Factory Method:</strong> Injects a focused factory interface (<code>IExporterFactory</code>). Dependencies are explicit. The factory has one job: create one type of product.</p>
-          <p class="mt-md">Key difference: with Service Locator, the class can resolve <em>anything</em>. With Factory Method, the class can only create what the factory interface allows.</p>
+          <p class="mb-sm">This is a common interview question because the two look deceptively similar — both "create" objects from some container. But they have fundamentally different philosophies about how a class should declare its needs.</p>
+          <p class="mb-sm"><strong>Service Locator:</strong> Injects the DI container (<code>IServiceProvider</code>) and calls <code>GetService&lt;T&gt;()</code> directly. Dependencies are hidden — you can't tell what a class needs by looking at its constructor. It's like giving someone a master key to every room in the building. They <em>can</em> open any door, but you have no idea which ones they actually use.</p>
+          <p class="mb-sm"><strong>Factory Method:</strong> Injects a focused factory interface (<code>IExporterFactory</code>). Dependencies are explicit — you can see from the constructor that this class creates exporters, nothing else. It's like giving someone a key to the supply room only. Clear, bounded, predictable.</p>
+
+          <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram comparing Service Locator (hidden dependencies, access to everything) vs Factory Method (explicit dependencies, focused access)" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="220" rx="12" fill="#1e293b"/>
+            <!-- Service Locator side -->
+            <text x="180" y="25" text-anchor="middle" fill="#fca5a5" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Service Locator (anti-pattern)</text>
+            <rect x="30" y="40" width="130" height="40" rx="6" fill="#3b1318" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="95" y="65" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="system-ui, -apple-system, sans-serif">MyClass</text>
+            <rect x="200" y="40" width="150" height="40" rx="6" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="275" y="65" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif">IServiceProvider</text>
+            <line x1="160" y1="60" x2="200" y2="60" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fm-q9-arr)"/>
+            <!-- Can resolve anything -->
+            <rect x="200" y="90" width="150" height="22" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+            <text x="275" y="105" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, -apple-system, sans-serif">GetService&lt;IExporter&gt;()</text>
+            <rect x="200" y="115" width="150" height="22" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+            <text x="275" y="130" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, -apple-system, sans-serif">GetService&lt;ILogger&gt;()</text>
+            <rect x="200" y="140" width="150" height="22" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+            <text x="275" y="155" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, -apple-system, sans-serif">GetService&lt;ANYTHING&gt;()</text>
+            <text x="180" y="190" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Hidden deps — can't tell what class needs</text>
+            <!-- Factory Method side -->
+            <text x="545" y="25" text-anchor="middle" fill="#86efac" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Factory Method (correct)</text>
+            <rect x="410" y="40" width="130" height="40" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="475" y="65" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif">MyClass</text>
+            <rect x="580" y="40" width="120" height="40" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="640" y="65" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif">IExporterFactory</text>
+            <line x1="540" y1="60" x2="580" y2="60" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fm-q9-arr)"/>
+            <!-- Only create exporters -->
+            <rect x="580" y="90" width="120" height="22" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+            <text x="640" y="105" text-anchor="middle" fill="#86efac" font-size="9" font-family="system-ui, -apple-system, sans-serif">Create(format)</text>
+            <text x="545" y="140" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">One job: create exporters. Nothing else.</text>
+            <text x="545" y="160" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Constructor tells you exactly what class needs.</text>
+            <!-- Divider -->
+            <line x1="375" y1="15" x2="375" y2="205" stroke="#475569" stroke-width="1" stroke-dasharray="4,4"/>
+          </svg>
+
+          <p class="mt-sm"><strong>Key difference:</strong> with Service Locator, the class can resolve <em>anything</em> from the container — its real dependencies are invisible. With Factory Method, the class can only create what the factory interface allows. The constructor signature is honest: "I need an exporter factory" is much clearer than "I need access to the entire DI container."</p>
+          <p class="mt-sm"><strong>Testing impact:</strong> To mock a Service Locator, you have to set up a fake <code>IServiceProvider</code> and pre-register every service the class might request (which you can't know without reading the implementation). To mock a factory, you set up one method: <code>Create()</code>. That's it.</p>
         </div>
       </div></div>
     </div>
@@ -2960,9 +3615,36 @@ mockFactory.Verify(f => f.Create(PaymentProvider.Stripe), Times.Once);</code></p
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What's different about Blazor Server's lifetime compared to traditional HTTP requests?</div>
         <div class="body-text">
-          <p class="mb-sm">In traditional ASP.NET Core, each HTTP request = one DI scope = one <code>DbContext</code>. Works perfectly.</p>
-          <p class="mb-sm">In Blazor Server, a <strong>circuit</strong> (SignalR connection) lives across many user interactions — could be minutes or hours. A single <code>DbContext</code> for the whole circuit leads to stale data, concurrency exceptions, and memory growth.</p>
-          <p class="mb-sm"><code>IDbContextFactory&lt;T&gt;</code> solves this by creating <strong>short-lived DbContext instances on demand</strong>:</p>
+          <p class="mb-sm">This question tests whether you understand DI scoping beyond the basic "one request = one scope" model. In traditional ASP.NET Core, each HTTP request creates one DI scope, which creates one <code>DbContext</code>. The request ends, the scope is disposed, the DbContext is cleaned up. Clean and simple.</p>
+          <p class="mb-sm">Blazor Server changes the game. A <strong>circuit</strong> (SignalR connection) represents a user's browser session. It stays alive for as long as the user has the page open — that could be minutes, hours, or even days. If you inject a Scoped <code>DbContext</code> into a Blazor component, that single DbContext lives for the entire circuit. Over time, its <span class="tooltip-trigger">change tracker<span class="tooltip-content">An EF Core mechanism that keeps track of all entities loaded in a DbContext, including their original and current values.</span></span> accumulates entities, memory grows, and data becomes stale.</p>
+
+          <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram comparing traditional HTTP request scoping vs Blazor Server long-lived circuit with IDbContextFactory" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q11-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="200" rx="12" fill="#1e293b"/>
+            <!-- Traditional side -->
+            <text x="180" y="22" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Traditional HTTP</text>
+            <rect x="30" y="35" width="90" height="30" rx="4" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="75" y="55" text-anchor="middle" fill="#86efac" font-size="9" font-family="system-ui, -apple-system, sans-serif">Req 1 → Db1</text>
+            <rect x="130" y="35" width="90" height="30" rx="4" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="175" y="55" text-anchor="middle" fill="#86efac" font-size="9" font-family="system-ui, -apple-system, sans-serif">Req 2 → Db2</text>
+            <rect x="230" y="35" width="90" height="30" rx="4" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="275" y="55" text-anchor="middle" fill="#86efac" font-size="9" font-family="system-ui, -apple-system, sans-serif">Req 3 → Db3</text>
+            <text x="180" y="85" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Each request = fresh DbContext. Disposed at end.</text>
+            <!-- Blazor side -->
+            <text x="540" y="22" text-anchor="middle" fill="#fca5a5" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Blazor Server (without factory)</text>
+            <rect x="400" y="35" width="280" height="30" rx="4" fill="#3b1318" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="540" y="55" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="system-ui, -apple-system, sans-serif">ONE DbContext for entire circuit (minutes/hours)</text>
+            <text x="540" y="85" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Stale data, memory growth, concurrency errors</text>
+            <!-- Fix -->
+            <rect x="120" y="110" width="480" height="70" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="360" y="132" text-anchor="middle" fill="#86efac" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Fix: IDbContextFactory&lt;T&gt;</text>
+            <text x="360" y="152" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Create short-lived DbContext per operation, dispose immediately.</text>
+            <text x="360" y="170" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">await using var db = DbFactory.CreateDbContextAsync(); // fresh every time</text>
+          </svg>
+
+          <p class="mb-sm"><code>IDbContextFactory&lt;T&gt;</code> solves this by creating <strong>short-lived DbContext instances on demand</strong> — each one is used for a single operation and disposed immediately:</p>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Blazor.razor</span></div>
             <div class="macos-body">
@@ -2971,6 +3653,7 @@ var products = await db.Products.ToListAsync();
 // db disposed immediately — no stale tracking, no memory leak</code></pre>
             </div>
           </div>
+          <p class="mt-md">This is Factory Method at its finest: the component doesn't manage DbContext lifetimes. It asks the factory for a fresh one, uses it, disposes it. The factory handles all the configuration and connection pooling behind the scenes.</p>
         </div>
       </div></div>
     </div>
@@ -3041,14 +3724,48 @@ var products = await db.Products.ToListAsync();
       </div>
       <div class="qa-body"><div class="qa-content">
         <div class="body-text">
-          <p class="mb-sm">Adding a new payment provider (e.g., Square) with Factory Method:</p>
+          <p class="mb-sm">This is a powerful interview answer because you can walk through a concrete example step by step. Let's say you have a payment system with Stripe and PayPal, and you need to add Square.</p>
+          <p class="mb-sm">With a dictionary-based Factory Method pattern (using <code>IEnumerable&lt;T&gt;</code> auto-discovery), adding Square requires:</p>
           <ol class="qa-list">
             <li>Create <code>SquareProcessor : IPaymentProcessor</code> — new file, new class</li>
             <li>Add DI registration: <code>services.AddKeyedTransient&lt;IPaymentProcessor, SquareProcessor&gt;("square")</code></li>
             <li>Add enum value: <code>PaymentProvider.Square</code></li>
           </ol>
-          <p class="mt-md"><strong>Files modified: 0 existing files.</strong> No changes to the factory, controller, or any existing processor. The factory discovers the new processor via DI. That's OCP in action — open for extension (new class), closed for modification (zero existing code changes).</p>
-          <p class="mt-md">Compare with Simple Factory: you'd modify the switch statement inside the factory class. Every new type = a change to existing code.</p>
+
+          <svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing OCP in action: adding Square requires zero changes to existing factory, controller, or Stripe/PayPal code" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q14-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="240" rx="12" fill="#1e293b"/>
+            <text x="360" y="22" text-anchor="middle" fill="#93c5fd" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Adding Square — what changes?</text>
+            <!-- Existing (unchanged) -->
+            <rect x="30" y="40" width="130" height="40" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="95" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">StripeProcessor</text>
+            <text x="95" y="70" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">NO changes</text>
+            <rect x="180" y="40" width="130" height="40" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="245" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">PayPalProcessor</text>
+            <text x="245" y="70" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">NO changes</text>
+            <rect x="330" y="40" width="150" height="40" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="405" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">PaymentFactory</text>
+            <text x="405" y="70" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">NO changes</text>
+            <rect x="500" y="40" width="130" height="40" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="565" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Controller</text>
+            <text x="565" y="70" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">NO changes</text>
+            <!-- New (added) -->
+            <text x="360" y="110" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">New files only:</text>
+            <rect x="130" y="125" width="200" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="230" y="143" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">SquareProcessor.cs</text>
+            <text x="230" y="160" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">new file, new class</text>
+            <rect x="380" y="125" width="220" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="490" y="143" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Program.cs — 1 line added</text>
+            <text x="490" y="160" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">AddKeyedTransient(...)</text>
+            <!-- Bottom summary -->
+            <rect x="120" y="190" width="480" height="35" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="360" y="212" text-anchor="middle" fill="#86efac" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">0 existing files modified. That's OCP.</text>
+          </svg>
+
+          <p class="mt-sm"><strong>Files modified: 0 existing files.</strong> No changes to the factory, controller, or any existing processor. The factory discovers the new processor via DI. That's OCP in action — open for extension (new class), closed for modification (zero existing code changes).</p>
+          <p class="mt-md">Compare with Simple Factory: you'd modify the switch statement inside the factory class. Every new type = a change to existing code. With the dictionary/DI-based factory, the switch statement doesn't exist — the factory builds its lookup from the injected collection, so new products automatically appear.</p>
         </div>
       </div></div>
     </div>
@@ -3064,7 +3781,8 @@ var products = await db.Products.ToListAsync();
       </div>
       <div class="qa-body"><div class="qa-content">
         <div class="body-text">
-          <p class="mb-sm">Use async factories when creation requires I/O — loading config from a database, downloading a license file, or warming up a connection.</p>
+          <p class="mb-sm">Most factory methods are synchronous because object creation is cheap — just allocating memory and wiring up dependencies. But sometimes creation itself involves I/O: loading configuration from a database, downloading a license file, establishing a connection, or warming up a cache. In those cases, a synchronous factory would block the calling thread, which is unacceptable in async web applications.</p>
+          <p class="mb-sm">The solution is an async factory: <code>Task&lt;IProduct&gt; CreateAsync(CancellationToken ct)</code>. The key design decisions are: always accept a <code>CancellationToken</code> (the caller might cancel during a long creation), and always use <code>ConfigureAwait(false)</code> in library code to avoid deadlocks.</p>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncFactory.cs</span></div>
             <div class="macos-body">
@@ -3223,7 +3941,44 @@ public class ReportController([FromKeyedServices("pdf")] IExporter exporter) { }
       </div>
       <div class="qa-body"><div class="qa-content">
         <div class="body-text">
-          <p class="mb-sm">Wrap factory products in decorators for retry, logging, or caching — the caller doesn't know the difference:</p>
+          <p class="mb-sm">This is a powerful combination that comes up in senior-level interviews. The idea: instead of modifying factory products to add retry logic, logging, or caching, you <em>wrap</em> them in a decorator. The caller gets what looks like a normal <code>IExporter</code>, but it secretly has retry behavior built in. The factory handles the wrapping transparently.</p>
+          <p class="mb-sm">Think of it like gift wrapping at a store. The product is the same, but it's wrapped in a layer that adds something extra. You can stack multiple layers — retry, then logging, then caching — and the caller never knows.</p>
+
+          <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing Factory + Decorator layering: base factory creates exporter, decorator factory wraps with retry, caller gets transparent resilience" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q19-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="200" rx="12" fill="#1e293b"/>
+            <!-- Caller -->
+            <rect x="30" y="70" width="100" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="80" y="88" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Caller</text>
+            <text x="80" y="104" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">Create(Pdf)</text>
+            <!-- Decorator Factory -->
+            <rect x="170" y="50" width="170" height="85" rx="8" fill="#312e81" stroke="#818cf8" stroke-width="2"/>
+            <text x="255" y="72" text-anchor="middle" fill="#c7d2fe" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">ResilientFactory</text>
+            <text x="255" y="90" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">Wraps in RetryExporter</text>
+            <text x="255" y="108" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">then LoggingExporter</text>
+            <text x="255" y="125" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">(decorates the product)</text>
+            <!-- Base Factory -->
+            <rect x="380" y="70" width="140" height="45" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="450" y="88" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">BaseFactory</text>
+            <text x="450" y="104" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">Creates PdfExporter</text>
+            <!-- Final product -->
+            <rect x="560" y="50" width="140" height="85" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="630" y="72" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">What caller gets:</text>
+            <text x="630" y="90" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">LoggingExporter</text>
+            <text x="630" y="105" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">  → RetryExporter</text>
+            <text x="630" y="120" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">    → PdfExporter</text>
+            <text x="630" y="132" text-anchor="middle" fill="#64748b" font-size="8" font-family="system-ui, -apple-system, sans-serif">(all look like IExporter)</text>
+            <!-- Arrows -->
+            <line x1="130" y1="92" x2="170" y2="92" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-q19-arr)"/>
+            <line x1="340" y1="92" x2="380" y2="92" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-q19-arr)"/>
+            <line x1="520" y1="92" x2="560" y2="92" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#fm-q19-arr)"/>
+            <!-- Bottom note -->
+            <text x="360" y="170" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Caller just sees IExporter — retry + logging are invisible.</text>
+            <text x="360" y="188" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">Add/remove layers by changing DI wiring, not product code.</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DecoratorFactory.cs</span></div>
             <div class="macos-body">
@@ -3255,6 +4010,7 @@ services.AddSingleton&lt;IExporterFactory&gt;(sp =>
     new ResilientExporterFactory(sp.GetRequiredService&lt;ExporterFactory&gt;()));</code></pre>
             </div>
           </div>
+          <p class="mt-md"><strong>Walking through the code:</strong> The <code>RetryExporter</code> implements the same <code>IExporter</code> interface as the real exporter. It wraps the real exporter and adds retry logic. The <code>ResilientExporterFactory</code> wraps the base factory — every product it creates gets automatically wrapped in a retry decorator. The DI wiring chains them: resolve <code>IExporterFactory</code> → get <code>ResilientExporterFactory</code> → which delegates to <code>ExporterFactory</code> → which creates the real product → which gets wrapped. The caller sees a plain <code>IExporter</code> and has no idea there's retry logic underneath.</p>
         </div>
       </div></div>
     </div>
@@ -3337,14 +4093,46 @@ services.AddSingleton&lt;IExporterFactory&gt;(sp =>
       </div>
       <div class="qa-body"><div class="qa-content">
         <div class="body-text">
-          <p class="mb-sm">When you register <code>services.AddTransient(typeof(IRepository&lt;&gt;), typeof(Repository&lt;&gt;))</code>, the DI container becomes a factory:</p>
+          <p class="mb-sm">This is one of the most elegant factory patterns in .NET — the DI container itself becomes a generic factory. Instead of registering <code>IRepository&lt;Order&gt;</code>, <code>IRepository&lt;Product&gt;</code>, and <code>IRepository&lt;Customer&gt;</code> separately, you register the <em>open generic</em> once and the container figures out the rest.</p>
+
+          <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing how open generic registration works: one registration serves infinite closed generic types" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q22-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="220" rx="12" fill="#1e293b"/>
+            <!-- Registration -->
+            <rect x="30" y="30" width="280" height="45" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="170" y="48" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">One Registration (open generic)</text>
+            <text x="170" y="66" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">IRepository&lt;&gt; → Repository&lt;&gt;</text>
+            <!-- DI Container -->
+            <rect x="230" y="100" width="260" height="50" rx="8" fill="#312e81" stroke="#818cf8" stroke-width="2"/>
+            <text x="360" y="118" text-anchor="middle" fill="#c7d2fe" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">DI Container (acts as factory)</text>
+            <text x="360" y="138" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">Match → Substitute T → Create</text>
+            <!-- Resolved types -->
+            <rect x="30" y="175" width="200" height="30" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="130" y="195" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif">IRepository&lt;Order&gt; → Repository&lt;Order&gt;</text>
+            <rect x="260" y="175" width="210" height="30" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="365" y="195" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif">IRepository&lt;Product&gt; → Repository&lt;Product&gt;</text>
+            <rect x="500" y="175" width="200" height="30" rx="6" fill="#1a3320" stroke="#22c55e" stroke-width="1"/>
+            <text x="600" y="195" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif">IRepository&lt;Customer&gt; → Repository&lt;Customer&gt;</text>
+            <!-- Arrows -->
+            <line x1="170" y1="75" x2="300" y2="100" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-q22-arr)"/>
+            <line x1="310" y1="150" x2="130" y2="175" stroke="#22c55e" stroke-width="1" marker-end="url(#fm-q22-arr)"/>
+            <line x1="360" y1="150" x2="365" y2="175" stroke="#22c55e" stroke-width="1" marker-end="url(#fm-q22-arr)"/>
+            <line x1="420" y1="150" x2="600" y2="175" stroke="#22c55e" stroke-width="1" marker-end="url(#fm-q22-arr)"/>
+            <!-- Label -->
+            <text x="580" y="48" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Infinite types from 1 registration</text>
+            <text x="580" y="66" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">Container fills in T automatically</text>
+          </svg>
+
+          <p class="mb-sm">Here's the step-by-step process when you request <code>IRepository&lt;Order&gt;</code>:</p>
           <ol class="qa-list">
             <li>Container sees request for <code>IRepository&lt;Order&gt;</code></li>
             <li>Matches against open generic registration <code>IRepository&lt;&gt;</code></li>
             <li>Substitutes type argument: <code>Repository&lt;&gt;</code> → <code>Repository&lt;Order&gt;</code></li>
-            <li>Creates instance of <code>Repository&lt;Order&gt;</code> via reflection</li>
+            <li>Creates instance of <code>Repository&lt;Order&gt;</code> via reflection (compiled expression for speed)</li>
           </ol>
-          <p class="mt-md"><strong>When it fails:</strong> generic constraints mismatch (e.g., <code>where T : class</code> but you request <code>IRepository&lt;int&gt;</code>), missing nested generic arguments, or the implementation has constructor parameters the container can't resolve.</p>
+          <p class="mt-md"><strong>When it fails:</strong> generic constraints mismatch (e.g., <code>where T : class</code> but you request <code>IRepository&lt;int&gt;</code>), missing nested generic arguments, or the implementation has constructor parameters the container can't resolve. These errors appear at resolution time, not at registration time — use <code>ValidateOnBuild = true</code> to catch them at startup.</p>
         </div>
       </div></div>
     </div>
@@ -3383,13 +4171,16 @@ services.AddSingleton&lt;IExporterFactory&gt;(sp =>
       </div>
       <div class="qa-body"><div class="qa-content">
         <div class="body-text">
-          <p class="mb-sm">Yes, conceptually. When you call <code>mediator.Send(new CreateOrderCommand())</code>:</p>
+          <p class="mb-sm">Yes, conceptually — and this is a great example of how Factory Method thinking appears in libraries you use every day, even when it's not called "factory." Think about what <code>mediator.Send()</code> does: you give it a request object, and it figures out which handler to create and invoke. That's fundamentally a factory operation — "here's what I need, give me the right object to handle it."</p>
+          <p class="mb-sm">When you call <code>mediator.Send(new CreateOrderCommand())</code>:</p>
           <ol class="qa-list">
-            <li>MediatR resolves <code>IRequestHandler&lt;CreateOrderCommand, OrderResult&gt;</code> from DI</li>
+            <li>MediatR looks at the type of the request: <code>CreateOrderCommand</code></li>
+            <li>It resolves <code>IRequestHandler&lt;CreateOrderCommand, OrderResult&gt;</code> from the DI container</li>
             <li>The DI container acts as the factory — it knows the mapping from request type to handler type</li>
-            <li>The handler is created (or retrieved from scope) and invoked</li>
+            <li>The handler is created (or retrieved from the current scope) and its <code>Handle()</code> method is invoked</li>
           </ol>
-          <p class="mt-md">The <strong>type parameter itself</strong> is the key — you don't pass a string or enum. The C# type system ensures at compile time that a handler exists for each request type. This is a type-safe factory where the generic type argument replaces the traditional factory key.</p>
+          <p class="mt-md">The clever part is what serves as the "key." In a traditional factory, you pass a string or enum: <code>factory.Create("pdf")</code>. In MediatR, the <strong>type parameter itself</strong> is the key. The C# type system ensures at compile time that a handler exists for each request type. If you create <code>CreateOrderCommand</code> but forget to implement its handler, the DI container will throw at runtime — and with <code>ValidateOnBuild = true</code>, it'll throw at startup instead.</p>
+          <p class="mt-md">This is a type-safe factory where the generic type argument replaces the traditional factory key. No strings to misspell, no enums to forget updating. The compiler does the work.</p>
         </div>
       </div></div>
     </div>
@@ -3406,6 +4197,50 @@ services.AddSingleton&lt;IExporterFactory&gt;(sp =>
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What interfaces do you need? How do you handle DI? What about disposal?</div>
         <div class="body-text">
+          <p class="mb-sm">In a live coding interview, the interviewer wants to see how you think through a complete design — not just the factory itself, but interfaces, DI registration, disposal, and usage. Start by sketching the architecture before writing code:</p>
+
+          <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram for document export factory system: Controller -> Factory -> Products (PDF, Excel, CSV) with IAsyncDisposable" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q25-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="220" rx="12" fill="#1e293b"/>
+            <!-- Controller -->
+            <rect x="30" y="60" width="120" height="55" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="90" y="80" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Controller</text>
+            <text x="90" y="97" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">await using</text>
+            <text x="90" y="109" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">= auto-dispose</text>
+            <!-- Factory -->
+            <rect x="200" y="50" width="180" height="75" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="2"/>
+            <text x="290" y="72" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">IDocumentExporterFactory</text>
+            <text x="290" y="90" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Create(format)</text>
+            <text x="290" y="107" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">SupportedFormats</text>
+            <text x="290" y="120" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">Dict&lt;Format, Func&gt; O(1)</text>
+            <!-- Products -->
+            <rect x="440" y="20" width="120" height="35" rx="6" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+            <text x="500" y="42" text-anchor="middle" fill="#c7d2fe" font-size="10" font-family="system-ui, -apple-system, sans-serif">PdfExporter</text>
+            <rect x="440" y="65" width="120" height="35" rx="6" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+            <text x="500" y="87" text-anchor="middle" fill="#c7d2fe" font-size="10" font-family="system-ui, -apple-system, sans-serif">ExcelExporter</text>
+            <rect x="440" y="110" width="120" height="35" rx="6" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+            <text x="500" y="132" text-anchor="middle" fill="#c7d2fe" font-size="10" font-family="system-ui, -apple-system, sans-serif">CsvExporter</text>
+            <!-- Interface label -->
+            <rect x="590" y="45" width="110" height="75" rx="6" fill="#422006" stroke="#f59e0b" stroke-width="1"/>
+            <text x="645" y="65" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">IDocumentExporter</text>
+            <text x="645" y="82" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">ContentType</text>
+            <text x="645" y="96" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">ExportAsync()</text>
+            <text x="645" y="110" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">IAsyncDisposable</text>
+            <!-- Arrows -->
+            <line x1="150" y1="87" x2="200" y2="87" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#fm-q25-arr)"/>
+            <line x1="380" y1="75" x2="440" y2="38" stroke="#94a3b8" stroke-width="1" marker-end="url(#fm-q25-arr)"/>
+            <line x1="380" y1="87" x2="440" y2="82" stroke="#94a3b8" stroke-width="1" marker-end="url(#fm-q25-arr)"/>
+            <line x1="380" y1="100" x2="440" y2="127" stroke="#94a3b8" stroke-width="1" marker-end="url(#fm-q25-arr)"/>
+            <line x1="560" y1="82" x2="590" y2="82" stroke="#f59e0b" stroke-width="1" marker-end="url(#fm-q25-arr)"/>
+            <!-- Bottom: key design decisions -->
+            <rect x="60" y="165" width="600" height="40" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+            <text x="360" y="183" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Key decisions: IAsyncDisposable on products | Dictionary O(1) lookup | CancellationToken on async ops | SupportedFormats for discoverability</text>
+            <text x="360" y="198" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, -apple-system, sans-serif">Factory registered as Singleton (holds delegates, not instances) | Products registered as Transient (fresh per call)</text>
+          </svg>
+
+          <p class="mb-sm">Now let's implement it step by step:</p>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LiveCoding.cs</span></div>
             <div class="macos-body">
@@ -3515,7 +4350,46 @@ app.MapGet("/export/{format}", async (
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can a Singleton factory create Scoped products? Who owns the scope? What about disposal?</div>
         <div class="body-text">
-          <p>This is the <strong>captive dependency problem</strong> applied to factories. The factory must respect product lifetimes:</p>
+          <p class="mb-sm">This is a senior-level question that combines Factory Method with DI lifetime management. The core challenge: a Singleton factory lives forever, but some products need shorter lifetimes. How do you reconcile that?</p>
+
+          <svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing three DI lifetimes (Transient, Scoped, Singleton) and how a factory handles each differently" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q27-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="230" rx="12" fill="#1e293b"/>
+            <text x="360" y="22" text-anchor="middle" fill="#93c5fd" font-size="13" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Factory Handling Three Lifetimes</text>
+            <!-- Singleton Factory -->
+            <rect x="250" y="35" width="220" height="40" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+            <text x="360" y="52" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Singleton Factory</text>
+            <text x="360" y="68" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">Lives forever. Must handle all lifetimes.</text>
+            <!-- Transient -->
+            <rect x="30" y="100" width="200" height="70" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="130" y="118" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Transient Products</text>
+            <text x="130" y="136" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">new instance every call</text>
+            <text x="130" y="154" text-anchor="middle" fill="#4ade80" font-size="10" font-family="system-ui, -apple-system, sans-serif">Caller disposes</text>
+            <text x="130" y="166" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">Simple — just new it up</text>
+            <!-- Scoped -->
+            <rect x="260" y="100" width="200" height="70" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="360" y="118" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Scoped Products</text>
+            <text x="360" y="136" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">IServiceScopeFactory</text>
+            <text x="360" y="154" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="system-ui, -apple-system, sans-serif">Create scope per product</text>
+            <text x="360" y="166" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">Wrapper disposes scope + product</text>
+            <!-- Singleton -->
+            <rect x="490" y="100" width="200" height="70" rx="8" fill="#312e81" stroke="#818cf8" stroke-width="1.5"/>
+            <text x="590" y="118" text-anchor="middle" fill="#c7d2fe" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Singleton Products</text>
+            <text x="590" y="136" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">Same instance every time</text>
+            <text x="590" y="154" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">Lazy&lt;T&gt; or cache</text>
+            <text x="590" y="166" text-anchor="middle" fill="#64748b" font-size="9" font-family="system-ui, -apple-system, sans-serif">Must be thread-safe</text>
+            <!-- Arrows -->
+            <line x1="300" y1="75" x2="130" y2="100" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fm-q27-arr)"/>
+            <line x1="360" y1="75" x2="360" y2="100" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#fm-q27-arr)"/>
+            <line x1="420" y1="75" x2="590" y2="100" stroke="#818cf8" stroke-width="1.5" marker-end="url(#fm-q27-arr)"/>
+            <!-- Bottom -->
+            <rect x="120" y="190" width="480" height="28" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+            <text x="360" y="209" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="system-ui, -apple-system, sans-serif">Caller shouldn't know the lifetime — factory abstracts it.</text>
+          </svg>
+
+          <p class="mb-sm">This is the <strong>captive dependency problem</strong> applied to factories. The factory must respect product lifetimes:</p>
           <ol>
             <li><strong>Transient products:</strong> Factory creates a new instance every call. Caller owns disposal</li>
             <li><strong>Scoped products:</strong> Factory must create a scope via <code>IServiceScopeFactory</code>, resolve the product within that scope, and return both the product and a dispose handle</li>
@@ -3576,7 +4450,50 @@ app.MapGet("/export/{format}", async (
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How do you add new types to a running application? What about assembly loading? Config-driven vs code-driven?</div>
         <div class="body-text">
-          <p>Two approaches depending on the degree of dynamism:</p>
+          <p class="mb-sm">This is an advanced architecture question that tests your understanding of dynamic extensibility. There are two very different levels of "hot reload" — one is straightforward, the other is deeply complex. A great answer distinguishes between them.</p>
+
+          <svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing two hot-reload approaches: config-driven (IOptionsMonitor) vs plugin-based (AssemblyLoadContext)" style="width:100%; max-width:720px; margin:1rem 0;">
+            <defs>
+              <marker id="fm-q29-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+            </defs>
+            <rect x="0" y="0" width="720" height="230" rx="12" fill="#1e293b"/>
+            <!-- Approach 1 -->
+            <text x="180" y="22" text-anchor="middle" fill="#86efac" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Approach 1: Config-Driven (90% of cases)</text>
+            <rect x="30" y="35" width="130" height="70" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="95" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Config changes</text>
+            <text x="95" y="72" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">IOptionsMonitor</text>
+            <text x="95" y="88" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">OnChange callback</text>
+            <rect x="195" y="35" width="155" height="70" rx="8" fill="#1a3320" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="272" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Factory rebuilds dict</text>
+            <text x="272" y="72" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">Interlocked.Exchange</text>
+            <text x="272" y="88" text-anchor="middle" fill="#4ade80" font-size="9" font-family="system-ui, -apple-system, sans-serif">Atomic swap, no locks</text>
+            <line x1="160" y1="70" x2="195" y2="70" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fm-q29-arr)"/>
+            <!-- Approach 2 -->
+            <text x="540" y="22" text-anchor="middle" fill="#fbbf24" font-size="12" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Approach 2: Plugin-Based (advanced)</text>
+            <rect x="400" y="35" width="130" height="70" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="465" y="55" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">New DLL dropped</text>
+            <text x="465" y="72" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">FileSystemWatcher</text>
+            <text x="465" y="88" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">detects new plugin</text>
+            <rect x="565" y="35" width="130" height="70" rx="8" fill="#422006" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="630" y="52" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">AssemblyLoad</text>
+            <text x="630" y="68" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Context</text>
+            <text x="630" y="85" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">Loads DLL, scans for</text>
+            <text x="630" y="98" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="system-ui, -apple-system, sans-serif">IExporter types</text>
+            <line x1="530" y1="70" x2="565" y2="70" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#fm-q29-arr)"/>
+            <!-- Comparison -->
+            <rect x="30" y="130" width="320" height="80" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+            <text x="190" y="150" text-anchor="middle" fill="#86efac" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Config-Driven Pros:</text>
+            <text x="190" y="168" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Simple, safe, uses built-in .NET features</text>
+            <text x="190" y="184" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Types already compiled — just enable/disable</text>
+            <text x="190" y="200" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">No reflection, no memory management issues</text>
+            <rect x="370" y="130" width="320" height="80" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+            <text x="530" y="150" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="system-ui, -apple-system, sans-serif" font-weight="600">Plugin-Based Pros:</text>
+            <text x="530" y="168" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">True extensibility — add types not in original build</text>
+            <text x="530" y="184" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, -apple-system, sans-serif">Think VS Code extensions</text>
+            <text x="530" y="200" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Complex: memory leaks, type safety, unloading</text>
+          </svg>
+
+          <p class="mb-sm">Two approaches depending on the degree of dynamism:</p>
           <p><strong>1. Config-driven hot-reload</strong> (simpler): Types are already compiled, config determines which are active.</p>
           <ol>
             <li>Register all possible products at startup</li>

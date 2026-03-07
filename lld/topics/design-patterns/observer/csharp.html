@@ -1966,10 +1966,48 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>WPF dashboard app.</strong> A viewmodel subscribes to a long-lived service event on creation. The window closes and the viewmodel should be garbage collected &mdash; but it never is. Memory grows until OOM crash after hours of use.</p>
+          <p class="body-text"><strong>WPF dashboard app.</strong> The team built a stock-price dashboard. Every time a user opened a new tab, the app created a fresh <code>DashboardViewModel</code>. That viewmodel immediately subscribed to a long-lived <code>StockService</code> singleton so it could show live prices.</p>
+          <p class="body-text">Everything looked fine during development. One window, one tab, no problems. But in production, traders would open and close dozens of tabs throughout the day. After about four hours of use, the app started lagging. After six hours, it crashed with an <code>OutOfMemoryException</code>.</p>
+          <p class="body-text">The confusing part: there was no obvious memory hog. No giant arrays, no image caches, no database result sets sitting in memory. The business logic looked clean. The leak was invisible in normal code review because the problem wasn't what the code <em>did</em> &mdash; it was what the code <em>didn't do</em>.</p>
+          <p class="body-text">When someone finally ran a memory profiler, it told a clear story: hundreds of <code>DashboardViewModel</code> objects were alive in memory, all held by one thing &mdash; the <code>StockService</code>'s event delegate list. Every closed tab left behind a zombie viewmodel that could never be garbage-collected, because the service still held a reference to it through the event subscription.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours &mdash; memory profiler showed GC roots leading back to the event delegate list. No obvious leak in business logic.</p>
+
+        <!-- SVG: Memory leak reference chain -->
+        <svg viewBox="0 0 720 220" role="img" aria-label="Diagram showing how an event subscription creates a hidden reference chain that prevents garbage collection" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="obs-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          </defs>
+          <rect x="10" y="60" width="160" height="70" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="90" y="88" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">StockService</text>
+          <text x="90" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">(Singleton &mdash; lives forever)</text>
+
+          <rect x="230" y="60" width="180" height="70" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="320" y="88" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">PriceChanged event</text>
+          <text x="320" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">(delegate list inside)</text>
+
+          <rect x="470" y="20" width="220" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="580" y="42" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">DashboardVM #1 (closed)</text>
+          <text x="580" y="56" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Should be GC'd but CAN'T</text>
+
+          <rect x="470" y="85" width="220" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="580" y="107" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">DashboardVM #2 (closed)</text>
+          <text x="580" y="121" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Should be GC'd but CAN'T</text>
+
+          <rect x="470" y="150" width="220" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="580" y="172" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">DashboardVM #N (closed)</text>
+          <text x="580" y="186" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Memory grows until OOM</text>
+
+          <line x1="170" y1="95" x2="226" y2="95" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-b1-arr)"/>
+          <line x1="410" y1="80" x2="466" y2="45" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b1-arr)"/>
+          <line x1="410" y1="95" x2="466" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b1-arr)"/>
+          <line x1="410" y1="110" x2="466" y2="175" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b1-arr)"/>
+
+          <text x="192" y="88" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10">owns</text>
+          <text x="430" y="68" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">holds ref</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="obug1-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2000,6 +2038,7 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The constructor subscribes to <code>PriceChanged</code> with <code>+=</code>. This tells C# to store a reference to <em>this viewmodel</em> inside the service's delegate list. That's the trap. The service is a singleton &mdash; it lives for the entire application lifetime. So the delegate list lives forever too. And every viewmodel that ever subscribed is stuck in that list, even after the user closed the tab. There's no <code>Dispose()</code>, no <code>-=</code>, no cleanup at all. The viewmodel just hopes the garbage collector will clean it up &mdash; but the GC can't, because the service is still pointing at it.</p>
           </div>
           <div class="tab-panel" id="obug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -2036,11 +2075,16 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
 // ✅ In WPF: call Dispose() in Window.Closed handler</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The viewmodel now implements <code>IDisposable</code>, which gives it a cleanup hook. When the user closes the tab, the WPF window calls <code>Dispose()</code>, which runs <code>-= OnPriceChanged</code>. That removes the viewmodel from the service's delegate list. Now nothing references the viewmodel, so the garbage collector can reclaim its memory. The <code>_disposed</code> flag prevents double-unsubscription &mdash; calling Dispose twice is safe and does nothing the second time.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Every <code>+=</code> needs a matching <code>-=</code>. The <span class="tooltip-trigger">event handler keeps the subscriber alive<span class="tooltip-content">When you do service.PriceChanged += viewModel.OnPriceChanged, the delegate stores a reference to viewModel. Service is alive, delegate is alive, viewModel is alive &mdash; even if all other references to it are gone. The GC can&apos;t collect it. This is the classic Observer memory leak. Fix: implement IDisposable and unsubscribe on Dispose.</span></span> as long as the Subject exists. Implement <code>IDisposable</code> on all subscribers.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for <code>+=</code> on any event. For each one, ask: "Where is the matching <code>-=</code>?" If you can't find one, you likely have a memory leak. Pay extra attention to short-lived objects (ViewModels, dialog windows, page components) subscribing to long-lived services (singletons, static events, application-lifetime objects). A memory profiler like dotMemory or Visual Studio's Diagnostic Tools will show you "retained objects" held by delegate chains &mdash; that's your smoking gun.</p>
         </div>
       </div>
     </div>
@@ -2053,10 +2097,48 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Temperature converter service.</strong> Observer A is notified by Subject X. A updates Subject Y. Y notifies Observer B. B updates Subject X. X notifies A again. Stack overflow in seconds.</p>
+          <p class="body-text"><strong>Temperature converter service.</strong> A team built a unit-conversion tool that synchronized Celsius and Fahrenheit displays in real time. They had two "sensors" (subjects) &mdash; one for Celsius, one for Fahrenheit &mdash; and a converter object that observed both.</p>
+          <p class="body-text">Here's where it went wrong: when the Celsius sensor changed, the converter updated the Fahrenheit sensor to match. But the Fahrenheit sensor then notified all <em>its</em> observers &mdash; including the same converter. The converter saw a Fahrenheit change and tried to update the Celsius sensor. Which notified the converter. Which updated Fahrenheit. Which notified the converter. And so on, forever.</p>
+          <p class="body-text">The app crashed with a <code>StackOverflowException</code> within milliseconds. The stack trace was hundreds of frames long, all alternating between the same two methods. The tricky part was that each individual piece of code looked perfectly reasonable in isolation &mdash; the circular dependency only became visible when you traced the notification chain across multiple files.</p>
+          <p class="body-text">This is one of the nastiest Observer bugs because it's easy to create accidentally whenever observers modify subjects. Two objects that seem unrelated can form a hidden loop through a chain of three or four intermediate observers.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours &mdash; stack trace showed a loop without a clear entry point. The circular dependency was spread across multiple files.</p>
+
+        <!-- SVG: Circular notification loop -->
+        <svg viewBox="0 0 720 230" role="img" aria-label="Diagram showing how circular observer notifications create an infinite loop between Celsius and Fahrenheit sensors" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="obs-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+            <marker id="obs-b2-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          </defs>
+          <rect x="30" y="80" width="160" height="60" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="110" y="106" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Celsius Sensor</text>
+          <text x="110" y="126" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">SetValue(25)</text>
+
+          <rect x="280" y="80" width="160" height="60" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="360" y="106" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">TempConverter</text>
+          <text x="360" y="126" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">OnNext()</text>
+
+          <rect x="530" y="80" width="160" height="60" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="610" y="106" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Fahrenheit Sensor</text>
+          <text x="610" y="126" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">SetValue(77)</text>
+
+          <!-- Forward arrows -->
+          <line x1="190" y1="100" x2="276" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b2-arr)"/>
+          <text x="230" y="92" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">1. notify</text>
+
+          <line x1="440" y1="100" x2="526" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b2-arr)"/>
+          <text x="480" y="92" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">2. update</text>
+
+          <!-- Return loop (below) -->
+          <path d="M 610 140 L 610 190 L 110 190 L 110 140" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#obs-b2-arr)"/>
+          <text x="360" y="207" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">3. F notifies converter, which updates C, which notifies converter...</text>
+
+          <!-- Infinite symbol -->
+          <text x="360" y="35" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold">StackOverflowException</text>
+          <text x="360" y="55" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="12">Crashes in milliseconds</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="obug2-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2090,6 +2172,7 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The converter subscribes to both sensors. When Celsius changes, <code>OnNext</code> fires. Inside <code>OnNext</code>, it calls <code>_fahrenheit.SetValue()</code> &mdash; which triggers Fahrenheit's notification loop, which calls <code>OnNext</code> on this same converter again, which calls <code>_celsius.SetValue()</code>, which triggers Celsius's notification loop, which calls <code>OnNext</code> again... and the stack grows deeper with every round-trip until the runtime kills the process.</p>
           </div>
           <div class="tab-panel" id="obug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -2121,11 +2204,16 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The <code>_updating</code> boolean acts like a "Do Not Disturb" sign. When <code>OnNext</code> starts processing, it sets the flag to true. If the converter is called again (because the Fahrenheit sensor notified it back), it sees the flag and immediately returns &mdash; breaking the cycle. The <code>finally</code> block ensures the flag is always reset, even if an exception occurs, so the converter is ready for the next legitimate notification.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">If an observer modifies any Subject, you risk circular notification. Use a <span class="tooltip-trigger">re-entrancy guard<span class="tooltip-content">A boolean flag that prevents an observer from being re-invoked while already processing a notification. Set to true before state changes, reset to false in a finally block. For thread-safe re-entrancy, use Interlocked.CompareExchange or ThreadLocal&lt;bool&gt; instead of a plain bool.</span></span> flag or redesign the observation topology to eliminate cycles entirely.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Draw your observer graph on paper: boxes for subjects, arrows for subscriptions. If you can trace a loop from any box back to itself, you have a cycle. The warning signs in code: an observer's <code>OnNext</code> or <code>Update</code> method calls <code>SetValue()</code>, <code>RaiseEvent()</code>, or any method that triggers another notification. If you see this pattern, add a re-entrancy guard immediately &mdash; or better yet, redesign so observers are read-only consumers that never modify subjects.</p>
         </div>
       </div>
     </div>
@@ -2138,10 +2226,49 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Real-time stock ticker.</strong> Notifications fire from a Timer (background thread). A UI thread simultaneously unsubscribes an observer. The foreach throws <code>InvalidOperationException: Collection was modified</code>. Intermittent, crashes production.</p>
+          <p class="body-text"><strong>Real-time stock ticker.</strong> The system had a simple setup: a background timer fired every 100 milliseconds, fetched the latest stock price, and notified all subscribed observers. On the UI side, users could close chart panels, which unsubscribed the corresponding observer. Both things happened constantly throughout the trading day.</p>
+          <p class="body-text">For weeks, everything worked fine. Then one morning, the app started crashing in production with <code>InvalidOperationException: Collection was modified</code>. The crash was completely random &mdash; sometimes after 5 minutes, sometimes after 2 hours, sometimes not at all. QA couldn't reproduce it.</p>
+          <p class="body-text">The root cause was a classic race condition. The background timer thread was looping through the observer list with <code>foreach</code>. At the exact same moment, the UI thread was removing an observer from that same list because a user closed a panel. Two threads touching the same <code>List&lt;T&gt;</code> at the same time &mdash; one reading, one modifying &mdash; and the <code>foreach</code> iterator detected the structural change and threw.</p>
+          <p class="body-text">What made this so hard to catch is that it only happened when the timer thread was mid-loop at the exact millisecond the UI thread removed an observer. Under light usage, that collision was rare. Under heavy production load with dozens of panels opening and closing, it became inevitable.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">6 hours &mdash; impossible to reproduce locally because it required exact timing between two threads. Only appeared under production load.</p>
+
+        <!-- SVG: Thread race condition -->
+        <svg viewBox="0 0 720 250" role="img" aria-label="Diagram showing two threads racing to access the same observer list simultaneously, causing a crash" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="obs-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="obs-b3-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Timer thread -->
+          <rect x="20" y="30" width="170" height="50" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="105" y="52" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Timer Thread</text>
+          <text x="105" y="70" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">foreach (obs in _observers)</text>
+
+          <!-- UI thread -->
+          <rect x="20" y="160" width="170" height="50" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="105" y="182" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">UI Thread</text>
+          <text x="105" y="200" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">_observers.Remove(obs)</text>
+
+          <!-- Shared list -->
+          <rect x="300" y="85" width="180" height="70" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2.5"/>
+          <text x="390" y="112" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">List&lt;IObserver&gt;</text>
+          <text x="390" y="132" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">SHARED &mdash; No lock!</text>
+
+          <!-- Arrows -->
+          <line x1="190" y1="55" x2="296" y2="100" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-b3-arr)"/>
+          <text x="235" y="68" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10">reading</text>
+          <line x1="190" y1="185" x2="296" y2="140" stroke="#f59e0b" stroke-width="2" marker-end="url(#obs-b3-red)"/>
+          <text x="235" y="175" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">modifying</text>
+
+          <!-- Explosion -->
+          <text x="550" y="110" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="28">💥</text>
+          <text x="610" y="105" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">CRASH</text>
+          <text x="610" y="123" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Collection was</text>
+          <text x="610" y="137" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">modified</text>
+          <line x1="480" y1="120" x2="540" y2="115" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b3-red)"/>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="obug3-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2174,6 +2301,7 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>NotifyAll</code> method runs on a background timer thread and starts iterating through <code>_observers</code> with <code>foreach</code>. Meanwhile, the UI thread calls <code>Unsubscribe</code> which calls <code>_observers.Remove()</code> on the very same list. C#'s <code>List&lt;T&gt;</code> is not designed for concurrent access &mdash; when the <code>foreach</code> iterator detects that the list structure changed mid-loop, it throws immediately. There's no lock, no snapshot, no protection at all.</p>
           </div>
           <div class="tab-panel" id="obug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -2205,11 +2333,16 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The key insight is the "snapshot" approach. Before iterating, we briefly grab a lock and copy the entire observer list into a new list (<code>.ToList()</code>). Then we immediately release the lock and iterate the copy. If the UI thread removes an observer from the original list while we're iterating the copy, it doesn't matter &mdash; we're reading from two different lists now. The lock ensures the copy itself is atomic (no half-modified list), but we don't hold the lock during notification, which prevents deadlocks if an observer tries to subscribe or unsubscribe from within <code>OnNext</code>.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">In multi-threaded code, always take a <span class="tooltip-trigger">snapshot of the observer list<span class="tooltip-content">_observers.ToList() creates an independent copy at that moment. Modifications to _observers after the snapshot don&apos;t affect the iteration. Lock only during snapshot creation, not during the notification loop. Never hold a lock while calling observer methods &mdash; they might call back into your Subject, causing a deadlock.</span></span> before iterating. Lock only long enough to copy the list, then release immediately.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for any <code>foreach</code> loop over a collection where another method modifies the same collection &mdash; especially if those methods can run on different threads. Red flags: a <code>NotifyAll</code> method that iterates <code>_observers</code> combined with <code>Subscribe</code>/<code>Unsubscribe</code> methods that add/remove from the same list without a lock. Even in single-threaded code, an observer that unsubscribes itself during <code>OnNext</code> triggers the same crash. The snapshot pattern (<code>.ToList()</code> before <code>foreach</code>) fixes both cases.</p>
         </div>
       </div>
     </div>
@@ -2222,10 +2355,54 @@ public sealed class PriceBroadcaster(IHubContext&lt;StockHub&gt; hub) : Backgrou
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Trading platform.</strong> Observer uses the pull model &mdash; it calls back on the Subject after notification to read current state. By the time it reads, state has changed again. Wrong price, bad trade executed.</p>
+          <p class="body-text"><strong>Trading platform.</strong> The trading system used a "pull" model for Observer notifications. When the stock market subject changed its price, it sent a simple "hey, something changed" signal to all observers &mdash; but without including the actual data. Each observer then called back to the subject to read the current price.</p>
+          <p class="body-text">This worked perfectly in testing because prices changed slowly. But in live markets, prices can change hundreds of times per second. Here's what happened: the subject set the price to $185.50 and notified all observers. Observer A started processing. Before A could read the price, the subject received a new feed update and changed the price to $186.20. When A finally called <code>_subject.CurrentPrice</code>, it got $186.20 &mdash; not the $185.50 that triggered its notification.</p>
+          <p class="body-text">The result was subtle but devastating: automated trading algorithms made decisions based on the wrong price. A "buy at $185.50" decision was actually executing at $186.20. Small discrepancies added up to thousands of dollars in losses before anyone noticed.</p>
+          <p class="body-text">The debugging was especially painful because the logs showed the final correct state, not the state at notification time. Everything looked fine in logs because they captured "current price" which was always the latest value. Adding timestamps to every read finally revealed the timing gap.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">8 hours &mdash; the data looked correct in logs because the logs captured the final state, not the state at notification time. Required adding timestamps to every read.</p>
+
+        <!-- SVG: Push vs Pull timing diagram -->
+        <svg viewBox="0 0 720 240" role="img" aria-label="Timeline diagram showing how pull-model Observer reads stale data because the subject's state changes between notification and read" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="obs-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="obs-b4-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Timeline -->
+          <line x1="60" y1="120" x2="690" y2="120" stroke="#475569" stroke-width="2"/>
+          <text x="30" y="124" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Time</text>
+
+          <!-- Event 1: Price set to 185.50 -->
+          <line x1="150" y1="100" x2="150" y2="140" stroke="#14b8a6" stroke-width="2"/>
+          <rect x="95" y="50" width="110" height="45" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+          <text x="150" y="68" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Price = $185.50</text>
+          <text x="150" y="84" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Notify sent!</text>
+
+          <!-- Event 2: Notify reaches observer -->
+          <line x1="310" y1="100" x2="310" y2="140" stroke="#f59e0b" stroke-width="2"/>
+          <rect x="250" y="145" width="120" height="40" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="310" y="162" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Observer wakes</text>
+          <text x="310" y="178" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">"Something changed"</text>
+
+          <!-- Event 3: Price changes AGAIN -->
+          <line x1="420" y1="100" x2="420" y2="140" stroke="#ef4444" stroke-width="2"/>
+          <rect x="365" y="50" width="110" height="45" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="420" y="68" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Price = $186.20</text>
+          <text x="420" y="84" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Changed AGAIN!</text>
+
+          <!-- Event 4: Observer reads (too late!) -->
+          <line x1="560" y1="100" x2="560" y2="140" stroke="#ef4444" stroke-width="2"/>
+          <rect x="490" y="145" width="140" height="55" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="560" y="162" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Observer reads</text>
+          <text x="560" y="178" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Gets $186.20</text>
+          <text x="560" y="194" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Expected $185.50!</text>
+
+          <!-- Danger zone bracket -->
+          <line x1="150" y1="28" x2="420" y2="28" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="285" y="22" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Danger window: state can change here</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="obug4-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2252,6 +2429,7 @@ public class PriceTracker : IObserver
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>OnChanged()</code> method receives no data &mdash; it's just a "heads up" signal. So the observer has to reach back to the subject and ask "what's the current price?" using <code>_subject.CurrentPrice</code>. The problem is that between the moment the notification was sent and the moment the observer reads, the subject's price may have changed one, two, or ten times. The observer gets whatever value happens to be there <em>now</em>, not the value that triggered the notification. This is called a "time-of-check vs time-of-use" race condition.</p>
           </div>
           <div class="tab-panel" id="obug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -2284,11 +2462,16 @@ public class PriceTracker : IObserver
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of saying "something changed, go check," the subject now says "the price is $185.50" by passing the value directly in the notification. The observer receives the exact price that triggered the event &mdash; even if the subject has since moved to $186.20 or $190.00. The data is captured at the moment of change and delivered as a package. No callback, no race condition, no stale reads.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Prefer the <span class="tooltip-trigger">push model<span class="tooltip-content">Subject packages all relevant data into the notification and sends it directly in OnNext(T value). Observers never need to call back on the Subject. Eliminates stale-state bugs because the observer always has the exact data that triggered the notification &mdash; not whatever state the Subject happens to be in when the observer reads it.</span></span>. Pass the changed data directly in the notification (<code>OnNext(newPrice)</code>). Pulling data back introduces a time-of-check vs time-of-use race condition.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for observer methods that receive no data (like <code>OnChanged()</code> with no parameters) and then call back to the subject to read state (like <code>_subject.GetCurrentValue()</code>). That "call back to read" pattern is the pull model, and it's risky whenever the subject can change faster than observers can react. The fix is almost always to include the relevant data in the notification itself, so observers never need to reach back.</p>
         </div>
       </div>
     </div>
@@ -2301,10 +2484,54 @@ public class PriceTracker : IObserver
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Order processing pipeline.</strong> Three observers subscribed. Observer 2 throws. Exception propagates &mdash; Observer 3 never gets notified. Audit log silently misses a critical event. Silent data loss discovered days later.</p>
+          <p class="body-text"><strong>Order processing pipeline.</strong> The e-commerce system processed every new order through three observers: one updated inventory, one sent a confirmation email, and one wrote an audit log entry for compliance. All three subscribed to the <code>OrderPlaced</code> event.</p>
+          <p class="body-text">One day, the email server went down. The email observer (Observer #2 in the subscription order) threw an <code>HttpRequestException</code> when it couldn't connect to the SMTP server. Because there was no exception handling in the notification loop, that exception flew up the call stack immediately. The <code>foreach</code> loop stopped dead. Observer #3 &mdash; the audit log &mdash; never ran.</p>
+          <p class="body-text">Nobody noticed for three days. The email failures were visible (customers complained about missing confirmations), so the team fixed the SMTP server. But they didn't realize the audit log had also been skipping entries. It wasn't until a compliance audit that someone discovered 847 orders had no audit trail. Regulators were not amused.</p>
+          <p class="body-text">The insidious part: the exception wasn't "swallowed" in the traditional sense. It did propagate &mdash; but it propagated from the <em>email</em> observer, so the error message was about SMTP, not about audit logging. The team investigated SMTP and declared it fixed. The real damage &mdash; silently skipped downstream observers &mdash; was completely invisible because there was no error about <em>them</em>.</p>
         </div>
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">12 hours &mdash; the missing audit entries weren&apos;t noticed until a compliance check. No error logs because the exception was caught by the framework before reaching our logging.</p>
+
+        <!-- SVG: Exception killing the chain -->
+        <svg viewBox="0 0 720 220" role="img" aria-label="Diagram showing how one observer's exception stops all subsequent observers from receiving the notification" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="obs-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="obs-b5-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Subject -->
+          <rect x="20" y="75" width="120" height="60" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="80" y="100" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">OrderService</text>
+          <text x="80" y="118" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">NotifyAll()</text>
+
+          <!-- Observer 1: Inventory (OK) -->
+          <rect x="210" y="20" width="140" height="50" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="280" y="42" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">1. Inventory</text>
+          <text x="280" y="58" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Runs OK</text>
+          <line x1="140" y1="90" x2="206" y2="50" stroke="#22c55e" stroke-width="2" marker-end="url(#obs-b5-arr)"/>
+
+          <!-- Observer 2: Email (THROWS) -->
+          <rect x="210" y="85" width="140" height="50" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2.5"/>
+          <text x="280" y="107" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">2. Email</text>
+          <text x="280" y="123" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">THROWS!</text>
+          <line x1="140" y1="105" x2="206" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b5-red)"/>
+
+          <!-- Exception explosion -->
+          <rect x="380" y="85" width="180" height="50" rx="8" fill="#451a03" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="470" y="107" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">HttpRequestException</text>
+          <text x="470" y="123" text-anchor="middle" fill="#fbbf24" font-family="system-ui, -apple-system, sans-serif" font-size="10">Loop STOPS here</text>
+          <line x1="350" y1="110" x2="376" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-b5-red)"/>
+
+          <!-- Observer 3: Audit (NEVER RUNS) -->
+          <rect x="210" y="150" width="140" height="50" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2" stroke-dasharray="5,3"/>
+          <text x="280" y="172" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">3. Audit Log</text>
+          <text x="280" y="188" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">NEVER RUNS</text>
+          <line x1="140" y1="120" x2="206" y2="170" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#obs-b5-arr)"/>
+
+          <!-- Warning -->
+          <text x="600" y="170" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">847 orders</text>
+          <text x="600" y="186" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">with no audit trail</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="obug5-bad" role="tab" aria-selected="true">Buggy Code</button>
@@ -2337,6 +2564,7 @@ public class BrokenEmailSender : IObserver&lt;decimal&gt;
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>NotifyAll</code> loop calls each observer one by one. When it reaches <code>BrokenEmailSender</code>, the <code>OnNext</code> method throws an <code>HttpRequestException</code>. Because there's no <code>try/catch</code> inside the loop, the exception immediately exits the <code>foreach</code>. Any observers that come after the email sender in the list never get called. The loop doesn't resume, the remaining observers don't get their notification, and there's no record that they were skipped.</p>
           </div>
           <div class="tab-panel" id="obug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -2374,11 +2602,16 @@ public void NotifyAll(decimal price)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Each observer call is wrapped in its own <code>try/catch</code>. If the email observer throws, the exception is caught, logged with full context (which observer failed, what data was being sent), and the loop continues to the next observer. The audit log observer runs no matter what happened to the email observer. At the end, if any observers failed, all their exceptions are collected into an <code>AggregateException</code> and re-thrown &mdash; so the caller knows failures occurred. Every observer is treated as independent: one failure never kills another.</p>
           </div>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Observers are independent &mdash; one failure shouldn&apos;t cascade. Wrap each call in <code>try/catch</code>, log (don&apos;t swallow silently!), and continue. Collect all failures and throw <span class="tooltip-trigger"><code>AggregateException</code><span class="tooltip-content">System.AggregateException wraps multiple exceptions into one. Ideal for Observer notification loops where multiple observers might fail independently. It preserves all failure details while letting the notification loop complete. Callers inspect AggregateException.InnerExceptions to see exactly which observers failed and why.</span></span> at the end if the caller needs to know.</p>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Find every loop that calls observer methods (any <code>foreach</code> over a subscriber list that calls <code>OnNext</code>, <code>Update</code>, <code>Handle</code>, etc.). If the loop body has no <code>try/catch</code>, one failing observer will kill the rest. This is especially dangerous when observers do I/O (HTTP calls, database writes, file operations) because I/O can fail unpredictably. The rule is simple: every notification loop needs per-observer exception isolation.</p>
         </div>
       </div>
     </div>
@@ -2405,8 +2638,41 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Subscribing to an event with <code>+=</code> but never calling <code>-=</code>. The publisher's delegate list holds a strong reference to the subscriber, preventing garbage collection even after the subscriber is "gone."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It feels natural to subscribe in a constructor &mdash; "I need this data, let me sign up." But developers often forget the second half: cleaning up when done. In most code, you create an object and trust the garbage collector to clean it up. But event subscriptions are different &mdash; they create a hidden reference from the publisher to the subscriber. If the publisher lives longer than the subscriber (which is very common with singletons, static services, or application-level objects), the subscriber can never be garbage-collected. It's like signing up for a mailing list and never unsubscribing &mdash; the mail keeps coming, and your mailbox fills up forever.</p>
           <p class="body-text"><strong>Why Bad:</strong> Long-lived publishers (singletons, static services) keep every short-lived subscriber (ViewModels, dialogs) alive forever. Memory grows until OOM crash. Classic in WPF/MAUI apps.</p>
-          <p class="body-text"><strong>Fix:</strong> Implement <code>IDisposable</code> on all subscribers. In <code>Dispose()</code>, always <code>-=</code> the handler. With <code>IObservable&lt;T&gt;</code>, store the subscription and <code>Dispose()</code> it when done.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadUnsubscribe.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class PricePanel
+{
+    public PricePanel(StockService service)
+    {
+        service.PriceChanged += OnPrice; // subscribes...
+        // No Dispose, no cleanup, no -= anywhere
+        // This panel can NEVER be garbage-collected
+    }
+    private void OnPrice(object? s, decimal p) => Update(p);
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodUnsubscribe.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class PricePanel : IDisposable
+{
+    private readonly StockService _service;
+    public PricePanel(StockService service)
+    {
+        _service = service;
+        _service.PriceChanged += OnPrice;
+    }
+    private void OnPrice(object? s, decimal p) => Update(p);
+    public void Dispose() => _service.PriceChanged -= OnPrice;
+    // Now the caller just calls panel.Dispose() when done
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version creates a permanent reference from the service to the panel. The good version implements <code>IDisposable</code> so the panel can cleanly unsubscribe when it's no longer needed. The key insight: every <code>+=</code> must have a corresponding <code>-=</code> somewhere in the lifecycle.</p>
         </div>
       </div>
     </div>
@@ -2420,8 +2686,33 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> An observer's <code>Update()</code> calls <code>Unsubscribe()</code> while the subject is iterating its observer list. The <code>foreach</code> throws <code>InvalidOperationException: Collection was modified</code>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It seems perfectly logical &mdash; an observer receives a notification and decides "I'm done, I don't need more updates." So it calls <code>Unsubscribe()</code> right there inside the handler. The problem is timing: the subject is currently looping through its observer list to send notifications, and removing an item from the list while the loop is running breaks the iteration. Developers don't think about this because the subscription and notification code are usually in different files, so the conflict isn't visible.</p>
           <p class="body-text"><strong>Why Bad:</strong> Intermittent crash that only happens when an observer decides to self-unsubscribe during a notification. Hard to reproduce in testing.</p>
-          <p class="body-text"><strong>Fix:</strong> Iterate a snapshot: <code>foreach (var obs in _observers.ToList())</code>. Or use <code>ImmutableList&lt;T&gt;</code> which creates a new list on every add/remove &mdash; no concurrent modification possible.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadIteration.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Subject notification loop
+foreach (var obs in _observers)     // iterating the LIVE list
+    obs.OnNext(value);              // observer might call Unsubscribe()!
+
+// Observer handler
+public void OnNext(decimal price)
+{
+    if (price > _threshold)
+        _subject.Unsubscribe(this); // BOOM: modifies list during foreach
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodIteration.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Subject notification loop — iterate a SNAPSHOT
+foreach (var obs in _observers.ToList())  // .ToList() = independent copy
+    obs.OnNext(value);                    // safe: modifying _observers
+                                          // doesn't affect the copy</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The fix is just six characters: <code>.ToList()</code>. This creates a snapshot &mdash; a separate copy of the list at that moment. The original list can be modified freely while we iterate the copy. It costs a small allocation, but it eliminates an entire class of crashes.</p>
         </div>
       </div>
     </div>
@@ -2435,8 +2726,36 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Subject fires events from a background thread (timer, SignalR). Observer tries to update a UI element directly.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When you write an observer handler, you're thinking about <em>what</em> to do with the data, not <em>which thread</em> it arrives on. The handler says "update the label text" which seems harmless. But UI frameworks (WPF, MAUI, WinForms) require that all UI updates happen on a specific "main" thread. If your subject fires from a background timer or a SignalR callback, the handler runs on that background thread &mdash; and trying to touch a UI element from the wrong thread causes an immediate crash.</p>
           <p class="body-text"><strong>Why Bad:</strong> WPF/MAUI throw <code>InvalidOperationException: "The calling thread cannot access this object because a different thread owns it."</code> Crashes your app immediately.</p>
-          <p class="body-text"><strong>Fix:</strong> Marshal to UI thread: <code>Dispatcher.BeginInvoke()</code> (WPF) or <code>MainThread.BeginInvokeOnMainThread()</code> (MAUI). Best approach: use Rx <code>.ObserveOn(MainThreadScheduler)</code> to handle it transparently.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadThread.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Observer handler — runs on whatever thread the subject fires from
+public void OnPriceChanged(object? s, decimal price)
+{
+    // If subject fires from a background thread:
+    PriceLabel.Text = $"${price}"; // CRASH: wrong thread!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodThread.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Option 1: Marshal to UI thread manually
+public void OnPriceChanged(object? s, decimal price)
+{
+    Dispatcher.BeginInvoke(() =>
+        PriceLabel.Text = $"${price}");  // runs on UI thread
+}
+
+// Option 2: Let Rx handle it transparently
+priceStream
+    .ObserveOn(SynchronizationContext.Current!) // switch to UI thread
+    .Subscribe(price => PriceLabel.Text = $"${price}");</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version assumes the handler runs on the UI thread. The good version explicitly marshals to the UI thread using <code>Dispatcher.BeginInvoke()</code> (WPF) or lets Rx handle it with <code>ObserveOn</code>. The Rx approach is cleaner because the thread switch is declared once in the pipeline, not repeated in every handler.</p>
         </div>
       </div>
     </div>
@@ -2450,8 +2769,44 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> One observer makes a database call or HTTP request inside <code>OnNext()</code>. The synchronous notification loop blocks every observer after it.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers think of observer handlers like any other method &mdash; "I need to save this data, so I'll write to the database right here." What they forget is that the notification loop is <strong>synchronous</strong>. The subject calls observer 1, waits for it to finish, then calls observer 2, and so on. If observer 1 makes a 2-second database call, every other observer sits idle for those 2 seconds. In a UI app, the entire screen freezes. In a server app, the thread is blocked for no good reason.</p>
           <p class="body-text"><strong>Why Bad:</strong> Your 10ms event becomes a 2-second freeze. All downstream observers are delayed. In UI apps, the screen locks up.</p>
-          <p class="body-text"><strong>Fix:</strong> Queue heavy work instead of doing it inline. Use <code>Channel&lt;T&gt;</code> to offload to a background processor, or <code>Task.Run()</code> for fire-and-forget. Never call <code>.Wait()</code> or <code>.Result</code> inside an observer.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadHeavyWork.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public void OnNext(OrderPlacedEvent evt)
+{
+    // Blocks the entire notification chain for 2+ seconds
+    _httpClient.PostAsync(webhookUrl, content).Result; // .Result = BLOCK
+    _database.SaveAuditLog(evt);                       // another 500ms
+    // Every observer after this one waits 2.5 seconds
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodHeavyWork.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">private readonly Channel&lt;OrderPlacedEvent&gt; _queue =
+    Channel.CreateBounded&lt;OrderPlacedEvent&gt;(1000);
+
+public void OnNext(OrderPlacedEvent evt)
+{
+    _queue.Writer.TryWrite(evt); // instant — just drops it in a queue
+    // Notification loop continues immediately to the next observer
+}
+
+// Background worker processes the queue at its own pace
+private async Task ProcessAsync(CancellationToken ct)
+{
+    await foreach (var evt in _queue.Reader.ReadAllAsync(ct))
+    {
+        await _httpClient.PostAsync(webhookUrl, content);
+        await _database.SaveAuditLogAsync(evt);
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version does heavy I/O work inline, blocking the entire notification chain. The good version drops the event into a <code>Channel&lt;T&gt;</code> (which is nearly instant) and processes it asynchronously in a background worker. The notification loop finishes in microseconds instead of seconds, and other observers aren't held hostage by slow I/O.</p>
         </div>
       </div>
     </div>
@@ -2465,8 +2820,36 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Observer A modifies Subject B, which notifies Observer C, which modifies Subject A again. Infinite loop or stack overflow.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Each observer handler looks innocent on its own. Observer A says "when X changes, update Y." Observer C says "when Y changes, update X." Neither developer knows about the other's handler because they're in different files, possibly written by different team members. The circular dependency is invisible until runtime, when it manifests as a <code>StackOverflowException</code> or an infinite hang.</p>
           <p class="body-text"><strong>Why Bad:</strong> Nightmarish to debug &mdash; the stack trace shows a loop with no clear entry point. The circular dependency is often spread across multiple files.</p>
-          <p class="body-text"><strong>Fix:</strong> Add a re-entrancy guard flag (<code>if (_updating) return;</code>). Better: redesign the observation topology to eliminate cycles. Circular Observer dependencies are a design smell &mdash; consider introducing a Mediator.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadCircular.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// File A: when celsius changes, update fahrenheit
+celsius.Changed += (s, c) =>
+    fahrenheit.Value = c * 9.0 / 5 + 32;  // triggers fahrenheit.Changed
+
+// File B: when fahrenheit changes, update celsius
+fahrenheit.Changed += (s, f) =>
+    celsius.Value = (f - 32) * 5.0 / 9;   // triggers celsius.Changed
+// Result: infinite loop → StackOverflowException</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodCircular.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">private bool _updating;
+
+celsius.Changed += (s, c) =>
+{
+    if (_updating) return;   // already inside an update — stop the cycle
+    _updating = true;
+    try { fahrenheit.Value = c * 9.0 / 5 + 32; }
+    finally { _updating = false; }
+};</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version creates a ping-pong loop between two event handlers. The good version uses a re-entrancy guard: a simple boolean that says "I'm already processing an update, don't start another one." When the Fahrenheit handler tries to call back into the Celsius handler, the flag is already set, so it returns immediately &mdash; breaking the loop.</p>
         </div>
       </div>
     </div>
@@ -2480,8 +2863,38 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Reaching for events/Observer when there's exactly one listener. Adding subscribe/unsubscribe ceremony for a single consumer.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers learn about Observer and events, and then start using them everywhere because it feels "clean" or "decoupled." But Observer is designed for one-to-<em>many</em> broadcasting. When there's exactly one consumer, an event is ceremony without benefit. You're adding subscription management, potential memory leak surface area, and harder-to-trace data flow &mdash; all for a scenario where a simple callback delegate would do the job perfectly.</p>
           <p class="body-text"><strong>Why Bad:</strong> Premature Observer adds complexity: potential memory leaks, harder to trace data flow, subscribe/unsubscribe boilerplate. All for zero benefit when there's only one consumer.</p>
-          <p class="body-text"><strong>Fix:</strong> Pass a callback delegate (<code>Action&lt;T&gt;</code>) via the constructor instead. Use Observer only when you need multiple, dynamic subscribers.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadOveruse.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class FileProcessor
+{
+    public event EventHandler&lt;int&gt;? ProgressChanged; // event for ONE consumer?
+    public void Process()
+    {
+        for (int i = 0; i <= 100; i += 10)
+            ProgressChanged?.Invoke(this, i);
+    }
+}
+// Caller must subscribe, track, unsubscribe... for ONE listener</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodSimpleCallback.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class FileProcessor
+{
+    public void Process(Action&lt;int&gt;? onProgress = null)
+    {
+        for (int i = 0; i <= 100; i += 10)
+            onProgress?.Invoke(i);  // simple callback — no subscription needed
+    }
+}
+// Caller: processor.Process(pct => progressBar.Value = pct);</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version uses a full event for something that only has one listener. The good version accepts a callback delegate &mdash; no subscription ceremony, no unsubscribe to forget, no memory leak possible. Use Observer when you need multiple, dynamic subscribers. Use callbacks when you know there's exactly one consumer.</p>
         </div>
       </div>
     </div>
@@ -2495,8 +2908,33 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Checking <code>if (EventHandler != null)</code> then invoking on the next line. Between those two lines, another thread unsubscribes.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It looks safe: "I checked if the event has subscribers, and it does, so I'll invoke it." The problem is that between the null check and the invoke, another thread can unsubscribe &mdash; setting the delegate back to null. By the time <code>.Invoke()</code> runs, the handler is null, and you get a <code>NullReferenceException</code>. This is a race condition, and it's devilishly hard to reproduce because it requires exact timing between two threads.</p>
           <p class="body-text"><strong>Why Bad:</strong> NullReferenceException or missed events. Classic race condition that's impossible to reproduce reliably in tests.</p>
-          <p class="body-text"><strong>Fix:</strong> Copy the delegate to a local variable first: <code>var handler = EventHandler; handler?.Invoke(args);</code> The local copy is safe even if the original changes.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadNullCheck.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public event EventHandler&lt;decimal&gt;? PriceChanged;
+
+private void OnPriceChanged(decimal price)
+{
+    if (PriceChanged != null)        // Thread B unsubscribes HERE
+        PriceChanged.Invoke(this, price); // NullReferenceException!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodNullSafe.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public event EventHandler&lt;decimal&gt;? PriceChanged;
+
+private void OnPriceChanged(decimal price)
+{
+    PriceChanged?.Invoke(this, price); // ?.Invoke is atomic — thread-safe
+    // OR: var handler = PriceChanged; handler?.Invoke(this, price);
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version has a gap between the null check and the invoke where another thread can sneak in. The good version uses the null-conditional operator <code>?.</code> which is atomic &mdash; it reads the delegate, checks for null, and invokes in a single operation that can't be interrupted. Alternatively, copy the delegate to a local variable first: <code>var handler = PriceChanged;</code> &mdash; the local copy is safe even if the original changes.</p>
         </div>
       </div>
     </div>
@@ -2510,8 +2948,42 @@ public void NotifyAll(decimal price)
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Making the observer list public: <code>public List&lt;IObserver&gt; Observers { get; }</code>. Anyone can bypass your subscribe/unsubscribe logic.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer thinks "I'll expose the observer list so callers can add themselves directly &mdash; it's simpler than writing Subscribe/Unsubscribe methods." The problem is that exposing the raw list lets anyone do anything: clear all subscribers, add duplicates, remove someone else's subscription, or iterate in ways that aren't thread-safe. You lose all control over the subscription lifecycle.</p>
           <p class="body-text"><strong>Why Bad:</strong> Callers can <code>.Clear()</code> the list, add duplicates, or remove others' subscriptions. Bypasses validation, locking, and logging. Subtle bugs that are nearly impossible to trace.</p>
-          <p class="body-text"><strong>Fix:</strong> Keep the list private. Expose only <code>Subscribe()</code> and <code>Unsubscribe()</code> methods. Return an <code>IDisposable</code> subscription token for clean unsubscription.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadExposed.cs &mdash; &#10060;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class EventBroadcaster
+{
+    // Anyone can: .Clear(), .Add(duplicate), .Remove(someone else's)
+    public List&lt;IObserver&lt;string&gt;&gt; Observers { get; } = new();
+
+    public void Notify(string msg)
+    {
+        foreach (var obs in Observers) // no snapshot — crash risk too
+            obs.OnNext(msg);
+    }
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GoodEncapsulated.cs &mdash; &#9989;</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class EventBroadcaster
+{
+    private readonly List&lt;IObserver&lt;string&gt;&gt; _observers = new();
+
+    public IDisposable Subscribe(IObserver&lt;string&gt; observer)
+    {
+        _observers.Add(observer);
+        return new Subscription(() => _observers.Remove(observer));
+    }
+    // List is PRIVATE — callers can only Subscribe/Dispose
+    // You control validation, locking, logging, duplicate prevention
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The bad version hands out the raw list, giving callers unrestricted access. The good version keeps the list private and exposes only a <code>Subscribe</code> method that returns an <code>IDisposable</code> token. Callers can subscribe and dispose &mdash; nothing else. You maintain full control over validation, thread safety, and lifecycle management.</p>
         </div>
       </div>
     </div>
@@ -3099,7 +3571,8 @@ public async Task NotifyParallelAsync(object state)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens without Observer when a state change must notify 5 different objects?</div>
         <div class="body-text">
-          <p>Observer solves the "notification problem" — when something changes, how do you tell everyone who cares without hardcoding who those "someones" are? Without Observer, the code that changes data would have to manually call <code>screen.Update()</code>, <code>logger.Log()</code>, <code>emailer.Send()</code> — and every time you add a new consumer, you'd edit that code again. Observer flips this: interested parties <strong>subscribe</strong> themselves, and the broadcaster just says "something changed" to everyone on the list. It only knows the interface, never the specific subscriber types.</p>
+          <p>Observer solves the "notification problem" &mdash; when something changes, how do you tell everyone who cares without hardcoding who those "someones" are? Think of it like a YouTube channel. When a creator posts a new video, they don't personally call every viewer. Instead, viewers <strong>subscribe</strong> to the channel, and YouTube automatically notifies everyone on the list. The creator doesn't know (or care) who's subscribed &mdash; they just publish, and the platform handles delivery.</p>
+          <p>Without Observer, the code that changes data would have to manually call <code>screen.Update()</code>, <code>logger.Log()</code>, <code>emailer.Send()</code> &mdash; and every time you add a new consumer, you'd edit that code again. That's like the creator maintaining a personal phone list and calling each fan individually. Observer flips this: interested parties subscribe themselves, and the broadcaster just says "something changed" to everyone on the list. It only knows the interface, never the specific subscriber types. Adding a new consumer is just adding a new subscriber &mdash; zero changes to the publisher.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Observer also enables runtime flexibility — subscribers attach and detach dynamically without redeploying the subject. In .NET, this maps directly to event += and -= at runtime, making plugin architectures trivial."</div>
       </div></div>
@@ -3113,8 +3586,9 @@ public async Task NotifyParallelAsync(object state)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If your observer only needs one field from a 20-field object, which model wastes less bandwidth?</div>
         <div class="body-text">
-          <p><strong>Push:</strong> Subject sends data directly — <code>observer.Update(newPrice)</code>. Simpler for observers but they receive everything whether they want it or not.</p>
-          <p><strong>Pull:</strong> Subject sends a notification (<code>observer.Update(this)</code>), then the observer calls back to fetch only what it needs: <code>var price = subject.GetPrice()</code>. More flexible but creates a back-reference. In .NET: C# events are push (EventArgs carry the data). <code>INotifyPropertyChanged</code> is pull-ish — sends the property name; observer calls the getter.</p>
+          <p>Imagine a restaurant kitchen. In the <strong>push model</strong>, the chef puts the finished plate on the counter and calls out "Table 4, your steak is ready!" &mdash; the food comes to you with all the details. In the <strong>pull model</strong>, the chef just rings a bell and says "something's ready" &mdash; and the waiter has to walk over, look at the counter, and figure out what it is and who it's for.</p>
+          <p><strong>Push:</strong> Subject sends data directly &mdash; <code>observer.Update(newPrice)</code>. Simpler for observers but they receive everything whether they want it or not. This is the default in most modern implementations because it eliminates timing bugs (the observer always gets the exact data that triggered the notification).</p>
+          <p><strong>Pull:</strong> Subject sends a bare notification (<code>observer.Update(this)</code>), then the observer calls back to fetch only what it needs: <code>var price = subject.GetPrice()</code>. More flexible when the payload is large, but creates a back-reference and risks stale reads. In .NET: C# events are push (EventArgs carry the data). <code>INotifyPropertyChanged</code> is pull-ish &mdash; it sends the property name, and the observer calls the getter to read the value.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In practice, .NET's IObservable&lt;T&gt; uses push with typed payloads. If the payload is large, consider sending a lightweight notification (pull) with a correlation ID so observers can fetch only what they need from a cache or store."</div>
       </div></div>
@@ -3188,8 +3662,9 @@ public async Task NotifyParallelAsync(object state)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can Observer work across two different microservices running on different machines?</div>
         <div class="body-text">
-          <p><strong>Observer:</strong> The Subject holds direct references to observers. Tightly coupled in the sense that they're in the same process; loosely coupled in terms of concrete types (only interface). Same-process, direct calls.</p>
-          <p><strong><span class="tooltip-trigger">Pub/Sub<span class="tooltip-content">Publish/Subscribe uses a message broker (Azure Service Bus, Kafka, RabbitMQ) as an intermediary. Publishers and subscribers don't know each other at all — they both know only the broker and the message contract. Works across processes, services, and data centers. Provides durability (messages persist if subscriber is down) and fan-out (one publish → many subscribers across services).</span></span>:</strong> Publishers and subscribers communicate through a broker. No direct references. Works across processes and services. Adds durability, ordering, and distributed fan-out. Observer = in-process; Pub/Sub = distributed.</p>
+          <p>Think of it this way: <strong>Observer</strong> is like shouting across a room &mdash; you can see everyone you're talking to, and they hear you instantly. <strong>Pub/Sub</strong> is like posting a letter through the post office &mdash; you drop it off, the postal system figures out who gets it, and the recipients might be in a completely different city.</p>
+          <p><strong>Observer:</strong> The Subject holds direct references to observers. They live in the same process, same memory space. The subject calls observer methods directly &mdash; like a function call. Tightly coupled physically (same process), but loosely coupled in terms of types (only knows the interface).</p>
+          <p><strong><span class="tooltip-trigger">Pub/Sub<span class="tooltip-content">Publish/Subscribe uses a message broker (Azure Service Bus, Kafka, RabbitMQ) as an intermediary. Publishers and subscribers don't know each other at all — they both know only the broker and the message contract. Works across processes, services, and data centers. Provides durability (messages persist if subscriber is down) and fan-out (one publish → many subscribers across services).</span></span>:</strong> Publishers and subscribers communicate through a message broker (like Azure Service Bus or Kafka). No direct references. The publisher doesn't know who's listening. The broker handles delivery, retries, and persistence. Works across processes, services, machines, and even data centers. Observer = in-process, fast, simple. Pub/Sub = distributed, durable, scalable.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The hybrid approach is powerful: use in-process Observer (events or MediatR) within a service boundary, then publish domain events to a broker for cross-service Pub/Sub. This gives you simplicity locally and durability across services."</div>
       </div></div>
@@ -3239,6 +3714,42 @@ public async Task NotifyParallelAsync(object state)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What can go wrong when subscribe and notify happen simultaneously on different threads?</div>
         <div class="body-text">
+          <p>The core problem is simple: if one thread is looping through the observer list to send notifications, and another thread adds or removes an observer from the same list at the same time, things break. You might get a crash, a skipped observer, or a notification sent to an observer that just unsubscribed. The solution is the "copy-on-write" pattern &mdash; instead of modifying the existing list, every subscription change creates a brand new list and swaps the reference atomically.</p>
+
+          <!-- SVG: Copy-on-Write pattern -->
+          <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing copy-on-write pattern where Subscribe creates a new list and atomically swaps the reference, while Notify reads the current snapshot safely" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <rect x="20" y="70" width="130" height="55" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="85" y="92" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">_observers ref</text>
+            <text x="85" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">(single pointer)</text>
+
+            <rect x="220" y="20" width="170" height="50" rx="8" fill="#1e293b" stroke="#0d9488" stroke-width="2"/>
+            <text x="305" y="40" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Old List [A, B, C]</text>
+            <text x="305" y="58" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">Notify() reads this safely</text>
+
+            <rect x="220" y="120" width="170" height="50" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="305" y="140" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">New List [A, B, C, D]</text>
+            <text x="305" y="158" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">Subscribe() creates this</text>
+
+            <line x1="150" y1="85" x2="216" y2="45" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#obs-q9-arr)"/>
+            <text x="170" y="55" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">was</text>
+            <line x1="150" y1="105" x2="216" y2="145" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-q9-arr)"/>
+            <text x="170" y="140" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="9">now points to</text>
+
+            <rect x="470" y="20" width="220" height="50" rx="8" fill="#0f2a1e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="580" y="40" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Notify thread</text>
+            <text x="580" y="56" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Iterates old list undisturbed</text>
+
+            <rect x="470" y="120" width="220" height="50" rx="8" fill="#1a1a0f" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="580" y="140" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Subscribe thread</text>
+            <text x="580" y="156" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Swaps ref under lock</text>
+
+            <line x1="390" y1="45" x2="466" y2="45" stroke="#22c55e" stroke-width="1.5" marker-end="url(#obs-q9-arr)"/>
+            <line x1="390" y1="145" x2="466" y2="145" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#obs-q9-arr)"/>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ThreadSafeSubject.cs</span></div>
             <div class="macos-body">
@@ -3483,8 +3994,52 @@ public class OrderEventDispatcher(IEnumerable&lt;IOrderEventHandler&gt; handlers
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Observer: A broadcasts to many listeners. Mediator: everyone talks through a central hub. When does one-to-many broadcasting become many-to-many coordination?</div>
         <div class="body-text">
-          <p><strong>Observer:</strong> Subject knows it has observers. One-directional notification. Best for event broadcasting, property change, "something happened — here's the data."</p>
-          <p><strong>Mediator:</strong> No object knows about others — all talk through the mediator. Mediator knows everyone. Best for complex object interactions, form coordination, NÃ—M connections. MediatR in .NET is the classic implementation. Rule: A telling B "something changed" → Observer. A asking "who handles this command?" → Mediator.</p>
+          <p>Think of Observer like a radio station: one broadcaster sends a signal, and anyone with a radio picks it up. The station doesn't coordinate between listeners. Now think of Mediator like an air traffic controller: every plane talks only to the controller, and the controller coordinates who goes where. Planes never talk directly to each other.</p>
+
+          <!-- SVG: Observer vs Mediator side-by-side -->
+          <svg viewBox="0 0 720 200" role="img" aria-label="Side-by-side comparison showing Observer as one-to-many broadcast versus Mediator as hub-and-spoke coordination" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q16-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+              <marker id="obs-q16-prp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a78bfa"/></marker>
+            </defs>
+            <!-- Observer side -->
+            <text x="180" y="20" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Observer (one-to-many)</text>
+            <rect x="130" y="55" width="100" height="40" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="180" y="80" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Subject</text>
+            <rect x="40" y="130" width="80" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="80" y="152" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Obs A</text>
+            <rect x="140" y="130" width="80" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="180" y="152" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Obs B</text>
+            <rect x="240" y="130" width="80" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="280" y="152" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Obs C</text>
+            <line x1="155" y1="95" x2="90" y2="126" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q16-arr)"/>
+            <line x1="180" y1="95" x2="180" y2="126" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q16-arr)"/>
+            <line x1="205" y1="95" x2="270" y2="126" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q16-arr)"/>
+
+            <!-- Divider -->
+            <line x1="360" y1="10" x2="360" y2="190" stroke="#475569" stroke-width="1" stroke-dasharray="5,4"/>
+
+            <!-- Mediator side -->
+            <text x="540" y="20" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Mediator (hub-and-spoke)</text>
+            <rect x="490" y="75" width="100" height="40" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+            <text x="540" y="100" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Mediator</text>
+            <rect x="400" y="40" width="60" height="30" rx="6" fill="#1e293b" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="430" y="60" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">A</text>
+            <rect x="400" y="130" width="60" height="30" rx="6" fill="#1e293b" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="430" y="150" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">B</text>
+            <rect x="620" y="40" width="60" height="30" rx="6" fill="#1e293b" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="650" y="60" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">C</text>
+            <rect x="620" y="130" width="60" height="30" rx="6" fill="#1e293b" stroke="#7c3aed" stroke-width="1.5"/>
+            <text x="650" y="150" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">D</text>
+            <line x1="460" y1="60" x2="486" y2="85" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#obs-q16-prp)"/>
+            <line x1="460" y1="140" x2="486" y2="115" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#obs-q16-prp)"/>
+            <line x1="620" y1="60" x2="594" y2="85" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#obs-q16-prp)"/>
+            <line x1="620" y1="140" x2="594" y2="115" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#obs-q16-prp)"/>
+          </svg>
+
+          <p><strong>Observer:</strong> Subject knows it has observers. One-directional notification. Best for event broadcasting, property change, "something happened &mdash; here's the data." The subject talks, observers listen.</p>
+          <p><strong>Mediator:</strong> No object knows about others &mdash; all talk through the mediator. The mediator knows everyone and coordinates interactions. Best for complex object interactions, form coordination, or N-by-M connections where everything talks to everything. MediatR in .NET is the classic implementation.</p>
+          <p><strong>The decision rule:</strong> If A is telling B "something changed" &mdash; use Observer. If A is asking "who handles this command?" &mdash; use Mediator. If your observer graph starts looking like a web instead of a tree, it's time to upgrade to a Mediator.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In practice, I start with Observer and graduate to Mediator when observers start publishing their own events that other observers consume — creating implicit coupling. If your observer graph looks like a web rather than a tree, Mediator centralizes that complexity."</div>
       </div></div>
@@ -3574,6 +4129,53 @@ private IDisposable CreateSubscription(StockPriceSubject subject, out WeakRefere
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when a stock ticker fires 50K events/sec and each observer takes 1ms?</div>
         <div class="body-text">
+          <p>Backpressure is what happens when a producer creates data faster than consumers can process it. Imagine a fire hose connected to a drinking fountain &mdash; the fountain can't handle the flow. Without a strategy, you get either crashed consumers (out of memory from queuing too many events) or lost data (events dropped on the floor). The key is choosing the right strategy for your domain.</p>
+
+          <!-- SVG: Backpressure strategies -->
+          <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing four backpressure strategies: Throttle, Sample, Buffer, and BoundedChannel with their effects on event flow" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q19-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Fast producer -->
+            <rect x="15" y="70" width="120" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="75" y="92" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Producer</text>
+            <text x="75" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">50K events/sec</text>
+
+            <!-- Strategies -->
+            <rect x="190" y="15" width="150" height="38" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="265" y="30" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Throttle</text>
+            <text x="265" y="46" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Wait for quiet period</text>
+
+            <rect x="190" y="62" width="150" height="38" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="265" y="77" text-anchor="middle" fill="#0d9488" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Sample</text>
+            <text x="265" y="93" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Take latest every N ms</text>
+
+            <rect x="190" y="109" width="150" height="38" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="265" y="124" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Buffer</text>
+            <text x="265" y="140" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Batch into windows</text>
+
+            <rect x="190" y="156" width="150" height="38" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="265" y="171" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">BoundedChannel</text>
+            <text x="265" y="187" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Drop oldest when full</text>
+
+            <!-- Arrows from producer to strategies -->
+            <line x1="135" y1="82" x2="186" y2="34" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q19-arr)"/>
+            <line x1="135" y1="90" x2="186" y2="81" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q19-arr)"/>
+            <line x1="135" y1="100" x2="186" y2="128" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q19-arr)"/>
+            <line x1="135" y1="110" x2="186" y2="175" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q19-arr)"/>
+
+            <!-- Use cases -->
+            <text x="400" y="30" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10">Best for: search box input</text>
+            <text x="400" y="77" fill="#0d9488" font-family="system-ui, -apple-system, sans-serif" font-size="10">Best for: UI dashboard refresh</text>
+            <text x="400" y="124" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">Best for: analytics bulk insert</text>
+            <text x="400" y="171" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="10">Best for: async hand-off to workers</text>
+
+            <!-- Slow consumer -->
+            <rect x="580" y="70" width="120" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="640" y="92" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Consumer</text>
+            <text x="640" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">1K events/sec</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Backpressure.cs</span></div>
             <div class="macos-body">
@@ -3613,7 +4215,49 @@ ticker.Prices
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Standard Observer loses events if no one is listening. How does Event Sourcing solve this?</div>
         <div class="body-text">
-          <p>Event Sourcing stores every state change as an immutable event. Projections (read models) are observers of the event stream — they subscribe and build their own views by processing events sequentially. The event store is the Subject; projections are Observers. The key difference from basic Observer: ES events are <strong>persisted and replayable</strong>. Standard Observer notifications are ephemeral — missed events are gone. With ES, any projection can be rebuilt from scratch by replaying from event 0, making Observer's "fire-and-forget" limitation irrelevant.</p>
+          <p>Think of standard Observer like a live radio broadcast &mdash; if you weren't tuned in, you missed it forever. Event Sourcing is like recording every broadcast. Anyone who joins late can replay the recordings to catch up, then listen live from that point forward.</p>
+
+          <!-- SVG: Event Sourcing + Observer -->
+          <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing Event Store as a persistent event log with projections (Observers) that can replay from the beginning or subscribe to live events" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q20-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Event Store -->
+            <rect x="30" y="60" width="300" height="80" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="180" y="85" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Event Store (Subject)</text>
+            <text x="180" y="105" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Persisted, immutable, replayable</text>
+            <!-- Event boxes -->
+            <rect x="45" y="115" width="50" height="18" rx="3" fill="#0d9488" opacity="0.3"/>
+            <text x="70" y="128" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="8">evt 0</text>
+            <rect x="100" y="115" width="50" height="18" rx="3" fill="#0d9488" opacity="0.4"/>
+            <text x="125" y="128" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="8">evt 1</text>
+            <rect x="155" y="115" width="50" height="18" rx="3" fill="#0d9488" opacity="0.5"/>
+            <text x="180" y="128" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="8">evt 2</text>
+            <rect x="210" y="115" width="50" height="18" rx="3" fill="#0d9488" opacity="0.7"/>
+            <text x="235" y="128" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="8">evt 3</text>
+            <rect x="265" y="115" width="50" height="18" rx="3" fill="#0d9488" opacity="0.9"/>
+            <text x="290" y="128" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="8">evt 4</text>
+
+            <!-- Projections (Observers) -->
+            <rect x="420" y="25" width="170" height="55" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="505" y="47" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Projection A</text>
+            <text x="505" y="65" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Live at evt 4</text>
+
+            <rect x="420" y="110" width="170" height="55" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+            <text x="505" y="132" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Projection B (new)</text>
+            <text x="505" y="150" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Replaying from evt 0</text>
+
+            <!-- Arrows -->
+            <line x1="330" y1="85" x2="416" y2="52" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q20-arr)"/>
+            <text x="375" y="58" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="9">live</text>
+            <line x1="330" y1="110" x2="416" y2="137" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#obs-q20-arr)"/>
+            <text x="365" y="135" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="9">replay</text>
+
+            <!-- Key difference -->
+            <text x="600" y="185" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Late joiners can catch up!</text>
+          </svg>
+
+          <p>Event Sourcing stores every state change as an immutable event. Projections (read models) are observers of the event stream &mdash; they subscribe and build their own views by processing events sequentially. The event store is the Subject; projections are Observers. The key difference from basic Observer: ES events are <strong>persisted and replayable</strong>. Standard Observer notifications are ephemeral &mdash; missed events are gone. With ES, any projection can be rebuilt from scratch by replaying from event 0, making Observer's "fire-and-forget" limitation irrelevant.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Combine ES with Observer: the event store provides durability and replay, while in-process Observer handles real-time projections. New projections catch up by replaying the store, then switch to live Observer notifications — both historical completeness and real-time responsiveness."</div>
       </div></div>
@@ -3627,7 +4271,51 @@ ticker.Prices
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> In-process Observer uses direct method calls. What replaces method calls when subject and observer are in different services on different machines?</div>
         <div class="body-text">
-          <p>Distributed Observer is Pub/Sub with a message broker. Subject publishes to a topic (Azure Service Bus, Kafka, RabbitMQ). Subscriber services consume from that topic — each service is an independent Observer. The broker provides: durability, fan-out, ordering, and at-least-once delivery. In .NET, MassTransit or NServiceBus abstract the broker: consumers implement <code>IConsumer&lt;TMessage&gt;</code> — the Observer interface mapped to a message type. Critical addition over in-process Observer: <strong>idempotency</strong> — network failures can deliver messages twice; design consumers to handle duplicates safely (check-then-act with a processed-event log).</p>
+          <p>When Observer needs to cross process boundaries &mdash; when the subject and observers live in different services on different machines &mdash; direct method calls won't work. You need a message broker sitting in the middle to carry notifications between services. This is Pub/Sub: the distributed version of Observer.</p>
+
+          <!-- SVG: Distributed Observer with broker -->
+          <svg viewBox="0 0 720 210" role="img" aria-label="Architecture diagram showing a publishing service sending events through a message broker to multiple subscribing microservices" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q21-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Publisher service -->
+            <rect x="20" y="70" width="140" height="65" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="90" y="95" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Order Service</text>
+            <text x="90" y="115" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">publishes events</text>
+
+            <!-- Broker -->
+            <rect x="240" y="55" width="180" height="90" rx="12" fill="#1e293b" stroke="#f59e0b" stroke-width="2.5"/>
+            <text x="330" y="80" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Message Broker</text>
+            <text x="330" y="100" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Kafka / Azure Service Bus</text>
+            <text x="330" y="118" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">durability + fan-out + retry</text>
+            <text x="330" y="136" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">at-least-once delivery</text>
+
+            <!-- Subscriber services -->
+            <rect x="510" y="15" width="170" height="40" rx="8" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="595" y="40" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Inventory Service</text>
+
+            <rect x="510" y="70" width="170" height="40" rx="8" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="595" y="95" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Email Service</text>
+
+            <rect x="510" y="125" width="170" height="40" rx="8" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="595" y="150" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Analytics Service</text>
+
+            <!-- Arrows -->
+            <line x1="160" y1="100" x2="236" y2="100" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-q21-arr)"/>
+            <line x1="420" y1="80" x2="506" y2="35" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q21-arr)"/>
+            <line x1="420" y1="100" x2="506" y2="90" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q21-arr)"/>
+            <line x1="420" y1="120" x2="506" y2="145" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q21-arr)"/>
+
+            <!-- Labels -->
+            <text x="186" y="88" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="9">publish</text>
+            <text x="455" y="50" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="9">consume</text>
+
+            <!-- Idempotency note -->
+            <text x="360" y="195" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Each consumer must handle duplicate messages (idempotency)</text>
+          </svg>
+
+          <p>The subject publishes to a topic (Azure Service Bus, Kafka, RabbitMQ). Subscriber services consume from that topic &mdash; each service is an independent Observer. The broker provides durability (messages survive crashes), fan-out (one publish reaches many consumers), ordering, and at-least-once delivery. In .NET, MassTransit or NServiceBus abstract the broker: consumers implement <code>IConsumer&lt;TMessage&gt;</code> &mdash; the Observer interface mapped to a message type.</p>
+          <p>The critical addition over in-process Observer: <strong>idempotency</strong>. Network failures can cause the broker to deliver the same message twice. Your consumers must handle duplicates safely &mdash; typically by checking a "processed events" log before acting. Without idempotency, a redelivered "OrderPlaced" event could charge a customer twice.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Add the Outbox pattern: write the event to an outbox table in the same transaction as the state change. A background process publishes from the outbox. This guarantees at-least-once delivery without distributed transactions."</div>
       </div></div>
@@ -3641,7 +4329,42 @@ ticker.Prices
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when a push-based Observable produces events faster than the subscriber can process them?</div>
         <div class="body-text">
-          <p>Classic Observer is push-only: the subject pushes at whatever rate it wants. Reactive Streams extends Observer with <strong>async backpressure</strong>: subscribers signal "I'm ready for N more items" via a <code>request(n)</code> signal. The publisher only sends what's requested. In .NET, <code>IAsyncEnumerable&lt;T&gt;</code> with <code>await foreach</code> implements this — each <code>await MoveNextAsync()</code> IS the subscriber requesting one item. The producer can't outrun the consumer because it must await each request. <code>System.Threading.Channels</code> provides the same with <code>BoundedChannel</code> + <code>ReadAllAsync()</code>.</p>
+          <p>Classic Observer is push-only &mdash; the subject pushes data at whatever rate it wants, and the consumer has to keep up or drown. Reactive Streams fixes this by adding a conversation between producer and consumer. The consumer says "I'm ready for 5 more items," and the producer only sends 5. This is called <strong>async backpressure</strong>.</p>
+
+          <!-- SVG: Push-only vs Reactive Streams -->
+          <svg viewBox="0 0 720 180" role="img" aria-label="Comparison showing push-only Observer overwhelming consumers versus Reactive Streams where the consumer controls the pace with request(n) signals" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q22-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+              <marker id="obs-q22-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+              <marker id="obs-q22-back" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#a78bfa"/></marker>
+            </defs>
+            <!-- Push-only side -->
+            <text x="180" y="18" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Classic Observer (push-only)</text>
+            <rect x="30" y="50" width="100" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="80" y="75" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Producer</text>
+            <rect x="220" y="50" width="100" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="270" y="75" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Consumer</text>
+            <line x1="130" y1="65" x2="216" y2="65" stroke="#ef4444" stroke-width="2" marker-end="url(#obs-q22-red)"/>
+            <text x="173" y="58" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="9">push push push!</text>
+            <text x="180" y="115" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Consumer overwhelmed</text>
+
+            <!-- Divider -->
+            <line x1="360" y1="10" x2="360" y2="160" stroke="#475569" stroke-width="1" stroke-dasharray="5,4"/>
+
+            <!-- Reactive Streams side -->
+            <text x="540" y="18" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Reactive Streams (backpressure)</text>
+            <rect x="400" y="50" width="100" height="40" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="450" y="75" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Producer</text>
+            <rect x="590" y="50" width="100" height="40" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="640" y="75" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Consumer</text>
+            <line x1="500" y1="60" x2="586" y2="60" stroke="#22c55e" stroke-width="1.5" marker-end="url(#obs-q22-arr)"/>
+            <text x="543" y="53" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="9">send 5 items</text>
+            <line x1="586" y1="80" x2="500" y2="80" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#obs-q22-back)"/>
+            <text x="543" y="96" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="9">request(5)</text>
+            <text x="540" y="130" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Consumer controls the pace</text>
+          </svg>
+
+          <p>In .NET, <code>IAsyncEnumerable&lt;T&gt;</code> with <code>await foreach</code> implements this naturally &mdash; each <code>await MoveNextAsync()</code> IS the subscriber requesting one item. The producer can't outrun the consumer because it must await each request. <code>System.Threading.Channels</code> provides the same pattern with <code>BoundedChannel</code> + <code>ReadAllAsync()</code>.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In .NET 8 the convergence is Channel + IAsyncEnumerable: BoundedChannel handles the async hand-off with built-in backpressure, and ReadAllAsync() returns IAsyncEnumerable so consumers iterate at their own pace."</div>
       </div></div>
@@ -3689,7 +4412,61 @@ var behavior = new BehaviorSubject&lt;int&gt;(initialValue: 0);
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> In CQRS, the write side changes state and the read side serves queries. What connects them?</div>
         <div class="body-text">
-          <p>In CQRS, the Write side (command handlers) produces domain events after state changes. Observer connects Write to Read (projections) and side effects (email, analytics). Pipeline: <strong>Command → CommandHandler → Aggregate (raises DomainEvent) → DomainEventDispatcher → [ProjectionA, ProjectionB, EmailHandler, AuditHandler]</strong>. The dispatcher is the Subject; each handler is an Observer. Adding a new side effect = new handler class + one DI registration. Zero changes to the aggregate or command handler.</p>
+          <p>CQRS splits your system into a Write side (handles commands, changes state) and a Read side (serves queries, displays data). The Observer pattern is the bridge between them &mdash; when the write side changes something, domain events notify the read side to update its projections.</p>
+
+          <!-- SVG: CQRS + Observer pipeline -->
+          <svg viewBox="0 0 720 210" role="img" aria-label="CQRS pipeline diagram showing Command flowing through Aggregate to DomainEvent, then Observer dispatching to multiple projection and side-effect handlers" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q24-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Write side -->
+            <rect x="10" y="75" width="100" height="50" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="60" y="96" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Command</text>
+            <text x="60" y="114" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">PlaceOrder</text>
+
+            <line x1="110" y1="100" x2="140" y2="100" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-q24-arr)"/>
+
+            <rect x="144" y="75" width="110" height="50" rx="8" fill="#1e293b" stroke="#0d9488" stroke-width="2"/>
+            <text x="199" y="96" text-anchor="middle" fill="#0d9488" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Aggregate</text>
+            <text x="199" y="114" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Raises events</text>
+
+            <line x1="254" y1="100" x2="284" y2="100" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-q24-arr)"/>
+
+            <!-- Domain Event (diamond) -->
+            <polygon points="340,75 385,100 340,125 295,100" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="340" y="104" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold">Event</text>
+
+            <line x1="385" y1="100" x2="415" y2="100" stroke="#f59e0b" stroke-width="2" marker-end="url(#obs-q24-arr)"/>
+
+            <!-- Dispatcher (Subject) -->
+            <rect x="419" y="75" width="110" height="50" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="474" y="96" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Dispatcher</text>
+            <text x="474" y="114" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">(Subject)</text>
+
+            <!-- Observer handlers -->
+            <line x1="529" y1="85" x2="570" y2="35" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q24-arr)"/>
+            <line x1="529" y1="95" x2="570" y2="80" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q24-arr)"/>
+            <line x1="529" y1="105" x2="570" y2="130" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q24-arr)"/>
+            <line x1="529" y1="115" x2="570" y2="175" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q24-arr)"/>
+
+            <rect x="574" y="15" width="130" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="639" y="37" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Read Projection A</text>
+
+            <rect x="574" y="62" width="130" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="639" y="84" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Read Projection B</text>
+
+            <rect x="574" y="112" width="130" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="639" y="134" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Email Handler</text>
+
+            <rect x="574" y="158" width="130" height="35" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1.5"/>
+            <text x="639" y="180" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="10">Audit Handler</text>
+
+            <!-- Labels -->
+            <text x="60" y="60" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="10">WRITE SIDE</text>
+            <text x="639" y="8" text-anchor="middle" fill="#475569" font-family="system-ui, -apple-system, sans-serif" font-size="10">READ SIDE + SIDE EFFECTS</text>
+          </svg>
+
+          <p>The pipeline flows like this: <strong>Command</strong> arrives, the <strong>Aggregate</strong> processes it and raises <strong>DomainEvents</strong>, the <strong>Dispatcher</strong> (which is the Subject) delivers those events to every registered handler (each handler is an Observer). Projections update read models; side-effect handlers send emails, write audit logs, etc. Adding a new reaction to any event = one new handler class + one DI registration line. Zero changes to the aggregate or command handler.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Because Observer decouples write from read, you can add eventual consistency strategies per projection. A critical projection (account balance) might use synchronous Observer. A non-critical one (analytics dashboard) might use async Observer with a queue — same pattern, different timing guarantees."</div>
       </div></div>
@@ -3703,7 +4480,58 @@ var behavior = new BehaviorSubject&lt;int&gt;(initialValue: 0);
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> An event fires but one observer never receives it — list the possible causes.</div>
         <div class="body-text">
-          <p>Systematic checklist: (1) <strong>Was the observer subscribed?</strong> — Log in Subscribe(). (2) <strong>Did the event fire?</strong> — Log at the top of Notify(). (3) <strong>Was it unsubscribed too early?</strong> — Log in Unsubscribe() with stack trace. (4) <strong>Did a prior observer throw and stop the chain?</strong> — Add try-catch + logging per observer. (5) <strong>Thread affinity?</strong> — Is notification on a background thread but observer requires UI thread? (6) <strong>Filter dropped it?</strong> — Log at each Where() boundary. In Rx pipelines, use <code>.Do(x => logger.Log("Value: {V}", x))</code> for tap-style debugging between operators.</p>
+          <p>When an event fires but one observer never receives it, the problem could be anywhere in the notification chain. Think of it like debugging a package that never arrived &mdash; was it never sent? Was it sent to the wrong address? Did it get intercepted along the way? Here's a systematic checklist to narrow it down:</p>
+
+          <!-- SVG: Debug checklist as flow -->
+          <svg viewBox="0 0 720 220" role="img" aria-label="Flowchart showing six debugging checkpoints for tracing a disappeared Observer event: subscription check, fire check, unsubscribe timing, exception chain, thread affinity, and filter" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q25-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Step 1 -->
+            <rect x="10" y="20" width="110" height="55" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="65" y="42" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">1. Subscribed?</text>
+            <text x="65" y="62" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">Log Subscribe()</text>
+            <line x1="120" y1="48" x2="140" y2="48" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q25-arr)"/>
+
+            <!-- Step 2 -->
+            <rect x="144" y="20" width="110" height="55" rx="8" fill="#1e293b" stroke="#0d9488" stroke-width="2"/>
+            <text x="199" y="42" text-anchor="middle" fill="#0d9488" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">2. Event fired?</text>
+            <text x="199" y="62" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">Log top of Notify()</text>
+            <line x1="254" y1="48" x2="274" y2="48" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q25-arr)"/>
+
+            <!-- Step 3 -->
+            <rect x="278" y="20" width="120" height="55" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="338" y="42" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">3. Unsub too early?</text>
+            <text x="338" y="62" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">Log Unsubscribe()</text>
+            <line x1="398" y1="48" x2="418" y2="48" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q25-arr)"/>
+
+            <!-- Step 4 -->
+            <rect x="422" y="20" width="120" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="482" y="42" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">4. Prior threw?</text>
+            <text x="482" y="62" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">try/catch per obs</text>
+
+            <!-- Step 5 -->
+            <rect x="144" y="110" width="120" height="55" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+            <text x="204" y="132" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">5. Wrong thread?</text>
+            <text x="204" y="152" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">Check thread ID</text>
+
+            <!-- Step 6 -->
+            <rect x="300" y="110" width="120" height="55" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="360" y="132" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">6. Filter dropped?</text>
+            <text x="360" y="152" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">Log at each Where()</text>
+
+            <!-- Solution -->
+            <rect x="500" y="110" width="190" height="55" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="595" y="130" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">Rx: .Do() tap operator</text>
+            <text x="595" y="148" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">Log between every operator</text>
+
+            <line x1="482" y1="75" x2="204" y2="106" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q25-arr)"/>
+            <line x1="264" y1="137" x2="296" y2="137" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q25-arr)"/>
+            <line x1="420" y1="137" x2="496" y2="137" stroke="#14b8a6" stroke-width="1.5" marker-end="url(#obs-q25-arr)"/>
+          </svg>
+
+          <p>Walk through each checkpoint in order: (1) <strong>Was the observer subscribed?</strong> &mdash; Add logging inside <code>Subscribe()</code>. (2) <strong>Did the event fire at all?</strong> &mdash; Log at the top of <code>Notify()</code>. (3) <strong>Was it unsubscribed too early?</strong> &mdash; Log inside <code>Unsubscribe()</code> with a stack trace to see who triggered it. (4) <strong>Did a prior observer throw and stop the chain?</strong> &mdash; Add per-observer try/catch to isolate failures. (5) <strong>Thread affinity?</strong> &mdash; Is the notification on a background thread while the observer needs the UI thread? (6) <strong>Filter dropped it?</strong> &mdash; Log at each <code>Where()</code> boundary in Rx pipelines.</p>
+          <p>In Rx pipelines, the <code>.Do(x => logger.Log("Value: {V}", x))</code> operator is invaluable &mdash; it lets you "tap" into the stream at any point to see what values are flowing through, without changing the pipeline behavior. Place it between operators to find exactly where events get filtered or dropped.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Wrap every observer call with structured logging that captures observer type, payload, and timestamp. With Serilog or OpenTelemetry, reconstruct the full notification graph from logs and find exactly where the event was dropped, filtered, or swallowed."</div>
       </div></div>
@@ -3778,7 +4606,45 @@ public class HttpEventObserver : IObserver&lt;KeyValuePair&lt;string, object?&gt
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> An Order aggregate marks itself as "placed." Three other parts of the system need to react: inventory, email, analytics. Where does the coupling live?</div>
         <div class="body-text">
-          <p>Domain events ARE Observer applied to DDD. The aggregate (Subject) raises events; domain event handlers (Observers) react. The aggregate never knows who's listening — it just records what happened. The dispatch timing matters: <strong>pre-commit</strong> handlers (same transaction) are for consistency-critical reactions like inventory reservation. <strong>Post-commit</strong> handlers (after SaveChanges) are for side effects like email and analytics.</p>
+          <p>Domain events ARE Observer applied to DDD. The aggregate (Subject) raises events; domain event handlers (Observers) react. The aggregate never knows who's listening &mdash; it just records what happened.</p>
+          <p>The dispatch timing matters: <strong>pre-commit</strong> handlers (same transaction) are for consistency-critical reactions like inventory reservation. <strong>Post-commit</strong> handlers (after SaveChanges) are for side effects like email and analytics. This two-phase approach lets you guarantee correctness for critical operations while keeping non-critical work decoupled.</p>
+
+          <!-- SVG: Domain Event dispatch timing -->
+          <svg viewBox="0 0 720 180" role="img" aria-label="Timeline showing domain event dispatch in two phases: pre-commit handlers run in the same transaction, post-commit handlers run after SaveChanges" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q28-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Timeline -->
+            <line x1="30" y1="90" x2="690" y2="90" stroke="#475569" stroke-width="2"/>
+
+            <!-- Aggregate raises event -->
+            <line x1="100" y1="70" x2="100" y2="110" stroke="#14b8a6" stroke-width="2"/>
+            <rect x="40" y="25" width="120" height="40" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="100" y="42" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Order.Place()</text>
+            <text x="100" y="57" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">Raise(OrderPlaced)</text>
+
+            <!-- Pre-commit zone -->
+            <rect x="170" y="72" width="180" height="36" rx="4" fill="#14532d" opacity="0.4" stroke="#22c55e" stroke-width="1"/>
+            <text x="260" y="82" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">PRE-COMMIT (same TX)</text>
+            <text x="220" y="100" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="9">Inventory</text>
+            <text x="300" y="100" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="9">Validation</text>
+
+            <!-- SaveChanges -->
+            <line x1="400" y1="70" x2="400" y2="110" stroke="#f59e0b" stroke-width="2.5"/>
+            <text x="400" y="60" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">SaveChanges()</text>
+
+            <!-- Post-commit zone -->
+            <rect x="450" y="72" width="210" height="36" rx="4" fill="#1e1b4b" opacity="0.4" stroke="#a78bfa" stroke-width="1"/>
+            <text x="555" y="82" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">POST-COMMIT (side effects)</text>
+            <text x="495" y="100" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="9">Email</text>
+            <text x="555" y="100" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="9">Analytics</text>
+            <text x="620" y="100" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="9">Audit</text>
+
+            <!-- Labels -->
+            <text x="260" y="140" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="9">Rollback if handler fails</text>
+            <text x="555" y="140" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="9">Failures don't roll back order</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DomainEvents.cs</span></div>
             <div class="macos-body">
@@ -3827,7 +4693,43 @@ public class DomainEventDispatcher(IServiceProvider sp)
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> You have 500 observers on a subject that fires 10,000 events/sec. What's the total method call overhead?</div>
         <div class="body-text">
-          <p>Observer bottlenecks in three scenarios: <strong>Fan-out explosion</strong> (N observers × M events/sec = N*M calls), <strong>synchronous blocking</strong> (one slow observer blocks the chain), and <strong>GC pressure</strong> (EventArgs allocation at high frequency). Decision framework: under 100 events/sec with &lt;20 observers — standard Observer is fine. 100–10K events/sec — add batching via Channel + Buffer. 10K+ — consider the Disruptor pattern or per-consumer queues.</p>
+          <p>Observer becomes a bottleneck when the math works against you. 500 observers multiplied by 10,000 events per second equals 5 million method calls per second. Each call allocates EventArgs, traverses the list, and waits for the observer to finish. At some point, the overhead overwhelms your system.</p>
+
+          <!-- SVG: Performance decision framework -->
+          <svg viewBox="0 0 720 180" role="img" aria-label="Decision framework showing three tiers of Observer performance: under 100 events/sec is fine, 100 to 10K needs batching, above 10K needs per-consumer queues" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="obs-q29-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <!-- Tier 1: Green -->
+            <rect x="20" y="30" width="200" height="100" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="120" y="55" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">&lt; 100 evt/sec</text>
+            <text x="120" y="75" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Standard Observer</text>
+            <text x="120" y="95" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">&lt; 20 observers</text>
+            <text x="120" y="115" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">No optimization needed</text>
+
+            <!-- Tier 2: Yellow -->
+            <rect x="260" y="30" width="200" height="100" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="360" y="55" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">100 - 10K evt/sec</text>
+            <text x="360" y="75" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Add batching</text>
+            <text x="360" y="95" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Channel + Buffer</text>
+            <text x="360" y="115" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">100x fewer calls</text>
+
+            <!-- Tier 3: Red -->
+            <rect x="500" y="30" width="200" height="100" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="600" y="55" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">&gt; 10K evt/sec</text>
+            <text x="600" y="75" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Per-consumer queues</text>
+            <text x="600" y="95" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Disruptor / Channels</text>
+            <text x="600" y="115" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Object pooling required</text>
+
+            <!-- Arrows -->
+            <line x1="220" y1="80" x2="256" y2="80" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-q29-arr)"/>
+            <line x1="460" y1="80" x2="496" y2="80" stroke="#14b8a6" stroke-width="2" marker-end="url(#obs-q29-arr)"/>
+
+            <!-- Bottom label -->
+            <text x="360" y="165" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Three bottlenecks: fan-out explosion, synchronous blocking, GC pressure from allocations</text>
+          </svg>
+
+          <p>The three scenarios: <strong>Fan-out explosion</strong> (N observers x M events/sec = N*M calls), <strong>synchronous blocking</strong> (one slow observer blocks the chain), and <strong>GC pressure</strong> (EventArgs allocation at high frequency). Use the decision framework above to pick the right strategy for your throughput level.</p>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HighPerfObserver.cs</span></div>
             <div class="macos-body">
