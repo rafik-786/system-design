@@ -4020,7 +4020,7 @@ public record ExitRequest(string TicketId);</code></pre>
       </div>
     </div>
 
-    <p class="body-text">You've seen the good solution. Now let's study three BAD solutions — each one teaches a different lesson about what goes wrong when design principles are ignored.</p>
+    <p class="body-text">You've seen the good solution. Now let's study three BAD solutions. Each one teaches a different lesson about what goes wrong when design principles are ignored. We'll walk through exactly what happens in each case, why the code breaks, and what the fixed version looks like.</p>
 
     <!-- Bad Solution 1: The God Class -->
     <div class="card open">
@@ -4028,16 +4028,84 @@ public record ExitRequest(string TicketId);</code></pre>
         <i class="fa-solid fa-1 text-red" aria-hidden="true"></i> Bad Solution 1: "The God Class"
       </h3>
       <div class="card-body">
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">GodClass.cs — Everything in One Place</span>
+
+        <p class="body-text">Imagine a restaurant where one person does everything: takes orders, cooks the food, serves the tables, washes the dishes, manages the cash register, and restocks the fridge. On a quiet Tuesday, it works. On a busy Saturday night, everything falls apart because one person can't context-switch between six jobs without dropping plates.</p>
+
+        <p class="body-text">That's exactly what happens in the "God Class" approach to parking lot design. A single class called <code>ParkingLotSystem</code> handles spot management, ticket tracking, pricing calculations, display updates, receipt printing, and Singleton lifecycle management. At first it feels productive because everything is in one place. But the moment two different features need to change at the same time, the class becomes a minefield.</p>
+
+        <p class="body-text">Here's the real danger: when a junior developer needs to update the pricing formula from hourly to tiered, they open a 400-line file. They scroll past spot management, past entry tracking, past display logic, and finally find the pricing code buried inside the <code>Exit()</code> method. They change the pricing formula but accidentally modify a variable that spot tracking also depends on. The bug doesn't show up in their quick test because they only tested with one car. Six months later, a customer is charged for 47 hours because the entry time got corrupted.</p>
+
+        <p class="body-text">The root cause isn't bad developers. It's bad architecture. When everything lives in one class, every change is a risk because you can't modify pricing without potentially breaking parking, display, or receipts.</p>
+
+        <!-- SVG: God Class Responsibility Explosion -->
+        <svg viewBox="0 0 720 300" role="img" aria-label="Diagram showing the God Class with 6 different responsibilities all crammed into one box, compared to the clean solution with separate focused classes" style="width:100%; max-width:720px; margin:1.25rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="pl-gc1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+          <!-- Left: God Class blob -->
+          <rect x="20" y="20" width="310" height="260" rx="12" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="175" y="48" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text-primary)">ParkingLotSystem (God Class)</text>
+          <rect x="40" y="62" width="130" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="105" y="81" text-anchor="middle" font-size="10" fill="var(--text-primary)">Spot Management</text>
+          <rect x="180" y="62" width="130" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="245" y="81" text-anchor="middle" font-size="10" fill="var(--text-primary)">Pricing Logic</text>
+          <rect x="40" y="100" width="130" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="105" y="119" text-anchor="middle" font-size="10" fill="var(--text-primary)">Display Updates</text>
+          <rect x="180" y="100" width="130" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="245" y="119" text-anchor="middle" font-size="10" fill="var(--text-primary)">Receipt Printing</text>
+          <rect x="40" y="138" width="130" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="105" y="157" text-anchor="middle" font-size="10" fill="var(--text-primary)">Singleton Lifecycle</text>
+          <rect x="180" y="138" width="130" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="245" y="157" text-anchor="middle" font-size="10" fill="var(--text-primary)">String-based Types</text>
+          <text x="175" y="192" text-anchor="middle" font-size="11" font-weight="600" fill="#ef4444">6 reasons to change</text>
+          <text x="175" y="210" text-anchor="middle" font-size="10" fill="var(--text-muted)">Change pricing? Risk breaking spots.</text>
+          <text x="175" y="226" text-anchor="middle" font-size="10" fill="var(--text-muted)">Change display? Risk breaking receipts.</text>
+          <text x="175" y="248" text-anchor="middle" font-size="22" fill="#ef4444">&#x2718;</text>
+          <text x="175" y="272" text-anchor="middle" font-size="10" font-weight="600" fill="#ef4444">Untestable, unscalable, fragile</text>
+
+          <!-- Arrow -->
+          <line x1="345" y1="150" x2="385" y2="150" stroke="var(--accent-primary)" stroke-width="2" marker-end="url(#pl-gc1-arr)"/>
+
+          <!-- Right: Clean separation -->
+          <rect x="395" y="20" width="310" height="260" rx="12" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="550" y="48" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text-primary)">Clean Separation (SRP)</text>
+          <rect x="415" y="62" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="480" y="81" text-anchor="middle" font-size="10" fill="var(--text-primary)">ParkingLot</text>
+          <rect x="555" y="62" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="620" y="81" text-anchor="middle" font-size="10" fill="var(--text-primary)">IPricingStrategy</text>
+          <rect x="415" y="100" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="480" y="119" text-anchor="middle" font-size="10" fill="var(--text-primary)">DisplayBoard</text>
+          <rect x="555" y="100" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="620" y="119" text-anchor="middle" font-size="10" fill="var(--text-primary)">ReceiptGenerator</text>
+          <rect x="415" y="138" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="480" y="157" text-anchor="middle" font-size="10" fill="var(--text-primary)">VehicleType enum</text>
+          <rect x="555" y="138" width="130" height="28" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="620" y="157" text-anchor="middle" font-size="10" fill="var(--text-primary)">DI Container</text>
+          <text x="550" y="192" text-anchor="middle" font-size="11" font-weight="600" fill="#22c55e">1 reason to change each</text>
+          <text x="550" y="210" text-anchor="middle" font-size="10" fill="var(--text-muted)">Change pricing? Only IPricingStrategy.</text>
+          <text x="550" y="226" text-anchor="middle" font-size="10" fill="var(--text-muted)">Change display? Only DisplayBoard.</text>
+          <text x="550" y="248" text-anchor="middle" font-size="22" fill="#22c55e">&#x2714;</text>
+          <text x="550" y="272" text-anchor="middle" font-size="10" font-weight="600" fill="#22c55e">Testable, modular, safe to change</text>
+        </svg>
+
+        <!-- Tabbed: Buggy Code | Fix -->
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="pl-bs1-buggy" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="pl-bs1-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
+          <div class="tab-panel active" id="pl-bs1-buggy" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">GodClass.cs &mdash; Everything in One Place</span>
+              </div>
+              <div class="macos-body">
 <pre><code class="language-csharp">public class ParkingLotSystem
 {
-    private Dictionary&lt;string, string&gt; spots = new();     // spotId → plate
-    private Dictionary&lt;string, DateTime&gt; entryTimes = new(); // plate → time
+    private Dictionary&lt;string, string&gt; spots = new();     // spotId &rarr; plate
+    private Dictionary&lt;string, DateTime&gt; entryTimes = new(); // plate &rarr; time
     private string pricingType = "hourly";
     private static ParkingLotSystem? _instance;
 
@@ -4079,20 +4147,66 @@ public record ExitRequest(string TicketId);</code></pre>
         Console.WriteLine($"Receipt: {plate} - ${fee:F2}");
         return fee;
     }
-    // ... 400 more lines: display management, reporting, payment processing,
-    // admin functions, all in this one class
+    // ... 400 more lines: display, reporting, payment, admin
 }</code></pre>
+              </div>
+            </div>
+            <p class="body-text" style="margin-top:0.75rem;"><strong>Walking through the buggy code:</strong> Start at the top. The class stores spots as a flat <code>Dictionary&lt;string, string&gt;</code> &mdash; no types, no structure, just string keys and string values. Vehicle types are raw strings (<code>"motorcycle"</code>, <code>"car"</code>, <code>"truck"</code>), which means a typo like <code>"motrcycle"</code> compiles just fine but silently does nothing at runtime. The <code>Park()</code> method does spot searching, spot assignment, entry time tracking, AND display updating all in one method. The <code>Exit()</code> method does spot lookup by plate (a full dictionary scan), spot release, time calculation, pricing with hardcoded if/else chains, AND display/receipt printing. Every line of this class has a different reason to change, and every change risks breaking something unrelated.</p>
+          </div>
+          <div class="tab-panel" id="pl-bs1-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">CleanSeparation.cs &mdash; Each Class Has One Job</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// Each class does ONE thing well
+public enum VehicleType { Motorcycle, Car, Van, Truck }
+
+public interface IPricingStrategy
+{
+    decimal Calculate(TimeSpan duration);
+}
+
+public sealed class HourlyPricing(decimal ratePerHour) : IPricingStrategy
+{
+    public decimal Calculate(TimeSpan duration)
+        =&gt; (decimal)Math.Ceiling(duration.TotalHours) * ratePerHour;
+}
+
+public sealed class ParkingLot   // ONLY orchestration
+{
+    private readonly ConcurrentDictionary&lt;string, ParkingSpot&gt; _spots;
+    private readonly IPricingStrategy _pricing;
+    private readonly TimeProvider _clock;
+
+    public ParkingLot(IEnumerable&lt;ParkingSpot&gt; spots,
+        IPricingStrategy pricing, TimeProvider clock) { ... }
+
+    public ParkingTicket? TryPark(string plate, VehicleType type) { ... }
+    public ParkingReceipt? TryExit(string ticketId) { ... }
+}
+
+// Registered in DI:
+// builder.Services.AddSingleton&lt;IPricingStrategy, HourlyPricing&gt;();
+// builder.Services.AddSingleton&lt;ParkingLot&gt;();</code></pre>
+              </div>
+            </div>
+            <p class="body-text" style="margin-top:0.75rem;"><strong>Why the fix works:</strong> Each class now has exactly one reason to change. Need different pricing? Swap <code>IPricingStrategy</code> &mdash; zero changes to <code>ParkingLot</code>. Need to update the display board? That's a separate <code>DisplayBoard</code> class that subscribes to parking events. Vehicle types are an enum, so the compiler catches typos. The <code>ParkingLot</code> class does only orchestration &mdash; it connects pieces together but doesn't contain business logic for pricing, display, or receipts. This is the Single Responsibility Principle in action: one class, one reason to change.</p>
           </div>
         </div>
-        <div class="callout callout-red" style="margin-top:1rem;">
+
+        <div class="callout callout-danger" style="margin-top:1rem;">
           <i class="fa-solid fa-skull icon-gap"></i>
-          <strong>What's wrong:</strong> Parking logic, pricing, display, receipt, Singleton, Console.WriteLine — ALL in one class. <span class="tooltip-trigger">String comparisons<span class="tooltip-content">Using "motorcycle", "car" etc. as strings instead of enums. Strings have no compiler protection — a typo like "motrcycle" compiles fine but fails silently at runtime. Enums catch these errors at compile time.</span></span> for vehicle types. <code>DateTime.Now</code> instead of <span class="tooltip-trigger"><code>DateTimeOffset.UtcNow</code><span class="tooltip-content">DateTime.Now returns local time, which shifts during DST transitions and varies by server timezone. DateTimeOffset.UtcNow stores the exact UTC instant plus timezone offset — essential for accurate billing across time zones.</span></span>. No thread safety. No interfaces. No tests possible.
+          <strong>The incident:</strong> Month 6. The class is 800 lines. A junior dev needs to change pricing. They modify the <code>Exit()</code> method, accidentally break spot tracking. Nobody notices until a customer reports being charged for 47 hours. The class is too big for anyone to review safely.
         </div>
+
         <div class="callout callout-warning" style="margin-top:0.5rem;">
-          <i class="fa-solid fa-clock icon-gap"></i>
-          <strong>The moment it dies:</strong> Month 6. The class is 800 lines. A junior dev needs to change pricing. They modify the <code>Exit()</code> method, accidentally break spot tracking. Nobody notices until a customer reports being charged for 47 hours. The class is too big for anyone to review safely.
+          <i class="fa-solid fa-search icon-gap"></i>
+          <strong>How to Spot This in Your Code:</strong> If you can describe a class using the word "and" more than once ("it manages spots AND calculates pricing AND updates the display AND prints receipts"), it's a God Class. The test: can you name the class without using "Manager" or "System"? If not, split it.
         </div>
-        <p class="body-text" style="margin-top:0.75rem;"><strong>Lesson:</strong> <span class="tooltip-trigger">SRP<span class="tooltip-content">Single Responsibility Principle — a class should have only one reason to change. The God Class has 6 reasons to change: spot management, pricing, display, receipts, admin, and reporting. Each change risks breaking everything else.</span></span>. One class, one reason to change. Parking logic ≠ pricing ≠ display ≠ receipts.</p>
+
+        <p class="body-text" style="margin-top:0.75rem;"><strong>Lesson:</strong> <span class="tooltip-trigger">SRP<span class="tooltip-content">Single Responsibility Principle &mdash; a class should have only one reason to change. The God Class has 6 reasons to change: spot management, pricing, display, receipts, admin, and reporting. Each change risks breaking everything else.</span></span>. One class, one reason to change. Parking logic, pricing, display, and receipts are four different reasons to change &mdash; so they belong in four different classes.</p>
       </div>
     </div>
 
@@ -4102,12 +4216,78 @@ public record ExitRequest(string TicketId);</code></pre>
         <i class="fa-solid fa-2 text-yellow" aria-hidden="true"></i> Bad Solution 2: "The Over-Engineer"
       </h3>
       <div class="card-body">
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">OverEngineered.cs — Pattern for Every Occasion</span>
+
+        <p class="body-text">Picture this: you need to hang a picture frame. You go to the hardware store and buy a drill, a stud finder, a laser level, a drywall anchor set, a bracket system, and a motorized picture-hanging robot. All you needed was a hammer and one nail. But the hardware store salesperson (who works on commission) convinced you that you might need all that stuff "someday."</p>
+
+        <p class="body-text">The Over-Engineer does the same thing with design patterns. They've read about all 23 Gang of Four patterns, and they're determined to use every single one. Factory for creating vehicles. Factory for creating factories. Strategy for selecting strategies. Observer for notifying the observer-notification-service. Every feature gets wrapped in three layers of abstraction "just in case" a requirement changes that hasn't been asked for.</p>
+
+        <p class="body-text">The problem isn't that patterns are bad &mdash; patterns are excellent tools. The problem is using them without a specific problem to solve. When a new developer opens this codebase and asks "how do I park a car?", the answer is a 20-step journey through <code>IVehicleFactory</code> to <code>IParkingSpotAssignmentStrategyFactoryProvider</code> to <code>ITicketGenerationCommandHandler</code>. The parking lot has become an enterprise architecture demo, not a working system.</p>
+
+        <p class="body-text">The real cost shows up in onboarding time. A new hire who should be productive in a week takes a month to understand how the pieces connect. And when they finally need to add a simple feature like "motorcycle can park in car spots if no motorcycle spots are available," they discover they need to modify six factories, three strategies, and two mediators. The system is so abstract that concrete changes are nearly impossible.</p>
+
+        <!-- SVG: Abstraction Explosion vs Right-Sized -->
+        <svg viewBox="0 0 720 310" role="img" aria-label="Diagram comparing the over-engineered solution with 47 files and 15 interfaces versus the right-sized solution with 8 files and 3 interfaces" style="width:100%; max-width:720px; margin:1.25rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="pl-oe2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+          <!-- Left: Over-Engineered stack -->
+          <rect x="20" y="15" width="310" height="280" rx="12" fill="rgba(234,179,8,0.06)" stroke="#eab308" stroke-width="1.5"/>
+          <text x="175" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text-primary)">Over-Engineered (47 files)</text>
+          <!-- Stacked layers -->
+          <rect x="45" y="58" width="260" height="24" rx="5" fill="rgba(234,179,8,0.15)" stroke="#eab308" stroke-width="1"/>
+          <text x="175" y="75" text-anchor="middle" font-size="9" fill="var(--text-primary)">IAbstractPricingStrategyFactoryMediator</text>
+          <rect x="45" y="86" width="260" height="24" rx="5" fill="rgba(234,179,8,0.15)" stroke="#eab308" stroke-width="1"/>
+          <text x="175" y="103" text-anchor="middle" font-size="9" fill="var(--text-primary)">IParkingSpotAssignmentStrategyFactoryProvider</text>
+          <rect x="45" y="114" width="260" height="24" rx="5" fill="rgba(234,179,8,0.15)" stroke="#eab308" stroke-width="1"/>
+          <text x="175" y="131" text-anchor="middle" font-size="9" fill="var(--text-primary)">ITicketGenerationCommandHandler</text>
+          <rect x="45" y="142" width="260" height="24" rx="5" fill="rgba(234,179,8,0.15)" stroke="#eab308" stroke-width="1"/>
+          <text x="175" y="159" text-anchor="middle" font-size="9" fill="var(--text-primary)">IEntryGateEventObserverNotificationService</text>
+          <rect x="45" y="170" width="260" height="24" rx="5" fill="rgba(234,179,8,0.15)" stroke="#eab308" stroke-width="1"/>
+          <text x="175" y="187" text-anchor="middle" font-size="9" fill="var(--text-primary)">IExitGateReceiptBuilderDirector</text>
+          <rect x="45" y="198" width="260" height="24" rx="5" fill="rgba(234,179,8,0.12)" stroke="#eab308" stroke-width="1" stroke-dasharray="4"/>
+          <text x="175" y="215" text-anchor="middle" font-size="9" fill="var(--text-muted)">... 10 more interfaces ...</text>
+          <text x="175" y="250" text-anchor="middle" font-size="11" font-weight="600" fill="#ca8a04">15 interfaces, 23 classes, 4 factories</text>
+          <text x="175" y="268" text-anchor="middle" font-size="10" fill="var(--text-muted)">"Where does parking happen?"</text>
+          <text x="175" y="284" text-anchor="middle" font-size="10" fill="#ef4444">"Follow the 20-step sequence diagram."</text>
+
+          <!-- Arrow -->
+          <line x1="345" y1="155" x2="385" y2="155" stroke="var(--accent-primary)" stroke-width="2" marker-end="url(#pl-oe2-arr)"/>
+
+          <!-- Right: Right-Sized -->
+          <rect x="395" y="15" width="310" height="280" rx="12" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="550" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text-primary)">Right-Sized (8 files)</text>
+          <rect x="420" y="62" width="125" height="32" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="483" y="83" text-anchor="middle" font-size="10" fill="var(--text-primary)">IPricingStrategy</text>
+          <rect x="555" y="62" width="125" height="32" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="618" y="83" text-anchor="middle" font-size="10" fill="var(--text-primary)">ISpotAssignment</text>
+          <rect x="420" y="104" width="125" height="32" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="483" y="125" text-anchor="middle" font-size="10" fill="var(--text-primary)">ParkingLot</text>
+          <rect x="555" y="104" width="125" height="32" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="618" y="125" text-anchor="middle" font-size="10" fill="var(--text-primary)">Floor</text>
+          <rect x="420" y="146" width="125" height="32" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="483" y="167" text-anchor="middle" font-size="10" fill="var(--text-primary)">ParkingTicket</text>
+          <rect x="555" y="146" width="125" height="32" rx="6" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="618" y="167" text-anchor="middle" font-size="10" fill="var(--text-primary)">ParkingReceipt</text>
+          <text x="550" y="210" text-anchor="middle" font-size="11" font-weight="600" fill="#22c55e">3 interfaces, 5 classes</text>
+          <text x="550" y="230" text-anchor="middle" font-size="10" fill="var(--text-muted)">"Where does parking happen?"</text>
+          <text x="550" y="246" text-anchor="middle" font-size="10" fill="#22c55e">"ParkingLot.TryPark() &mdash; line 14."</text>
+          <text x="550" y="275" text-anchor="middle" font-size="10" fill="var(--text-muted)">New dev productive in 1 day, not 1 month</text>
+        </svg>
+
+        <!-- Tabbed: Buggy Code | Fix -->
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="pl-bs2-buggy" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="pl-bs2-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
+          <div class="tab-panel active" id="pl-bs2-buggy" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">OverEngineered.cs &mdash; Pattern for Every Occasion</span>
+              </div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// 15 interfaces, 23 classes, 4 abstract factories
 public interface IVehicle { }
 public interface IVehicleFactory { IVehicle Create(string plate); }
@@ -4131,17 +4311,63 @@ public interface IEntryGateEventObserverNotificationService { ... }
 public interface IExitGateReceiptBuilderDirector { ... }
 // ... 200 more lines of interfaces and abstractions
 // ... for a system that parks cars</code></pre>
+              </div>
+            </div>
+            <p class="body-text" style="margin-top:0.75rem;"><strong>Walking through the buggy code:</strong> Count the interfaces. There's a factory for creating vehicles, a factory for creating parking spots, a factory-provider for selecting which assignment strategy to use, a factory-mediator for resolving pricing strategies, a command handler for generating tickets, and an observer-notification-service for gate events. Each interface has at least one implementation class. Each implementation probably injects three other interfaces. To trace "what happens when a car enters," you'd need to follow: <code>IVehicleFactory</code> creates the vehicle, <code>IParkingSpotAssignmentStrategyFactoryProvider</code> picks a strategy, the strategy calls <code>IParkingSpotFactory</code>, then <code>ITicketGenerationCommandHandler</code> creates the ticket, and finally <code>IEntryGateEventObserverNotificationService</code> sends notifications. That's six indirections for "park a car."</p>
+          </div>
+          <div class="tab-panel" id="pl-bs2-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">RightSized.cs &mdash; Only Patterns That Solve Real Problems</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// Strategy for pricing &mdash; because pricing rules ACTUALLY change independently
+public interface IPricingStrategy
+{
+    decimal Calculate(TimeSpan duration);
+}
+
+// The parking lot itself &mdash; clear, direct, readable
+public sealed class ParkingLot
+{
+    private readonly ConcurrentDictionary&lt;string, ParkingSpot&gt; _spots;
+    private readonly IPricingStrategy _pricing;
+    private readonly Lock _lock = new();
+
+    public ParkingTicket? TryPark(string plate, VehicleType type)
+    {
+        lock (_lock)
+        {
+            var size = SpotSizeMapping.For(type);
+            var spot = _spots.Values.FirstOrDefault(s =&gt; s.IsAvailable &amp;&amp; s.Size == size);
+            if (spot is null) return null;
+            spot.Assign();
+            return new ParkingTicket(Guid.NewGuid().ToString(), plate, type,
+                spot.Id, DateTimeOffset.UtcNow);
+        }
+    }
+}
+
+// Total: 3 interfaces, 5 classes. Done.
+// "Where does parking happen?" &rarr; ParkingLot.TryPark(), line 14.</code></pre>
+              </div>
+            </div>
+            <p class="body-text" style="margin-top:0.75rem;"><strong>Why the fix works:</strong> The right-sized solution uses patterns only where there's a real problem. <code>IPricingStrategy</code> exists because pricing rules genuinely change independently (hourly today, tiered next month). But vehicles don't need a factory because an enum and a record are plenty. Tickets don't need a command handler because <code>new ParkingTicket(...)</code> is perfectly clear. The result: 8 files instead of 47, a new developer can trace "park a car" in one method call, and adding a feature means changing 1 file instead of 6.</p>
           </div>
         </div>
-        <div class="callout callout-red" style="margin-top:1rem;">
+
+        <div class="callout callout-danger" style="margin-top:1rem;">
           <i class="fa-solid fa-skull icon-gap"></i>
-          <strong>What's wrong:</strong> Factory for factories. Strategy for strategy selection. Observer for notification of observation. Every <span class="tooltip-trigger">GoF pattern<span class="tooltip-content">Gang of Four — the 23 classic design patterns from the 1994 book "Design Patterns" by Gamma, Helm, Johnson, Vlissides. They're powerful tools, but applying all 23 to a parking lot is like using a chainsaw to butter toast.</span></span> crammed in whether the system needs it or not. A new developer asks "where does parking happen?" The answer requires a 20-step sequence diagram.
+          <strong>The incident:</strong> A new hire opens the repo. Counts 47 files for a parking lot. Asks "how do I add a new vehicle type?" The answer involves 6 factories, 3 strategies, and 2 mediators. They update their LinkedIn that afternoon.
         </div>
+
         <div class="callout callout-warning" style="margin-top:0.5rem;">
-          <i class="fa-solid fa-clock icon-gap"></i>
-          <strong>The moment it dies:</strong> A new hire opens the repo. Counts 47 files for a parking lot. Asks "how do I add a new vehicle type?" The answer involves 6 factories, 3 strategies, and 2 mediators. They update their LinkedIn that afternoon.
+          <i class="fa-solid fa-search icon-gap"></i>
+          <strong>How to Spot This in Your Code:</strong> If the interface name is longer than the sentence describing what it does, you've over-engineered. The YAGNI test: can you name a concrete scenario where this abstraction is needed TODAY? If you're saying "we might need it someday," remove it. You can always add abstraction later; removing it is much harder.
         </div>
-        <p class="body-text" style="margin-top:0.75rem;"><strong>Lesson:</strong> <span class="tooltip-trigger">YAGNI<span class="tooltip-content">You Aren't Gonna Need It. Don't add abstraction for hypothetical future requirements. If you don't have the problem NOW, don't add the pattern NOW. Patterns solve problems. No problem → no pattern.</span></span>. Patterns solve PROBLEMS. No problem → no pattern. Our system needs 2 Strategy + 1 DI Singleton + 1 Decorator. Not 15 interfaces.</p>
+
+        <p class="body-text" style="margin-top:0.75rem;"><strong>Lesson:</strong> <span class="tooltip-trigger">YAGNI<span class="tooltip-content">You Aren't Gonna Need It. Don't add abstraction for hypothetical future requirements. If you don't have the problem NOW, don't add the pattern NOW. Patterns solve problems. No problem &rarr; no pattern.</span></span>. Patterns solve PROBLEMS. No problem, no pattern. Our system needs 2 Strategy interfaces + 1 DI Singleton + 1 Decorator. Not 15 interfaces and 23 classes.</p>
       </div>
     </div>
 
@@ -4151,48 +4377,96 @@ public interface IExitGateReceiptBuilderDirector { ... }
         <i class="fa-solid fa-3 text-green" aria-hidden="true"></i> Bad Solution 3: "The Happy-Path Hero"
       </h3>
       <div class="card-body">
-        <div class="macos-window">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">HappyPathHero.cs — Looks Great. Isn't.</span>
+
+        <p class="body-text">This one is the most dangerous of the three, because it looks perfect. Imagine a bridge that was beautifully designed, passed every visual inspection, and looked gorgeous in photos. But the engineer never tested what happens when two heavy trucks cross at the same time, or when a storm hits, or when the temperature drops below freezing. On a sunny day with light traffic, the bridge works flawlessly. The first real stress test? It collapses.</p>
+
+        <p class="body-text">Bad Solution 3 is that bridge. The code is clean. The naming is professional. It uses the Strategy pattern correctly. Records are immutable. It would pass most code reviews. But it was only tested with one car, one gate, and no edge cases. The developer never asked "what if two cars arrive at the same time?" or "what if a customer loses their ticket?" or "what if the server is in a different timezone?"</p>
+
+        <p class="body-text">Here's what makes it so dangerous: Bad Solutions 1 and 2 are obviously bad. Any experienced developer spots them in code review. They would never make it to production. But Solution 3 looks professional. It passes code review. It works in development. It works in staging. It only explodes when real-world conditions meet your code: Monday morning rush hour, three entry gates, customers who lose tickets, and servers whose clocks disagree.</p>
+
+        <p class="body-text">The lesson isn't "write ugly code." The lesson is that clean code is necessary but not sufficient. Professional-looking code that breaks under concurrency, edge cases, and real-world time is worse than ugly code that handles them &mdash; because the ugly code will get fixed before production. The pretty code won't.</p>
+
+        <!-- SVG: Happy Path vs Reality -->
+        <svg viewBox="0 0 720 280" role="img" aria-label="Diagram showing the Happy Path Hero code working fine in testing with one car and one gate, but failing in production with multiple cars, gates, and edge cases" style="width:100%; max-width:720px; margin:1.25rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="pl-hp3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+          <!-- Left: Testing (Happy Path) -->
+          <rect x="20" y="15" width="320" height="250" rx="12" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="180" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#22c55e">Testing (Happy Path)</text>
+          <text x="180" y="62" text-anchor="middle" font-size="10" fill="var(--text-muted)">1 car, 1 gate, no edge cases</text>
+          <!-- Single car entering -->
+          <rect x="60" y="80" width="90" height="36" rx="8" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="105" y="103" text-anchor="middle" font-size="10" fill="var(--text-primary)">Car A enters</text>
+          <line x1="150" y1="98" x2="190" y2="98" stroke="#22c55e" stroke-width="1.5" marker-end="url(#pl-hp3-arr)"/>
+          <rect x="195" y="80" width="80" height="36" rx="8" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <text x="235" y="103" text-anchor="middle" font-size="10" fill="var(--text-primary)">Spot R-1</text>
+          <text x="180" y="140" text-anchor="middle" font-size="22" fill="#22c55e">&#x2714;</text>
+          <text x="180" y="162" text-anchor="middle" font-size="10" fill="#22c55e">Works perfectly!</text>
+          <text x="180" y="182" text-anchor="middle" font-size="10" fill="var(--text-muted)">No concurrency to trigger race conditions</text>
+          <text x="180" y="198" text-anchor="middle" font-size="10" fill="var(--text-muted)">No edge cases to uncover null refs</text>
+          <text x="180" y="214" text-anchor="middle" font-size="10" fill="var(--text-muted)">No timezone difference to break billing</text>
+          <text x="180" y="242" text-anchor="middle" font-size="11" font-weight="600" fill="#22c55e">"Ship it! Looks great."</text>
+
+          <!-- Right: Production (Reality) -->
+          <rect x="380" y="15" width="320" height="250" rx="12" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="540" y="42" text-anchor="middle" font-size="13" font-weight="700" fill="#ef4444">Production (Reality)</text>
+          <text x="540" y="62" text-anchor="middle" font-size="10" fill="var(--text-muted)">3 gates, rush hour, real world</text>
+          <!-- Two cars racing -->
+          <rect x="400" y="78" width="76" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="438" y="97" text-anchor="middle" font-size="9" fill="var(--text-primary)">Car A</text>
+          <rect x="400" y="112" width="76" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+          <text x="438" y="131" text-anchor="middle" font-size="9" fill="var(--text-primary)">Car B</text>
+          <line x1="476" y1="92" x2="520" y2="105" stroke="#ef4444" stroke-width="1.2"/>
+          <line x1="476" y1="126" x2="520" y2="113" stroke="#ef4444" stroke-width="1.2"/>
+          <rect x="524" y="96" width="62" height="28" rx="6" fill="rgba(239,68,68,0.25)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="555" y="115" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444">Spot R-1</text>
+          <text x="630" y="115" font-size="9" fill="#ef4444">DOUBLE BOOKED!</text>
+          <!-- Failures list -->
+          <text x="540" y="156" text-anchor="middle" font-size="10" fill="#ef4444">&#x2718; Race condition: 2 cars, 1 spot</text>
+          <text x="540" y="174" text-anchor="middle" font-size="10" fill="#ef4444">&#x2718; Lost ticket: KeyNotFoundException crash</text>
+          <text x="540" y="192" text-anchor="middle" font-size="10" fill="#ef4444">&#x2718; Display shows -3 available spots</text>
+          <text x="540" y="210" text-anchor="middle" font-size="10" fill="#ef4444">&#x2718; DST change: bills off by 1 hour</text>
+          <text x="540" y="242" text-anchor="middle" font-size="11" font-weight="600" fill="#ef4444">"It worked in testing!"</text>
+        </svg>
+
+        <!-- Tabbed: Buggy Code | Fix -->
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="pl-bs3-buggy" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="pl-bs3-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// Clean code. Good patterns. Proper naming. Passes code review.
-public interface IPricingStrategy
-{
-    decimal Calculate(TimeSpan duration);
-}
-
-public sealed class HourlyPricing(decimal rate) : IPricingStrategy
-{
-    public decimal Calculate(TimeSpan duration)
-        =&gt; (decimal)Math.Ceiling(duration.TotalHours) * rate;
-}
-
-public sealed class ParkingLotService(
-    List&lt;ParkingSpot&gt; spots,    // ← not ConcurrentDictionary
+          <div class="tab-panel active" id="pl-bs3-buggy" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">HappyPathHero.cs &mdash; Looks Great. Isn't.</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public sealed class ParkingLotService(
+    List&lt;ParkingSpot&gt; spots,    // &larr; not ConcurrentDictionary
     IPricingStrategy pricing)
 {
-    private readonly Dictionary&lt;string, ParkingTicket&gt; _tickets = new(); // ← not Concurrent
+    private readonly Dictionary&lt;string, ParkingTicket&gt; _tickets = new(); // &larr; not Concurrent
 
     public ParkingTicket Park(string plate, VehicleType type)
     {
         var size = SpotSizeMapping.For(type);
-        var spot = spots.First(s =&gt; !s.IsOccupied &amp;&amp; s.Size == size); // ← no null check
+        var spot = spots.First(s =&gt; !s.IsOccupied &amp;&amp; s.Size == size); // &larr; no null check
         spot.IsOccupied = true;
-        // ← no lock around find + occupy
+        // &larr; no lock around find + occupy (TOCTOU race condition)
 
         var ticket = new ParkingTicket(Guid.NewGuid().ToString(), plate,
-            type, spot.Id, DateTime.Now); // ← DateTime.Now, not DateTimeOffset.UtcNow
+            type, spot.Id, DateTime.Now); // &larr; DateTime.Now, not DateTimeOffset.UtcNow
         _tickets[ticket.TicketId] = ticket;
         return ticket;
     }
 
     public ParkingReceipt Exit(string ticketId)
     {
-        var ticket = _tickets[ticketId]; // ← KeyNotFoundException if invalid
-        _tickets.Remove(ticketId);
-        // ← no lock, not thread-safe
+        var ticket = _tickets[ticketId]; // &larr; KeyNotFoundException if invalid
+        _tickets.Remove(ticketId);       // &larr; not thread-safe
 
         var spot = spots.First(s =&gt; s.Id == ticket.SpotId);
         spot.IsOccupied = false;
@@ -4202,17 +4476,73 @@ public sealed class ParkingLotService(
             pricing.Calculate(duration));
     }
 }</code></pre>
+              </div>
+            </div>
+            <p class="body-text" style="margin-top:0.75rem;"><strong>Walking through the buggy code:</strong> The code reads cleanly. Good class name, constructor injection, Strategy pattern for pricing. But follow it under stress. Two threads call <code>Park()</code> at the same time. Both execute <code>spots.First(s => !s.IsOccupied ...)</code> and both find the same spot available. Both set <code>IsOccupied = true</code>. Both create tickets pointing to the same spot. That's a double booking. In <code>Exit()</code>, if someone passes an invalid ticket ID, <code>_tickets[ticketId]</code> throws a <code>KeyNotFoundException</code> that crashes the whole service. And <code>DateTime.Now</code> means that during a Daylight Saving Time change, a 1-hour parking session might be billed as 2 hours (or 0 hours).</p>
+          </div>
+          <div class="tab-panel" id="pl-bs3-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">ProductionReady.cs &mdash; Same Clean Code, Now Robust</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public sealed class ParkingLotService(
+    ConcurrentDictionary&lt;string, ParkingSpot&gt; spots,  // thread-safe collection
+    IPricingStrategy pricing,
+    TimeProvider clock)                                 // injectable clock
+{
+    private readonly ConcurrentDictionary&lt;string, ParkingTicket&gt; _tickets = new();
+    private readonly Lock _lock = new();
+
+    public ParkingTicket? TryPark(string plate, VehicleType type)
+    {
+        lock (_lock)  // find + assign is ATOMIC
+        {
+            var size = SpotSizeMapping.For(type);
+            var spot = spots.Values
+                .FirstOrDefault(s =&gt; s.IsAvailable &amp;&amp; s.Size == size);
+            if (spot is null) return null;  // graceful "lot full"
+            spot.Assign();
+
+            var ticket = new ParkingTicket(Guid.NewGuid().ToString(), plate,
+                type, spot.Id, clock.GetUtcNow());  // UTC, no DST bugs
+            _tickets[ticket.TicketId] = ticket;
+            return ticket;
+        }
+    }
+
+    public (bool Success, ParkingReceipt? Receipt, string Error) TryExit(string ticketId)
+    {
+        if (!_tickets.TryRemove(ticketId, out var ticket))
+            return (false, null, "Ticket not found");  // no crash
+
+        var spot = spots[ticket.SpotId];
+        spot.Release();
+
+        var duration = clock.GetUtcNow() - ticket.EntryTime;
+        var receipt = new ParkingReceipt(ticket, clock.GetUtcNow(),
+            duration, pricing.Calculate(duration));
+        return (true, receipt, string.Empty);
+    }
+}</code></pre>
+              </div>
+            </div>
+            <p class="body-text" style="margin-top:0.75rem;"><strong>Why the fix works:</strong> The fix addresses every hidden bug while keeping the clean code style. The <code>lock</code> around find-and-assign makes spot allocation atomic &mdash; no more double bookings. <code>FirstOrDefault</code> plus a null check means a full lot returns <code>null</code> instead of crashing. <code>TryRemove</code> handles invalid ticket IDs gracefully with a tuple result. And <code>TimeProvider</code> (the .NET 8 abstraction for time) gives us UTC timestamps that survive DST transitions, plus it's injectable so tests can freeze or advance time. Same clean architecture, now production-ready.</p>
           </div>
         </div>
-        <div class="callout callout-red" style="margin-top:1rem;">
+
+        <div class="callout callout-danger" style="margin-top:1rem;">
           <i class="fa-solid fa-skull icon-gap"></i>
-          <strong>What's wrong:</strong> It <em>looks</em> production-ready. Clean Strategy pattern. Good naming. Proper records. But: no thread safety (race condition from Level 3), no edge case handling (Level 5), <code>DateTime.Now</code> instead of <code>DateTimeOffset.UtcNow</code> (timezone bugs), <span class="tooltip-trigger"><code>.First()</code><span class="tooltip-content">LINQ's First() throws InvalidOperationException when no matching element exists. In production, this crashes the service. Use FirstOrDefault() with a null check, or better yet, return a Result type that explicitly handles the "not found" case.</span></span> throws if lot is full instead of returning gracefully.
+          <strong>The incident:</strong> First week in production. Monday morning rush. 3 entry gates. Two cars get assigned the same spot (race condition). The display shows -3 available spots. A customer with a lost ticket crashes the system with <code>KeyNotFoundException</code>. The developer says "but it worked in testing!" Yes &mdash; with one gate and no edge cases.
         </div>
+
         <div class="callout callout-warning" style="margin-top:0.5rem;">
-          <i class="fa-solid fa-clock icon-gap"></i>
-          <strong>The moment it dies:</strong> First week in production. Monday morning rush. 3 entry gates. Two cars get assigned the same spot (race condition). The display shows -3 available spots. A customer with a lost ticket crashes the system with <code>KeyNotFoundException</code>. The developer says "but it worked in testing!" Yes — with one gate and no edge cases.
+          <i class="fa-solid fa-search icon-gap"></i>
+          <strong>How to Spot This in Your Code:</strong> For every method, ask three questions: (1) What happens if two threads call this at the same time? (2) What happens if the input doesn't exist? (3) What happens if this runs in a different timezone? If you can't answer all three, you've got a Happy-Path Hero.
         </div>
-        <p class="body-text" style="margin-top:0.75rem;"><strong>Lesson:</strong> Clean code ≠ robust code. Good patterns don't excuse missing thread safety, edge cases, and proper error handling. This solution is the most <em>dangerous</em> of the three — because it <strong>looks professional</strong> and passes code review.</p>
+
+        <p class="body-text" style="margin-top:0.75rem;"><strong>Lesson:</strong> Clean code is necessary but not sufficient. Good patterns don't excuse missing thread safety, edge cases, and proper error handling. This solution is the most <em>dangerous</em> of the three &mdash; because it <strong>looks professional</strong> and passes code review. The wolf in sheep's clothing.</p>
       </div>
     </div>
 
@@ -4693,10 +5023,27 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> Does this need a new enum value, a new class, or both? Does charging introduce new BEHAVIOR?</div>
           <div class="body-text">
-            <p><strong>Answer:</strong> Add <code>ElectricVehicle</code> to the <code>VehicleType</code> enum, add its mapping in <span class="tooltip-trigger"><code>SpotSizeMapping</code><span class="tooltip-content">A static class with a FrozenDictionary mapping VehicleType → SpotSize. Adding a new vehicle type is one new dictionary entry — no if/else chains. FrozenDictionary (new in .NET 8) is optimized for read-heavy scenarios with zero writes.</span></span>. Since EVs need charging spots, add <code>Charging</code> to <code>SpotSize</code>.</p>
-            <p><strong>Great Answer:</strong> "If charging is just a spot type — enum values. But if EVs have BEHAVIOR differences (charging session management, billing for electricity), that's when VehicleType might graduate from an enum to a class hierarchy. Right now, I'd keep it simple with enums and only refactor if charging introduces actual behavior. YAGNI."</p>
+            <p>Think about how a real parking lot adds EV charging spots. They don't redesign the entire lot &mdash; they paint new markings on a few existing spots and install chargers. The structure of the lot stays the same; they just add a new category of spot. Your code should work the same way.</p>
+            <p><strong>Answer:</strong> Add <code>ElectricVehicle</code> to the <code>VehicleType</code> enum, add its mapping in <span class="tooltip-trigger"><code>SpotSizeMapping</code><span class="tooltip-content">A static class with a FrozenDictionary mapping VehicleType &rarr; SpotSize. Adding a new vehicle type is one new dictionary entry &mdash; no if/else chains. FrozenDictionary (new in .NET 8) is optimized for read-heavy scenarios with zero writes.</span></span>. Since EVs need charging spots, add <code>Charging</code> to <code>SpotSize</code>. That's two enum values and one dictionary entry &mdash; zero changes to existing code.</p>
+            <p><strong>Great Answer:</strong> "If charging is just a spot type &mdash; enum values. But if EVs have BEHAVIOR differences (charging session management, billing for electricity), that's when VehicleType might graduate from an enum to a class hierarchy. Right now, I'd keep it simple with enums and only refactor if charging introduces actual behavior. YAGNI."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Adding EV Support &mdash; 3 Lines of Change</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// Step 1: Add to enum
+public enum VehicleType { Motorcycle, Car, Van, Truck, ElectricVehicle }
+public enum SpotSize    { Compact, Regular, Large, Charging }
+
+// Step 2: Add one mapping entry
+SpotSizeMapping: { VehicleType.ElectricVehicle, SpotSize.Charging }
+
+// That's it. ParkingLot, IPricingStrategy, Floor -- zero changes.</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Adding a type is one enum value + one dictionary entry. If it needs behavior, I'd refactor then — not preemptively."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Adding a type is one enum value + one dictionary entry. If it needs behavior, I'd refactor then &mdash; not preemptively."</div>
         </div>
       </div>
     </div>
@@ -4712,12 +5059,64 @@ public sealed class ParkingLotService(
       </div>
       <div class="qa-body">
         <div class="qa-content">
-          <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> What's the actual dangerous operation? It's not reading — it's the compound read-then-write.</div>
+          <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> What's the actual dangerous operation? It's not reading &mdash; it's the compound read-then-write.</div>
           <div class="body-text">
+            <p>Think of it like a bathroom with a lock. If two people check "is the bathroom free?" at the same time, both see "free," and both walk in. The problem isn't the checking or the walking &mdash; it's the gap between checking and walking. A lock removes the gap by making "check + enter" a single atomic action.</p>
             <p><strong>Answer:</strong> Use a <code>lock</code> around the find-and-occupy operation. <code>ConcurrentDictionary</code> for individual lookups.</p>
-            <p><strong>Great Answer:</strong> "<code>ConcurrentDictionary</code> alone isn't enough — it handles individual operations but not compound ones. The find-a-free-spot-then-mark-it-occupied is a two-step <span class="tooltip-trigger">TOCTOU<span class="tooltip-content">Time-Of-Check to Time-Of-Use — a race condition where the state changes between checking a condition and acting on it. Thread A checks "spot available?" (yes) → Thread B grabs the spot → Thread A assigns the now-taken spot. The lock makes check+assign atomic.</span></span> problem. I use <code>lock</code> to make it atomic. The lock scope is minimal — just the compound operation. Pure calculations like fee calculation don't need locking."</p>
+            <p><strong>Great Answer:</strong> "<code>ConcurrentDictionary</code> alone isn't enough &mdash; it handles individual operations but not compound ones. The find-a-free-spot-then-mark-it-occupied is a two-step <span class="tooltip-trigger">TOCTOU<span class="tooltip-content">Time-Of-Check to Time-Of-Use &mdash; a race condition where the state changes between checking a condition and acting on it. Thread A checks "spot available?" (yes) &rarr; Thread B grabs the spot &rarr; Thread A assigns the now-taken spot. The lock makes check+assign atomic.</span></span> problem. I use <code>lock</code> to make it atomic. The lock scope is minimal &mdash; just the compound operation. Pure calculations like fee calculation don't need locking."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Thread Safety: What to Lock and What NOT to Lock</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">private readonly Lock _lock = new();
+
+// MUST lock: compound operation (find + assign)
+public ParkingTicket? TryPark(string plate, VehicleType type)
+{
+    lock (_lock)  // Only this compound section needs protection
+    {
+        var spot = _spots.Values.FirstOrDefault(s =&gt; s.IsAvailable &amp;&amp; s.Size == size);
+        if (spot is null) return null;
+        spot.Assign();  // find + assign is now ATOMIC
+        return new ParkingTicket(...);
+    }
+}
+
+// NO lock needed: pure calculation with no shared state
+public decimal Calculate(TimeSpan duration)
+    =&gt; (decimal)Math.Ceiling(duration.TotalHours) * _ratePerHour;</code></pre>
+              </div>
+            </div>
+
+            <!-- SVG: Lock scope diagram -->
+            <svg viewBox="0 0 720 180" role="img" aria-label="Diagram showing which operations need locking (compound find+assign) versus which don't (pure calculations)" style="width:100%; max-width:720px; margin:0.75rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+              <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+              <!-- Lock needed zone -->
+              <rect x="20" y="15" width="340" height="150" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6"/>
+              <text x="190" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#ef4444">MUST Lock (Shared Mutable State)</text>
+              <rect x="40" y="50" width="140" height="34" rx="6" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1"/>
+              <text x="110" y="72" text-anchor="middle" font-size="10" fill="var(--text-primary)">Find free spot</text>
+              <text x="195" y="72" text-anchor="middle" font-size="14" fill="#ef4444">+</text>
+              <rect x="210" y="50" width="130" height="34" rx="6" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1"/>
+              <text x="275" y="72" text-anchor="middle" font-size="10" fill="var(--text-primary)">Mark occupied</text>
+              <rect x="40" y="96" width="300" height="28" rx="6" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+              <text x="190" y="115" text-anchor="middle" font-size="10" fill="#ef4444">lock(_lock) { find + assign } = ATOMIC</text>
+              <text x="190" y="150" text-anchor="middle" font-size="9" fill="var(--text-muted)">Without lock: two threads both "find" same spot</text>
+              <!-- No lock zone -->
+              <rect x="390" y="15" width="310" height="150" rx="10" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="6"/>
+              <text x="545" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#22c55e">NO Lock Needed (Pure / Read-Only)</text>
+              <rect x="410" y="50" width="130" height="34" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+              <text x="475" y="72" text-anchor="middle" font-size="10" fill="var(--text-primary)">Calculate fee</text>
+              <rect x="550" y="50" width="130" height="34" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+              <text x="615" y="72" text-anchor="middle" font-size="10" fill="var(--text-primary)">Generate receipt</text>
+              <rect x="410" y="96" width="270" height="28" rx="6" fill="rgba(34,197,94,0.08)" stroke="#22c55e" stroke-width="1"/>
+              <text x="545" y="115" text-anchor="middle" font-size="10" fill="#22c55e">No shared state modified = safe without lock</text>
+              <text x="545" y="150" text-anchor="middle" font-size="9" fill="var(--text-muted)">Over-locking hurts performance unnecessarily</text>
+            </svg>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "ConcurrentDictionary handles individual ops. Lock handles compound ops. Minimal lock scope."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "ConcurrentDictionary handles individual ops. Lock handles compound ops. Minimal lock scope &mdash; only protect the critical section, not the whole method."</div>
         </div>
       </div>
     </div>
@@ -4735,10 +5134,37 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> Is weekend pricing a NEW algorithm, or a MODIFIER on an existing one?</div>
           <div class="body-text">
+            <p>Think about how coffee shops handle pricing. A "large" upcharge doesn't change the recipe &mdash; it modifies the base price. Weekend pricing works the same way: it doesn't replace hourly or tiered pricing, it wraps around them with a multiplier. The question is whether you create a whole new algorithm or add a modifier to an existing one.</p>
             <p><strong>Answer:</strong> Create a new class implementing <code>IPricingStrategy</code>. Register it in DI. Zero changes to existing code.</p>
-            <p><strong>Great Answer:</strong> "Weekend pricing is actually a <span class="tooltip-trigger">Decorator<span class="tooltip-content">A pattern that wraps an existing object to add behavior without modifying it. Here, WeekendSurchargePricing wraps any IPricingStrategy, multiplying its result on weekends. You get N×M combinations (N strategies × M decorators) without creating N×M classes.</span></span> — it wraps an existing strategy with a multiplier. <code>WeekendSurchargePricing</code> takes an <code>IPricingStrategy inner</code> and multiplies the base fee on weekends. This way, we can combine 'hourly + weekend' or 'tiered + weekend' without writing HourlyWeekend, TieredWeekend, etc. Composition over <span class="tooltip-trigger">combinatorial explosion<span class="tooltip-content">Without Decorator, adding M modifiers to N strategies requires N×M classes: HourlyWeekend, HourlyHoliday, FlatRateWeekend, FlatRateHoliday... With Decorator, you have N + M classes that compose freely.</span></span>."</p>
+            <p><strong>Great Answer:</strong> "Weekend pricing is actually a <span class="tooltip-trigger">Decorator<span class="tooltip-content">A pattern that wraps an existing object to add behavior without modifying it. Here, WeekendSurchargePricing wraps any IPricingStrategy, multiplying its result on weekends. You get N&times;M combinations (N strategies &times; M decorators) without creating N&times;M classes.</span></span> &mdash; it wraps an existing strategy with a multiplier. <code>WeekendSurchargePricing</code> takes an <code>IPricingStrategy inner</code> and multiplies the base fee on weekends. This way, we can combine 'hourly + weekend' or 'tiered + weekend' without writing HourlyWeekend, TieredWeekend, etc. Composition over <span class="tooltip-trigger">combinatorial explosion<span class="tooltip-content">Without Decorator, adding M modifiers to N strategies requires N&times;M classes: HourlyWeekend, HourlyHoliday, FlatRateWeekend, FlatRateHoliday... With Decorator, you have N + M classes that compose freely.</span></span>."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Weekend Pricing as a Decorator</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// The Decorator wraps any existing strategy -- no changes to HourlyPricing!
+public sealed class WeekendSurchargePricing(
+    IPricingStrategy inner,
+    decimal weekendMultiplier = 1.5m,
+    TimeProvider clock) : IPricingStrategy
+{
+    public decimal Calculate(TimeSpan duration)
+    {
+        var baseFee = inner.Calculate(duration);  // delegate to wrapped strategy
+        var isWeekend = clock.GetUtcNow().DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+        return isWeekend ? baseFee * weekendMultiplier : baseFee;
+    }
+}
+
+// DI registration -- compose like Lego blocks:
+// Hourly + Weekend surcharge
+builder.Services.AddSingleton&lt;IPricingStrategy&gt;(
+    new WeekendSurchargePricing(new HourlyPricing(5.00m), 1.5m, TimeProvider.System));</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "New algorithm → new Strategy class. Modifier → Decorator wrapping existing strategy."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "New algorithm &rarr; new Strategy class. Modifier &rarr; Decorator wrapping existing strategy. Composition, not combinatorial explosion."</div>
         </div>
       </div>
     </div>
@@ -4756,10 +5182,35 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> The ticket ID is the key to finding the entry record. Without it, how do we identify the vehicle?</div>
           <div class="body-text">
+            <p>This happens all the time in real parking garages. You've probably seen the sign: "Lost ticket? Pay maximum daily rate." The garage doesn't shrug and give up &mdash; it has a backup plan. Your system should too. The question tests whether you think about real-world failure scenarios, not just the happy path.</p>
             <p><strong>Answer:</strong> Look up by license plate in the active tickets. Charge the maximum daily rate as a penalty.</p>
-            <p><strong>Great Answer:</strong> "Two approaches: (1) Look up by license plate — we store it in the ticket. Charge maximum daily rate. (2) Look up by spot — if they remember the floor/section. Either way, this is an edge case I'd handle in Exit() with a separate <code>ExitByPlate(string plate)</code> method. The key insight: we stored the license plate in the ticket for exactly this reason."</p>
+            <p><strong>Great Answer:</strong> "Two approaches: (1) Look up by license plate &mdash; we store it in the ticket. Charge maximum daily rate. (2) Look up by spot &mdash; if they remember the floor/section. Either way, this is an edge case I'd handle with a separate <code>ExitByPlate(string plate)</code> method. The key insight: we stored the license plate in the ticket for exactly this reason. Forward-thinking data design makes edge-case handling trivial."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Lost Ticket Fallback</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// Normal exit: by ticket ID (O(1) lookup)
+public ParkingReceipt? TryExit(string ticketId) { ... }
+
+// Lost ticket: by license plate (scan active tickets)
+public ParkingReceipt? ExitByPlate(string plate)
+{
+    var ticket = _tickets.Values.FirstOrDefault(t =&gt; t.Plate == plate);
+    if (ticket is null) return null;  // not found at all
+
+    // Apply lost-ticket penalty: charge max daily rate
+    var maxDailyFee = 50.00m;  // configurable via IOptions
+    _tickets.TryRemove(ticket.TicketId, out _);
+    _spots[ticket.SpotId].Release();
+    return new ParkingReceipt(ticket, _clock.GetUtcNow(),
+        _clock.GetUtcNow() - ticket.EntryTime, maxDailyFee);
+}</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "License plate lookup as fallback. We planned for this by storing the plate in the ticket."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "License plate lookup as fallback. We planned for this by storing the plate in the ticket. Max daily rate penalty &mdash; just like real garages."</div>
         </div>
       </div>
     </div>
@@ -4777,10 +5228,37 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> What distinguishes records from classes in C#? When does immutability matter?</div>
           <div class="body-text">
-            <p><strong>Answer:</strong> Tickets are immutable after creation — records enforce this at the type level.</p>
-            <p><strong>Great Answer:</strong> "A ticket represents a historical event — 'Car ABC entered at 2:30 PM in spot R-5.' That fact should NEVER change. Records give me: <span class="tooltip-trigger">immutability by default<span class="tooltip-content">C# records with positional syntax (record Foo(int X)) generate init-only properties. Once created, the values can't change. This prevents accidental mutation — no one can "update" an entry time after the fact.</span></span>, <span class="tooltip-trigger">value equality<span class="tooltip-content">Unlike classes (reference equality — same object in memory?), records compare by VALUE (same data?). Two ParkingTicket instances with identical fields are Equal. This makes testing easier and dictionary lookups intuitive.</span></span> (two tickets with the same data are equal), and built-in <code>ToString()</code> for logging. Classes would let someone accidentally mutate the entry time. The compiler should prevent bugs, not just comments."</p>
+            <p>Think of a parking ticket as a printed receipt. Once the printer creates it, the text can't change &mdash; "Car ABC entered at 2:30 PM in spot R-5" is a historical fact. If someone could scribble on the receipt and change the entry time to 1:00 PM, the entire billing system breaks. Records are the programming equivalent of that printed receipt: once created, the data is locked in.</p>
+            <p><strong>Answer:</strong> Tickets are immutable after creation &mdash; records enforce this at the type level.</p>
+            <p><strong>Great Answer:</strong> "A ticket represents a historical event &mdash; 'Car ABC entered at 2:30 PM in spot R-5.' That fact should NEVER change. Records give me: <span class="tooltip-trigger">immutability by default<span class="tooltip-content">C# records with positional syntax (record Foo(int X)) generate init-only properties. Once created, the values can't change. This prevents accidental mutation &mdash; no one can "update" an entry time after the fact.</span></span>, <span class="tooltip-trigger">value equality<span class="tooltip-content">Unlike classes (reference equality &mdash; same object in memory?), records compare by VALUE (same data?). Two ParkingTicket instances with identical fields are Equal. This makes testing easier and dictionary lookups intuitive.</span></span> (two tickets with the same data are equal), and built-in <code>ToString()</code> for logging. Classes would let someone accidentally mutate the entry time. The compiler should prevent bugs, not just comments."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Record vs. Class &mdash; Why It Matters for Tickets</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// Record: immutable by default -- entry time can NEVER be modified
+public record ParkingTicket(
+    string TicketId, string Plate, VehicleType Type,
+    string SpotId, DateTimeOffset EntryTime);
+
+var ticket = new ParkingTicket("T1", "ABC-123", VehicleType.Car, "R-5",
+    DateTimeOffset.UtcNow);
+// ticket.EntryTime = someOtherTime;  // Compiler ERROR! Can't mutate.
+
+// Class: mutable by default -- anyone can change anything
+public class MutableTicket
+{
+    public string TicketId { get; set; }     // anyone can change this
+    public DateTimeOffset EntryTime { get; set; }  // billing fraud waiting to happen
+}
+
+var bad = new MutableTicket { TicketId = "T1", EntryTime = DateTimeOffset.UtcNow };
+bad.EntryTime = DateTimeOffset.MinValue;  // Compiles fine. Billing: $0.00.</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Records for immutable data snapshots. Classes for things with behavior and mutable state."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Records for immutable data snapshots. Classes for things with behavior and mutable state. Let the compiler enforce what comments can't."</div>
         </div>
       </div>
     </div>
@@ -4798,8 +5276,64 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> What changes when you go from in-memory to persistent? From single-service to distributed?</div>
           <div class="body-text">
+            <p>This is the bridge question between LLD and HLD. The interviewer wants to see if you can zoom out from code to architecture. Think of it like running a single coffee shop versus a chain of 50. The coffee recipe (your LLD) doesn't change. What changes is the logistics: inventory tracking across locations, a central dashboard, delivery routing. Same product, different infrastructure.</p>
             <p><strong>Answer:</strong> Database for persistence. Each lot as a microservice. API Gateway for routing.</p>
-            <p><strong>Great Answer:</strong> "Step 1: Persist to <span class="tooltip-trigger">PostgreSQL<span class="tooltip-content">A popular open-source relational database. Our record types map naturally to rows — ParkingTicket becomes a tickets table, ParkingReceipt becomes a receipts table. EF Core handles the mapping.</span></span> — our records map cleanly to tables. Step 2: Each lot is an instance of the same service with a lot ID. Step 3: <span class="tooltip-trigger">API Gateway<span class="tooltip-content">A single entry point that routes requests to the correct backend service. Instead of clients knowing about 50 lot URLs, they call one gateway. Routes like /lots/{lotId}/entry get forwarded to the right lot service instance.</span></span> routes <code>/lots/{lotId}/entry</code> to the right instance. Step 4: Entry/exit events published to a <span class="tooltip-trigger">message bus<span class="tooltip-content">Infrastructure that decouples producers and consumers. The parking lot publishes events without knowing who listens. Dashboard, display boards, and analytics each subscribe independently. Examples: RabbitMQ, Azure Service Bus, Apache Kafka.</span></span> — dashboard service subscribes for analytics, display boards subscribe for availability via SignalR. The LLD code barely changes — Strategy and DI mean swapping in-memory for DB is a config change, not a rewrite."</p>
+            <p><strong>Great Answer:</strong> "Step 1: Persist to <span class="tooltip-trigger">PostgreSQL<span class="tooltip-content">A popular open-source relational database. Our record types map naturally to rows &mdash; ParkingTicket becomes a tickets table, ParkingReceipt becomes a receipts table. EF Core handles the mapping.</span></span> &mdash; our records map cleanly to tables. Step 2: Each lot is an instance of the same service with a lot ID. Step 3: <span class="tooltip-trigger">API Gateway<span class="tooltip-content">A single entry point that routes requests to the correct backend service. Instead of clients knowing about 50 lot URLs, they call one gateway. Routes like /lots/{lotId}/entry get forwarded to the right lot service instance.</span></span> routes <code>/lots/{lotId}/entry</code> to the right instance. Step 4: Entry/exit events published to a <span class="tooltip-trigger">message bus<span class="tooltip-content">Infrastructure that decouples producers and consumers. The parking lot publishes events without knowing who listens. Dashboard, display boards, and analytics each subscribe independently. Examples: RabbitMQ, Azure Service Bus, Apache Kafka.</span></span> &mdash; dashboard service subscribes for analytics, display boards subscribe for availability via SignalR. The LLD code barely changes &mdash; Strategy and DI mean swapping in-memory for DB is a config change, not a rewrite."</p>
+
+            <!-- SVG: Scaling Architecture -->
+            <svg viewBox="0 0 720 320" role="img" aria-label="Architecture diagram showing how the parking lot system scales from a single service to 50 lots with API gateway, database, and message bus" style="width:100%; max-width:720px; margin:0.75rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="pl-q6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+              </defs>
+              <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+              <!-- Mobile/Web clients -->
+              <rect x="20" y="20" width="100" height="40" rx="8" fill="rgba(96,165,250,0.12)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+              <text x="70" y="45" text-anchor="middle" font-size="10" fill="var(--text-primary)">Mobile App</text>
+              <rect x="20" y="70" width="100" height="40" rx="8" fill="rgba(96,165,250,0.12)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+              <text x="70" y="95" text-anchor="middle" font-size="10" fill="var(--text-primary)">Web Dashboard</text>
+              <!-- API Gateway -->
+              <line x1="120" y1="45" x2="175" y2="105" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q6-arr)"/>
+              <line x1="120" y1="90" x2="175" y2="105" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q6-arr)"/>
+              <rect x="180" y="82" width="120" height="46" rx="10" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1.5"/>
+              <text x="240" y="104" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)">API Gateway</text>
+              <text x="240" y="120" text-anchor="middle" font-size="8" fill="var(--text-muted)">/lots/{lotId}/...</text>
+              <!-- Lot services -->
+              <line x1="300" y1="95" x2="360" y2="45" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q6-arr)"/>
+              <line x1="300" y1="105" x2="360" y2="105" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q6-arr)"/>
+              <line x1="300" y1="115" x2="360" y2="165" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q6-arr)"/>
+              <rect x="365" y="25" width="130" height="38" rx="8" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1.2"/>
+              <text x="430" y="42" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)">Lot Service #1</text>
+              <text x="430" y="56" text-anchor="middle" font-size="8" fill="var(--text-muted)">Same LLD code</text>
+              <rect x="365" y="86" width="130" height="38" rx="8" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1.2"/>
+              <text x="430" y="103" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)">Lot Service #2</text>
+              <text x="430" y="117" text-anchor="middle" font-size="8" fill="var(--text-muted)">Same LLD code</text>
+              <rect x="365" y="147" width="130" height="38" rx="8" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1.2" stroke-dasharray="4"/>
+              <text x="430" y="164" text-anchor="middle" font-size="10" fill="var(--text-muted)">... Lot #50</text>
+              <text x="430" y="178" text-anchor="middle" font-size="8" fill="var(--text-muted)">Same LLD code</text>
+              <!-- Database -->
+              <line x1="495" y1="105" x2="555" y2="105" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q6-arr)"/>
+              <rect x="560" y="78" width="130" height="55" rx="10" fill="rgba(245,158,11,0.1)" stroke="#f59e0b" stroke-width="1.2"/>
+              <text x="625" y="100" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)">PostgreSQL</text>
+              <text x="625" y="116" text-anchor="middle" font-size="8" fill="var(--text-muted)">tickets, receipts, spots</text>
+              <text x="625" y="128" text-anchor="middle" font-size="8" fill="var(--text-muted)">per-lot partitioned</text>
+              <!-- Message Bus -->
+              <rect x="200" y="210" width="490" height="42" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.2"/>
+              <text x="445" y="230" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)">Message Bus (RabbitMQ / Azure Service Bus)</text>
+              <text x="445" y="246" text-anchor="middle" font-size="8" fill="var(--text-muted)">VehicleEntered, VehicleExited events</text>
+              <line x1="430" y1="186" x2="430" y2="208" stroke="#ef4444" stroke-width="1" marker-end="url(#pl-q6-arr)"/>
+              <!-- Subscribers -->
+              <line x1="300" y1="252" x2="300" y2="275" stroke="#ef4444" stroke-width="1" marker-end="url(#pl-q6-arr)"/>
+              <rect x="230" y="278" width="120" height="30" rx="6" fill="rgba(96,165,250,0.08)" stroke="var(--accent-primary)" stroke-width="1"/>
+              <text x="290" y="298" text-anchor="middle" font-size="9" fill="var(--text-primary)">Analytics Service</text>
+              <line x1="450" y1="252" x2="450" y2="275" stroke="#ef4444" stroke-width="1" marker-end="url(#pl-q6-arr)"/>
+              <rect x="380" y="278" width="120" height="30" rx="6" fill="rgba(96,165,250,0.08)" stroke="var(--accent-primary)" stroke-width="1"/>
+              <text x="440" y="298" text-anchor="middle" font-size="9" fill="var(--text-primary)">Display Boards</text>
+              <line x1="590" y1="252" x2="590" y2="275" stroke="#ef4444" stroke-width="1" marker-end="url(#pl-q6-arr)"/>
+              <rect x="530" y="278" width="120" height="30" rx="6" fill="rgba(96,165,250,0.08)" stroke="var(--accent-primary)" stroke-width="1"/>
+              <text x="590" y="298" text-anchor="middle" font-size="9" fill="var(--text-primary)">Notifications</text>
+            </svg>
+
+            <p class="body-text">Notice the key insight in the diagram: every lot service runs <strong>the exact same LLD code</strong> we built. The only thing that changes is the infrastructure around it &mdash; database instead of in-memory dictionaries, message bus instead of direct method calls, API Gateway for routing. This is why good LLD matters for scalability: if your classes depend on interfaces (Strategy + DI), swapping implementations is a configuration change, not a rewrite.</p>
           </div>
           <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Good LLD makes scaling a config change. Strategy + DI = swap storage and transport without touching business logic."</div>
         </div>
@@ -4819,10 +5353,46 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> The car is at the exit. Payment failed. Do we let them leave? Do we keep the spot occupied?</div>
           <div class="body-text">
+            <p>Think about what happens at a toll booth when a credit card declines. They don't block the highway forever. They note the license plate, let the car through, and send a bill later. Customer safety and traffic flow matter more than immediate payment. Your parking system should follow the same principle.</p>
             <p><strong>Answer:</strong> Retry payment. If still failing, issue a "pay later" voucher and raise the barrier. Don't hold the car hostage.</p>
-            <p><strong>Great Answer:</strong> "I'd separate the exit operation into two phases: (1) Calculate fee + attempt payment (can fail), (2) Release spot + open barrier (only after payment or override). If payment fails: retry once, then fall back to a 'deferred payment' record linked to the license plate. The car leaves, the spot is released, and the unpaid fee is tracked for follow-up. The key: never keep the barrier closed indefinitely — safety and customer experience trump revenue collection."</p>
+            <p><strong>Great Answer:</strong> "I'd separate the exit operation into two phases: (1) Calculate fee + attempt payment (can fail), (2) Release spot + open barrier (only after payment or override). If payment fails: retry once, then fall back to a 'deferred payment' record linked to the license plate. The car leaves, the spot is released, and the unpaid fee is tracked for follow-up. The key: never keep the barrier closed indefinitely &mdash; safety and customer experience trump revenue collection."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Two-Phase Exit with Payment Failure Handling</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public async Task&lt;ExitResult&gt; ProcessExit(string ticketId)
+{
+    // Phase 1: Calculate fee + attempt payment
+    var ticket = _tickets[ticketId];
+    var fee = _pricing.Calculate(ticket.EntryTime, _clock.GetUtcNow());
+
+    var paymentResult = await _paymentService.TryCharge(fee);
+    if (!paymentResult.Success)
+    {
+        // Retry once
+        paymentResult = await _paymentService.TryCharge(fee);
+    }
+
+    // Phase 2: Release spot regardless of payment outcome
+    _spots[ticket.SpotId].Release();
+    _tickets.TryRemove(ticketId, out _);
+
+    if (!paymentResult.Success)
+    {
+        // Deferred payment -- car leaves, fee tracked for follow-up
+        await _deferredPayments.Record(ticket.Plate, fee, _clock.GetUtcNow());
+        return ExitResult.DeferredPayment(ticket, fee);
+    }
+
+    return ExitResult.Paid(ticket, fee, paymentResult.TransactionId);
+    // NEVER: keep barrier closed indefinitely. Safety first.
+}</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Separate calculation from barrier control. Never hold cars hostage. Deferred payment for failures."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Separate calculation from barrier control. Never hold cars hostage. Deferred payment for failures &mdash; track by plate, bill later."</div>
         </div>
       </div>
     </div>
@@ -4840,10 +5410,35 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> What's the deciding factor between enum and class hierarchy?</div>
           <div class="body-text">
-            <p><strong>Answer:</strong> Vehicle types have no different behavior — they're categories. Enums are the right abstraction.</p>
-            <p><strong>Great Answer:</strong> "The test is: does the type override any behavior? A Motorcycle doesn't park() differently from a Car — it just needs a different sized spot. That's DATA, not behavior. Enums express this perfectly. If we later needed EVs with charging logic or motorcycles that share spots, THAT introduces behavior — and that's when we'd refactor to a hierarchy. But YAGNI: solve the problem you have, not the problem you might have."</p>
+            <p>This question is about one of the most important judgment calls in OOP: when does a "type" deserve its own class versus being a simple label? Think about T-shirt sizes. Small, Medium, Large, XL &mdash; they're not different kinds of shirts with different behavior. They're the same shirt in different sizes. You wouldn't create <code>class SmallShirt : Shirt</code>. You'd use an enum. Vehicle types in a parking lot work the same way.</p>
+            <p><strong>Answer:</strong> Vehicle types have no different behavior &mdash; they're categories. Enums are the right abstraction.</p>
+            <p><strong>Great Answer:</strong> "The test is: does the type override any behavior? A Motorcycle doesn't <code>park()</code> differently from a Car &mdash; it just needs a different sized spot. That's DATA, not behavior. Enums express this perfectly. If we later needed EVs with charging logic or motorcycles that share spots, THAT introduces behavior &mdash; and that's when we'd refactor to a hierarchy. But YAGNI: solve the problem you have, not the problem you might have."</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">The Decision Test: Data vs. Behavior</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// DATA difference (spot size) -- use enum
+public enum VehicleType { Motorcycle, Car, Van, Truck }
+// One mapping table handles everything:
+SpotSizeMapping: { Motorcycle &rarr; Compact, Car &rarr; Regular, Truck &rarr; Large }
+
+// BEHAVIOR difference (if EVs needed charging sessions) -- THEN use classes
+public abstract class Vehicle(string Plate)
+{
+    public abstract Task OnPark(ParkingSpot spot);  // different behavior per type
+}
+public class ElectricVehicle(string Plate) : Vehicle(Plate)
+{
+    public override async Task OnPark(ParkingSpot spot)
+        =&gt; await spot.StartChargingSession();  // EVs do something DIFFERENT
+}
+// But we don't have this requirement NOW -- so we use enums. YAGNI.</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Different behavior → classes. Different data → enums. Currently just data."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Different behavior &rarr; classes. Different data &rarr; enums. Currently just data. I'd refactor to classes only if a new type introduces genuinely different behavior."</div>
         </div>
       </div>
     </div>
@@ -4861,10 +5456,75 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> "Real-time" means push, not poll. What events trigger display updates?</div>
           <div class="body-text">
+            <p>When you see "Available: 42 spots" on a highway sign for a parking garage, that number updates the instant a car enters or exits. It doesn't refresh every 30 seconds &mdash; it changes immediately. That's push-based (event-driven), not pull-based (polling). Your system needs the same behavior: when something happens, tell everyone who cares, right now.</p>
             <p><strong>Answer:</strong> Publish events on entry/exit. Display board subscribes via WebSocket/SignalR.</p>
-            <p><strong>Great Answer:</strong> "I'd introduce an <code>IParkingEventPublisher</code> interface. After each entry/exit, the service publishes a <code>VehicleEnteredEvent</code> or <code>VehicleExitedEvent</code>. The display board subscribes via SignalR. In LLD, the publisher is an interface — the implementation could be in-memory <code>Channel&lt;T&gt;</code> for single-lot or RabbitMQ for multi-lot. The service doesn't know or care. Observer pattern at the infrastructure level."</p>
+            <p><strong>Great Answer:</strong> "I'd introduce an <code>IParkingEventPublisher</code> interface. After each entry/exit, the service publishes a <code>VehicleEnteredEvent</code> or <code>VehicleExitedEvent</code>. The display board subscribes via SignalR. In LLD, the publisher is an interface &mdash; the implementation could be in-memory <code>Channel&lt;T&gt;</code> for single-lot or RabbitMQ for multi-lot. The service doesn't know or care. Observer pattern at the infrastructure level."</p>
+
+            <!-- SVG: Event-Driven Display Architecture -->
+            <svg viewBox="0 0 720 230" role="img" aria-label="Diagram showing how parking events flow from the ParkingLot service through an event publisher to multiple subscribers like display boards and analytics" style="width:100%; max-width:720px; margin:0.75rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="pl-q9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+              </defs>
+              <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+              <!-- ParkingLot Service -->
+              <rect x="20" y="70" width="140" height="70" rx="10" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="90" y="96" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)">ParkingLot</text>
+              <text x="90" y="114" text-anchor="middle" font-size="9" fill="var(--text-muted)">TryPark() / TryExit()</text>
+              <text x="90" y="130" text-anchor="middle" font-size="9" fill="#22c55e">fires events</text>
+              <!-- Arrow to publisher -->
+              <line x1="160" y1="105" x2="220" y2="105" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#pl-q9-arr)"/>
+              <!-- Event Publisher -->
+              <rect x="225" y="60" width="170" height="90" rx="10" fill="rgba(168,85,247,0.08)" stroke="#a855f7" stroke-width="1.5"/>
+              <text x="310" y="88" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)">IParkingEventPublisher</text>
+              <text x="310" y="106" text-anchor="middle" font-size="9" fill="var(--text-muted)">VehicleEnteredEvent</text>
+              <text x="310" y="120" text-anchor="middle" font-size="9" fill="var(--text-muted)">VehicleExitedEvent</text>
+              <text x="310" y="140" text-anchor="middle" font-size="8" fill="#a855f7">Channel&lt;T&gt; or RabbitMQ</text>
+              <!-- Arrows to subscribers -->
+              <line x1="395" y1="85" x2="470" y2="40" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q9-arr)"/>
+              <line x1="395" y1="105" x2="470" y2="105" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q9-arr)"/>
+              <line x1="395" y1="125" x2="470" y2="170" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#pl-q9-arr)"/>
+              <!-- Subscribers -->
+              <rect x="475" y="18" width="220" height="44" rx="8" fill="rgba(96,165,250,0.1)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+              <text x="585" y="38" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)">Display Boards (SignalR)</text>
+              <text x="585" y="54" text-anchor="middle" font-size="8" fill="var(--text-muted)">"Available: 42 spots" &mdash; updates instantly</text>
+              <rect x="475" y="84" width="220" height="44" rx="8" fill="rgba(96,165,250,0.1)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+              <text x="585" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)">Mobile App (WebSocket)</text>
+              <text x="585" y="120" text-anchor="middle" font-size="8" fill="var(--text-muted)">Push notification: "Your spot is ready"</text>
+              <rect x="475" y="150" width="220" height="44" rx="8" fill="rgba(96,165,250,0.1)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+              <text x="585" y="170" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)">Analytics Service</text>
+              <text x="585" y="186" text-anchor="middle" font-size="8" fill="var(--text-muted)">Peak hours, utilization, revenue</text>
+              <!-- Key insight -->
+              <text x="360" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-muted)">ParkingLot doesn't know WHO listens &mdash; it just publishes. Observer pattern at infrastructure level.</text>
+            </svg>
+
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Event Publisher Interface + SignalR Subscriber</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// The interface -- ParkingLot depends on this, not the implementation
+public interface IParkingEventPublisher
+{
+    Task PublishAsync(ParkingEvent evt);
+}
+
+// In ParkingLot.TryPark():
+await _eventPublisher.PublishAsync(
+    new VehicleEnteredEvent(ticket.SpotId, ticket.Plate, DateTimeOffset.UtcNow));
+
+// SignalR hub -- display board subscribes here
+public class ParkingHub : Hub
+{
+    public async Task OnVehicleEntered(VehicleEnteredEvent evt)
+        =&gt; await Clients.All.SendAsync("SpotUpdate", new { Available = currentCount });
+}
+
+// Implementation swap: Channel&lt;T&gt; for dev, RabbitMQ for prod -- zero code changes</code></pre>
+              </div>
+            </div>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Event-driven: publish on entry/exit, display subscribes. Interface means transport is swappable."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Event-driven: publish on entry/exit, display subscribes. Interface means transport is swappable &mdash; Channel for dev, RabbitMQ for prod."</div>
         </div>
       </div>
     </div>
@@ -4882,10 +5542,103 @@ public sealed class ParkingLotService(
         <div class="qa-content">
           <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think:</strong> Current system is in-memory. What happens to active tickets if the server restarts?</div>
           <div class="body-text">
+            <p>Imagine a power outage at a parking garage. The barrier is down, the display is off. When power comes back, the system needs to know: which cars are currently inside? What time did they enter? Which spots are occupied? If all that data was only in RAM, it's gone. The garage has no idea what's happening inside it.</p>
+            <p>This question tests whether you understand the difference between volatile (in-memory) and durable (persisted) state, and what trade-offs come with each persistence strategy.</p>
             <p><strong>Answer:</strong> Persist tickets to a database. On startup, reload active tickets into memory.</p>
-            <p><strong>Great Answer:</strong> "Two strategies: (1) <strong><span class="tooltip-trigger">Write-through<span class="tooltip-content">Every state change is immediately persisted to the database. On crash recovery, the DB has the latest state. Simple and consistent, but adds latency to every operation (DB write on every entry/exit).</span></span>:</strong> Every entry/exit writes to DB immediately. On restart, reload active tickets from DB. Consistent but slower. (2) <strong><span class="tooltip-trigger">Event sourcing<span class="tooltip-content">Instead of storing current state, store the sequence of events that produced it (VehicleEntered, VehicleExited). To recover, replay all events. More complex but gives you a complete audit trail and the ability to "time travel" through state history.</span></span>:</strong> Store entry/exit events. Replay events on startup to rebuild state. More complex but gives full audit trail. For a parking lot, write-through is sufficient — the volume is manageable and we get immediate durability. Our record types map cleanly to DB rows since they're already immutable snapshots."</p>
+            <p><strong>Great Answer:</strong> "Two strategies: (1) <strong><span class="tooltip-trigger">Write-through<span class="tooltip-content">Every state change is immediately persisted to the database. On crash recovery, the DB has the latest state. Simple and consistent, but adds latency to every operation (DB write on every entry/exit).</span></span>:</strong> Every entry/exit writes to DB immediately. On restart, reload active tickets from DB. Consistent but slower. (2) <strong><span class="tooltip-trigger">Event sourcing<span class="tooltip-content">Instead of storing current state, store the sequence of events that produced it (VehicleEntered, VehicleExited). To recover, replay all events. More complex but gives you a complete audit trail and the ability to "time travel" through state history.</span></span>:</strong> Store entry/exit events. Replay events on startup to rebuild state. More complex but gives full audit trail. For a parking lot, write-through is sufficient &mdash; the volume is manageable and we get immediate durability. Our record types map cleanly to DB rows since they're already immutable snapshots."</p>
+
+            <!-- SVG: Write-Through vs Event Sourcing -->
+            <svg viewBox="0 0 720 280" role="img" aria-label="Comparison diagram showing write-through persistence (simple, immediate) versus event sourcing (complex, full audit trail) for crash recovery" style="width:100%; max-width:720px; margin:0.75rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="pl-q10-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+              </defs>
+              <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+              <!-- Strategy 1: Write-Through -->
+              <rect x="20" y="15" width="330" height="250" rx="12" fill="rgba(34,197,94,0.05)" stroke="#22c55e" stroke-width="1.5"/>
+              <text x="185" y="40" text-anchor="middle" font-size="12" font-weight="700" fill="#22c55e">Strategy 1: Write-Through</text>
+              <text x="185" y="58" text-anchor="middle" font-size="9" fill="var(--text-muted)">Simple &amp; recommended for parking lots</text>
+              <!-- Flow -->
+              <rect x="40" y="72" width="110" height="34" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+              <text x="95" y="94" text-anchor="middle" font-size="10" fill="var(--text-primary)">Car enters</text>
+              <line x1="150" y1="89" x2="185" y2="89" stroke="#22c55e" stroke-width="1.2" marker-end="url(#pl-q10-arr)"/>
+              <rect x="190" y="72" width="140" height="34" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+              <text x="260" y="94" text-anchor="middle" font-size="10" fill="var(--text-primary)">Write ticket to DB</text>
+              <!-- Crash -->
+              <rect x="100" y="125" width="140" height="28" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+              <text x="170" y="144" text-anchor="middle" font-size="10" font-weight="600" fill="#ef4444">Server crashes!</text>
+              <!-- Recovery -->
+              <rect x="40" y="170" width="140" height="34" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+              <text x="110" y="192" text-anchor="middle" font-size="10" fill="var(--text-primary)">Server restarts</text>
+              <line x1="180" y1="187" x2="215" y2="187" stroke="#22c55e" stroke-width="1.2" marker-end="url(#pl-q10-arr)"/>
+              <rect x="220" y="170" width="110" height="34" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+              <text x="275" y="192" text-anchor="middle" font-size="10" fill="var(--text-primary)">Reload from DB</text>
+              <text x="185" y="232" text-anchor="middle" font-size="10" fill="#22c55e">+ Simple, consistent, zero data loss</text>
+              <text x="185" y="250" text-anchor="middle" font-size="10" fill="var(--text-muted)">- Adds DB write latency to every operation</text>
+
+              <!-- Strategy 2: Event Sourcing -->
+              <rect x="370" y="15" width="330" height="250" rx="12" fill="rgba(168,85,247,0.05)" stroke="#a855f7" stroke-width="1.5"/>
+              <text x="535" y="40" text-anchor="middle" font-size="12" font-weight="700" fill="#a855f7">Strategy 2: Event Sourcing</text>
+              <text x="535" y="58" text-anchor="middle" font-size="9" fill="var(--text-muted)">Complex but full audit trail</text>
+              <!-- Flow -->
+              <rect x="390" y="72" width="110" height="34" rx="6" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1"/>
+              <text x="445" y="94" text-anchor="middle" font-size="10" fill="var(--text-primary)">Car enters</text>
+              <line x1="500" y1="89" x2="535" y2="89" stroke="#a855f7" stroke-width="1.2" marker-end="url(#pl-q10-arr)"/>
+              <rect x="540" y="72" width="140" height="34" rx="6" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1"/>
+              <text x="610" y="94" text-anchor="middle" font-size="10" fill="var(--text-primary)">Append event log</text>
+              <!-- Crash -->
+              <rect x="450" y="125" width="140" height="28" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+              <text x="520" y="144" text-anchor="middle" font-size="10" font-weight="600" fill="#ef4444">Server crashes!</text>
+              <!-- Recovery -->
+              <rect x="390" y="170" width="110" height="34" rx="6" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1"/>
+              <text x="445" y="192" text-anchor="middle" font-size="10" fill="var(--text-primary)">Server restarts</text>
+              <line x1="500" y1="187" x2="535" y2="187" stroke="#a855f7" stroke-width="1.2" marker-end="url(#pl-q10-arr)"/>
+              <rect x="540" y="170" width="140" height="34" rx="6" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1"/>
+              <text x="610" y="192" text-anchor="middle" font-size="10" fill="var(--text-primary)">Replay all events</text>
+              <text x="535" y="232" text-anchor="middle" font-size="10" fill="#a855f7">+ Full audit trail, time-travel debugging</text>
+              <text x="535" y="250" text-anchor="middle" font-size="10" fill="var(--text-muted)">- More complex, replay can be slow</text>
+            </svg>
+
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Write-Through Recovery in Code</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// On every entry: persist immediately
+public async Task&lt;ParkingTicket?&gt; TryPark(string plate, VehicleType type)
+{
+    lock (_lock)
+    {
+        var spot = FindAvailableSpot(type);
+        if (spot is null) return null;
+        spot.Assign();
+        var ticket = new ParkingTicket(...);
+        _tickets[ticket.TicketId] = ticket;
+        await _db.Tickets.AddAsync(ticket);   // write-through to DB
+        await _db.SaveChangesAsync();
+        return ticket;
+    }
+}
+
+// On startup: reload active tickets from DB
+public async Task InitializeAsync()
+{
+    var activeTickets = await _db.Tickets
+        .Where(t =&gt; t.ExitTime == null)  // still parked
+        .ToListAsync();
+
+    foreach (var ticket in activeTickets)
+    {
+        _tickets[ticket.TicketId] = ticket;
+        _spots[ticket.SpotId].Assign();  // rebuild in-memory state
+    }
+    // System is back to exactly where it was before the crash
+}</code></pre>
+              </div>
+            </div>
+            <p class="body-text">The code walkthrough shows how write-through works in practice. Every <code>TryPark()</code> call writes the ticket to the database immediately after creating it in memory. If the server crashes between two operations, the database has the complete state. On restart, <code>InitializeAsync()</code> queries for all tickets without an exit time (meaning those cars are still parked), loads them back into the in-memory dictionary, and marks their spots as occupied. The system is back to exactly where it was before the crash, with zero data loss.</p>
           </div>
-          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Write-through for simplicity. Event sourcing if you need full audit trail. Records map naturally to DB rows."</div>
+          <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>What to SAY:</strong> "Write-through for simplicity and zero data loss. Event sourcing if you need full audit trail. Records map naturally to DB rows &mdash; our immutable design pays off here."</div>
         </div>
       </div>
     </div>
@@ -4931,7 +5684,8 @@ public sealed class ParkingLotService(
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">You hear "design a parking lot" and immediately start writing <code>class ParkingSpot</code>. You haven't asked: how many floors? multiple vehicle types? pricing? reservations? The interviewer watches you code a solution to a problem you never confirmed.</p>
+            <p class="body-text"><strong>Why this happens:</strong> Anxiety. You hear "design a parking lot" and your brain panics: "I need to start showing output fast or they'll think I'm stuck." So you jump to the keyboard and start typing <code>class ParkingSpot</code>. You haven't asked: how many floors? Multiple vehicle types? Pricing? Reservations? The interviewer watches you build a solution to a problem you never confirmed.</p>
+            <p class="body-text">Here's what goes wrong: 10 minutes into coding, you realize you need pricing but you've already structured everything around a simple enter/exit flow. Now you have to rip apart your design while the clock ticks. Meanwhile, the interviewer has already decided you don't think before you build &mdash; because in production, this person will build the wrong feature for two sprints before asking what the customer actually needed.</p>
             <div class="macos-window" style="margin:0.75rem 0;">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -4951,7 +5705,7 @@ public class ParkingLot
             <div class="callout callout-yellow" style="margin:0.5rem 0 0.75rem;">
               <strong><i class="fa-solid fa-eye icon-gap"></i> What the interviewer thinks:</strong> "No system thinking. This person codes before understanding. They'll build the wrong thing in production too."
             </div>
-            <p class="body-text"><strong>Fix:</strong> Open with <span class="tooltip-trigger">CREATES<span class="tooltip-content">The 7-step LLD interview structure: Clarify &rarr; Requirements &rarr; Entities &rarr; API &rarr; Trade-offs &rarr; Edge cases &rarr; Scale. Use it as your opening ritual every single interview &mdash; it signals structured thinking before a single line of code.</span></span>. Spend the first 3 minutes asking: "Single-floor or multi-floor? Which vehicle types? Is pricing required? Do we need reservations?" Then summarize back before touching code.</p>
+            <p class="body-text"><strong>Fix:</strong> Open with <span class="tooltip-trigger">CREATES<span class="tooltip-content">The 7-step LLD interview structure: Clarify &rarr; Requirements &rarr; Entities &rarr; API &rarr; Trade-offs &rarr; Edge cases &rarr; Scale. Use it as your opening ritual every single interview &mdash; it signals structured thinking before a single line of code.</span></span>. Spend the first 3 minutes asking: "Single-floor or multi-floor? Which vehicle types? Is pricing required? Do we need reservations?" Then summarize back before touching code. The interviewer won't penalize you for 3 minutes of questions &mdash; they'll reward you for it. That's exactly what senior engineers do on real projects.</p>
           </div>
         </div>
       </div>
@@ -4966,7 +5720,8 @@ public class ParkingLot
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">Your <code>ParkingLot</code> class handles spot finding, ticket creation, pricing calculation, payment processing, and floor management all at once. It becomes a 300-line monster that changes for every new requirement.</p>
+            <p class="body-text"><strong>Why this happens:</strong> It feels efficient. "I'll put everything in one class so I don't have to jump between files." Early on, the class is short and readable. But classes grow. Every new feature &mdash; pricing, receipts, display updates, payment processing &mdash; gets bolted onto the same class because "it's already here." By week 3, the class is 300 lines. By month 6, it's 800.</p>
+            <p class="body-text">The real danger is that the God Class makes changes unpredictable. A pricing change might accidentally break spot tracking because both live in the same class and share the same state. No one can review the class confidently because understanding the pricing code requires reading the spot management code requires reading the display code. Everything is tangled.</p>
             <div class="macos-window" style="margin:0.75rem 0;">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -4984,10 +5739,11 @@ public class ParkingLot
 }</code></pre>
               </div>
             </div>
+            <p class="body-text"><strong>Connection to the fix:</strong> Each method in the God Class represents a separate responsibility. <code>CalculateFee</code> should live in <code>IPricingStrategy</code>. <code>ProcessPayment</code> should live in a payment service. <code>UpdateSign</code> should live in a display observer. When each piece is separate, you can change pricing without risking spot assignment, test pricing without needing a real display board, and review each piece independently.</p>
             <div class="callout callout-yellow" style="margin:0.5rem 0 0.75rem;">
               <strong><i class="fa-solid fa-eye icon-gap"></i> What the interviewer thinks:</strong> "Doesn't understand <span class="tooltip-trigger">SRP<span class="tooltip-content">Single Responsibility Principle &mdash; a class should have only one reason to change. If pricing changes, only IPricingStrategy changes. If spot-finding changes, only the finder changes. God classes violate SRP by having dozens of reasons to change.</span></span>. This person will create unmaintainable systems."
             </div>
-            <p class="body-text"><strong>Fix:</strong> Ask yourself "what changes independently?" Pricing rules change separately from spot assignment. Split responsibilities: <code>ParkingLot</code> (orchestration only), <code>IPricingStrategy</code> (fee logic), <code>ISpotFinder</code> (assignment logic), <code>Floor</code> (spot inventory).</p>
+            <p class="body-text"><strong>Fix:</strong> Ask yourself "what changes independently?" Pricing rules change separately from spot assignment. Split responsibilities: <code>ParkingLot</code> (orchestration only), <code>IPricingStrategy</code> (fee logic), <code>ISpotFinder</code> (assignment logic), <code>Floor</code> (spot inventory). The test: if you can describe the class using the word "and" more than once, it needs splitting.</p>
           </div>
         </div>
       </div>
@@ -5002,7 +5758,8 @@ public class ParkingLot
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">You create <code>Vehicle &rarr; Car &rarr; ElectricCar &rarr; TeslaModelS</code>. Vehicle type is a <em>category</em>, not a behavior difference. The inheritance adds zero value and creates fragile coupling.</p>
+            <p class="body-text"><strong>Why this happens:</strong> Object-oriented programming is taught through inheritance. "A Dog IS-A Animal. A Cat IS-A Animal." So when you see "Motorcycle, Car, Truck," your brain immediately reaches for a class hierarchy. It feels natural. But vehicles in a parking lot are categories, not behavioral subtypes. A motorcycle doesn't park differently from a car &mdash; it just needs a smaller spot. That's data, not behavior.</p>
+            <p class="body-text">The deep hierarchy (<code>Vehicle &rarr; Car &rarr; ElectricCar &rarr; TeslaModelS</code>) creates fragile coupling. Adding "Van" means deciding: does Van extend Car? Does it extend Vehicle directly? What about an electric van? Every new type forces an existential crisis about the class tree. Enums avoid all of this because they represent what vehicle types actually are: a flat list of categories.</p>
             <div class="macos-window" style="margin:0.75rem 0;">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -5038,7 +5795,43 @@ public record Vehicle(string LicensePlate, VehicleType Type);</code></pre>
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">Two cars arrive at the same time, both see the last available spot, both get assigned it. You've just double-booked. In a parking lot with a busy entrance, this isn't a corner case &mdash; it's the default case.</p>
+            <p class="body-text"><strong>Why this happens:</strong> Most developers learn to code in a single-threaded world. Your university assignments, your side projects, your tutorials &mdash; they all run one request at a time. So when you design a parking lot, you naturally think: "Find a free spot. Assign it." That's two steps, and in single-threaded code, nothing happens between them.</p>
+            <p class="body-text">But a real parking lot has multiple entry gates. On a Monday morning, three cars might arrive within the same second. Three threads each run "find a free spot" and all three see the same spot as available. Then all three run "assign it." The result: three tickets pointing to one physical spot. Two of those drivers show up to find someone already parked there. This isn't a rare edge case &mdash; it's what happens every rush hour.</p>
+
+            <!-- SVG: Race Condition Timeline -->
+            <svg viewBox="0 0 720 250" role="img" aria-label="Timeline diagram showing two threads racing to assign the same parking spot, resulting in a double booking" style="width:100%; max-width:720px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="pl-m4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-muted)"/></marker>
+              </defs>
+              <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+              <!-- Timeline axis -->
+              <line x1="100" y1="30" x2="700" y2="30" stroke="var(--text-muted)" stroke-width="1" marker-end="url(#pl-m4-arr)"/>
+              <text x="710" y="34" font-size="10" fill="var(--text-muted)">time</text>
+              <!-- Thread A -->
+              <text x="20" y="80" font-size="11" font-weight="600" fill="var(--accent-primary)">Thread A</text>
+              <rect x="120" y="62" width="130" height="28" rx="6" fill="rgba(96,165,250,0.15)" stroke="var(--accent-primary)" stroke-width="1"/>
+              <text x="185" y="81" text-anchor="middle" font-size="9" fill="var(--text-primary)">Find spot R-1 (free)</text>
+              <rect x="340" y="62" width="130" height="28" rx="6" fill="rgba(96,165,250,0.15)" stroke="var(--accent-primary)" stroke-width="1"/>
+              <text x="405" y="81" text-anchor="middle" font-size="9" fill="var(--text-primary)">Assign R-1 to Car A</text>
+              <!-- Thread B -->
+              <text x="20" y="130" font-size="11" font-weight="600" fill="#f59e0b">Thread B</text>
+              <rect x="170" y="112" width="130" height="28" rx="6" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="1"/>
+              <text x="235" y="131" text-anchor="middle" font-size="9" fill="var(--text-primary)">Find spot R-1 (free)</text>
+              <rect x="390" y="112" width="130" height="28" rx="6" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="1"/>
+              <text x="455" y="131" text-anchor="middle" font-size="9" fill="var(--text-primary)">Assign R-1 to Car B</text>
+              <!-- Danger zone -->
+              <rect x="560" y="62" width="120" height="78" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.5"/>
+              <text x="620" y="88" text-anchor="middle" font-size="10" font-weight="600" fill="#ef4444">DOUBLE</text>
+              <text x="620" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#ef4444">BOOKED!</text>
+              <text x="620" y="126" text-anchor="middle" font-size="9" fill="#ef4444">R-1 assigned to</text>
+              <text x="620" y="140" text-anchor="middle" font-size="9" fill="#ef4444">BOTH cars</text>
+              <!-- Explanation -->
+              <text x="360" y="175" text-anchor="middle" font-size="10" fill="var(--text-muted)">Both threads see R-1 as "free" because Thread A hasn't assigned it yet when Thread B checks.</text>
+              <!-- Fix line -->
+              <rect x="120" y="198" width="400" height="28" rx="6" fill="rgba(34,197,94,0.08)" stroke="#22c55e" stroke-width="1"/>
+              <text x="320" y="217" text-anchor="middle" font-size="10" fill="#22c55e">Fix: lock(_lock) { find + assign } &mdash; makes both steps ATOMIC</text>
+            </svg>
+
             <div class="macos-window" style="margin:0.75rem 0;">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -5089,11 +5882,36 @@ public ParkingSpot? FindAndAssign(SpotSize size)
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">You add a <span class="tooltip-trigger">Chain of Responsibility<span class="tooltip-content">A behavioral pattern where a request passes through a chain of handlers, each deciding to handle it or pass it on. Great for validation pipelines or middleware. But in a parking lot interview, if you can't explain which real problem it solves, it's just noise that signals pattern name-dropping rather than design instinct.</span></span> for spot assignment, an Abstract Factory for ticket creation, and a Facade for the entrance &mdash; none of which solve a real problem in the current scope. The interviewer asks "why did you use Chain of Responsibility?" and you hesitate.</p>
+            <p class="body-text"><strong>Why this happens:</strong> You studied design patterns hard. You memorized all 23. Now you're in the interview and you want to show that knowledge. So you add a Chain of Responsibility for spot assignment, an Abstract Factory for ticket creation, and a Facade for the entrance &mdash; none of which solve a real problem in the current scope.</p>
+            <p class="body-text">The problem surfaces when the interviewer asks the most important follow-up question in any design interview: "Why did you use Chain of Responsibility here?" And you hesitate. Because there's no real answer. You used it because you know it, not because you need it. The interviewer immediately sees the difference between someone who understands patterns and someone who name-drops them.</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Pattern Name-Dropping vs. Problem-Driven Patterns</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// BAD: Pattern for pattern's sake -- no real problem
+public interface ISpotAssignmentChainHandler  // Chain of Responsibility
+{
+    ISpotAssignmentChainHandler? Next { get; set; }
+    ParkingSpot? Handle(VehicleType type);
+}
+// Why? There's only ONE assignment rule: find a free spot of the right size.
+// Chain of Responsibility needs multiple handlers to justify its existence.
+
+// GOOD: Pattern because there's a real problem
+public interface IPricingStrategy  // Strategy pattern
+{
+    decimal Calculate(TimeSpan duration);
+}
+// Why? Pricing rules ACTUALLY change: hourly, flat, tiered.
+// Without Strategy, we'd need if/else chains that grow with every new rule.</code></pre>
+              </div>
+            </div>
             <div class="callout callout-yellow" style="margin:0.5rem 0 0.75rem;">
               <strong><i class="fa-solid fa-eye icon-gap"></i> What the interviewer thinks:</strong> "Uses patterns as resume keywords, not solutions. Knows the name but not the problem it solves. This is cargo-cult design."
             </div>
-            <p class="body-text"><strong>Fix:</strong> Only introduce a pattern when you can complete this sentence: <em>"I'm using [Pattern] because [specific problem] &mdash; without it, [this bad thing] happens."</em> Strategy for pricing works because pricing rules change independently. Observer for events works because the lot needs to notify multiple systems on entry/exit. No real problem &rarr; no pattern.</p>
+            <p class="body-text"><strong>Fix:</strong> Only introduce a pattern when you can complete this sentence: <em>"I'm using [Pattern] because [specific problem] &mdash; without it, [this bad thing] happens."</em> Strategy for pricing works because pricing rules change independently. Observer for events works because the lot needs to notify multiple systems on entry/exit. No real problem, no pattern.</p>
           </div>
         </div>
       </div>
@@ -5108,7 +5926,8 @@ public ParkingSpot? FindAndAssign(SpotSize size)
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">You design and code the whole system without once mentioning how you'd test it. Every class depends on concrete types. There's no way to substitute a fake clock or a mock payment processor. The interviewer can't tell if you've ever maintained production code.</p>
+            <p class="body-text"><strong>Why this happens:</strong> Testing feels like a separate concern &mdash; something you do after the design is done. So you focus entirely on making the system work, and you never stop to ask: "Could I write a unit test for this?" The result: every class depends on concrete types. Your pricing class calls <code>DateTime.Now</code> directly, so you can't test what happens at midnight. Your service creates its own dependencies, so you can't substitute a fake payment processor.</p>
+            <p class="body-text">Interviewers care about testability because it reveals whether you've maintained production code. Anyone can write a system that works once. The question is: can someone else change it safely six months later? Testability is the foundation of safe change.</p>
             <div class="macos-window" style="margin:0.75rem 0;">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -5234,7 +6053,8 @@ public sealed class HourlyPricing(
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">Your <code>Exit()</code> method assumes the ticket always exists, the vehicle always matches, and the payment always succeeds. You haven't mentioned: what if someone lost their ticket? What if the barrier jams? What if the DB is down during checkout?</p>
+            <p class="body-text"><strong>Why this happens:</strong> When you're designing under time pressure, your brain focuses on making the system work, not on what happens when it doesn't. You write <code>Exit()</code> assuming the ticket exists, the vehicle matches, and the payment succeeds. You're not being careless &mdash; you're being focused on the wrong thing.</p>
+            <p class="body-text">But production doesn't care about your assumptions. Customers lose tickets. Credit cards get declined. Databases go down during checkout. The gap between "works in my tests" and "works in production" is almost entirely edge cases. Interviewers know this, which is why proactively mentioning 2-3 edge cases signals production experience more than any pattern name ever could.</p>
             <div class="macos-window" style="margin:0.75rem 0;">
               <div class="macos-titlebar">
                 <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -5279,11 +6099,37 @@ public (bool Success, decimal Fee, string Error) Exit(string ticketId)
         </div>
         <div class="collapsible-content">
           <div class="collapsible-body">
-            <p class="body-text">You nail the LLD &mdash; clean classes, good patterns, concurrency handled. Then you stop. You haven't mentioned how this single-server in-memory system would survive real traffic: 10 lots, 1000 entries/hour, server restarts, mobile apps querying live spot counts.</p>
+            <p class="body-text"><strong>Why this happens:</strong> You've been heads-down in code for 30 minutes. You finally feel good about your design &mdash; clean classes, patterns justified, concurrency handled. You're mentally exhausted. So you stop and say "I think that's it." But the interviewer was waiting for you to zoom out.</p>
+            <p class="body-text">They wanted to hear how this in-memory, single-server system would survive in the real world: 10 parking lots, 1000 entries per hour, server restarts, mobile apps querying live spot counts. The LLD-to-HLD bridge is what separates "good coder" from "systems thinker." Even 30 seconds of HLD thinking elevates your entire interview.</p>
+            <div class="macos-window" style="margin:0.75rem 0;">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">What to SAY in the Last 2 Minutes</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// "If I had more time, here's how this scales:"
+//
+// 1. PERSISTENCE: Replace in-memory dictionaries with PostgreSQL.
+//    Our record types map cleanly to DB rows.
+//    builder.Services.AddSingleton&lt;ITicketStore, PostgresTicketStore&gt;();
+//
+// 2. MULTI-LOT: Each lot is a service instance with a lotId.
+//    API Gateway routes /lots/{lotId}/entry to the right instance.
+//
+// 3. EVENTS: Entry/exit publish to a message bus.
+//    Display boards subscribe via SignalR for real-time updates.
+//
+// 4. RESILIENCE: Write-through to DB means server crash loses nothing.
+//    On restart, reload active tickets from the database.
+//
+// The beauty: our LLD code barely changes. Strategy + DI means
+// swapping in-memory for DB is a config change, not a rewrite.</code></pre>
+              </div>
+            </div>
             <div class="callout callout-yellow" style="margin:0.5rem 0 0.75rem;">
               <strong><i class="fa-solid fa-eye icon-gap"></i> What the interviewer thinks:</strong> "Only sees code, not systems. Can't zoom out. May struggle at senior level where design spans multiple components."
             </div>
-            <p class="body-text"><strong>Fix:</strong> In the last 2 minutes, bridge to <span class="tooltip-trigger">HLD<span class="tooltip-content">High-Level Design &mdash; the system architecture view: services, databases, queues, APIs. LLD is how a single component works internally. HLD is how multiple components connect. Interviewers at senior levels want you to connect both worlds: "My ParkingLot class would run inside an ASP.NET Core service, behind an API gateway, backed by PostgreSQL."</span></span>: "This LLD runs as an ASP.NET Core service. For multiple lots, I'd add a persistence layer (PostgreSQL), a <span class="tooltip-trigger">message bus<span class="tooltip-content">An event-driven communication layer (e.g., Azure Service Bus, RabbitMQ). On VehicleEntered, publish an event. Multiple consumers subscribe: billing service, notification service, analytics. Decoupled, scalable, observable &mdash; and your ParkingLot class stays completely unchanged.</span></span> for entry/exit events, and a read-through cache for availability display boards." One paragraph of HLD shows you see the big picture.</p>
+            <p class="body-text"><strong>Fix:</strong> In the last 2 minutes, bridge to <span class="tooltip-trigger">HLD<span class="tooltip-content">High-Level Design &mdash; the system architecture view: services, databases, queues, APIs. LLD is how a single component works internally. HLD is how multiple components connect. Interviewers at senior levels want you to connect both worlds: "My ParkingLot class would run inside an ASP.NET Core service, behind an API gateway, backed by PostgreSQL."</span></span>: "This LLD runs as an ASP.NET Core service. For multiple lots, I'd add a persistence layer (PostgreSQL), a <span class="tooltip-trigger">message bus<span class="tooltip-content">An event-driven communication layer (e.g., Azure Service Bus, RabbitMQ). On VehicleEntered, publish an event. Multiple consumers subscribe: billing service, notification service, analytics. Decoupled, scalable, observable &mdash; and your ParkingLot class stays completely unchanged.</span></span> for entry/exit events, and a read-through cache for availability display boards." One paragraph of HLD shows you see the big picture &mdash; and it costs you only 30 seconds.</p>
           </div>
         </div>
       </div>
