@@ -1,0 +1,182 @@
+[
+  {
+    "id": "strategy-001",
+    "topic": "Strategy Pattern",
+    "code": "public class ShippingCalculator {\n  public decimal Calculate(string method, decimal weight) {\n    if (method == \"ground\") return weight * 1.5m;\n    if (method == \"air\") return weight * 3.0m;\n    if (method == \"express\") return weight * 5.0m;\n    if (method == \"drone\") return weight * 4.0m;\n    throw new NotSupportedException();\n  }\n}",
+    "question": "Each new shipping method adds another if-branch. Which pattern fixes this?",
+    "options": ["Strategy", "Observer", "Singleton", "Factory Method"],
+    "answer": 0,
+    "explanation": "Strategy lets you define each shipping calculation in its own class implementing IShippingStrategy. The calculator receives a strategy and calls it — no if/else, and new methods don't change existing code."
+  },
+  {
+    "id": "strategy-002",
+    "topic": "Strategy Pattern",
+    "code": "public interface ISortStrategy {\n  int[] Sort(int[] data);\n}\npublic class QuickSort : ISortStrategy {\n  public int[] Sort(int[] data) { /* quicksort */ }\n}\npublic class MergeSort : ISortStrategy {\n  public int[] Sort(int[] data) { /* mergesort */ }\n}\npublic class Sorter {\n  private ISortStrategy _strategy;\n  public Sorter(ISortStrategy strategy) => _strategy = strategy;\n  public int[] Run(int[] data) => _strategy.Sort(data);\n}",
+    "question": "What makes this the Strategy pattern?",
+    "options": ["The algorithm is interchangeable at runtime through the interface", "It uses an interface", "There are multiple sort classes", "Sorter delegates to another class"],
+    "answer": 0,
+    "explanation": "Strategy encapsulates algorithms behind a common interface and lets you swap them. The Sorter doesn't know or care which algorithm it uses — it just calls Sort(). You can even change the strategy at runtime."
+  },
+  {
+    "id": "strategy-003",
+    "topic": "Strategy Pattern",
+    "code": "public class PaymentService {\n  public void Pay(decimal amount, string type) {\n    switch (type) {\n      case \"credit\": ChargeCreditCard(amount); break;\n      case \"paypal\": CallPayPalApi(amount); break;\n      case \"crypto\": SendToWallet(amount); break;\n      case \"apple\":  ApplePayCharge(amount); break;\n    }\n  }\n  private void ChargeCreditCard(decimal a) { /* ... */ }\n  private void CallPayPalApi(decimal a) { /* ... */ }\n  private void SendToWallet(decimal a) { /* ... */ }\n  private void ApplePayCharge(decimal a) { /* ... */ }\n}",
+    "question": "How many principles/patterns does this violate?",
+    "options": ["At least 2 — OCP (can't extend without modifying) and missing Strategy pattern", "Just 1 — SRP", "None — switch statements are fine", "3 — SRP, OCP, and DIP"],
+    "answer": 0,
+    "explanation": "Adding Google Pay means modifying this class (OCP violation). The fix: IPaymentStrategy with CreditCardStrategy, PayPalStrategy, etc. PaymentService receives a strategy — it never mentions specific payment types."
+  },
+  {
+    "id": "strategy-004",
+    "topic": "Strategy Pattern",
+    "code": "public class TextFormatter {\n  private IFormatStrategy _strategy;\n  \n  public void SetStrategy(IFormatStrategy strategy) {\n    _strategy = strategy;\n  }\n  \n  public string Format(string text) {\n    return _strategy.Apply(text);\n  }\n}\n// Usage:\nformatter.SetStrategy(new UpperCaseStrategy());\nformatter.Format(\"hello\"); // \"HELLO\"\nformatter.SetStrategy(new HtmlEscapeStrategy());\nformatter.Format(\"<b>hi</b>\"); // \"&lt;b&gt;hi&lt;/b&gt;\"",
+    "question": "What's special about changing strategy at runtime with SetStrategy()?",
+    "options": ["The same object changes behavior without if/else or subclassing", "It creates a new TextFormatter", "SetStrategy replaces the old formatter", "It's faster than constructor injection"],
+    "answer": 0,
+    "explanation": "Unlike inheritance (which locks behavior at compile time), Strategy lets you swap behavior at runtime. The same TextFormatter object can uppercase text one moment and HTML-escape the next — dynamic behavior without conditionals."
+  },
+  {
+    "id": "strategy-005",
+    "topic": "Strategy Pattern",
+    "code": "public class NavigationApp {\n  private IRouteStrategy _router;\n  public NavigationApp(IRouteStrategy router) => _router = router;\n  \n  public Route FindRoute(Point from, Point to) {\n    return _router.Calculate(from, to);\n  }\n}\npublic class CarRoute : IRouteStrategy { /* roads */ }\npublic class WalkRoute : IRouteStrategy { /* sidewalks */ }\npublic class BikeRoute : IRouteStrategy { /* bike lanes */ }",
+    "question": "Adding a 'Public Transit' route option requires what?",
+    "options": ["Just a new TransitRoute : IRouteStrategy — nothing else changes", "Modifying NavigationApp", "Changing IRouteStrategy interface", "Adding a switch case"],
+    "answer": 0,
+    "explanation": "Create TransitRoute implementing IRouteStrategy. Pass it to NavigationApp. The app doesn't know or care about transit specifics — it just calls Calculate(). Zero modifications to existing code."
+  },
+  {
+    "id": "strategy-006",
+    "topic": "Strategy Pattern",
+    "code": "public class Compressor {\n  public byte[] Compress(byte[] data, string algorithm) {\n    if (algorithm == \"gzip\") return GzipCompress(data);\n    if (algorithm == \"lz4\") return Lz4Compress(data);\n    if (algorithm == \"brotli\") return BrotliCompress(data);\n    throw new ArgumentException(\"Unknown algorithm\");\n  }\n}",
+    "question": "Refactoring to Strategy — what becomes the strategy interface?",
+    "options": ["ICompressionStrategy with a Compress(byte[]) method", "The Compressor class itself", "The algorithm string", "The byte[] data parameter"],
+    "answer": 0,
+    "explanation": "Define ICompressionStrategy { byte[] Compress(byte[] data); }. GzipStrategy, Lz4Strategy, BrotliStrategy each implement it. Compressor takes a strategy and delegates — no string matching needed."
+  },
+  {
+    "id": "strategy-007",
+    "topic": "Strategy Pattern",
+    "code": "public class PricingEngine {\n  private readonly IPricingStrategy _strategy;\n  public PricingEngine(IPricingStrategy s) => _strategy = s;\n  public decimal CalculatePrice(Product p) => _strategy.GetPrice(p);\n}\npublic class RegularPricing : IPricingStrategy {\n  public decimal GetPrice(Product p) => p.BasePrice;\n}\npublic class HolidaySale : IPricingStrategy {\n  public decimal GetPrice(Product p) => p.BasePrice * 0.7m;\n}",
+    "question": "How is Strategy different from just using if/else for pricing?",
+    "options": ["Each pricing rule is isolated, testable, and reusable independently", "Strategy is faster", "if/else can't do math", "Strategy uses less memory"],
+    "answer": 0,
+    "explanation": "With if/else, all pricing logic is tangled in one place. With Strategy, each rule is a separate class you can unit test, reuse, and modify independently. Adding a new sale type never risks breaking existing pricing."
+  },
+  {
+    "id": "strategy-008",
+    "topic": "Strategy Pattern",
+    "code": "// C# with Func<T>\npublic class Validator {\n  private readonly Func<string, bool> _rule;\n  public Validator(Func<string, bool> rule) => _rule = rule;\n  public bool IsValid(string input) => _rule(input);\n}\n\nvar emailValidator = new Validator(s => s.Contains(\"@\"));\nvar lengthValidator = new Validator(s => s.Length >= 8);",
+    "question": "Using Func<> instead of an interface — is this still Strategy?",
+    "options": ["Yes — the algorithm is still interchangeable, just using a lambda instead of a class", "No — Strategy requires an interface", "No — Func is a delegate, not a pattern", "Yes — but only in C#"],
+    "answer": 0,
+    "explanation": "Strategy is about swappable algorithms — the interface is just one way to implement it. In C#, Func<>/Action<> or lambdas work perfectly for simple strategies. The pattern is in the design, not the syntax."
+  },
+  {
+    "id": "strategy-009",
+    "topic": "Strategy Pattern",
+    "code": "public class Logger {\n  public void Log(string message) {\n    Console.WriteLine(message);  // always console\n  }\n}",
+    "question": "You need to add file logging and cloud logging. What's the Strategy approach?",
+    "options": ["ILogStrategy with ConsoleLog, FileLog, CloudLog — Logger delegates to it", "Add if/else for each log target", "Create FileLogger and CloudLogger subclasses", "Make Logger a singleton"],
+    "answer": 0,
+    "explanation": "Define ILogStrategy { void Log(string msg); }. ConsoleLog, FileLog, CloudLog implement it. Logger receives a strategy — you can swap or even combine strategies without modifying Logger."
+  },
+  {
+    "id": "strategy-010",
+    "topic": "Strategy Pattern",
+    "code": "public class AuthService {\n  private readonly IAuthStrategy _auth;\n  public AuthService(IAuthStrategy auth) => _auth = auth;\n  public bool Authenticate(string token) => _auth.Validate(token);\n}\npublic class JwtAuth : IAuthStrategy { /* JWT validation */ }\npublic class ApiKeyAuth : IAuthStrategy { /* API key lookup */ }\npublic class OAuth2Auth : IAuthStrategy { /* OAuth2 flow */ }",
+    "question": "The app uses JWT now but needs OAuth2 for a new client. What changes?",
+    "options": ["Just inject OAuth2Auth instead of JwtAuth — AuthService is unchanged", "Rewrite AuthService for OAuth2", "Add an if-check for the client type", "Create a new AuthService2"],
+    "answer": 0,
+    "explanation": "Strategy shines here — swap JwtAuth for OAuth2Auth in the DI container configuration. AuthService doesn't know or care about the authentication mechanism. Zero code changes, maximum flexibility."
+  },
+  {
+    "id": "observer-001",
+    "topic": "Observer Pattern",
+    "code": "public class TemperatureSensor {\n  public double Temperature { get; private set; }\n  \n  public void UpdateTemperature(double temp) {\n    Temperature = temp;\n    // How do the display, logger, and alarm know the temperature changed?\n  }\n}",
+    "question": "The display, logger, and alarm all need to react when temperature changes. Which pattern?",
+    "options": ["Observer — sensor notifies all subscribers when temperature changes", "Strategy — swap the notification algorithm", "Singleton — share one sensor", "Factory Method — create sensors"],
+    "answer": 0,
+    "explanation": "Observer lets the sensor maintain a list of subscribers (display, logger, alarm). When temperature changes, it notifies all of them automatically. Subscribers register themselves — the sensor doesn't need to know their types."
+  },
+  {
+    "id": "observer-002",
+    "topic": "Observer Pattern",
+    "code": "public class StockPrice {\n  private List<IObserver> _observers = new();\n  private decimal _price;\n  \n  public void Subscribe(IObserver observer) => _observers.Add(observer);\n  public void Unsubscribe(IObserver observer) => _observers.Remove(observer);\n  \n  public void SetPrice(decimal newPrice) {\n    _price = newPrice;\n    foreach (var obs in _observers)\n      obs.Update(_price);\n  }\n}",
+    "question": "What's the relationship between StockPrice and its observers?",
+    "options": ["One-to-many — one subject notifies many observers", "One-to-one — each stock has one observer", "Many-to-many — observers watch multiple stocks", "Many-to-one — many stocks notify one observer"],
+    "answer": 0,
+    "explanation": "Observer establishes a one-to-many dependency. When StockPrice changes, ALL registered observers (dashboards, trading bots, alert systems) are notified automatically. One change, many reactions."
+  },
+  {
+    "id": "observer-003",
+    "topic": "Observer Pattern",
+    "code": "public class Button {\n  public event EventHandler Clicked;\n  \n  public void Click() {\n    Clicked?.Invoke(this, EventArgs.Empty);\n  }\n}\n\n// Subscribing\nbutton.Clicked += (sender, e) => Console.WriteLine(\"Button was clicked!\");\nbutton.Clicked += (sender, e) => LogClick();",
+    "question": "C# events are a built-in implementation of which pattern?",
+    "options": ["Observer — Clicked event notifies all subscribers", "Strategy — swapping click behavior", "Command — encapsulating the click action", "Mediator — coordinating objects"],
+    "answer": 0,
+    "explanation": "C# events are Observer baked into the language. The Button is the subject, event handlers are observers. += subscribes, -= unsubscribes, Invoke notifies. You're using Observer every time you wire up an event handler."
+  },
+  {
+    "id": "observer-004",
+    "topic": "Observer Pattern",
+    "code": "public class NewsAgency {\n  private string _latestNews;\n  public void PublishNews(string news) {\n    _latestNews = news;\n    // Problem: how do TV, Radio, and App know?\n  }\n}\n\n// Polling approach — each checks every 5 seconds\nwhile (true) {\n  var news = agency.GetLatestNews();\n  if (news != lastKnown) { display(news); lastKnown = news; }\n  Thread.Sleep(5000);\n}",
+    "question": "Why is Observer better than polling?",
+    "options": ["Observers get notified instantly when news changes — no wasted checks", "Polling is faster", "Observer uses less memory", "Polling doesn't work in C#"],
+    "answer": 0,
+    "explanation": "Polling wastes CPU checking every 5 seconds when nothing changed, and has up to 5 seconds delay when something does. Observer pushes updates immediately — zero wasted checks, zero delay."
+  },
+  {
+    "id": "observer-005",
+    "topic": "Observer Pattern",
+    "code": "public class OrderService {\n  public void PlaceOrder(Order order) {\n    _db.Save(order);\n    _emailService.SendConfirmation(order);\n    _inventoryService.UpdateStock(order);\n    _analyticsService.TrackOrder(order);\n    _loyaltyService.AddPoints(order);\n  }\n}",
+    "question": "OrderService is directly calling 4 other services. How does Observer help?",
+    "options": ["Raise an OrderPlaced event — each service subscribes and reacts independently", "Make OrderService a singleton", "Use a factory for each service", "Add try-catch around each call"],
+    "answer": 0,
+    "explanation": "With Observer, OrderService raises OrderPlaced and doesn't know who's listening. Email, inventory, analytics, and loyalty subscribe independently. Adding a new reaction (e.g., SMS notification) doesn't touch OrderService."
+  },
+  {
+    "id": "observer-006",
+    "topic": "Observer Pattern",
+    "code": "public class ChatRoom {\n  private List<IUser> _users = new();\n  public void Join(IUser user) => _users.Add(user);\n  public void Leave(IUser user) => _users.Remove(user);\n  \n  public void SendMessage(IUser sender, string msg) {\n    foreach (var user in _users)\n      if (user != sender)\n        user.Receive(msg);\n  }\n}",
+    "question": "Is this an example of Observer pattern?",
+    "options": ["Yes — ChatRoom notifies all joined users when a message is sent", "No — it's Mediator pattern", "No — Observer requires events", "Yes — but only because it uses a list"],
+    "answer": 0,
+    "explanation": "This is Observer: the ChatRoom (subject) maintains a list of users (observers) and notifies them when a new message arrives. Join/Leave are subscribe/unsubscribe. It also has Mediator characteristics — both patterns can coexist."
+  },
+  {
+    "id": "observer-007",
+    "topic": "Observer Pattern",
+    "code": "public class WeatherStation {\n  public event Action<WeatherData> WeatherChanged;\n  \n  public void MeasureWeather() {\n    var data = ReadSensors();\n    WeatherChanged?.Invoke(data);\n  }\n}\n\n// Subscribers\nstation.WeatherChanged += data => currentDisplay.Update(data);\nstation.WeatherChanged += data => forecastDisplay.Update(data);\nstation.WeatherChanged += data => statsDisplay.Update(data);",
+    "question": "What happens if forecastDisplay throws an exception in its Update?",
+    "options": ["statsDisplay never gets notified — the event chain breaks", "All three still get notified", "Only forecastDisplay crashes", "The WeatherStation crashes"],
+    "answer": 0,
+    "explanation": "C# events invoke handlers sequentially. If the second handler throws, the third never runs. This is a real Observer pitfall — consider try-catch per handler, or use an event aggregator that isolates failures."
+  },
+  {
+    "id": "observer-008",
+    "topic": "Observer Pattern",
+    "code": "public class Subject {\n  private List<IObserver> _observers = new();\n  public void Attach(IObserver o) => _observers.Add(o);\n  public void Detach(IObserver o) => _observers.Remove(o);\n  \n  protected void Notify() {\n    foreach (var o in _observers)\n      o.Update(this);\n  }\n}",
+    "question": "A subscriber forgets to call Detach when it's done. What happens?",
+    "options": ["Memory leak — the subject holds a reference, preventing garbage collection", "The subscriber stops receiving updates", "Nothing — GC handles it", "The subject crashes"],
+    "answer": 0,
+    "explanation": "The subject's list keeps a reference to the observer, so the garbage collector can't collect it even if nothing else references it. This is the classic 'lapsed listener' memory leak in Observer. Always Detach when done."
+  },
+  {
+    "id": "observer-009",
+    "topic": "Observer Pattern",
+    "code": "// Push model\npublic interface IObserver {\n  void Update(double temperature, double humidity, double pressure);\n}\n\n// Pull model\npublic interface IObserver {\n  void Update(ISubject subject); // observer calls subject.GetTemp(), etc.\n}",
+    "question": "What's the difference between push and pull in Observer?",
+    "options": ["Push sends data directly; Pull lets observers request only what they need", "Push is faster; Pull is slower", "Push uses events; Pull uses polling", "They're the same thing"],
+    "answer": 0,
+    "explanation": "Push model: subject sends all data to every observer (simple but may send unneeded data). Pull model: subject notifies observers it changed, and they query for what they need (flexible but more coupling). Both are valid."
+  },
+  {
+    "id": "observer-010",
+    "topic": "Observer Pattern",
+    "code": "public class FileWatcher {\n  private readonly FileSystemWatcher _watcher;\n  \n  public FileWatcher(string path) {\n    _watcher = new FileSystemWatcher(path);\n    _watcher.Changed += OnChanged;\n    _watcher.Created += OnCreated;\n    _watcher.Deleted += OnDeleted;\n    _watcher.EnableRaisingEvents = true;\n  }\n}",
+    "question": "FileSystemWatcher is a real-world Observer. What's the subject?",
+    "options": ["The file system — it notifies watchers when files change", "The FileWatcher class", "The event handlers", "The path string"],
+    "answer": 0,
+    "explanation": "The OS file system is the subject — it monitors changes and raises events. FileSystemWatcher subscribes to those events. Changed, Created, Deleted are different event types you can observe. This is Observer in the .NET framework."
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "parking-001",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingLot {\n  public bool Park(Vehicle v) {\n    foreach (var spot in _spots) {\n      if (spot.IsAvailable && spot.Size >= v.Size) {\n        spot.Occupy(v);\n        return true;\n      }\n    }\n    return false;\n  }\n}",
+    "question": "This always parks in the first available spot. What's the design issue?",
+    "options": ["No parking strategy — can't switch between nearest, cheapest, or floor-based", "The loop is too slow", "It should use a database", "Vehicle shouldn't have a Size property"],
+    "answer": 0,
+    "explanation": "The parking algorithm is hardcoded. Using Strategy pattern, you'd inject an IParkingStrategy — NearestSpotStrategy, CheapestSpotStrategy, SameLevelStrategy. The lot delegates the decision without knowing the algorithm."
+  },
+  {
+    "id": "parking-002",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingSpot {\n  public SpotSize Size { get; }\n  public Vehicle CurrentVehicle { get; private set; }\n  \n  public void Occupy(Vehicle v) {\n    CurrentVehicle = v;\n  }\n  public void Vacate() {\n    CurrentVehicle = null;\n  }\n  public bool IsAvailable => CurrentVehicle == null;\n}",
+    "question": "A motorcycle parks in a large spot meant for trucks. Is this good design?",
+    "options": ["Depends — if Size >= v.Size allows it, small vehicles waste big spots", "Yes — any vehicle in any spot is fine", "No — motorcycles can't park in truck spots", "Only if the lot is almost full"],
+    "answer": 0,
+    "explanation": "Allowing small vehicles in large spots wastes capacity. Better: assign spots by vehicle type or use a strategy that fills smallest-fitting spots first. Some systems allow it only when same-type spots are full."
+  },
+  {
+    "id": "parking-003",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingLot {\n  private int _totalSpots = 500;\n  private int _occupied = 0;\n  \n  public void Park() { _occupied++; }\n  public void Leave() { _occupied--; }\n  public bool IsFull => _occupied >= _totalSpots;\n}",
+    "question": "Two cars arrive at the same time when _occupied is 499. What can go wrong?",
+    "options": ["Race condition — both read 499, both increment, _occupied becomes 501", "Nothing — integers are thread-safe", "The second car waits automatically", "IsFull prevents this"],
+    "answer": 0,
+    "explanation": "Without synchronization, both threads read _occupied as 499, both see IsFull as false, both park. Now _occupied is 501 but there are only 500 spots. Use lock, Interlocked, or a concurrent data structure."
+  },
+  {
+    "id": "parking-004",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingTicket {\n  public DateTime EntryTime { get; }\n  public DateTime? ExitTime { get; set; }\n  public ParkingSpot Spot { get; }\n  \n  public decimal CalculateFee() {\n    var hours = (ExitTime.Value - EntryTime).TotalHours;\n    return (decimal)Math.Ceiling(hours) * 5.00m; // $5/hour\n  }\n}",
+    "question": "The fee is always $5/hour. How would you support different rates?",
+    "options": ["Use Strategy pattern — IPricingStrategy for hourly, daily, weekend, EV rates", "Add if/else for each rate type", "Create ParkingTicketHourly, ParkingTicketDaily subclasses", "Hard-code all rates in CalculateFee"],
+    "answer": 0,
+    "explanation": "Pricing varies by vehicle type, time of day, membership, etc. Strategy pattern: inject an IPricingStrategy. HourlyPricing, FlatDailyRate, WeekendDiscount each implement it. The ticket delegates fee calculation."
+  },
+  {
+    "id": "parking-005",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingLot {\n  public void DisplayBoard() {\n    Console.WriteLine($\"Available: {GetAvailableCount()}\");\n    Console.WriteLine($\"Compact: {GetAvailableByType(SpotType.Compact)}\");\n    Console.WriteLine($\"Large: {GetAvailableByType(SpotType.Large)}\");\n  }\n}",
+    "question": "The display board is inside ParkingLot. What principle does this violate?",
+    "options": ["SRP — the lot manages parking, not display rendering", "OCP — can't add display types", "LSP — display can't substitute for parking", "DIP — display depends on console"],
+    "answer": 0,
+    "explanation": "ParkingLot shouldn't know about console output or display formatting. Extract a DisplayBoard class that reads spot data from the lot. Now you can have LED displays, mobile app views, or web dashboards — all separate from lot logic."
+  },
+  {
+    "id": "parking-006",
+    "topic": "Parking Lot System",
+    "code": "public enum VehicleType {\n  Motorcycle,\n  Car,\n  Truck,\n  ElectricCar,\n  HandicappedVan\n}\n\npublic class ParkingSpot {\n  public bool CanFit(VehicleType type) {\n    switch (_spotType) {\n      case SpotType.Compact: return type == VehicleType.Motorcycle || type == VehicleType.Car;\n      case SpotType.Large: return true;\n      case SpotType.Handicapped: return type == VehicleType.HandicappedVan;\n      case SpotType.EV: return type == VehicleType.ElectricCar;\n      default: return false;\n    }\n  }\n}",
+    "question": "Adding a 'Bus' vehicle type requires modifying CanFit. Better approach?",
+    "options": ["Each VehicleType knows its compatible SpotTypes — or use a compatibility matrix", "Add another case to the switch", "Create a subclass for each vehicle", "Remove the enum and use strings"],
+    "answer": 0,
+    "explanation": "A compatibility matrix (dictionary mapping vehicle types to allowed spot types) separates the data from the logic. Adding a Bus means adding one row to the matrix — no switch modification. Or let each Vehicle declare its compatible spot sizes."
+  },
+  {
+    "id": "parking-007",
+    "topic": "Parking Lot System",
+    "code": "public interface IParkingLot {\n  Ticket Enter(Vehicle vehicle);\n  decimal Exit(Ticket ticket);\n  int GetAvailableSpots();\n  ParkingSpot FindSpot(Vehicle vehicle);\n}",
+    "question": "Is this interface well-designed for a parking lot system?",
+    "options": ["Yes — Enter, Exit, query availability, and find spot cover the core operations", "No — it should include payment methods", "No — FindSpot should be internal", "Yes — but GetAvailableSpots should return a list"],
+    "answer": 0,
+    "explanation": "This interface captures the parking lot's essential operations: vehicles enter and exit, clients query availability, and the system finds spots. Payment details belong in a separate IPricingService — the lot manages space, not money."
+  },
+  {
+    "id": "parking-008",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingFloor {\n  private List<ParkingSpot> _spots;\n  \n  public ParkingSpot FindAvailable(VehicleType type) {\n    return _spots.FirstOrDefault(s => s.IsAvailable && s.CanFit(type));\n  }\n}\n\npublic class ParkingLot {\n  private List<ParkingFloor> _floors;\n  \n  public ParkingSpot FindSpot(VehicleType type) {\n    foreach (var floor in _floors) {\n      var spot = floor.FindAvailable(type);\n      if (spot != null) return spot;\n    }\n    return null;\n  }\n}",
+    "question": "What design benefit does the ParkingFloor abstraction provide?",
+    "options": ["Each floor manages its own spots — lot delegates instead of knowing all 500+ spots", "Floors are faster than one big list", "It reduces the total number of spots", "Floors are required by the Strategy pattern"],
+    "answer": 0,
+    "explanation": "Separating floors from the lot follows SRP. Each floor handles its own spot management. The lot orchestrates across floors. This also maps to real-world structure — multi-story garages have floor-specific displays and entry points."
+  },
+  {
+    "id": "parking-009",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingLot {\n  public Ticket Enter(Vehicle v) {\n    var spot = FindSpot(v);\n    if (spot == null) throw new ParkingFullException();\n    spot.Occupy(v);\n    var ticket = new Ticket(v, spot, DateTime.Now);\n    return ticket;\n  }\n  \n  public decimal Exit(Ticket ticket) {\n    ticket.Spot.Vacate();\n    ticket.ExitTime = DateTime.Now;\n    return _pricing.Calculate(ticket);\n  }\n}",
+    "question": "What should happen between Exit and the gate opening?",
+    "options": ["Payment processing — verify payment succeeded before vacating the spot", "Nothing — the gate opens automatically", "The ticket is printed", "The vehicle is inspected"],
+    "answer": 0,
+    "explanation": "In a real system, Exit calculates the fee, the driver pays (cash/card/app), and THEN the spot is vacated and the gate opens. The current code vacates first — if payment fails, the spot is already freed. Process payment before vacating."
+  },
+  {
+    "id": "parking-010",
+    "topic": "Parking Lot System",
+    "code": "public class ParkingLot {\n  private static ParkingLot _instance;\n  public static ParkingLot Instance => _instance ??= new ParkingLot();\n  private ParkingLot() { }\n}",
+    "question": "Should a parking lot be a Singleton?",
+    "options": ["Only if the system manages exactly one physical lot — not for multi-location", "Yes — always use Singleton for parking", "No — Singleton is never appropriate for real-world objects", "Yes — to prevent duplicate lots"],
+    "answer": 0,
+    "explanation": "Singleton works when there's truly one lot in the system. But a parking management company with 50 garages needs multiple ParkingLot instances. Use Singleton only when the single-instance constraint is real, not assumed."
+  }
+]

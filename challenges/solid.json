@@ -1,0 +1,452 @@
+[
+  {
+    "id": "srp-001",
+    "topic": "Single Responsibility Principle",
+    "code": "public class UserService {\n  public void Register(User user) {\n    _db.Save(user);\n    SendWelcomeEmail(user.Email);\n    LogAction(\"User registered\");\n  }\n  private void SendWelcomeEmail(string email) { /* SMTP logic */ }\n  private void LogAction(string msg) { /* file logging */ }\n}",
+    "question": "What design principle does this class violate?",
+    "options": ["Single Responsibility Principle", "Open/Closed Principle", "Liskov Substitution Principle", "Dependency Inversion Principle"],
+    "answer": 0,
+    "explanation": "UserService handles registration, email sending, AND logging — three separate responsibilities. Each should be its own class."
+  },
+  {
+    "id": "srp-002",
+    "topic": "Single Responsibility Principle",
+    "code": "public class Invoice {\n  public decimal CalculateTotal() { /* math */ }\n  public void SaveToDatabase() { /* SQL insert */ }\n  public string GeneratePdf() { /* PDF rendering */ }\n  public void EmailToCustomer() { /* SMTP send */ }\n}",
+    "question": "This Invoice class has too many jobs. How many responsibilities can you spot?",
+    "options": ["4 — calculate, persist, render, email", "2 — calculate and save", "3 — calculate, render, email", "1 — it's all invoice-related"],
+    "answer": 0,
+    "explanation": "Calculating totals, saving to DB, generating PDFs, and emailing are four distinct responsibilities. Only CalculateTotal belongs in Invoice — the rest should be separate classes."
+  },
+  {
+    "id": "srp-003",
+    "topic": "Single Responsibility Principle",
+    "code": "public class ReportGenerator {\n  public string BuildReport(Data data) {\n    var html = \"<h1>Report</h1>\";\n    // ... 200 lines of HTML generation\n    File.WriteAllText(\"report.html\", html);\n    Console.WriteLine(\"Report saved.\");\n    return html;\n  }\n}",
+    "question": "What's the SRP violation here?",
+    "options": ["Building HTML and saving to file are mixed together", "The method is too long", "It uses Console.WriteLine", "It returns a string"],
+    "answer": 0,
+    "explanation": "ReportGenerator both builds the report content AND saves it to disk. Building and persisting are two separate reasons to change — they should be in different classes."
+  },
+  {
+    "id": "srp-004",
+    "topic": "Single Responsibility Principle",
+    "code": "public class OrderController {\n  public void PlaceOrder(Order order) {\n    if (order.Total <= 0) throw new Exception(\"Invalid\");\n    _db.Orders.Add(order);\n    _db.SaveChanges();\n    var msg = $\"Order {order.Id} placed\";\n    _slack.PostMessage(\"#orders\", msg);\n  }\n}",
+    "question": "Which responsibility does NOT belong in OrderController?",
+    "options": ["Sending Slack notifications", "Validating the order total", "Saving to database", "Creating the order object"],
+    "answer": 0,
+    "explanation": "A controller shouldn't know about Slack. Notification logic should live in its own service — if you switch from Slack to Teams, you shouldn't need to touch the order controller."
+  },
+  {
+    "id": "srp-005",
+    "topic": "Single Responsibility Principle",
+    "code": "public class Logger {\n  public void Log(string message) {\n    var formatted = $\"[{DateTime.Now:yyyy-MM-dd}] {message}\";\n    File.AppendAllText(\"app.log\", formatted);\n  }\n}",
+    "question": "Does this Logger class violate SRP?",
+    "options": ["Yes — formatting and writing are mixed", "No — it has one job: logging", "Yes — it uses DateTime.Now", "Yes — it writes to a file"],
+    "answer": 1,
+    "explanation": "This Logger has a single responsibility: logging messages. Formatting the message is part of that job. This is actually a well-designed class — not every class with two lines of code violates SRP!"
+  },
+  {
+    "id": "srp-006",
+    "topic": "Single Responsibility Principle",
+    "code": "public class AuthService {\n  public bool Login(string user, string pass) {\n    var hash = ComputeSha256(pass);\n    var match = _db.Users.Any(u => u.Name == user && u.PassHash == hash);\n    if (match) HttpContext.Session[\"user\"] = user;\n    return match;\n  }\n  private string ComputeSha256(string input) { /* hashing */ }\n}",
+    "question": "What's the hidden SRP problem?",
+    "options": ["Hashing, database lookup, and session management are all coupled", "The method returns a bool", "ComputeSha256 should be public", "HttpContext shouldn't be used"],
+    "answer": 0,
+    "explanation": "AuthService does password hashing, credential verification, AND session management. If you switch from session-based to JWT auth, you'd need to change a class that also handles password hashing — those are separate concerns."
+  },
+  {
+    "id": "srp-007",
+    "topic": "Single Responsibility Principle",
+    "code": "public class ProductValidator {\n  public bool IsValid(Product p) {\n    if (string.IsNullOrEmpty(p.Name)) return false;\n    if (p.Price < 0) return false;\n    if (p.Stock < 0) return false;\n    return true;\n  }\n}",
+    "question": "Does ProductValidator follow SRP?",
+    "options": ["Yes — it only validates products", "No — it checks three different fields", "No — it should use exceptions", "No — it returns bool instead of a list of errors"],
+    "answer": 0,
+    "explanation": "ProductValidator has one clear responsibility: validating product data. Checking multiple fields is part of that single job — it all changes for the same reason (product validation rules change)."
+  },
+  {
+    "id": "srp-008",
+    "topic": "Single Responsibility Principle",
+    "code": "public class Employee {\n  public string Name { get; set; }\n  public decimal Salary { get; set; }\n  \n  public decimal CalculateTax() {\n    return Salary * 0.3m;\n  }\n  \n  public string ToXml() {\n    return $\"<employee><name>{Name}</name></employee>\";\n  }\n}",
+    "question": "What should be extracted from this Employee class?",
+    "options": ["ToXml — serialization is a separate concern", "CalculateTax — tax logic is a separate concern", "Both ToXml and CalculateTax", "Nothing — it's fine as-is"],
+    "answer": 2,
+    "explanation": "Both tax calculation and XML serialization are separate reasons to change. If tax rules change, Employee changes. If the XML format changes, Employee changes. Extract TaxCalculator and EmployeeSerializer."
+  },
+  {
+    "id": "srp-009",
+    "topic": "Single Responsibility Principle",
+    "code": "public class FileManager {\n  public byte[] Read(string path) {\n    return File.ReadAllBytes(path);\n  }\n  public void Write(string path, byte[] data) {\n    File.WriteAllBytes(path, data);\n  }\n  public void Compress(string path) {\n    // GZip compression logic\n  }\n  public void Encrypt(string path) {\n    // AES encryption logic\n  }\n}",
+    "question": "Which methods don't belong in FileManager?",
+    "options": ["Compress and Encrypt — they're transformations, not file I/O", "Read and Write — they're too simple", "All methods belong here", "Only Encrypt doesn't belong"],
+    "answer": 0,
+    "explanation": "Reading and writing files is FileManager's job. But compression and encryption are data transformations — they should be separate services. If the encryption algorithm changes, why should a file manager class change?"
+  },
+  {
+    "id": "srp-010",
+    "topic": "Single Responsibility Principle",
+    "code": "public class ShoppingCart {\n  private List<Item> _items = new();\n  public void AddItem(Item item) { _items.Add(item); }\n  public void RemoveItem(Item item) { _items.Remove(item); }\n  public decimal GetTotal() { return _items.Sum(i => i.Price * i.Qty); }\n}",
+    "question": "Does this ShoppingCart violate SRP?",
+    "options": ["No — managing cart items is one responsibility", "Yes — Add, Remove, and GetTotal are three responsibilities", "Yes — it should use a database", "Yes — Sum should be in a calculator class"],
+    "answer": 0,
+    "explanation": "ShoppingCart has one job: managing a collection of items and their total. Add, Remove, and GetTotal all serve that single purpose. This is clean SRP!"
+  },
+  {
+    "id": "ocp-001",
+    "topic": "Open/Closed Principle",
+    "code": "public class DiscountCalculator {\n  public decimal Calculate(string customerType, decimal amount) {\n    if (customerType == \"Regular\") return amount * 0.05m;\n    if (customerType == \"Premium\") return amount * 0.10m;\n    if (customerType == \"VIP\") return amount * 0.20m;\n    return 0;\n  }\n}",
+    "question": "What happens when you need to add a 'Student' discount?",
+    "options": ["You must modify DiscountCalculator — violates Open/Closed", "You create a new class — follows Open/Closed", "You add a new if-branch — that's fine", "You change the return type"],
+    "answer": 0,
+    "explanation": "Every new customer type forces you to modify this class. OCP says classes should be open for extension but closed for modification. Use an interface like IDiscountStrategy instead."
+  },
+  {
+    "id": "ocp-002",
+    "topic": "Open/Closed Principle",
+    "code": "public class NotificationService {\n  public void Send(string type, string message) {\n    switch (type) {\n      case \"email\": SendEmail(message); break;\n      case \"sms\": SendSms(message); break;\n      case \"push\": SendPush(message); break;\n    }\n  }\n}",
+    "question": "Adding WhatsApp notifications requires changing this class. Which principle is violated?",
+    "options": ["Open/Closed Principle", "Single Responsibility Principle", "Liskov Substitution Principle", "Interface Segregation Principle"],
+    "answer": 0,
+    "explanation": "The switch statement must grow every time a new channel is added. With OCP, you'd define an INotificationChannel interface and add new channels without touching existing code."
+  },
+  {
+    "id": "ocp-003",
+    "topic": "Open/Closed Principle",
+    "code": "public interface IShape {\n  double Area();\n}\npublic class Circle : IShape {\n  public double Radius { get; set; }\n  public double Area() => Math.PI * Radius * Radius;\n}\npublic class AreaCalculator {\n  public double TotalArea(IEnumerable<IShape> shapes) {\n    return shapes.Sum(s => s.Area());\n  }\n}",
+    "question": "Does this design follow OCP?",
+    "options": ["Yes — new shapes extend IShape without modifying AreaCalculator", "No — AreaCalculator uses Sum which is inflexible", "No — IShape only has one method", "Yes — but only because it uses an interface"],
+    "answer": 0,
+    "explanation": "You can add Triangle, Hexagon, or any new shape by implementing IShape. AreaCalculator never needs to change — it's closed for modification but open for extension through the interface."
+  },
+  {
+    "id": "ocp-004",
+    "topic": "Open/Closed Principle",
+    "code": "public class TaxCalculator {\n  public decimal CalculateTax(string country, decimal income) {\n    if (country == \"US\") return income * 0.22m;\n    if (country == \"UK\") return income * 0.20m;\n    if (country == \"IN\") return income * 0.30m;\n    throw new NotSupportedException(country);\n  }\n}",
+    "question": "What's the best way to fix the OCP violation?",
+    "options": ["Create an ITaxRule interface with a Calculate method, one class per country", "Add more if-statements as needed", "Use a dictionary mapping country to rate", "Move to a database table"],
+    "answer": 0,
+    "explanation": "An ITaxRule interface lets you add new countries by creating new classes — no modification to existing code. A dictionary of rates works for simple cases, but real tax rules have complex logic that benefits from separate classes."
+  },
+  {
+    "id": "ocp-005",
+    "topic": "Open/Closed Principle",
+    "code": "public class PaymentProcessor {\n  public void Process(Payment payment) {\n    if (payment.Method == \"CreditCard\") {\n      // charge credit card\n    } else if (payment.Method == \"PayPal\") {\n      // call PayPal API\n    } else if (payment.Method == \"Crypto\") {\n      // send to wallet\n    }\n  }\n}",
+    "question": "This code violates OCP. What's the root cause?",
+    "options": ["New payment methods require modifying the Process method", "The payment object has a Method string", "It doesn't handle errors", "It's missing a default case"],
+    "answer": 0,
+    "explanation": "Every new payment method (Apple Pay, Google Pay, bank transfer) forces changes to this method. Define an IPaymentMethod interface with a Process method, and each payment type handles its own logic."
+  },
+  {
+    "id": "ocp-006",
+    "topic": "Open/Closed Principle",
+    "code": "public class ReportExporter {\n  private readonly List<IExportFormat> _formats;\n  public ReportExporter(List<IExportFormat> formats) {\n    _formats = formats;\n  }\n  public void Export(Report report, string formatName) {\n    var fmt = _formats.First(f => f.Name == formatName);\n    fmt.Export(report);\n  }\n}",
+    "question": "Is this ReportExporter following OCP?",
+    "options": ["Yes — new formats are added by implementing IExportFormat", "No — it uses a string to pick the format", "No — First() will throw if format not found", "No — it takes a list in the constructor"],
+    "answer": 0,
+    "explanation": "New export formats (PDF, CSV, Excel, JSON) can be added by implementing IExportFormat — no changes to ReportExporter needed. It's textbook OCP."
+  },
+  {
+    "id": "ocp-007",
+    "topic": "Open/Closed Principle",
+    "code": "public class Logger {\n  public void Log(string message) {\n    var entry = $\"[{DateTime.UtcNow}] {message}\";\n    File.AppendAllText(\"app.log\", entry);\n  }\n}",
+    "question": "You need to add database logging. Does this class support OCP?",
+    "options": ["No — you must modify Logger to add database support", "Yes — just add a new method", "No — but SRP is the real issue here", "Yes — subclass Logger and override Log"],
+    "answer": 0,
+    "explanation": "Logger is hardcoded to file output. To follow OCP, extract an ILogSink interface. Then FileLogSink, DatabaseLogSink, and ConsoleLogSink can all be added without modifying existing code."
+  },
+  {
+    "id": "ocp-008",
+    "topic": "Open/Closed Principle",
+    "code": "public abstract class SortAlgorithm {\n  public abstract int[] Sort(int[] data);\n}\npublic class BubbleSort : SortAlgorithm {\n  public override int[] Sort(int[] data) { /* bubble sort */ }\n}\npublic class Sorter {\n  public int[] Run(SortAlgorithm algo, int[] data) {\n    return algo.Sort(data);\n  }\n}",
+    "question": "Can you add QuickSort without modifying Sorter?",
+    "options": ["Yes — just create QuickSort extending SortAlgorithm", "No — Sorter needs to know about QuickSort", "Yes — but you need to modify the abstract class", "No — abstract classes don't support OCP"],
+    "answer": 0,
+    "explanation": "Sorter depends on the abstraction SortAlgorithm. You can add QuickSort, MergeSort, or any algorithm by extending the base class — Sorter stays unchanged. This is OCP in action."
+  },
+  {
+    "id": "ocp-009",
+    "topic": "Open/Closed Principle",
+    "code": "public class PriceCalculator {\n  public decimal GetPrice(Product product) {\n    decimal price = product.BasePrice;\n    // Holiday sale\n    if (DateTime.Now.Month == 12) price *= 0.8m;\n    // Bulk discount\n    if (product.Quantity > 100) price *= 0.9m;\n    // Loyalty discount\n    if (product.CustomerYears > 5) price *= 0.95m;\n    return price;\n  }\n}",
+    "question": "Adding a new discount rule means modifying GetPrice. What pattern fixes this?",
+    "options": ["Chain of pricing rules (each rule is a separate class)", "Factory Method", "Observer Pattern", "Singleton"],
+    "answer": 0,
+    "explanation": "Define an IPricingRule interface with Apply(decimal price, Product product). Each rule (holiday, bulk, loyalty) is a separate class. New rules are added without modifying PriceCalculator."
+  },
+  {
+    "id": "ocp-010",
+    "topic": "Open/Closed Principle",
+    "code": "public class Validator {\n  public bool Validate(Order order) {\n    if (order.Items.Count == 0) return false;\n    if (order.Total < 0) return false;\n    if (order.Customer == null) return false;\n    return true;\n  }\n}",
+    "question": "Is modifying this Validate method to add a new rule an OCP violation?",
+    "options": ["Yes — each validation rule should be a separate IValidationRule", "No — adding a check is normal maintenance", "Yes — but only if the rules change frequently", "No — validation is always one class"],
+    "answer": 0,
+    "explanation": "If validation rules change often (they usually do), this is an OCP violation. Extract each rule into an IValidationRule class. The validator runs all registered rules without knowing their details."
+  },
+  {
+    "id": "lsp-001",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Rectangle {\n  public virtual int Width { get; set; }\n  public virtual int Height { get; set; }\n  public int Area() => Width * Height;\n}\npublic class Square : Rectangle {\n  public override int Width {\n    set { base.Width = value; base.Height = value; }\n  }\n  public override int Height {\n    set { base.Width = value; base.Height = value; }\n  }\n}",
+    "question": "Why does Square break LSP when used as Rectangle?",
+    "options": ["Setting Width also changes Height — Rectangle doesn't promise that", "Square shouldn't override properties", "Area() returns wrong results", "Square is missing a constructor"],
+    "answer": 0,
+    "explanation": "If code sets rect.Width = 5 and rect.Height = 3, it expects Area() = 15. But with a Square, both become 3, so Area() = 9. The subclass broke the parent's behavioral contract — classic LSP violation."
+  },
+  {
+    "id": "lsp-002",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Bird {\n  public virtual void Fly() {\n    Console.WriteLine(\"Flying...\");\n  }\n}\npublic class Penguin : Bird {\n  public override void Fly() {\n    throw new NotSupportedException(\"Penguins can't fly!\");\n  }\n}",
+    "question": "What's wrong with Penguin inheriting from Bird?",
+    "options": ["Code expecting Bird.Fly() will crash with Penguin — LSP violation", "Penguin should hide Fly() with 'new' keyword", "NotSupportedException is the wrong exception type", "Nothing — penguins ARE birds"],
+    "answer": 0,
+    "explanation": "Any code using Bird expects Fly() to work. Penguin breaks that contract by throwing. LSP says a subclass must be usable wherever the parent is — Penguin can't. Use IFlyable instead of inheritance."
+  },
+  {
+    "id": "lsp-003",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class ReadOnlyCollection<T> : List<T> {\n  public new void Add(T item) {\n    throw new InvalidOperationException(\"Read-only!\");\n  }\n  public new void Remove(T item) {\n    throw new InvalidOperationException(\"Read-only!\");\n  }\n}",
+    "question": "Why is inheriting from List<T> a bad idea here?",
+    "options": ["Code using List<T> expects Add/Remove to work — this breaks that", "The 'new' keyword doesn't fully override", "List<T> is sealed", "ReadOnlyCollection should use a different name"],
+    "answer": 0,
+    "explanation": "If you pass ReadOnlyCollection where List<T> is expected, Add() and Remove() will throw unexpectedly. The subclass can't fulfill the parent's contract — a textbook LSP violation."
+  },
+  {
+    "id": "lsp-004",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Account {\n  public virtual void Withdraw(decimal amount) {\n    if (amount > Balance)\n      throw new InsufficientFundsException();\n    Balance -= amount;\n  }\n}\npublic class FixedDeposit : Account {\n  public override void Withdraw(decimal amount) {\n    throw new InvalidOperationException(\"Cannot withdraw from FD\");\n  }\n}",
+    "question": "What principle does FixedDeposit violate?",
+    "options": ["Liskov Substitution — it can't be used where Account is expected", "Single Responsibility — it does too much", "Open/Closed — it modifies behavior", "Dependency Inversion — it depends on a concrete class"],
+    "answer": 0,
+    "explanation": "Code that processes any Account expects Withdraw() to work (maybe throwing for insufficient funds). FixedDeposit always throws — it can't substitute for Account. Fix: don't inherit, or use separate interfaces."
+  },
+  {
+    "id": "lsp-005",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Shape {\n  public virtual double Area() => 0;\n}\npublic class Circle : Shape {\n  public double Radius { get; set; }\n  public override double Area() => Math.PI * Radius * Radius;\n}\npublic class Triangle : Shape {\n  public double Base { get; set; }\n  public double Height { get; set; }\n  public override double Area() => 0.5 * Base * Height;\n}",
+    "question": "Does this hierarchy follow LSP?",
+    "options": ["Yes — Circle and Triangle both fulfill Shape's contract", "No — they return different values", "No — Shape's Area() returns 0", "Yes — but only because Area() is virtual"],
+    "answer": 0,
+    "explanation": "Both subclasses correctly compute Area() without breaking any contract. You can use Circle or Triangle wherever Shape is expected — the behavior is consistent. This is clean LSP."
+  },
+  {
+    "id": "lsp-006",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Vehicle {\n  public virtual void StartEngine() { /* start */ }\n  public virtual void Accelerate() { /* go */ }\n}\npublic class Bicycle : Vehicle {\n  public override void StartEngine() {\n    // do nothing — bicycles have no engine\n  }\n}",
+    "question": "A Bicycle silently ignoring StartEngine() — is that an LSP violation?",
+    "options": ["Yes — callers expect the engine to actually start", "No — it doesn't throw, so it's fine", "Yes — but only if the caller checks engine state", "No — bicycles are vehicles"],
+    "answer": 0,
+    "explanation": "If code calls vehicle.StartEngine() and then relies on the engine being on (e.g., checking RPM), Bicycle breaks that assumption. Silently doing nothing can be as bad as throwing — the behavior contract is violated."
+  },
+  {
+    "id": "lsp-007",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class FileLogger : ILogger {\n  public void Log(string msg) {\n    File.AppendAllText(\"log.txt\", msg);\n  }\n}\npublic class DatabaseLogger : ILogger {\n  public void Log(string msg) {\n    _db.Logs.Add(new LogEntry(msg));\n    _db.SaveChanges();\n  }\n}",
+    "question": "Can DatabaseLogger substitute for FileLogger wherever ILogger is used?",
+    "options": ["Yes — both fulfill the ILogger contract by logging the message", "No — they write to different places", "No — DatabaseLogger is slower", "Yes — but only if the database is available"],
+    "answer": 0,
+    "explanation": "Both implementations accept a message and log it. The destination differs, but the contract (log this message) is fulfilled by both. Any code using ILogger works correctly with either — perfect LSP compliance."
+  },
+  {
+    "id": "lsp-008",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Stack<T> : List<T> {\n  public void Push(T item) => Add(item);\n  public T Pop() {\n    var item = this[Count - 1];\n    RemoveAt(Count - 1);\n    return item;\n  }\n}",
+    "question": "Why is Stack inheriting from List problematic?",
+    "options": ["Stack exposes Insert, RemoveAt, indexer — violates stack semantics", "Stack should use an array instead", "Push and Pop are redundant with Add and Remove", "List is too slow for a stack"],
+    "answer": 0,
+    "explanation": "A Stack should only allow Push/Pop (LIFO). But inheriting List means anyone can call Insert(0, item), Remove(), or use the indexer — breaking the stack's behavioral contract. Use composition, not inheritance."
+  },
+  {
+    "id": "lsp-009",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Animal {\n  public virtual string Speak() => \"...\";\n}\npublic class Dog : Animal {\n  public override string Speak() => \"Woof!\";\n}\npublic class Fish : Animal {\n  public override string Speak() => null;\n}",
+    "question": "Fish.Speak() returns null. Is this an LSP issue?",
+    "options": ["Yes — callers expect a string, not null (may cause NullReferenceException)", "No — null is a valid string value", "Yes — Fish shouldn't extend Animal", "No — the caller should check for null"],
+    "answer": 0,
+    "explanation": "If calling code does animal.Speak().ToUpper(), Fish causes a NullReferenceException. The contract implies a non-null string. Fish violates the expectation — returning empty string would be safer, or Fish shouldn't have Speak()."
+  },
+  {
+    "id": "lsp-010",
+    "topic": "Liskov Substitution Principle",
+    "code": "public class Cache {\n  public virtual void Set(string key, object val) { _dict[key] = val; }\n  public virtual object Get(string key) => _dict[key];\n}\npublic class ExpiringCache : Cache {\n  public override object Get(string key) {\n    if (IsExpired(key)) { Remove(key); return null; }\n    return base.Get(key);\n  }\n}",
+    "question": "Is ExpiringCache's Get() behavior an LSP violation?",
+    "options": ["No — returning null for expired keys is a valid cache behavior", "Yes — base cache always returns the value", "Yes — it modifies state during a Get", "No — but only if the caller handles null"],
+    "answer": 0,
+    "explanation": "Caches commonly return null for missing/expired keys — callers already expect this. ExpiringCache narrows when data is available but doesn't break the contract. This is acceptable LSP compliance."
+  },
+  {
+    "id": "isp-001",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IWorker {\n  void Work();\n  void Eat();\n  void Sleep();\n}\npublic class Robot : IWorker {\n  public void Work() { /* works */ }\n  public void Eat() { throw new NotSupportedException(); }\n  public void Sleep() { throw new NotSupportedException(); }\n}",
+    "question": "Robot is forced to implement Eat() and Sleep(). Which principle is violated?",
+    "options": ["Interface Segregation Principle", "Single Responsibility Principle", "Liskov Substitution Principle", "Dependency Inversion Principle"],
+    "answer": 0,
+    "explanation": "IWorker forces Robot to implement methods it can't use. ISP says no class should be forced to depend on methods it doesn't need. Split into IWorkable, IFeedable, ISleepable."
+  },
+  {
+    "id": "isp-002",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IPrinter {\n  void Print(Document doc);\n  void Scan(Document doc);\n  void Fax(Document doc);\n  void Staple(Document doc);\n}",
+    "question": "A basic inkjet printer only prints. What's wrong with implementing IPrinter?",
+    "options": ["It's forced to implement Scan, Fax, Staple it doesn't support", "The interface has too many methods", "Document should be generic", "Print should return a bool"],
+    "answer": 0,
+    "explanation": "A simple printer shouldn't implement Scan(), Fax(), or Staple(). ISP says split this into IPrint, IScan, IFax, IStaple. Each device implements only what it supports."
+  },
+  {
+    "id": "isp-003",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IRepository<T> {\n  T GetById(int id);\n  IEnumerable<T> GetAll();\n  void Add(T entity);\n  void Update(T entity);\n  void Delete(T entity);\n  IEnumerable<T> Search(string query);\n  void BulkInsert(IEnumerable<T> entities);\n  void ExecuteRawSql(string sql);\n}",
+    "question": "Most repositories don't need Search, BulkInsert, or ExecuteRawSql. Fix?",
+    "options": ["Split into IReadRepository, IWriteRepository, and IAdvancedRepository", "Remove the unused methods", "Make them virtual with default implementations", "Keep as-is — it's a generic interface"],
+    "answer": 0,
+    "explanation": "Not every repository needs search, bulk ops, or raw SQL. ISP says split the fat interface into focused ones. Simple services use IReadRepository; advanced ones compose the interfaces they need."
+  },
+  {
+    "id": "isp-004",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IUserService {\n  User GetUser(int id);\n  void CreateUser(User user);\n  void DeleteUser(int id);\n  void SendEmail(int userId, string msg);\n  void ResetPassword(int userId);\n  void GenerateReport();\n}",
+    "question": "What's the ISP violation?",
+    "options": ["Email, password, and reports don't belong with basic CRUD", "The interface has six methods", "GetUser should return a DTO", "DeleteUser should soft-delete"],
+    "answer": 0,
+    "explanation": "A class that only needs to read users is forced to depend on SendEmail, ResetPassword, and GenerateReport. Split into IUserRepository (CRUD), IEmailService, IPasswordService, IReportService."
+  },
+  {
+    "id": "isp-005",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IShape {\n  double Area();\n  double Perimeter();\n}\npublic class Circle : IShape {\n  public double Radius { get; set; }\n  public double Area() => Math.PI * Radius * Radius;\n  public double Perimeter() => 2 * Math.PI * Radius;\n}",
+    "question": "Does IShape violate ISP?",
+    "options": ["No — Area and Perimeter are both core to any shape", "Yes — some shapes can't have perimeter", "Yes — it should be split into IArea and IPerimeter", "No — but only because Circle implements both"],
+    "answer": 0,
+    "explanation": "Every shape can calculate area and perimeter — these are closely related and always used together. This is a cohesive interface, not a fat one. No ISP violation here."
+  },
+  {
+    "id": "isp-006",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IAnimal {\n  void Walk();\n  void Swim();\n  void Fly();\n}\npublic class Dog : IAnimal {\n  public void Walk() { /* walks */ }\n  public void Swim() { /* swims */ }\n  public void Fly() { throw new NotSupportedException(); }\n}",
+    "question": "How would you fix this ISP violation?",
+    "options": ["Create IWalkable, ISwimmable, IFlyable — Dog implements first two", "Make Fly() a no-op instead of throwing", "Add a CanFly property to IAnimal", "Remove Fly() from IAnimal"],
+    "answer": 0,
+    "explanation": "Split IAnimal into focused interfaces. Dog implements IWalkable and ISwimmable. Eagle implements IWalkable and IFlyable. No class is forced to implement abilities it doesn't have."
+  },
+  {
+    "id": "isp-007",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface INotification {\n  void SendEmail(string to, string body);\n  void SendSms(string phone, string body);\n  void SendPush(string deviceId, string body);\n}\npublic class EmailNotifier : INotification {\n  public void SendEmail(string to, string body) { /* works */ }\n  public void SendSms(string phone, string body) { }\n  public void SendPush(string deviceId, string body) { }\n}",
+    "question": "EmailNotifier implements empty methods for SMS and Push. What's the fix?",
+    "options": ["Split into IEmailSender, ISmsSender, IPushSender", "Make SendSms and SendPush throw exceptions", "Use a base class with virtual methods", "Keep it — empty methods are harmless"],
+    "answer": 0,
+    "explanation": "Empty method implementations are a code smell signaling ISP violation. EmailNotifier only sends emails — it shouldn't know about SMS or push. Separate interfaces let each notifier focus on its channel."
+  },
+  {
+    "id": "isp-008",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface ILogger {\n  void LogInfo(string msg);\n  void LogWarning(string msg);\n  void LogError(string msg);\n}",
+    "question": "Does this ILogger violate ISP?",
+    "options": ["No — all three methods are cohesive logging operations", "Yes — some loggers only need LogError", "Yes — it should be IInfoLogger, IWarningLogger, IErrorLogger", "No — but it should add LogDebug too"],
+    "answer": 0,
+    "explanation": "LogInfo, LogWarning, and LogError all serve the same purpose (logging at different levels). They change together and are used together. This is a cohesive interface — splitting it would be over-engineering."
+  },
+  {
+    "id": "isp-009",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IFileHandler {\n  byte[] Read(string path);\n  void Write(string path, byte[] data);\n  void Delete(string path);\n  void Compress(string path);\n  void Encrypt(string path);\n  FileInfo GetMetadata(string path);\n}",
+    "question": "A service that only reads files must depend on Write, Delete, Compress, Encrypt. Fix?",
+    "options": ["Split into IFileReader, IFileWriter, IFileTransformer, IFileInfo", "Remove methods the service doesn't need", "Use optional interface implementation", "Make all methods have default implementations"],
+    "answer": 0,
+    "explanation": "A read-only service shouldn't know about writing, deleting, or transforming files. ISP says split into focused interfaces — consumers depend only on what they actually use."
+  },
+  {
+    "id": "isp-010",
+    "topic": "Interface Segregation Principle",
+    "code": "public interface IOrderService {\n  Order GetOrder(int id);\n  List<Order> GetOrdersByCustomer(int customerId);\n}\npublic interface IOrderWriter {\n  void CreateOrder(Order order);\n  void CancelOrder(int id);\n}",
+    "question": "Is this a good example of ISP?",
+    "options": ["Yes — read and write operations are properly separated", "No — they should be one interface", "Yes — but GetOrdersByCustomer should be separate too", "No — IOrderWriter should include GetOrder for validation"],
+    "answer": 0,
+    "explanation": "Services that only read orders depend on IOrderService. Services that modify orders depend on IOrderWriter. Neither is forced to implement methods it doesn't need — clean ISP."
+  },
+  {
+    "id": "dip-001",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class OrderService {\n  private readonly SqlDatabase _db = new SqlDatabase();\n  private readonly SmtpEmailer _emailer = new SmtpEmailer();\n  \n  public void PlaceOrder(Order order) {\n    _db.Save(order);\n    _emailer.Send(order.CustomerEmail, \"Order placed!\");\n  }\n}",
+    "question": "What's wrong with `new SqlDatabase()` and `new SmtpEmailer()` here?",
+    "options": ["High-level OrderService depends on low-level implementations — DIP violation", "SqlDatabase should be a singleton", "The emailer should use async", "Nothing — concrete classes are fine"],
+    "answer": 0,
+    "explanation": "OrderService is tightly coupled to SqlDatabase and SmtpEmailer. DIP says high-level modules should depend on abstractions, not concretions. Use IDatabase and IEmailer interfaces injected via constructor."
+  },
+  {
+    "id": "dip-002",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class ReportService {\n  public string Generate() {\n    var data = new MySqlConnection(\"...\").Query(\"SELECT * FROM sales\");\n    var pdf = new PdfRenderer().Render(data);\n    return pdf;\n  }\n}",
+    "question": "How many DIP violations are in this code?",
+    "options": ["2 — directly creating MySqlConnection and PdfRenderer", "1 — only the database connection", "3 — database, renderer, and the SQL string", "0 — it works fine"],
+    "answer": 0,
+    "explanation": "ReportService creates MySqlConnection (what if you switch to PostgreSQL?) and PdfRenderer (what if you need Excel?) directly. Both should be abstractions injected from outside."
+  },
+  {
+    "id": "dip-003",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class NotificationService {\n  private readonly IMessageSender _sender;\n  public NotificationService(IMessageSender sender) {\n    _sender = sender;\n  }\n  public void Notify(string msg) {\n    _sender.Send(msg);\n  }\n}",
+    "question": "Does this follow DIP?",
+    "options": ["Yes — it depends on IMessageSender abstraction, not a concrete class", "No — it should create the sender internally", "Yes — but only because it uses constructor injection", "No — IMessageSender is too generic"],
+    "answer": 0,
+    "explanation": "NotificationService depends on the IMessageSender abstraction, not on EmailSender or SmsSender directly. The concrete implementation is injected — you can swap it without touching this class. Clean DIP."
+  },
+  {
+    "id": "dip-004",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class UserController {\n  public void Register(string name) {\n    var user = new User(name);\n    var db = new MongoDbContext();\n    db.Users.Insert(user);\n    var logger = new FileLogger();\n    logger.Log($\"User {name} registered\");\n  }\n}",
+    "question": "How would you fix the DIP violations?",
+    "options": ["Inject IUserRepository and ILogger through the constructor", "Make MongoDbContext and FileLogger static", "Use a factory to create them", "Move the 'new' calls to a separate method"],
+    "answer": 0,
+    "explanation": "Define IUserRepository and ILogger interfaces. Inject them via constructor: UserController(IUserRepository repo, ILogger logger). Now you can swap MongoDB for SQL or FileLogger for CloudLogger without changing the controller."
+  },
+  {
+    "id": "dip-005",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class PaymentService {\n  private readonly IPaymentGateway _gateway;\n  private readonly ILogger _logger;\n  \n  public PaymentService(IPaymentGateway gateway, ILogger logger) {\n    _gateway = gateway;\n    _logger = logger;\n  }\n  \n  public bool Charge(decimal amount) {\n    _logger.Log($\"Charging {amount}\");\n    return _gateway.Process(amount);\n  }\n}",
+    "question": "Is this code following DIP correctly?",
+    "options": ["Yes — both dependencies are abstractions injected via constructor", "No — it should use concrete types for performance", "Yes — but ILogger is unnecessary", "No — the constructor has too many parameters"],
+    "answer": 0,
+    "explanation": "PaymentService depends only on abstractions (IPaymentGateway, ILogger) and receives them through constructor injection. You can test it with mocks, swap Stripe for PayPal, or change logging — all without modifying this class."
+  },
+  {
+    "id": "dip-006",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class EmailService {\n  public void Send(string to, string body) {\n    var client = new SmtpClient(\"smtp.gmail.com\");\n    client.Send(new MailMessage(\"noreply@app.com\", to, \"Hi\", body));\n  }\n}",
+    "question": "What breaks if you need to switch from Gmail SMTP to SendGrid?",
+    "options": ["You must modify EmailService — it's coupled to SmtpClient and Gmail", "Nothing — just change the host string", "You create a new EmailService", "You override the Send method"],
+    "answer": 0,
+    "explanation": "EmailService is hardcoded to SmtpClient with Gmail's server. Switching to SendGrid (which uses a REST API) means rewriting the class. DIP fix: depend on an IEmailSender interface and inject the implementation."
+  },
+  {
+    "id": "dip-007",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class AnalyticsService {\n  private readonly IEventTracker _tracker;\n  public AnalyticsService(IEventTracker tracker) => _tracker = tracker;\n  public void TrackPageView(string page) => _tracker.Track(\"pageview\", page);\n}\n// In DI container:\nservices.AddScoped<IEventTracker, GoogleAnalyticsTracker>();",
+    "question": "What makes this easy to test?",
+    "options": ["IEventTracker can be mocked — no real Google Analytics needed in tests", "GoogleAnalyticsTracker is registered as scoped", "The class is small", "TrackPageView has simple logic"],
+    "answer": 0,
+    "explanation": "Because AnalyticsService depends on IEventTracker (not GoogleAnalyticsTracker), you can inject a mock in tests. No HTTP calls, no API keys, no external service — just verify Track() was called with the right args."
+  },
+  {
+    "id": "dip-008",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class CacheService {\n  private readonly MemoryCache _cache = new MemoryCache();\n  public T Get<T>(string key) => (T)_cache.Get(key);\n  public void Set<T>(string key, T value) => _cache.Set(key, value);\n}",
+    "question": "You need to switch from in-memory to Redis cache. What's the DIP problem?",
+    "options": ["CacheService is coupled to MemoryCache — needs an ICache abstraction", "MemoryCache doesn't support generics", "Redis is slower than memory", "CacheService is too simple to need DIP"],
+    "answer": 0,
+    "explanation": "CacheService directly creates MemoryCache. To switch to Redis, you'd rewrite the class. With DIP: inject an ICache interface. MemoryCacheAdapter and RedisCacheAdapter both implement it — swap freely."
+  },
+  {
+    "id": "dip-009",
+    "topic": "Dependency Inversion Principle",
+    "code": "public class WeatherApp {\n  public string GetForecast(string city) {\n    var json = new HttpClient()\n      .GetStringAsync($\"https://api.openweathermap.org/data/2.5/weather?q={city}\")\n      .Result;\n    return JsonConvert.DeserializeObject<Forecast>(json).Summary;\n  }\n}",
+    "question": "What's the biggest DIP issue here?",
+    "options": ["Directly coupled to OpenWeatherMap API — can't swap or test easily", "Using .Result instead of await", "HttpClient should be reused", "JsonConvert is outdated"],
+    "answer": 0,
+    "explanation": "WeatherApp is hardcoded to a specific API URL and HTTP client. DIP says inject an IWeatherProvider interface. In production, use OpenWeatherMapProvider. In tests, use a fake that returns predictable data."
+  },
+  {
+    "id": "dip-010",
+    "topic": "Dependency Inversion Principle",
+    "code": "// High-level\npublic class OrderProcessor {\n  private readonly IOrderRepository _repo;\n  private readonly IPaymentService _payment;\n  private readonly INotifier _notifier;\n  public OrderProcessor(IOrderRepository r, IPaymentService p, INotifier n) {\n    _repo = r; _payment = p; _notifier = n;\n  }\n}\n// Low-level implements the interfaces\npublic class SqlOrderRepository : IOrderRepository { }\npublic class StripePayment : IPaymentService { }\npublic class EmailNotifier : INotifier { }",
+    "question": "Who owns the interfaces in proper DIP?",
+    "options": ["The high-level module (OrderProcessor's layer) owns them", "The low-level modules (SQL, Stripe, Email) own them", "A shared library owns them", "It doesn't matter who owns them"],
+    "answer": 0,
+    "explanation": "In DIP, the high-level policy layer defines the interfaces it needs. Low-level modules implement those interfaces. This inverts the traditional dependency — low-level depends on high-level's abstractions, not the other way around."
+  }
+]

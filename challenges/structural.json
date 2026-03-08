@@ -1,0 +1,92 @@
+[
+  {
+    "id": "decorator-001",
+    "topic": "Decorator Pattern",
+    "code": "public class Coffee {\n  public virtual string Description => \"Plain coffee\";\n  public virtual decimal Cost => 2.00m;\n}\n\n// Need: coffee + milk + sugar + whipped cream\n// Without Decorator:\npublic class CoffeeWithMilk : Coffee { }\npublic class CoffeeWithMilkAndSugar : Coffee { }\npublic class CoffeeWithMilkAndSugarAndWhip : Coffee { }\n// Explosion of classes!",
+    "question": "Which pattern avoids the class explosion for coffee combinations?",
+    "options": ["Decorator — wrap coffee with add-on layers dynamically", "Strategy — swap coffee algorithms", "Factory Method — create coffee types", "Builder — construct coffee step by step"],
+    "answer": 0,
+    "explanation": "Decorator wraps the base coffee with layers: new Whip(new Sugar(new Milk(new Coffee()))). Each decorator adds behavior (cost + description) without creating every possible combination as a separate class."
+  },
+  {
+    "id": "decorator-002",
+    "topic": "Decorator Pattern",
+    "code": "public interface IDataSource {\n  void WriteData(string data);\n  string ReadData();\n}\npublic class FileDataSource : IDataSource {\n  public void WriteData(string data) { /* write to file */ }\n  public string ReadData() { /* read from file */ }\n}\npublic class EncryptionDecorator : IDataSource {\n  private readonly IDataSource _source;\n  public EncryptionDecorator(IDataSource source) => _source = source;\n  public void WriteData(string data) => _source.WriteData(Encrypt(data));\n  public string ReadData() => Decrypt(_source.ReadData());\n}",
+    "question": "What's the key structural requirement of a Decorator?",
+    "options": ["It implements the same interface as the object it wraps", "It extends the base class", "It uses static methods", "It creates new instances"],
+    "answer": 0,
+    "explanation": "A Decorator implements the same interface (IDataSource) and holds a reference to another IDataSource. This is what makes decorators stackable — you can wrap a FileDataSource with Encryption, then wrap that with Compression."
+  },
+  {
+    "id": "decorator-003",
+    "topic": "Decorator Pattern",
+    "code": "IDataSource source = new FileDataSource(\"data.txt\");\nsource = new CompressionDecorator(source);\nsource = new EncryptionDecorator(source);\nsource = new LoggingDecorator(source);\n\nsource.WriteData(\"Hello\");\n// Logged → Encrypted → Compressed → Written to file",
+    "question": "What happens when you call WriteData on the outermost decorator?",
+    "options": ["Each decorator processes in order, then delegates to the next inner layer", "Only the logging decorator runs", "All decorators run in parallel", "The file is written first, then decorated"],
+    "answer": 0,
+    "explanation": "LoggingDecorator logs, then calls EncryptionDecorator.WriteData(). That encrypts, then calls CompressionDecorator.WriteData(). That compresses, then calls FileDataSource.WriteData(). Each layer wraps the next — like nesting dolls."
+  },
+  {
+    "id": "decorator-004",
+    "topic": "Decorator Pattern",
+    "code": "public class NotificationService {\n  public void Send(string msg) {\n    SendEmail(msg);  // always email\n    if (_config.UseSms) SendSms(msg);\n    if (_config.UseSlack) SendSlack(msg);\n    if (_config.UsePush) SendPush(msg);\n  }\n}",
+    "question": "How does Decorator clean up these if-checks?",
+    "options": ["Stack decorators: new SlackDecorator(new SmsDecorator(new EmailNotifier()))", "Use a switch statement instead", "Make each notification a singleton", "Create a NotificationFactory"],
+    "answer": 0,
+    "explanation": "Each decorator sends via its channel AND delegates to the wrapped notifier. Want email + SMS? new SmsDecorator(new EmailNotifier()). Add Slack? Wrap it: new SlackDecorator(smsDecorator). No if-checks needed."
+  },
+  {
+    "id": "decorator-005",
+    "topic": "Decorator Pattern",
+    "code": "public interface IStream {\n  byte[] Read();\n  void Write(byte[] data);\n}\npublic class BufferedStream : IStream {\n  private readonly IStream _inner;\n  public BufferedStream(IStream inner) => _inner = inner;\n  public byte[] Read() {\n    // Read in chunks, buffer in memory\n    return _inner.Read();\n  }\n  public void Write(byte[] data) {\n    // Buffer writes, flush when full\n    _inner.Write(data);\n  }\n}",
+    "question": "BufferedStream adds buffering to any IStream. What's this pattern?",
+    "options": ["Decorator — adds behavior (buffering) without changing the original stream", "Adapter — converting interfaces", "Proxy — controlling access", "Facade — simplifying complex systems"],
+    "answer": 0,
+    "explanation": "BufferedStream wraps any IStream and adds buffering behavior transparently. The client code uses it exactly like any other stream. This is Decorator — same interface, added behavior, composable layers."
+  },
+  {
+    "id": "decorator-006",
+    "topic": "Decorator Pattern",
+    "code": "// .NET middleware pipeline\napp.UseAuthentication();\napp.UseAuthorization();\napp.UseRateLimiting();\napp.UseCors();\napp.UseResponseCompression();\napp.MapControllers();",
+    "question": "ASP.NET middleware is inspired by which pattern?",
+    "options": ["Decorator — each middleware wraps the next, adding behavior", "Observer — middleware observes requests", "Chain of Responsibility — passing requests along", "Strategy — swapping request handling"],
+    "answer": 0,
+    "explanation": "Each middleware wraps the next in the pipeline. A request passes through Authentication → Authorization → RateLimiting → CORS → Compression → Controller. Each layer adds behavior without changing the core handler — classic Decorator."
+  },
+  {
+    "id": "decorator-007",
+    "topic": "Decorator Pattern",
+    "code": "public class CachingRepository : IRepository<Product> {\n  private readonly IRepository<Product> _inner;\n  private readonly Dictionary<int, Product> _cache = new();\n  \n  public CachingRepository(IRepository<Product> inner) => _inner = inner;\n  \n  public Product GetById(int id) {\n    if (!_cache.ContainsKey(id))\n      _cache[id] = _inner.GetById(id);\n    return _cache[id];\n  }\n}",
+    "question": "How is this Decorator different from Proxy?",
+    "options": ["Decorator adds behavior (caching) — Proxy controls access. Both wrap the same interface.", "They're completely different patterns", "Decorator uses inheritance, Proxy uses composition", "Proxy can't cache"],
+    "answer": 0,
+    "explanation": "Decorator and Proxy are structurally identical (both wrap same interface). The intent differs: Decorator adds new behavior (caching, logging), Proxy controls access (lazy loading, permission checks). CachingRepository is a Decorator adding caching."
+  },
+  {
+    "id": "decorator-008",
+    "topic": "Decorator Pattern",
+    "code": "public class LoggingDecorator : IService {\n  private readonly IService _inner;\n  private readonly ILogger _logger;\n  \n  public LoggingDecorator(IService inner, ILogger logger) {\n    _inner = inner;\n    _logger = logger;\n  }\n  \n  public Result Execute(Request req) {\n    _logger.Log($\"Start: {req.Name}\");\n    var result = _inner.Execute(req);\n    _logger.Log($\"End: {req.Name} — {result.Status}\");\n    return result;\n  }\n}",
+    "question": "What's the advantage of logging via Decorator instead of inside the service?",
+    "options": ["Logging is separate from business logic — add/remove it without touching the service", "It's faster", "The logger is shared", "IService has fewer methods"],
+    "answer": 0,
+    "explanation": "The real service stays clean — pure business logic, no logging noise. LoggingDecorator wraps it and adds logging transparently. Turn off logging? Just don't wrap it. Add metrics? Stack another decorator. Clean separation of concerns."
+  },
+  {
+    "id": "decorator-009",
+    "topic": "Decorator Pattern",
+    "code": "public class Pizza {\n  public virtual string GetDescription() => \"Plain pizza\";\n  public virtual decimal GetCost() => 8.00m;\n}\npublic class CheeseDecorator : Pizza {\n  private readonly Pizza _pizza;\n  public CheeseDecorator(Pizza p) => _pizza = p;\n  public override string GetDescription() => _pizza.GetDescription() + \", cheese\";\n  public override decimal GetCost() => _pizza.GetCost() + 1.50m;\n}",
+    "question": "Can you add cheese twice?",
+    "options": ["Yes — new CheeseDecorator(new CheeseDecorator(basePizza)) adds double cheese", "No — Decorator can only be applied once", "Yes — but it would cause a stack overflow", "No — CheeseDecorator checks for duplicates"],
+    "answer": 0,
+    "explanation": "Decorators are infinitely stackable! Double cheese: wrap twice. Triple cheese: wrap three times. Each layer adds $1.50 to cost and ', cheese' to description. This is the power of Decorator — no class explosion."
+  },
+  {
+    "id": "decorator-010",
+    "topic": "Decorator Pattern",
+    "code": "// Without Decorator (inheritance approach)\npublic class Car { }\npublic class CarWithSunroof : Car { }\npublic class CarWithGPS : Car { }\npublic class CarWithSunroofAndGPS : Car { }\npublic class CarWithSunroofAndGPSAndLeather : Car { }\n// ... 2^N combinations!",
+    "question": "With N optional features, inheritance creates 2^N classes. How many does Decorator need?",
+    "options": ["N+1 — one base class + one decorator per feature", "N classes", "2*N classes", "Still 2^N"],
+    "answer": 0,
+    "explanation": "Decorator needs just N+1 classes: Car (base) + SunroofDecorator + GPSDecorator + LeatherDecorator. Any combination is created by stacking: new Leather(new GPS(new Sunroof(new Car()))). Linear growth vs exponential — massive win."
+  }
+]

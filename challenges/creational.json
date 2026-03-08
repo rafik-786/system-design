@@ -1,0 +1,452 @@
+[
+  {
+    "id": "singleton-001",
+    "topic": "Singleton Pattern",
+    "code": "public class AppConfig {\n  public string DbConnection { get; set; }\n  public int MaxRetries { get; set; }\n}\n// Usage throughout the app:\nvar config1 = new AppConfig();\nvar config2 = new AppConfig();\nconfig1.MaxRetries = 5;\nConsole.WriteLine(config2.MaxRetries); // prints 0",
+    "question": "config1 and config2 are different objects. Which pattern ensures a single shared instance?",
+    "options": ["Singleton", "Factory Method", "Abstract Factory", "Prototype"],
+    "answer": 0,
+    "explanation": "Multiple AppConfig instances mean settings aren't shared — changing one doesn't affect the other. Singleton ensures exactly one instance exists, so all code reads the same configuration."
+  },
+  {
+    "id": "singleton-002",
+    "topic": "Singleton Pattern",
+    "code": "public class Logger {\n  private static Logger _instance;\n  public static Logger Instance {\n    get {\n      if (_instance == null)\n        _instance = new Logger();\n      return _instance;\n    }\n  }\n  private Logger() { }\n}",
+    "question": "This Singleton has a subtle bug in multi-threaded apps. What is it?",
+    "options": ["Two threads can both see _instance as null and create two instances", "The constructor is private", "_instance should be readonly", "It needs a public constructor"],
+    "answer": 0,
+    "explanation": "If Thread A checks _instance == null and Thread B does the same before A finishes creating the instance, you get two Logger objects. Fix: use a lock, Lazy<T>, or static initializer for thread safety."
+  },
+  {
+    "id": "singleton-003",
+    "topic": "Singleton Pattern",
+    "code": "public class DatabasePool {\n  private static readonly Lazy<DatabasePool> _instance =\n    new Lazy<DatabasePool>(() => new DatabasePool());\n  public static DatabasePool Instance => _instance.Value;\n  private DatabasePool() { /* init pool */ }\n}",
+    "question": "Why is Lazy<T> a good choice for Singleton?",
+    "options": ["It's thread-safe and only creates the instance when first accessed", "It makes the class faster", "It allows multiple instances", "It's required by C# for singletons"],
+    "answer": 0,
+    "explanation": "Lazy<T> guarantees thread-safe, lazy initialization out of the box. The instance is created only when .Value is first called, and .NET ensures only one thread creates it — no manual locking needed."
+  },
+  {
+    "id": "singleton-004",
+    "topic": "Singleton Pattern",
+    "code": "public class GameManager {\n  public static GameManager Instance { get; } = new GameManager();\n  private GameManager() { }\n  \n  public int Score { get; set; }\n  public int Level { get; set; }\n  public List<Player> Players { get; set; }\n  public Settings Config { get; set; }\n  public AudioManager Audio { get; set; }\n  public NetworkManager Network { get; set; }\n}",
+    "question": "This Singleton has become a 'God Object'. What's the problem?",
+    "options": ["It holds unrelated state (score, audio, network) — violates SRP", "Static properties are slow", "It should use Lazy<T>", "GameManager shouldn't be a singleton"],
+    "answer": 0,
+    "explanation": "GameManager manages score, players, config, audio, AND networking. That's too many responsibilities. Singleton is fine for one shared instance, but don't dump every global concern into it."
+  },
+  {
+    "id": "singleton-005",
+    "topic": "Singleton Pattern",
+    "code": "public class CacheManager {\n  private static CacheManager _instance;\n  private static readonly object _lock = new object();\n  \n  public static CacheManager Instance {\n    get {\n      lock (_lock) {\n        if (_instance == null)\n          _instance = new CacheManager();\n      }\n      return _instance;\n    }\n  }\n}",
+    "question": "This lock-based Singleton works but has a performance issue. What is it?",
+    "options": ["Every access acquires the lock, even after instance exists", "The lock object should be static", "_instance should be volatile", "CacheManager needs a finalizer"],
+    "answer": 0,
+    "explanation": "After the instance is created, the lock is unnecessary — but every call still acquires it. Double-checked locking (check null before AND inside the lock) or using Lazy<T> avoids this overhead."
+  },
+  {
+    "id": "singleton-006",
+    "topic": "Singleton Pattern",
+    "code": "// Unit test\n[Test]\npublic void TestOrderTotal() {\n  var service = new OrderService();\n  // OrderService internally calls:\n  // var tax = TaxCalculator.Instance.GetRate();\n  var total = service.CalculateTotal(100m);\n  Assert.AreEqual(107m, total); // 7% tax\n}",
+    "question": "Why is this test fragile?",
+    "options": ["TaxCalculator.Instance is a global dependency that can't be mocked", "The test should use 200 instead of 100", "Assert.AreEqual doesn't work with decimals", "OrderService shouldn't calculate totals"],
+    "answer": 0,
+    "explanation": "OrderService secretly depends on TaxCalculator.Instance — a global singleton you can't replace in tests. If the real tax rate changes, the test breaks. Fix: inject ITaxCalculator instead of using a static Instance."
+  },
+  {
+    "id": "singleton-007",
+    "topic": "Singleton Pattern",
+    "code": "public class ConnectionPool {\n  private static ConnectionPool _instance;\n  public static ConnectionPool Instance => _instance ??= new ConnectionPool();\n  public int PoolSize { get; } = 10;\n}",
+    "question": "Is `??=` (null-coalescing assignment) thread-safe for Singleton?",
+    "options": ["No — two threads can race and create two instances", "Yes — ??= is atomic in C#", "Yes — but only on x64", "No — it should use ??"],
+    "answer": 0,
+    "explanation": "The ??= operator is NOT atomic. Two threads can evaluate _instance as null simultaneously and both create new instances. For thread-safe Singleton, use Lazy<T> or a static initializer."
+  },
+  {
+    "id": "singleton-008",
+    "topic": "Singleton Pattern",
+    "code": "public class PrintSpooler {\n  public static PrintSpooler Instance { get; } = new PrintSpooler();\n  private PrintSpooler() { }\n  \n  private readonly Queue<PrintJob> _queue = new();\n  public void Enqueue(PrintJob job) { _queue.Enqueue(job); }\n  public PrintJob Dequeue() { return _queue.Dequeue(); }\n}",
+    "question": "Why does a print spooler make sense as a Singleton?",
+    "options": ["All print jobs should go through one shared queue to prevent conflicts", "Queues must be singletons in C#", "PrintJob is too expensive to create", "It's faster than a regular class"],
+    "answer": 0,
+    "explanation": "If multiple spooler instances existed, print jobs would be split across different queues, causing chaos. One shared spooler ensures all jobs are ordered and processed sequentially — Singleton is the right fit."
+  },
+  {
+    "id": "singleton-009",
+    "topic": "Singleton Pattern",
+    "code": "public class FeatureFlags {\n  public static FeatureFlags Instance { get; } = new();\n  private FeatureFlags() { _flags = LoadFromFile(); }\n  \n  private Dictionary<string, bool> _flags;\n  public bool IsEnabled(string flag) => _flags.GetValueOrDefault(flag);\n}",
+    "question": "What happens if LoadFromFile() throws during Singleton creation?",
+    "options": ["The Singleton is never created and every access throws", "It retries automatically", "It creates the instance with empty flags", "The exception is silently caught"],
+    "answer": 0,
+    "explanation": "With a static initializer, if the constructor throws, the type is marked as failed. Every subsequent access to Instance throws a TypeInitializationException. There's no retry — the Singleton is permanently broken."
+  },
+  {
+    "id": "singleton-010",
+    "topic": "Singleton Pattern",
+    "code": "// Service registration\nservices.AddSingleton<ICache, RedisCache>();\n\n// Usage\npublic class ProductService {\n  private readonly ICache _cache;\n  public ProductService(ICache cache) => _cache = cache;\n}",
+    "question": "Is this DI-based singleton better than a static Instance property?",
+    "options": ["Yes — it's testable (inject mock ICache) and swappable", "No — static is faster", "Yes — but only because it uses Redis", "No — AddSingleton and static Instance are identical"],
+    "answer": 0,
+    "explanation": "DI-managed singletons give you one instance (like static) PLUS testability (inject mocks), swappability (change implementation in one place), and proper lifecycle management. Best of both worlds."
+  },
+  {
+    "id": "factory-method-001",
+    "topic": "Factory Method Pattern",
+    "code": "public class NotificationService {\n  public void Send(string type, string message) {\n    if (type == \"email\") {\n      var sender = new EmailSender();\n      sender.Send(message);\n    } else if (type == \"sms\") {\n      var sender = new SmsSender();\n      sender.Send(message);\n    } else if (type == \"push\") {\n      var sender = new PushSender();\n      sender.Send(message);\n    }\n  }\n}",
+    "question": "Which pattern removes the if/else chain for creating senders?",
+    "options": ["Factory Method", "Singleton", "Prototype", "Builder"],
+    "answer": 0,
+    "explanation": "Factory Method lets each notification type create its own sender through a method override. The client code works with the abstract creator — no if/else needed to pick the right sender."
+  },
+  {
+    "id": "factory-method-002",
+    "topic": "Factory Method Pattern",
+    "code": "public abstract class Document {\n  public abstract IPage CreatePage();\n  public void AddPage() {\n    var page = CreatePage();\n    Pages.Add(page);\n  }\n}\npublic class Resume : Document {\n  public override IPage CreatePage() => new ResumePage();\n}\npublic class Report : Document {\n  public override IPage CreatePage() => new ReportPage();\n}",
+    "question": "Where is the Factory Method in this code?",
+    "options": ["CreatePage() — subclasses decide which page type to create", "AddPage() — it adds pages to the list", "The Document constructor", "The Pages property"],
+    "answer": 0,
+    "explanation": "CreatePage() is the factory method — it's abstract in the base class and each subclass overrides it to create the appropriate page type. The base class calls it without knowing which concrete page is created."
+  },
+  {
+    "id": "factory-method-003",
+    "topic": "Factory Method Pattern",
+    "code": "public class VehicleFactory {\n  public static Vehicle Create(string type) {\n    return type switch {\n      \"car\" => new Car(),\n      \"truck\" => new Truck(),\n      \"bike\" => new Bike(),\n      _ => throw new ArgumentException(\"Unknown type\")\n    };\n  }\n}",
+    "question": "Is this a true Factory Method pattern?",
+    "options": ["No — this is a Simple Factory (static method, no inheritance)", "Yes — it creates objects based on input", "No — it should return an interface", "Yes — the switch is the factory method"],
+    "answer": 0,
+    "explanation": "This is a Simple Factory — a static helper that centralizes creation logic. True Factory Method uses inheritance: a base class defines an abstract creation method, subclasses override it. Different patterns!"
+  },
+  {
+    "id": "factory-method-004",
+    "topic": "Factory Method Pattern",
+    "code": "public abstract class GameLevel {\n  public void Initialize() {\n    var enemy = CreateEnemy();\n    enemy.Spawn();\n  }\n  protected abstract IEnemy CreateEnemy();\n}\npublic class ForestLevel : GameLevel {\n  protected override IEnemy CreateEnemy() => new Wolf();\n}\npublic class DesertLevel : GameLevel {\n  protected override IEnemy CreateEnemy() => new Scorpion();\n}",
+    "question": "What's the main benefit of this Factory Method design?",
+    "options": ["Adding a new level with new enemies doesn't change existing code", "It makes enemies spawn faster", "GameLevel can be instantiated directly", "Wolf and Scorpion share the same code"],
+    "answer": 0,
+    "explanation": "Want an OceanLevel with Sharks? Just create a new subclass — ForestLevel and DesertLevel remain untouched. The base class Initialize() works with any enemy through the factory method."
+  },
+  {
+    "id": "factory-method-005",
+    "topic": "Factory Method Pattern",
+    "code": "public class ButtonFactory {\n  public IButton CreateButton() {\n    if (OS == \"Windows\") return new WindowsButton();\n    if (OS == \"Mac\") return new MacButton();\n    return new LinuxButton();\n  }\n}",
+    "question": "To properly use Factory Method, what should you change?",
+    "options": ["Make ButtonFactory abstract with CreateButton as an abstract method, one subclass per OS", "Make CreateButton static", "Add more OS checks", "Return a concrete Button instead of IButton"],
+    "answer": 0,
+    "explanation": "True Factory Method: abstract ButtonFactory with abstract CreateButton(). Then WindowsButtonFactory, MacButtonFactory, LinuxButtonFactory each override it. No if/else, and each factory can be extended independently."
+  },
+  {
+    "id": "factory-method-006",
+    "topic": "Factory Method Pattern",
+    "code": "public abstract class LoggerFactory {\n  public abstract ILogger CreateLogger();\n  \n  public void Log(string message) {\n    var logger = CreateLogger();\n    logger.Write($\"[{DateTime.UtcNow}] {message}\");\n  }\n}\npublic class FileLoggerFactory : LoggerFactory {\n  public override ILogger CreateLogger() => new FileLogger(\"app.log\");\n}\npublic class CloudLoggerFactory : LoggerFactory {\n  public override ILogger CreateLogger() => new CloudLogger(\"https://logs.api.com\");\n}",
+    "question": "Why does LoggerFactory define both CreateLogger AND Log?",
+    "options": ["Log uses CreateLogger — the factory method provides the object, base class uses it", "To violate SRP", "CreateLogger should call Log instead", "They're unrelated methods"],
+    "answer": 0,
+    "explanation": "This is the Template Method + Factory Method combo. The base class defines the algorithm (Log), and delegates object creation to subclasses via CreateLogger(). The base class doesn't know or care which logger it gets."
+  },
+  {
+    "id": "factory-method-007",
+    "topic": "Factory Method Pattern",
+    "code": "public interface ITransport {\n  void Deliver(string package);\n}\npublic class Truck : ITransport {\n  public void Deliver(string p) => Console.WriteLine($\"Truck delivers {p}\");\n}\npublic class Ship : ITransport {\n  public void Deliver(string p) => Console.WriteLine($\"Ship delivers {p}\");\n}\n// Client code:\nITransport t = new Truck();\nt.Deliver(\"Package A\");",
+    "question": "The client directly creates `new Truck()`. How does Factory Method help?",
+    "options": ["A factory decides which transport to create — client doesn't pick", "Truck should be a singleton", "Ship and Truck should merge into one class", "ITransport should have more methods"],
+    "answer": 0,
+    "explanation": "With Factory Method, a LogisticsFactory subclass (RoadLogistics, SeaLogistics) creates the right transport. The client calls factory.CreateTransport() — it doesn't know or care if it gets a Truck or Ship."
+  },
+  {
+    "id": "factory-method-008",
+    "topic": "Factory Method Pattern",
+    "code": "public class ConnectionFactory {\n  public IDbConnection Create(string dbType) {\n    return dbType switch {\n      \"mysql\" => new MySqlConnection(),\n      \"postgres\" => new NpgsqlConnection(),\n      \"sqlite\" => new SqliteConnection(),\n      _ => throw new NotSupportedException()\n    };\n  }\n}",
+    "question": "Adding MongoDB support requires modifying this switch. Which principles does this violate?",
+    "options": ["Open/Closed Principle — and Factory Method pattern would fix it", "Only SRP", "Only DIP", "No principles — switch is fine here"],
+    "answer": 0,
+    "explanation": "Every new database type means changing this class. Factory Method fixes it: abstract ConnectionFactory with CreateConnection(), and MySqlFactory, PostgresFactory each override it. New DB? New factory class, no changes to existing code."
+  },
+  {
+    "id": "factory-method-009",
+    "topic": "Factory Method Pattern",
+    "code": "public abstract class Dialog {\n  public void Render() {\n    var btn = CreateButton();\n    btn.OnClick(() => Close());\n    btn.Render();\n  }\n  public abstract IButton CreateButton();\n}\npublic class WindowsDialog : Dialog {\n  public override IButton CreateButton() => new WindowsButton();\n}\npublic class WebDialog : Dialog {\n  public override IButton CreateButton() => new HtmlButton();\n}",
+    "question": "What pattern does the Render method demonstrate alongside Factory Method?",
+    "options": ["Template Method — defines the algorithm, delegates creation to subclass", "Observer — buttons observe clicks", "Strategy — swapping algorithms", "Decorator — wrapping behavior"],
+    "answer": 0,
+    "explanation": "Render() is a template method: it defines the steps (create button, set click, render) but lets subclasses decide WHICH button via CreateButton(). Factory Method is often used inside Template Method."
+  },
+  {
+    "id": "factory-method-010",
+    "topic": "Factory Method Pattern",
+    "code": "public class PaymentProcessor {\n  public void Process(Order order) {\n    IPayment payment;\n    if (order.Country == \"US\") payment = new StripePayment();\n    else if (order.Country == \"IN\") payment = new RazorpayPayment();\n    else payment = new PayPalPayment();\n    payment.Charge(order.Total);\n  }\n}",
+    "question": "Refactoring this with Factory Method — what becomes the factory method?",
+    "options": ["An abstract CreatePayment(Order) method in a base PaymentProcessor", "The Process method itself", "The IPayment interface", "The Order.Country property"],
+    "answer": 0,
+    "explanation": "Define abstract PaymentProcessor with abstract IPayment CreatePayment(Order order). USPaymentProcessor returns StripePayment, IndiaPaymentProcessor returns RazorpayPayment. Process() calls CreatePayment() — no if/else."
+  },
+  {
+    "id": "abstract-factory-001",
+    "topic": "Abstract Factory Pattern",
+    "code": "// Windows app\nvar button = new WindowsButton();\nvar textbox = new WindowsTextBox();\nvar checkbox = new WindowsCheckbox();\n\n// Mac app — need to change ALL three\nvar button = new MacButton();\nvar textbox = new MacTextBox();\nvar checkbox = new MacCheckbox();",
+    "question": "Which pattern creates families of related objects (button + textbox + checkbox) together?",
+    "options": ["Abstract Factory", "Factory Method", "Builder", "Prototype"],
+    "answer": 0,
+    "explanation": "Abstract Factory creates entire families of related objects. A WindowsUIFactory creates WindowsButton, WindowsTextBox, WindowsCheckbox together. A MacUIFactory creates the Mac versions. The client code works with the factory interface — never picks individual concrete types."
+  },
+  {
+    "id": "abstract-factory-002",
+    "topic": "Abstract Factory Pattern",
+    "code": "public interface IUIFactory {\n  IButton CreateButton();\n  ITextBox CreateTextBox();\n}\npublic class DarkThemeFactory : IUIFactory {\n  public IButton CreateButton() => new DarkButton();\n  public ITextBox CreateTextBox() => new DarkTextBox();\n}\npublic class LightThemeFactory : IUIFactory {\n  public IButton CreateButton() => new LightButton();\n  public ITextBox CreateTextBox() => new LightTextBox();\n}",
+    "question": "What's the key advantage over individual Factory Methods?",
+    "options": ["It guarantees consistency — Dark button always pairs with Dark textbox", "It creates objects faster", "It uses fewer classes", "It doesn't need interfaces"],
+    "answer": 0,
+    "explanation": "Abstract Factory ensures you never accidentally mix a DarkButton with a LightTextBox. The factory creates the whole family together, guaranteeing visual consistency across all UI components."
+  },
+  {
+    "id": "abstract-factory-003",
+    "topic": "Abstract Factory Pattern",
+    "code": "public class App {\n  public void BuildUI(string theme) {\n    IButton btn;\n    ITextBox txt;\n    if (theme == \"dark\") {\n      btn = new DarkButton();\n      txt = new DarkTextBox();\n    } else {\n      btn = new LightButton();\n      txt = new LightTextBox();\n    }\n  }\n}",
+    "question": "What's the problem if you add a 'High Contrast' theme?",
+    "options": ["You must add another if-branch and touch App — Abstract Factory avoids this", "DarkButton needs to support high contrast", "You need a new App class", "IButton needs a contrast property"],
+    "answer": 0,
+    "explanation": "Every new theme means modifying App. With Abstract Factory: create HighContrastFactory implementing IUIFactory. Pass it to App. Zero changes to App — it just calls factory.CreateButton() and factory.CreateTextBox()."
+  },
+  {
+    "id": "abstract-factory-004",
+    "topic": "Abstract Factory Pattern",
+    "code": "public interface IDbFactory {\n  IConnection CreateConnection();\n  ICommand CreateCommand();\n  ITransaction CreateTransaction();\n}\npublic class SqlServerFactory : IDbFactory { /* SQL Server types */ }\npublic class PostgresFactory : IDbFactory { /* Postgres types */ }",
+    "question": "Why is this better than creating each database object separately?",
+    "options": ["SqlServer connection + Postgres command would crash — factory prevents mixing", "It's faster than creating objects individually", "It uses less memory", "IDbFactory is simpler than three interfaces"],
+    "answer": 0,
+    "explanation": "A SQL Server connection can't work with a Postgres command — they're incompatible. Abstract Factory ensures all three objects come from the same database family, preventing runtime errors from mixed types."
+  },
+  {
+    "id": "abstract-factory-005",
+    "topic": "Abstract Factory Pattern",
+    "code": "public class GameWorld {\n  private readonly IEnvironmentFactory _factory;\n  public GameWorld(IEnvironmentFactory factory) => _factory = factory;\n  \n  public void Build() {\n    var terrain = _factory.CreateTerrain();\n    var sky = _factory.CreateSky();\n    var music = _factory.CreateMusic();\n    // All three match the same biome\n  }\n}",
+    "question": "Adding an 'Underwater' biome requires what?",
+    "options": ["A new UnderwaterFactory implementing IEnvironmentFactory — GameWorld unchanged", "Modifying GameWorld to handle underwater logic", "Adding if-checks in Build()", "Changing the terrain, sky, and music interfaces"],
+    "answer": 0,
+    "explanation": "Just create UnderwaterFactory with CreateTerrain → CoralReef, CreateSky → OceanSurface, CreateMusic → AmbientBubbles. Pass it to GameWorld — zero changes to existing code."
+  },
+  {
+    "id": "abstract-factory-006",
+    "topic": "Abstract Factory Pattern",
+    "code": "// Which pattern?\nvar factory = GetFactory(config.Platform);\nvar button = factory.CreateButton();\nvar menu = factory.CreateMenu();\nvar scrollbar = factory.CreateScrollbar();",
+    "question": "This creates multiple related objects from one factory. What pattern is this?",
+    "options": ["Abstract Factory — creating a family of platform-specific UI components", "Builder — constructing step by step", "Factory Method — single creation method", "Prototype — cloning objects"],
+    "answer": 0,
+    "explanation": "One factory creating multiple related objects (button, menu, scrollbar) that all belong to the same platform family — that's Abstract Factory. Factory Method would handle just one product type."
+  },
+  {
+    "id": "abstract-factory-007",
+    "topic": "Abstract Factory Pattern",
+    "code": "public interface IFurnitureFactory {\n  IChair CreateChair();\n  ITable CreateTable();\n  ISofa CreateSofa();\n}\npublic class VictorianFactory : IFurnitureFactory {\n  public IChair CreateChair() => new VictorianChair();\n  public ITable CreateTable() => new VictorianTable();\n  public ISofa CreateSofa() => new VictorianSofa();\n}",
+    "question": "A customer wants a VictorianChair with a ModernTable. Should the factory allow this?",
+    "options": ["No — Abstract Factory prevents mixing styles to ensure consistency", "Yes — the customer should choose freely", "No — but for performance reasons", "Yes — add a MixedFactory"],
+    "answer": 0,
+    "explanation": "The whole point of Abstract Factory is preventing inconsistent combinations. Victorian furniture has ornate curves; Modern is minimalist. Mixing them creates visual chaos. If mixing is needed, it's a different pattern."
+  },
+  {
+    "id": "abstract-factory-008",
+    "topic": "Abstract Factory Pattern",
+    "code": "public abstract class MealFactory {\n  public abstract IDrink CreateDrink();\n  public abstract ISide CreateSide();\n  public abstract IMain CreateMain();\n}\npublic class VeganMealFactory : MealFactory {\n  public override IDrink CreateDrink() => new SoyMilk();\n  public override ISide CreateSide() => new Salad();\n  public override IMain CreateMain() => new TofuBurger();\n}",
+    "question": "How does Abstract Factory differ from Builder here?",
+    "options": ["Factory creates independent objects; Builder constructs one complex object step by step", "They're the same pattern with different names", "Factory is faster", "Builder uses interfaces, Factory doesn't"],
+    "answer": 0,
+    "explanation": "Abstract Factory returns separate, independent products (drink, side, main). Builder would construct ONE Meal object step by step: meal.SetDrink().SetSide().SetMain().Build(). Different intents."
+  },
+  {
+    "id": "abstract-factory-009",
+    "topic": "Abstract Factory Pattern",
+    "code": "public class DocumentExporter {\n  public void Export(Document doc, string format) {\n    if (format == \"pdf\") {\n      new PdfHeader().Write(doc.Title);\n      new PdfBody().Write(doc.Content);\n      new PdfFooter().Write(doc.PageNum);\n    } else if (format == \"html\") {\n      new HtmlHeader().Write(doc.Title);\n      new HtmlBody().Write(doc.Content);\n      new HtmlFooter().Write(doc.PageNum);\n    }\n  }\n}",
+    "question": "Refactoring with Abstract Factory — what becomes the factory?",
+    "options": ["IExportFactory with CreateHeader(), CreateBody(), CreateFooter()", "The Export method", "The Document class", "The format string"],
+    "answer": 0,
+    "explanation": "Define IExportFactory with CreateHeader(), CreateBody(), CreateFooter(). PdfExportFactory and HtmlExportFactory implement it. DocumentExporter takes a factory — no if/else, and you can add Word, Markdown, etc."
+  },
+  {
+    "id": "abstract-factory-010",
+    "topic": "Abstract Factory Pattern",
+    "code": "// At startup\nIUIFactory factory = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)\n  ? new WindowsFactory()\n  : new MacFactory();\n\n// Throughout the app\nvar btn = factory.CreateButton();\nvar dlg = factory.CreateDialog();",
+    "question": "The platform check happens only once at startup. Why is this important?",
+    "options": ["All UI components are guaranteed to be from the same platform family", "It's faster than checking every time", "Windows and Mac can't coexist", "The factory can't change after creation"],
+    "answer": 0,
+    "explanation": "By choosing the factory once, every component created throughout the app comes from the same family. No risk of a Windows button appearing in a Mac dialog — consistency is enforced by design."
+  },
+  {
+    "id": "builder-001",
+    "topic": "Builder Pattern",
+    "code": "var user = new User(\n  \"John\", \"Doe\", \"john@email.com\", \"123 Main St\",\n  \"Springfield\", \"IL\", \"62704\", \"USA\",\n  \"555-0100\", true, false, \"premium\", null\n);",
+    "question": "This constructor has 13 parameters. Which pattern makes this readable?",
+    "options": ["Builder — construct step by step with named methods", "Factory Method — delegate creation", "Prototype — clone an existing user", "Singleton — one user instance"],
+    "answer": 0,
+    "explanation": "Builder lets you write: new UserBuilder().WithName(\"John\", \"Doe\").WithEmail(\"john@email.com\").InCity(\"Springfield\").Build(). Each step is named and clear — no guessing what the 7th parameter means."
+  },
+  {
+    "id": "builder-002",
+    "topic": "Builder Pattern",
+    "code": "var query = new SqlQueryBuilder()\n  .Select(\"name\", \"email\")\n  .From(\"users\")\n  .Where(\"age > 18\")\n  .OrderBy(\"name\")\n  .Limit(10)\n  .Build();",
+    "question": "What makes this a Builder pattern?",
+    "options": ["Step-by-step construction with a final Build() that produces the result", "It uses method chaining", "It creates SQL queries", "The methods return strings"],
+    "answer": 0,
+    "explanation": "Builder constructs a complex object (SQL query) step by step. Each method adds a part, and Build() assembles the final product. Method chaining is just a convenience — the pattern is about incremental construction."
+  },
+  {
+    "id": "builder-003",
+    "topic": "Builder Pattern",
+    "code": "public class Pizza {\n  public string Dough { get; set; }\n  public string Sauce { get; set; }\n  public string Cheese { get; set; }\n  public List<string> Toppings { get; set; } = new();\n}\n\nvar pizza = new Pizza();\npizza.Dough = \"thin\";\npizza.Sauce = \"tomato\";\n// Oops, forgot to set Cheese\n// Toppings is empty",
+    "question": "How does Builder prevent incomplete Pizza objects?",
+    "options": ["Build() can validate all required fields before returning the object", "Builder makes all fields required", "Builder uses a constructor", "Builder throws if Cheese is null"],
+    "answer": 0,
+    "explanation": "With a Builder, the Build() method can check that dough, sauce, and cheese are all set before creating the Pizza. Direct property setting has no validation — you get a cheeseless pizza with no warning."
+  },
+  {
+    "id": "builder-004",
+    "topic": "Builder Pattern",
+    "code": "public class HouseBuilder {\n  private int _floors;\n  private bool _garage;\n  private bool _pool;\n  \n  public HouseBuilder SetFloors(int n) { _floors = n; return this; }\n  public HouseBuilder AddGarage() { _garage = true; return this; }\n  public HouseBuilder AddPool() { _pool = true; return this; }\n  public House Build() => new House(_floors, _garage, _pool);\n}",
+    "question": "Why does each method `return this`?",
+    "options": ["To enable fluent method chaining: builder.SetFloors(2).AddGarage().Build()", "To prevent garbage collection", "It's required by the Builder pattern", "To make the builder immutable"],
+    "answer": 0,
+    "explanation": "Returning 'this' enables fluent chaining — you can call multiple methods in one expression. It's not required by the pattern, but it makes Builder code much more readable and natural to write."
+  },
+  {
+    "id": "builder-005",
+    "topic": "Builder Pattern",
+    "code": "// Without builder\nvar email = new Email(\n  \"to@test.com\", \"from@test.com\", \"Subject\",\n  \"<html>Body</html>\", true, Priority.High,\n  new[] { \"file.pdf\" }, null, null\n);\n\n// With builder\nvar email = new EmailBuilder()\n  .To(\"to@test.com\")\n  .From(\"from@test.com\")\n  .Subject(\"Subject\")\n  .HtmlBody(\"<html>Body</html>\")\n  .HighPriority()\n  .Attach(\"file.pdf\")\n  .Build();",
+    "question": "What's the biggest readability win with Builder?",
+    "options": ["No positional nulls — you see what's set and what's intentionally skipped", "It uses fewer lines", "It's alphabetically ordered", "The constructor is hidden"],
+    "answer": 0,
+    "explanation": "In the constructor call, what are those two 'null' values at the end? Nobody knows without checking the parameter list. Builder makes every value self-documenting and skipping optional fields is simply not calling that method."
+  },
+  {
+    "id": "builder-006",
+    "topic": "Builder Pattern",
+    "code": "public interface IReportBuilder {\n  void SetTitle(string title);\n  void AddChart(ChartData data);\n  void AddTable(TableData data);\n  void SetFooter(string text);\n}\npublic class PdfReportBuilder : IReportBuilder { /* builds PDF */ }\npublic class HtmlReportBuilder : IReportBuilder { /* builds HTML */ }",
+    "question": "How does having multiple builders help?",
+    "options": ["Same construction steps produce different representations (PDF vs HTML)", "PDF is faster than HTML", "IReportBuilder has fewer methods", "Multiple builders share code"],
+    "answer": 0,
+    "explanation": "The same director can call SetTitle, AddChart, AddTable on either builder. PdfReportBuilder produces a PDF file; HtmlReportBuilder produces a web page. Same process, different output formats."
+  },
+  {
+    "id": "builder-007",
+    "topic": "Builder Pattern",
+    "code": "public class ConnectionStringBuilder {\n  private string _server = \"localhost\";\n  private int _port = 5432;\n  private string _database;\n  private string _user;\n  \n  public ConnectionStringBuilder Server(string s) { _server = s; return this; }\n  public ConnectionStringBuilder Port(int p) { _port = p; return this; }\n  public ConnectionStringBuilder Database(string d) { _database = d; return this; }\n  public string Build() => $\"Host={_server};Port={_port};Database={_database};User={_user}\";",
+    "question": "What's useful about the default values for _server and _port?",
+    "options": ["You only need to set what differs from defaults — most configs just set Database", "Defaults make the builder faster", "All fields should have defaults", "It prevents null reference exceptions"],
+    "answer": 0,
+    "explanation": "Builder with sensible defaults means: new ConnectionStringBuilder().Database(\"mydb\").Build() gives you a working connection string. You override only what you need — localhost:5432 works for most dev setups."
+  },
+  {
+    "id": "builder-008",
+    "topic": "Builder Pattern",
+    "code": "var config = new ConfigBuilder()\n  .SetMaxRetries(3)\n  .SetTimeout(TimeSpan.FromSeconds(30))\n  .EnableLogging()\n  .Build();\n\n// config.MaxRetries = 5; // Compile error — read-only!",
+    "question": "Why should the built object be immutable?",
+    "options": ["Once configured and validated by Build(), it shouldn't be changed unexpectedly", "Immutable objects are faster", "C# requires it", "Builder pattern mandates immutability"],
+    "answer": 0,
+    "explanation": "The Builder validates and constructs a consistent configuration. If someone could change MaxRetries after Build(), they'd bypass that validation. Immutability guarantees the built object stays in a valid state."
+  },
+  {
+    "id": "builder-009",
+    "topic": "Builder Pattern",
+    "code": "public class Director {\n  public void BuildSportsCar(ICarBuilder builder) {\n    builder.SetSeats(2);\n    builder.SetEngine(\"V8\");\n    builder.SetGPS(true);\n  }\n  public void BuildSUV(ICarBuilder builder) {\n    builder.SetSeats(7);\n    builder.SetEngine(\"V6\");\n    builder.SetGPS(true);\n  }\n}",
+    "question": "What role does the Director play?",
+    "options": ["It defines preset construction recipes — which steps in what order", "It creates the builder", "It validates the car", "It's required by the pattern"],
+    "answer": 0,
+    "explanation": "The Director encapsulates construction recipes. BuildSportsCar and BuildSUV are presets — the Director knows the steps, the Builder knows how to execute them. Clients can use the Director for common configs or use the Builder directly."
+  },
+  {
+    "id": "builder-010",
+    "topic": "Builder Pattern",
+    "code": "var response = new HttpResponseBuilder()\n  .StatusCode(200)\n  .Header(\"Content-Type\", \"application/json\")\n  .Header(\"Cache-Control\", \"no-cache\")\n  .Body(jsonString)\n  .Build();",
+    "question": "Header() is called twice with different values. What does this demonstrate?",
+    "options": ["Builder supports repeated/accumulative steps — adding multiple headers", "It overwrites the first header", "It's a bug — Header should only be called once", "The second call is ignored"],
+    "answer": 0,
+    "explanation": "Builder can accumulate values — each Header() call adds to a collection. This is something constructors can't do elegantly. You can call AddTopping() five times on a PizzaBuilder the same way."
+  },
+  {
+    "id": "prototype-001",
+    "topic": "Prototype Pattern",
+    "code": "var template = new Report {\n  Font = \"Arial\",\n  FontSize = 12,\n  Margins = new Margins(1, 1, 1, 1),\n  HeaderLogo = LoadLogo(), // expensive\n  FooterText = \"Confidential\"\n};\n\n// Need 100 reports with same template\nfor (int i = 0; i < 100; i++) {\n  var report = new Report(); // sets everything from scratch\n  report.Font = \"Arial\";\n  // ... repeat all properties\n}",
+    "question": "Which pattern avoids repeating setup for each new report?",
+    "options": ["Prototype — clone the template instead of rebuilding", "Builder — construct step by step", "Factory Method — override creation", "Singleton — share one instance"],
+    "answer": 0,
+    "explanation": "Prototype lets you clone the template: var report = template.Clone(). All properties are copied, including the expensive logo. Then customize just what differs per report — no redundant setup."
+  },
+  {
+    "id": "prototype-002",
+    "topic": "Prototype Pattern",
+    "code": "var original = new User { Name = \"Alice\", Address = new Address(\"NYC\") };\nvar copy = original; // just copies the reference!\ncopy.Address.City = \"LA\";\nConsole.WriteLine(original.Address.City); // prints \"LA\" — oops!",
+    "question": "The copy changed the original's address. What went wrong?",
+    "options": ["It's a reference copy, not a clone — both point to the same Address object", "Address should be a struct", "copy should be readonly", "City is a value type"],
+    "answer": 0,
+    "explanation": "Assignment copies the reference, not the object. Both 'original' and 'copy' point to the same User and the same Address. Prototype pattern uses deep cloning to create truly independent copies."
+  },
+  {
+    "id": "prototype-003",
+    "topic": "Prototype Pattern",
+    "code": "public class Shape : ICloneable {\n  public int X { get; set; }\n  public int Y { get; set; }\n  public string Color { get; set; }\n  \n  public object Clone() {\n    return MemberwiseClone();\n  }\n}",
+    "question": "MemberwiseClone creates a shallow copy. When is this NOT enough?",
+    "options": ["When the object has reference-type fields (like a list or nested object)", "When the object has many properties", "When the object is large", "It's always enough"],
+    "answer": 0,
+    "explanation": "MemberwiseClone copies value types (int, string) correctly, but reference-type fields (lists, nested objects) still share the same reference. If Shape had a List<Point> corners, both copies would share the same list."
+  },
+  {
+    "id": "prototype-004",
+    "topic": "Prototype Pattern",
+    "code": "public class Document {\n  public string Title { get; set; }\n  public List<Page> Pages { get; set; }\n  \n  public Document DeepClone() {\n    var clone = (Document)MemberwiseClone();\n    clone.Pages = Pages.Select(p => p.Clone()).ToList();\n    return clone;\n  }\n}",
+    "question": "Why does DeepClone create a new list of cloned pages?",
+    "options": ["So modifying the clone's pages doesn't affect the original", "To sort the pages", "MemberwiseClone doesn't copy lists", "The original pages are deleted"],
+    "answer": 0,
+    "explanation": "Without deep cloning the Pages list, adding or editing a page in the clone would also change the original document. Deep clone creates independent copies of all nested reference types."
+  },
+  {
+    "id": "prototype-005",
+    "topic": "Prototype Pattern",
+    "code": "public class PrototypeRegistry {\n  private Dictionary<string, IPrototype> _prototypes = new();\n  \n  public void Register(string key, IPrototype proto) {\n    _prototypes[key] = proto;\n  }\n  \n  public IPrototype Create(string key) {\n    return _prototypes[key].Clone();\n  }\n}",
+    "question": "What's the benefit of a prototype registry?",
+    "options": ["Pre-configured prototypes can be cloned by name — no setup code needed", "It makes prototypes faster", "It limits the number of clones", "It validates prototypes"],
+    "answer": 0,
+    "explanation": "Register a fully configured 'default-report' prototype once. Later, Create(\"default-report\") gives you a clone with all settings pre-applied. No need to remember or repeat the setup every time."
+  },
+  {
+    "id": "prototype-006",
+    "topic": "Prototype Pattern",
+    "code": "var cell1 = new SpreadsheetCell {\n  Formula = \"=SUM(A1:A10)\",\n  Format = new CellFormat { Bold = true, Color = \"red\" }\n};\nvar cell2 = cell1.Clone();\ncell2.Formula = \"=AVG(B1:B10)\";",
+    "question": "After cloning, cell2 has a different formula but same format. Is cell2.Format independent?",
+    "options": ["Only if Clone() deep-copies the Format object", "Yes — Clone() always creates independent copies", "No — formats are always shared", "It depends on whether Format is a struct"],
+    "answer": 0,
+    "explanation": "If Clone() uses MemberwiseClone, cell2.Format points to the same CellFormat object. Changing cell2.Format.Bold would also change cell1's format. Deep cloning the Format is needed for independence."
+  },
+  {
+    "id": "prototype-007",
+    "topic": "Prototype Pattern",
+    "code": "// Game editor — placing trees\nvar oakTemplate = new Tree(\"Oak\", LoadMesh(\"oak.obj\"), LoadTexture(\"oak.png\"));\n\n// Place 500 trees\nfor (int i = 0; i < 500; i++) {\n  var tree = oakTemplate.Clone();\n  tree.Position = RandomPosition();\n  scene.Add(tree);\n}",
+    "question": "Why clone instead of creating 500 new Trees from scratch?",
+    "options": ["Loading mesh and texture is expensive — clone reuses the loaded data", "Clone is easier to type", "New Tree() isn't available", "Trees must be identical"],
+    "answer": 0,
+    "explanation": "LoadMesh and LoadTexture are heavy I/O operations. Cloning copies the already-loaded mesh and texture data — each tree gets the same visuals without re-reading files 500 times."
+  },
+  {
+    "id": "prototype-008",
+    "topic": "Prototype Pattern",
+    "code": "public interface IPrototype<T> {\n  T Clone();\n}\npublic class Enemy : IPrototype<Enemy> {\n  public int Health { get; set; }\n  public int Damage { get; set; }\n  public List<Item> Loot { get; set; }\n  \n  public Enemy Clone() {\n    var clone = (Enemy)MemberwiseClone();\n    clone.Loot = new List<Item>(Loot);\n    return clone;\n  }\n}",
+    "question": "The Loot list is copied with `new List<Item>(Loot)`. Is this deep enough?",
+    "options": ["Only if Item is immutable — otherwise Item objects are still shared", "Yes — creating a new list is always deep enough", "No — you should use Loot.ToList()", "It depends on the list size"],
+    "answer": 0,
+    "explanation": "new List<Item>(Loot) creates a new list but the Item references inside are shared. If an Item has mutable properties, changing loot in the clone affects the original. If Items are immutable (read-only), this is fine."
+  },
+  {
+    "id": "prototype-009",
+    "topic": "Prototype Pattern",
+    "code": "var original = new Config { MaxRetries = 3, Timeout = 30 };\nvar serialized = JsonSerializer.Serialize(original);\nvar clone = JsonSerializer.Deserialize<Config>(serialized);",
+    "question": "Using serialization for cloning — what's the trade-off?",
+    "options": ["Always deep copies everything, but slower and needs serializable types", "It's faster than MemberwiseClone", "It doesn't work with nested objects", "It creates shallow copies only"],
+    "answer": 0,
+    "explanation": "Serialize → deserialize creates a completely independent deep copy automatically. The downside: it's much slower than MemberwiseClone, and all types must be serializable. Great for prototyping, not for hot paths."
+  },
+  {
+    "id": "prototype-010",
+    "topic": "Prototype Pattern",
+    "code": "public class Notification {\n  public string Template { get; set; }\n  public string Channel { get; set; }\n  public Priority Priority { get; set; }\n}\n\nvar urgentEmail = new Notification {\n  Template = \"alert.html\",\n  Channel = \"email\",\n  Priority = Priority.High\n};\n\n// Send to 1000 users\nforeach (var user in users) {\n  var notif = urgentEmail.Clone();\n  notif.Template = notif.Template.Replace(\"{{name}}\", user.Name);\n  Send(notif);\n}",
+    "question": "Why is Prototype the right pattern here instead of Builder?",
+    "options": ["Most properties are identical — only the name changes per user", "Builder can't handle 1000 objects", "Prototype is faster than Builder", "Notification is too simple for Builder"],
+    "answer": 0,
+    "explanation": "When 90% of the object is the same and you're just tweaking small details per instance, cloning is more efficient and readable than rebuilding from scratch with a Builder each time."
+  }
+]
