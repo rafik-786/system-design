@@ -1514,8 +1514,48 @@ app.MapGet("/api/orders/{id}", async (int id, IOrderRepository repo) =&gt;
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2023, .NET 7 e-commerce platform.</strong> The pricing team updated discount calculation to return amounts in <em>cents</em> (integer) instead of dollars (decimal) for precision. After deployment, all order confirmation emails started showing "$0.45" instead of "$45.00" — the email template code was in the same service class and called a shared <code>GetTotal()</code> helper that now returned cents, but the email formatter still treated it as dollars.</p>
         </div>
+
+        <p class="body-text">Imagine you and your roommate share a single kitchen knife. You decide to sharpen it for cutting vegetables, but your roommate picks it up to spread butter and accidentally cuts through the bread. That's what happened here: two teams shared a single helper method, and when one team "sharpened" it for their needs, it cut the other team's work to pieces.</p>
+
+        <p class="body-text">The pricing team had a good reason for the change. Working with integers (cents) instead of decimals (dollars) avoids floating-point rounding errors. A $45.99 item times 3 can give you $137.96999... in decimal math, but 4599 cents times 3 is always exactly 13797 cents. So they updated <code>GetTotal()</code> to multiply by 100 and return cents. Clean, correct, well-tested.</p>
+
+        <p class="body-text">The problem? That same <code>GetTotal()</code> method was also called by <code>BuildEmailBody()</code>, written by the email team six months earlier. The email method used C#'s <code>:C</code> currency formatter, which assumed the number was in dollars. So when <code>GetTotal()</code> returned 4500 (cents), the email happily formatted it as "$4,500.00" instead of "$45.00". Every customer got a confirmation email showing 100x the actual price.</p>
+
+        <p class="body-text">The truly painful part: it took 3 hours to diagnose because <code>OrderService.cs</code> was 800 lines long. The pricing team's PR only touched <code>CalculateDiscountCents()</code> and <code>GetTotal()</code>. No one realized that <code>BuildEmailBody()</code> also depended on <code>GetTotal()</code> because it was buried 400 lines below, invisible in the PR diff.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">3 hours — the connection between pricing logic and email formatting wasn't obvious because they were in the same 800-line <code>OrderService</code>.</p>
+
+        <!-- SVG: Shared method coupling -->
+        <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing how a shared GetTotal method creates invisible coupling between pricing and email concerns" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="srp-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+            <marker id="srp-b1-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#e74c3c"/></marker>
+          </defs>
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:13px;fill:var(--text-primary)}</style>
+          <!-- OrderService box -->
+          <rect x="120" y="10" width="480" height="240" rx="12" fill="var(--bg-secondary)" stroke="var(--border-primary)" stroke-width="1.5" stroke-dasharray="6 3"/>
+          <text x="360" y="35" text-anchor="middle" font-weight="bold" font-size="14">OrderService.cs (800 lines)</text>
+          <!-- Pricing box -->
+          <rect x="140" y="55" width="200" height="70" rx="8" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="240" y="80" text-anchor="middle" font-weight="bold" font-size="12">Pricing Team's Code</text>
+          <text x="240" y="100" text-anchor="middle" font-size="11">CalculateDiscountCents()</text>
+          <!-- Email box -->
+          <rect x="380" y="55" width="200" height="70" rx="8" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="480" y="80" text-anchor="middle" font-weight="bold" font-size="12">Email Team's Code</text>
+          <text x="480" y="100" text-anchor="middle" font-size="11">BuildEmailBody()</text>
+          <!-- Shared method box -->
+          <rect x="230" y="165" width="260" height="55" rx="8" fill="#e74c3c22" stroke="#e74c3c" stroke-width="2"/>
+          <text x="360" y="188" text-anchor="middle" font-weight="bold" fill="#e74c3c" font-size="12">Shared: GetTotal()</text>
+          <text x="360" y="206" text-anchor="middle" font-size="11" fill="#e74c3c">Changed to cents -- broke email!</text>
+          <!-- Arrows down to shared -->
+          <line x1="240" y1="125" x2="320" y2="165" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#srp-b1-arr)"/>
+          <line x1="480" y1="125" x2="410" y2="165" stroke="#e74c3c" stroke-width="2" marker-end="url(#srp-b1-arr-red)" stroke-dasharray="6 3"/>
+          <!-- Labels -->
+          <text x="250" y="150" font-size="10" fill="var(--text-secondary)">calls</text>
+          <text x="430" y="150" font-size="10" fill="#e74c3c">also calls!</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug1-bad" role="tab" aria-selected="true" aria-controls="bug1-bad">Buggy Code</button>
@@ -1548,6 +1588,7 @@ app.MapGet("/api/orders/{id}", async (int id, IOrderRepository repo) =&gt;
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at <code>GetTotal()</code> on line 4. It used to just sum up prices. The pricing team added <code>* 100</code> at the end to convert to cents. That's the only line that changed. But scroll down to <code>BuildEmailBody()</code> — it also calls <code>GetTotal()</code> and passes the result straight into C#'s currency formatter (<code>:C</code>). The formatter doesn't know the number is in cents. It just adds a dollar sign and decimal point. So 4500 cents becomes "$4,500.00" instead of "$45.00". Two different teams, two different assumptions about the same shared method.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1575,8 +1616,15 @@ public class OrderEmailService(IEmailSender sender)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Now the pricing service and the email service are completely separate classes. They don't share any private methods. The pricing team can change how discounts are calculated — switching to cents, changing rounding rules, whatever they need. The email service has its own <code>FormatAmount()</code> method that reads <code>order.Total</code> directly from the Order model (which always stores dollars). Neither team can accidentally break the other's code, because they don't touch the same files.</p>
           </div>
         </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for <code>private</code> helper methods that are called by multiple public methods serving different purposes. If you see a private method used by both "business logic" methods and "presentation/email" methods, that's invisible coupling waiting to break. The fix: each concern gets its own class with its own private helpers.</p>
+        </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Shared private methods between responsibilities are invisible coupling. When pricing and email live in separate classes, a pricing change <em>cannot</em> break email formatting.</p>
@@ -1593,8 +1641,52 @@ public class OrderEmailService(IEmailSender sender)
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Friday 5:47 PM.</strong> Production API stopped responding. A service class that handled both order processing AND audit logging held an open <span class="tooltip-trigger">database transaction<span class="tooltip-content">A unit of work that groups multiple SQL operations. While a transaction is open, it holds locks on affected rows. If the code does slow work (HTTP calls, file I/O) inside the transaction, those locks are held for the entire duration — blocking other requests.</span></span> while synchronously writing to the audit log table. Under load, the long-held row locks caused a cascade: concurrent requests queued up waiting for locks, exhausting the connection pool within seconds.</p>
         </div>
+
+        <p class="body-text">Think of a database transaction like borrowing a library study room. While you have the room, nobody else can use it. Now imagine you borrowed the room to write an essay (your main task), but you also decided to update the room's visitor logbook while still inside (your audit log). The logbook update takes extra time, and during that time, 10 other students are standing in line waiting for the room. Eventually they all give up and leave. That's a deadlock under load.</p>
+
+        <p class="body-text">Here's what happened step by step. The <code>OrderProcessor</code> class opened a database transaction, updated the order status (locking the Orders row), then — while still holding those locks — also wrote an audit log entry to the AuditLogs table. Both writes used the same database context and the same transaction. Under normal traffic, this worked fine. Each request finished in about 50 milliseconds.</p>
+
+        <p class="body-text">But on Friday at 5:47 PM, a flash sale drove traffic 20x higher than usual. Suddenly dozens of requests tried to process orders at the same time. Each one opened a transaction, locked an Orders row, and then tried to write to AuditLogs. But AuditLogs was already locked by other transactions doing the same thing. Requests started queuing. The <span class="tooltip-trigger">connection pool<span class="tooltip-content">A fixed-size pool of database connections (default: 100 in .NET). When all connections are busy, new requests wait. If they wait too long, the pool is "exhausted" and requests fail with a timeout error. Long-running transactions are the #1 cause.</span></span> (capped at 100 connections by default) filled up within seconds. New requests got "connection pool exhausted" errors. The API returned 500 errors for every request.</p>
+
+        <p class="body-text">The worst part: it was invisible in testing. Local development hits the database sequentially (one request at a time), so the locks never overlapped. Only under concurrent production load did the deadlock appear. The team spent 4 hours staring at logs before they realized the audit writes inside the transaction were the bottleneck.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">4 hours — the connection pool exhaustion only appeared under concurrent load. Local testing with sequential requests never triggered it.</p>
+
+        <!-- SVG: Transaction lock cascade -->
+        <svg viewBox="0 0 720 280" role="img" aria-label="Diagram showing how audit logging inside a transaction causes lock cascading and connection pool exhaustion" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="srp-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+            <marker id="srp-b2-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#e74c3c"/></marker>
+          </defs>
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:12px;fill:var(--text-primary)}</style>
+          <!-- Timeline -->
+          <line x1="60" y1="50" x2="680" y2="50" stroke="var(--border-primary)" stroke-width="1"/>
+          <text x="370" y="30" text-anchor="middle" font-size="13" font-weight="bold">Transaction Timeline (under load)</text>
+          <!-- Request 1 -->
+          <rect x="80" y="60" width="140" height="30" rx="4" fill="var(--accent-primary)" opacity="0.3" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="150" y="80" text-anchor="middle" font-size="11" font-weight="bold">Req 1: Lock Orders</text>
+          <rect x="220" y="60" width="160" height="30" rx="4" fill="#e74c3c33" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="300" y="80" text-anchor="middle" font-size="11" fill="#e74c3c">+ Write AuditLogs</text>
+          <!-- Request 2 waiting -->
+          <rect x="180" y="110" width="40" height="30" rx="4" fill="var(--accent-primary)" opacity="0.3" stroke="var(--accent-primary)" stroke-width="1"/>
+          <rect x="220" y="110" width="200" height="30" rx="4" fill="#f39c1233" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="320" y="130" text-anchor="middle" font-size="11" fill="#f39c12">Req 2: WAITING for lock...</text>
+          <!-- Request 3 waiting -->
+          <rect x="230" y="160" width="230" height="30" rx="4" fill="#f39c1233" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="4 2"/>
+          <text x="345" y="180" text-anchor="middle" font-size="11" fill="#f39c12">Req 3: WAITING for lock...</text>
+          <!-- Explosion -->
+          <rect x="480" y="100" width="200" height="55" rx="8" fill="#e74c3c22" stroke="#e74c3c" stroke-width="2"/>
+          <text x="580" y="122" text-anchor="middle" font-weight="bold" fill="#e74c3c" font-size="12">Connection Pool</text>
+          <text x="580" y="142" text-anchor="middle" font-size="11" fill="#e74c3c">EXHAUSTED (100/100)</text>
+          <!-- Arrow to explosion -->
+          <line x1="460" y1="140" x2="480" y2="130" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#srp-b2-arr-red)"/>
+          <!-- Fix label -->
+          <rect x="80" y="220" width="280" height="45" rx="8" fill="#27ae6022" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="220" y="240" text-anchor="middle" font-weight="bold" fill="#27ae60" font-size="12">SRP Fix: Separate transactions</text>
+          <text x="220" y="256" text-anchor="middle" font-size="11" fill="#27ae60">Order = own context | Audit = own context</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug2-bad" role="tab" aria-selected="true" aria-controls="bug2-bad">Buggy Code</button>
@@ -1633,6 +1725,7 @@ public class OrderEmailService(IEmailSender sender)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Line 5 opens a transaction — from this point, every database write is wrapped in a "hold everything" lock. Line 8 updates the order status and locks that row. Then, instead of committing right away, line 11 also writes an audit log entry. Now the transaction holds locks on TWO tables. <code>SaveChangesAsync()</code> on line 18 pushes both writes to the database, but the transaction doesn't release its locks until <code>CommitAsync()</code> on line 19 completes. Under heavy load, that gap between "acquire lock" and "release lock" overlaps with other requests doing the same thing, and everyone ends up waiting for everyone else.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1665,8 +1758,15 @@ public class AuditLogger(AuditDbContext auditDb) : IAuditLogger
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Each class now has its own <code>DbContext</code>, which means its own database connection and its own transaction scope. The <code>OrderProcessor</code> locks the Orders row, writes, and immediately releases. The <code>AuditLogger</code> writes to AuditLogs on a completely separate connection. Even under 20x traffic, the order locks are held for milliseconds instead of the entire combined operation. The connection pool never fills up because each individual operation is fast.</p>
           </div>
         </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for methods that call <code>BeginTransactionAsync()</code> and then do multiple unrelated writes inside that transaction. If the writes serve different purposes (business data + audit trail, order status + notification queue), they should use separate <code>DbContext</code> instances. Also watch for any <code>SaveChangesAsync()</code> call that's bundling work for different stakeholders into a single round-trip.</p>
+        </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Mixing business logic with logging in the same class (and same transaction) creates invisible concurrency hazards. Separate responsibilities = separate transactions = no deadlocks.</p>
@@ -1683,8 +1783,52 @@ public class AuditLogger(AuditDbContext auditDb) : IAuditLogger
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2024, .NET 8 SaaS app.</strong> A junior developer added a new validation rule to the <code>UserService.Register()</code> method. The new rule used <code>throw</code> for invalid input — but the method also had a try/catch around the database save that swallowed exceptions. Valid users started getting "registration failed" errors because the new validation exception was caught by the persistence error handler.</p>
         </div>
+
+        <p class="body-text">Imagine a restaurant where the waiter takes your order AND cooks the food. The kitchen has a rule: "if anything goes wrong with the stove, throw away the dish and tell the customer it's a kitchen fire." Now the waiter adds a new rule: "reject orders without a drink." But when a customer orders food without a drink, the waiter throws an error — which gets caught by the kitchen's "stove fire" handler. The customer hears "sorry, kitchen fire" when the real problem was just a missing drink order. That's exactly what happened here.</p>
+
+        <p class="body-text">The original <code>Register()</code> method was written by a senior developer who wrapped the database save in a try/catch to handle transient database errors gracefully. The catch block returned <code>Result.Fail("Registration failed: DB error")</code>. This worked perfectly for months — when the database was down or a unique constraint failed, users got a clean error message.</p>
+
+        <p class="body-text">Then a junior developer was assigned to add email format validation and a minimum password length rule. They added two <code>throw new ArgumentException()</code> checks at the top of the same method. Their code was correct in isolation — if the email is empty, throw. If the password is too short, throw. But they didn't realize those throws would be caught by the <code>catch (Exception ex)</code> block below, which was designed for database errors. The catch block ate the validation exception and returned "DB error" to the user.</p>
+
+        <p class="body-text">The bug was especially sneaky because it only affected users who submitted invalid data. Users with valid data registered fine. The team didn't notice until a customer emailed support saying "I keep getting a database error but I just want to sign up." The support team assumed the database was down and escalated to infrastructure — who found nothing wrong. Only after an hour of digging did they realize it was a validation exception being misreported as a database error.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">1 hour — but only after a customer reported they couldn't sign up. The catch block logged "DB error" even though it was a validation error.</p>
+
+        <!-- SVG: Exception cross-contamination -->
+        <svg viewBox="0 0 720 270" role="img" aria-label="Diagram showing how validation exceptions get caught by the wrong error handler when concerns are mixed" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="srp-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+            <marker id="srp-b3-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#e74c3c"/></marker>
+          </defs>
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:12px;fill:var(--text-primary)}</style>
+          <!-- Method box -->
+          <rect x="60" y="10" width="600" height="250" rx="12" fill="var(--bg-secondary)" stroke="var(--border-primary)" stroke-width="1.5" stroke-dasharray="6 3"/>
+          <text x="360" y="35" text-anchor="middle" font-weight="bold" font-size="13">Register() method — all in one</text>
+          <!-- Validation step -->
+          <rect x="90" y="55" width="220" height="50" rx="8" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="200" y="75" text-anchor="middle" font-weight="bold" font-size="11">Validation (added later)</text>
+          <text x="200" y="92" text-anchor="middle" font-size="10">throw ArgumentException</text>
+          <!-- DB step -->
+          <rect x="90" y="125" width="220" height="50" rx="8" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="200" y="145" text-anchor="middle" font-weight="bold" font-size="11">Persistence (original)</text>
+          <text x="200" y="162" text-anchor="middle" font-size="10">db.SaveChanges()</text>
+          <!-- Catch block -->
+          <rect x="380" y="80" width="250" height="85" rx="8" fill="#e74c3c22" stroke="#e74c3c" stroke-width="2"/>
+          <text x="505" y="102" text-anchor="middle" font-weight="bold" fill="#e74c3c" font-size="11">catch (Exception ex)</text>
+          <text x="505" y="120" text-anchor="middle" font-size="10" fill="#e74c3c">return "DB error"</text>
+          <text x="505" y="150" text-anchor="middle" font-size="10" fill="#e74c3c">Catches EVERYTHING!</text>
+          <!-- Arrows -->
+          <line x1="310" y1="80" x2="380" y2="100" stroke="#e74c3c" stroke-width="2" marker-end="url(#srp-b3-arr-red)" stroke-dasharray="6 3"/>
+          <line x1="310" y1="150" x2="380" y2="130" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#srp-b3-arr)"/>
+          <!-- Labels -->
+          <text x="340" y="80" font-size="9" fill="#e74c3c">wrong!</text>
+          <text x="340" y="145" font-size="9" fill="var(--text-secondary)">intended</text>
+          <!-- Result -->
+          <rect x="150" y="200" width="420" height="40" rx="6" fill="#e74c3c11" stroke="#e74c3c" stroke-width="1"/>
+          <text x="360" y="225" text-anchor="middle" font-size="11" fill="#e74c3c">User sees: "Registration failed: DB error" -- but the DB is fine!</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug3-bad" role="tab" aria-selected="true" aria-controls="bug3-bad">Buggy Code</button>
@@ -1723,6 +1867,7 @@ public class AuditLogger(AuditDbContext auditDb) : IAuditLogger
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Lines 6-9 are the new validation rules — they throw <code>ArgumentException</code> when input is bad. Lines 12-21 are the original try/catch wrapper around the database save. The critical problem is on line 18: <code>catch (Exception ex)</code> catches <em>every</em> exception type, not just database-related ones. When line 7 throws <code>ArgumentException("Email required")</code>, execution jumps straight to line 18's catch block. The catch block has no idea it caught a validation error — it always returns "DB error". The original developer wrote the catch for <code>DbUpdateException</code>, but used the broad <code>Exception</code> base class. The junior developer had no way to know this trap existed.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1766,8 +1911,15 @@ public class RegistrationService(IValidator&lt;RegisterDto&gt; validator, IUserR
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Validation is now a completely separate class (<code>RegisterValidator</code>) that uses FluentValidation. It returns validation results — it never throws exceptions. The repository (<code>UserRepository</code>) only deals with database operations, so only database exceptions can occur there. The orchestrator (<code>RegistrationService</code>) calls validation first: if invalid, it returns the validation error immediately and never reaches the database. There's no way for a validation failure to be misreported as a database error because the two concerns run in different classes at different times.</p>
           </div>
         </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for methods that have both <code>throw</code> statements and <code>try/catch</code> blocks in the same method body. If the <code>throw</code> is for one concern (validation) and the <code>catch</code> is for another (persistence), that's a cross-contamination bug waiting to happen. Also watch for <code>catch (Exception)</code> with no type filtering — it catches everything indiscriminately.</p>
+        </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">When validation and persistence are in the same method, error handling becomes tangled. Separate them: validate first, persist second, each in its own class with its own error handling strategy.</p>
@@ -1784,8 +1936,52 @@ public class RegistrationService(IValidator&lt;RegisterDto&gt; validator, IUserR
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2023, .NET 7 analytics platform.</strong> A <code>DashboardService</code> handled both data fetching and caching. The performance team changed the cache TTL from 1 hour to 24 hours and modified the LINQ query to use a faster projection — but they didn't realize the cache key included a date component that was now stale. Dashboard showed yesterday's numbers all day because the 24-hour cache was populated before midnight.</p>
         </div>
+
+        <p class="body-text">Think of caching like a sticky note on your fridge that says "we have milk." If you check the note once an hour, you'll know pretty quickly when the milk runs out. But if someone changes the rule to "check the note once a day," and the milk runs out in the afternoon, you'll think you have milk until tomorrow morning. That's what happened with this dashboard — the "sticky note" (cache) said "here are today's sales numbers," but "today" was actually yesterday.</p>
+
+        <p class="body-text">The <code>DashboardService</code> was responsible for two completely different things: fetching sales data from the database (a data access concern) and caching that data in memory (a performance concern). The performance team was asked to improve response times. Their change was simple: bump the cache duration from 1 hour to 24 hours, and optimize the LINQ query with a faster projection. Both changes were correct in isolation.</p>
+
+        <p class="body-text">But here's the trap. The cache key was just <code>"dashboard-{userId}"</code> — it didn't include a date. When the cache was set to 1 hour, this didn't matter much because the data refreshed 24 times a day. But at 24 hours, a user who viewed their dashboard at 11:30 PM would get that snapshot cached. The next morning at 9 AM, they'd still see last night's numbers. Sales that happened overnight were invisible. The dashboard looked frozen.</p>
+
+        <p class="body-text">The bug went undetected for a full business day. The data <em>looked</em> real — it was actual sales numbers, just outdated. Nobody noticed until a user reported "my sales counter hasn't moved all day." The team checked the database: new sales were there. They checked the API: it returned old data. Only then did they trace it to the cache TTL change, hidden in a seemingly innocent performance PR.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">1 day — because the data <em>looked</em> correct (it was real data, just outdated). Only after a user reported "today's sales haven't moved" did the team investigate the cache.</p>
+
+        <!-- SVG: Cache staleness timeline -->
+        <svg viewBox="0 0 720 220" role="img" aria-label="Timeline showing how a 24-hour cache serves stale dashboard data across midnight" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="srp-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:12px;fill:var(--text-primary)}</style>
+          <!-- Timeline -->
+          <text x="360" y="20" text-anchor="middle" font-weight="bold" font-size="13">24-Hour Cache Timeline</text>
+          <line x1="60" y1="60" x2="660" y2="60" stroke="var(--border-primary)" stroke-width="2"/>
+          <!-- Time markers -->
+          <line x1="60" y1="55" x2="60" y2="65" stroke="var(--border-primary)" stroke-width="2"/>
+          <text x="60" y="80" text-anchor="middle" font-size="10">11 PM</text>
+          <line x1="210" y1="55" x2="210" y2="65" stroke="var(--border-primary)" stroke-width="2"/>
+          <text x="210" y="80" text-anchor="middle" font-size="10">Midnight</text>
+          <line x1="360" y1="55" x2="360" y2="65" stroke="var(--border-primary)" stroke-width="2"/>
+          <text x="360" y="80" text-anchor="middle" font-size="10">9 AM</text>
+          <line x1="510" y1="55" x2="510" y2="65" stroke="var(--border-primary)" stroke-width="2"/>
+          <text x="510" y="80" text-anchor="middle" font-size="10">3 PM</text>
+          <line x1="660" y1="55" x2="660" y2="65" stroke="var(--border-primary)" stroke-width="2"/>
+          <text x="660" y="80" text-anchor="middle" font-size="10">11 PM</text>
+          <!-- Cache bar -->
+          <rect x="60" y="95" width="600" height="30" rx="4" fill="#e74c3c22" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="360" y="115" text-anchor="middle" font-weight="bold" fill="#e74c3c" font-size="11">Cache: "yesterday's data" served all day</text>
+          <!-- Cache set point -->
+          <circle cx="60" cy="95" r="6" fill="var(--accent-primary)"/>
+          <text x="70" y="92" font-size="10" fill="var(--accent-primary)">Cache SET</text>
+          <!-- New data arriving -->
+          <rect x="210" y="145" width="450" height="25" rx="4" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="435" y="163" text-anchor="middle" font-size="10" fill="#27ae60">New sales data in DB (invisible to users!)</text>
+          <!-- User sees stale -->
+          <rect x="360" y="185" width="200" height="25" rx="4" fill="#f39c1222" stroke="#f39c12" stroke-width="1"/>
+          <text x="460" y="202" text-anchor="middle" font-size="10" fill="#f39c12">User: "My sales haven't moved!"</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug4-bad" role="tab" aria-selected="true" aria-controls="bug4-bad">Buggy Code</button>
@@ -1820,6 +2016,7 @@ public class RegistrationService(IValidator&lt;RegisterDto&gt; validator, IUserR
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Line 6 builds a cache key that's just <code>"dashboard-{userId}"</code> — no date, no version. Line 7 checks if we have cached data; if yes, return it immediately without hitting the database. If not, lines 10-14 fetch fresh data from the database. Line 17 stores it in cache for 24 hours. The problem: the performance team only changed the <code>TimeSpan</code> on line 17 from 1 hour to 24 hours, and tweaked the LINQ on lines 10-14. They never thought about the cache key. With a 1-hour TTL, a missing date in the key was a minor inconvenience (at most 1 hour of stale data). With a 24-hour TTL, it meant an entire business day of invisible data.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1866,8 +2063,15 @@ builder.Services.AddScoped&lt;IDashboardRepository&gt;(sp =&gt;
         sp.GetRequiredService&lt;IMemoryCache&gt;()));</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The repository (<code>DashboardRepository</code>) only knows about SQL — it has zero awareness of caching. The cache decorator (<code>CachedDashboardRepository</code>) only knows about caching — it has zero awareness of SQL. Now the performance team can change cache TTL, cache keys, or even swap from in-memory to Redis without ever touching the data access code. And the data team can optimize the LINQ query without worrying about cache invalidation. Each concern lives in its own class, reviewed by the team that owns it.</p>
           </div>
         </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for classes that inject both a data access dependency (<code>DbContext</code>, <code>HttpClient</code>) AND a caching dependency (<code>IMemoryCache</code>, <code>IDistributedCache</code>). That's two concerns in one class. The Decorator pattern lets you layer caching on top of data access without mixing them. Bonus: you can turn caching on/off just by changing DI registration — no code changes.</p>
+        </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Use the <strong><span class="tooltip-trigger">Decorator pattern<span class="tooltip-content">A structural design pattern that wraps an object to add behavior without modifying it. In .NET DI, you register the decorator as the interface and inject the real implementation into it.</span></span></strong> to separate caching from data access. The repository doesn't know about caching. The cache decorator doesn't know about SQL. Changes to caching strategy can't break data fetching logic.</p>
@@ -1884,8 +2088,62 @@ builder.Services.AddScoped&lt;IDashboardRepository&gt;(sp =&gt;
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2 AM. Production.</strong> A multi-tenant SaaS app had authorization checks scattered throughout a <code>ProjectService</code>. When a new feature was added, the developer forgot to add the tenant check. Users from Tenant A could see Tenant B's projects. Data breach reported, incident response triggered.</p>
         </div>
+
+        <p class="body-text">Imagine an apartment building where every door has its own separate lock, and it's each tenant's responsibility to lock their own door. If someone installs a new door and forgets to add a lock, anyone in the building can walk right in. That's what happened here: every method in <code>ProjectService</code> was responsible for adding its own tenant check, and the new method simply forgot.</p>
+
+        <p class="body-text">This was a multi-tenant SaaS application. "Multi-tenant" means multiple companies (tenants) share the same database, but each company should only see its own data. The existing <code>GetAll()</code> and <code>GetById()</code> methods both had a <code>.Where(p =&gt; p.TenantId == currentUser.TenantId)</code> filter. This worked, but the security check was duplicated in every method — it was the developer's job to remember to add it each time.</p>
+
+        <p class="body-text">A developer was assigned to build a new project search feature. They wrote a perfectly functional <code>Search()</code> method with a clean LINQ query: <code>db.Projects.Where(p =&gt; p.Name.Contains(query))</code>. It passed all unit tests (which used a single-tenant test database). It passed code review (the reviewer focused on the search logic, not the missing filter). It shipped to production at 6 PM on a Friday.</p>
+
+        <p class="body-text">At 2 AM, an automated security scanner flagged an anomaly: a user from Company A's search results included project names belonging to Company B. The incident response team was woken up. It took only 30 minutes to find the missing filter — but the real damage was the 2-week audit that followed. The legal team needed proof that no sensitive data was actually leaked across tenants. Every search query made between deployment and the fix had to be reviewed. The company had to notify affected customers under their data processing agreement.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">30 minutes to find — but 2 weeks of audit to confirm no data was actually leaked across tenants.</p>
+
+        <!-- SVG: Scattered vs centralized tenant check -->
+        <svg viewBox="0 0 720 260" role="img" aria-label="Diagram comparing scattered tenant checks per method versus a centralized tenant-scoped repository" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="srp-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:12px;fill:var(--text-primary)}</style>
+          <!-- Bad side -->
+          <text x="180" y="20" text-anchor="middle" font-weight="bold" font-size="13" fill="#e74c3c">Before: Scattered Checks</text>
+          <rect x="40" y="35" width="130" height="35" rx="6" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="105" y="57" text-anchor="middle" font-size="10">GetAll() + filter</text>
+          <rect x="40" y="80" width="130" height="35" rx="6" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="105" y="102" text-anchor="middle" font-size="10">GetById() + filter</text>
+          <rect x="40" y="125" width="130" height="35" rx="6" fill="#e74c3c22" stroke="#e74c3c" stroke-width="2"/>
+          <text x="105" y="147" text-anchor="middle" font-size="10" fill="#e74c3c">Search() NO filter!</text>
+          <rect x="200" y="35" width="120" height="125" rx="8" fill="var(--bg-secondary)" stroke="var(--border-primary)" stroke-width="1" stroke-dasharray="4 2"/>
+          <text x="260" y="100" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Database</text>
+          <text x="260" y="115" text-anchor="middle" font-size="10" fill="var(--text-secondary)">(all tenants)</text>
+          <!-- Arrow from bad search to DB -->
+          <line x1="170" y1="142" x2="200" y2="100" stroke="#e74c3c" stroke-width="2"/>
+          <!-- Divider -->
+          <line x1="360" y1="15" x2="360" y2="250" stroke="var(--border-primary)" stroke-width="1" stroke-dasharray="4 2"/>
+          <!-- Good side -->
+          <text x="540" y="20" text-anchor="middle" font-weight="bold" font-size="13" fill="#27ae60">After: Centralized Filter</text>
+          <rect x="400" y="35" width="130" height="35" rx="6" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="465" y="57" text-anchor="middle" font-size="10">GetAll()</text>
+          <rect x="400" y="80" width="130" height="35" rx="6" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="465" y="102" text-anchor="middle" font-size="10">GetById()</text>
+          <rect x="400" y="125" width="130" height="35" rx="6" fill="var(--bg-primary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="465" y="147" text-anchor="middle" font-size="10">Search()</text>
+          <!-- Single filter gate -->
+          <rect x="555" y="55" width="130" height="85" rx="8" fill="#27ae6022" stroke="#27ae60" stroke-width="2"/>
+          <text x="620" y="85" text-anchor="middle" font-weight="bold" font-size="10" fill="#27ae60">ScopedProjects</text>
+          <text x="620" y="100" text-anchor="middle" font-size="9" fill="#27ae60">TenantId filter</text>
+          <text x="620" y="115" text-anchor="middle" font-size="9" fill="#27ae60">ALWAYS applied</text>
+          <!-- Arrows through gate -->
+          <line x1="530" y1="52" x2="555" y2="75" stroke="var(--accent-primary)" stroke-width="1" marker-end="url(#srp-b5-arr)"/>
+          <line x1="530" y1="97" x2="555" y2="97" stroke="var(--accent-primary)" stroke-width="1" marker-end="url(#srp-b5-arr)"/>
+          <line x1="530" y1="142" x2="555" y2="118" stroke="var(--accent-primary)" stroke-width="1" marker-end="url(#srp-b5-arr)"/>
+          <!-- Caption -->
+          <rect x="100" y="190" width="520" height="50" rx="8" fill="var(--bg-secondary)" stroke="var(--border-primary)" stroke-width="1"/>
+          <text x="360" y="210" text-anchor="middle" font-size="11">Left: Every method must remember the filter (fragile).</text>
+          <text x="360" y="228" text-anchor="middle" font-size="11">Right: One property applies the filter for ALL methods (foolproof).</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug5-bad" role="tab" aria-selected="true" aria-controls="bug5-bad">Buggy Code</button>
@@ -1926,6 +2184,7 @@ builder.Services.AddScoped&lt;IDashboardRepository&gt;(sp =&gt;
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at <code>GetAll()</code> and <code>GetById()</code> — both have the tenant filter: <code>.Where(p =&gt; p.TenantId == currentUser.TenantId)</code>. Now look at <code>Search()</code> — it queries <code>db.Projects</code> directly, filtering only by name. The tenant filter is completely missing. This method returns projects from ALL tenants that match the search query. A user typing "Q4 Budget" would see every tenant's Q4 budget projects, not just their own. The pattern of "copy the filter into every method" is inherently fragile — it only takes one forgotten copy to create a security breach.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -1967,8 +2226,15 @@ public class ProjectSearchService(IProjectRepository repo)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The magic is the <code>ScopedProjects</code> property on line 6. It's a single place where the tenant filter is defined. Every method in the class uses <code>ScopedProjects</code> instead of <code>db.Projects</code>. When a developer adds a new method, they naturally write <code>await ScopedProjects.Where(...)</code>, and the tenant filter is automatically included. The business logic class (<code>ProjectSearchService</code>) doesn't even know tenants exist — it just calls the repository. You physically cannot forget the security check because it's built into the data source itself.</p>
           </div>
         </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for repeated <code>.Where()</code> clauses that appear in multiple methods of the same class, especially security-related filters like tenant ID, user ID, or soft-delete checks. If the same filter is copy-pasted into every method, one will eventually miss it. Centralize it into a base query property, or even better, use EF Core's Global Query Filters to apply it at the DbContext level so it's impossible to bypass.</p>
+        </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">Security-critical logic (tenant scoping, authorization) must be in a <strong>single class</strong> that's impossible to bypass. When auth checks are scattered across methods, new methods will inevitably miss them. SRP + <span class="tooltip-trigger">EF Core Global Query Filters<span class="tooltip-content">A DbContext feature that automatically applies a WHERE clause to all queries for a given entity type. Perfect for tenant scoping: configure once in OnModelCreating, applied everywhere automatically.</span></span> make this foolproof.</p>
@@ -1985,8 +2251,49 @@ public class ProjectSearchService(IProjectRepository repo)
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>2024, .NET 8 document management system.</strong> A <code>DocumentService</code> handled upload, virus scanning, thumbnail generation, and storage — all in one method. When a user uploaded a 500MB file, the method loaded it into memory for virus scanning, then kept it in memory while generating a thumbnail, then kept it in memory while uploading to blob storage. Peak memory: 1.5GB for one request. Three concurrent uploads crashed the server with <code>OutOfMemoryException</code>.</p>
         </div>
+
+        <p class="body-text">Think of moving into a new apartment. The wrong way: carry ALL your furniture to the front door, then carry ALL of it to the elevator, then carry ALL of it to your apartment — keeping everything in your hands the whole time. The right way: move each piece separately. Couch to apartment, done. Table to apartment, done. Each trip, you're only carrying one thing. That's the difference between buffering the entire file in memory versus streaming it through separate steps.</p>
+
+        <p class="body-text">The <code>DocumentService</code> had four distinct jobs packed into a single method: scan for viruses, generate a thumbnail preview, upload to cloud storage, and save metadata to the database. On line 6, it read the entire file into a <code>byte[]</code> array. A 500MB file means 500MB of RAM consumed. So far, that's bad but survivable.</p>
+
+        <p class="body-text">But here's where it gets catastrophic. The virus scanner held a reference to the original <code>bytes</code> array. The thumbnail generator created a second copy of the file data while processing it. The blob upload created a third copy when wrapping it in <code>BinaryData</code>. Peak memory for a single 500MB upload: approximately 1.5GB (500MB times 3 copies). The .NET garbage collector couldn't reclaim any of these copies because they were all referenced within the same method scope — the method hadn't finished yet, so nothing was eligible for garbage collection.</p>
+
+        <p class="body-text">With the server's default 2GB memory limit for an ASP.NET Core process, just three concurrent 500MB uploads (3 x 1.5GB = 4.5GB) exceeded the memory limit instantly. The server threw <code>OutOfMemoryException</code>, crashed the process, and every in-flight request — not just uploads — failed. The monitoring dashboard showed a cliff: healthy, healthy, healthy, dead.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours — memory profiling showed the entire file buffered 3 times because each "responsibility" within the method held a reference.</p>
+
+        <!-- SVG: Memory usage comparison -->
+        <svg viewBox="0 0 720 240" role="img" aria-label="Diagram comparing memory usage: monolithic method buffers 3 copies vs SRP streaming uses minimal memory" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:12px;fill:var(--text-primary)}</style>
+          <!-- Title -->
+          <text x="360" y="18" text-anchor="middle" font-weight="bold" font-size="13">Memory Usage: 500MB File Upload</text>
+          <!-- Bad side -->
+          <text x="180" y="42" text-anchor="middle" font-weight="bold" font-size="12" fill="#e74c3c">Monolithic (all in one method)</text>
+          <!-- Memory bars - stacked -->
+          <rect x="60" y="55" width="240" height="40" rx="4" fill="#e74c3c44" stroke="#e74c3c" stroke-width="1"/>
+          <text x="180" y="80" text-anchor="middle" font-size="11">bytes[] = 500 MB</text>
+          <rect x="60" y="95" width="240" height="40" rx="4" fill="#e74c3c66" stroke="#e74c3c" stroke-width="1"/>
+          <text x="180" y="120" text-anchor="middle" font-size="11">thumbnail copy = 500 MB</text>
+          <rect x="60" y="135" width="240" height="40" rx="4" fill="#e74c3c88" stroke="#e74c3c" stroke-width="1"/>
+          <text x="180" y="160" text-anchor="middle" font-size="11">upload buffer = 500 MB</text>
+          <text x="180" y="195" text-anchor="middle" font-weight="bold" font-size="13" fill="#e74c3c">Peak: ~1.5 GB</text>
+          <!-- Divider -->
+          <line x1="360" y1="35" x2="360" y2="220" stroke="var(--border-primary)" stroke-width="1" stroke-dasharray="4 2"/>
+          <!-- Good side -->
+          <text x="540" y="42" text-anchor="middle" font-weight="bold" font-size="12" fill="#27ae60">SRP (streaming, separate classes)</text>
+          <rect x="420" y="55" width="240" height="20" rx="4" fill="#27ae6044" stroke="#27ae60" stroke-width="1"/>
+          <text x="540" y="70" text-anchor="middle" font-size="10">Scan: 64KB buffer</text>
+          <rect x="420" y="85" width="240" height="20" rx="4" fill="#27ae6066" stroke="#27ae60" stroke-width="1"/>
+          <text x="540" y="100" text-anchor="middle" font-size="10">Thumbnail: reads first N bytes</text>
+          <rect x="420" y="115" width="240" height="20" rx="4" fill="#27ae6088" stroke="#27ae60" stroke-width="1"/>
+          <text x="540" y="130" text-anchor="middle" font-size="10">Upload: streams directly</text>
+          <text x="540" y="170" text-anchor="middle" font-weight="bold" font-size="13" fill="#27ae60">Peak: ~1 MB</text>
+          <!-- Bottom comparison -->
+          <rect x="140" y="210" width="440" height="25" rx="6" fill="var(--bg-secondary)" stroke="var(--border-primary)" stroke-width="1"/>
+          <text x="360" y="227" text-anchor="middle" font-size="11">SRP = 1,500x less memory per upload</text>
+        </svg>
+
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug6-bad" role="tab" aria-selected="true" aria-controls="bug6-bad">Buggy Code</button>
@@ -2026,6 +2333,7 @@ public class ProjectSearchService(IProjectRepository repo)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Line 6 allocates a <code>byte[]</code> the size of the entire file — for a 500MB file, that's 500MB of RAM. Line 7 reads the file into that array. Now lines 10-11 pass the full array to the virus scanner, which processes it (keeping the reference alive). Line 14 calls <code>GenerateThumbnail(bytes)</code>, which internally creates more buffers for image processing. Line 18 wraps it in <code>BinaryData(bytes)</code> — yet another copy. All these variables (<code>bytes</code>, <code>thumbnail</code>, the blob upload buffer) are in scope simultaneously. The garbage collector cannot free any of them until the entire method completes. That's why three concurrent uploads total 4.5GB and crash the process.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -2084,8 +2392,15 @@ public class DocumentUploadService(
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Each class now works with a <code>Stream</code> instead of a <code>byte[]</code>. The virus scanner reads the stream in small chunks (64KB at a time), never holding the entire file. The thumbnail generator reads only the first few kilobytes (enough to decode image headers). The blob uploader streams directly to Azure — the data flows from disk to network without ever fully loading into RAM. The orchestrator resets the stream position between steps so each class can read from the beginning. Peak memory for a 500MB upload: roughly 1MB (a 64KB scan buffer + a thumbnail + stream overhead). That's 1,500 times less memory than the monolithic version.</p>
           </div>
         </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for methods where a <code>byte[]</code> or large object is created early and then passed through multiple processing steps in the same method. If you see <code>new byte[file.Length]</code> followed by multiple operations that all reference the same array, that's a memory multiplication bug. The fix: separate each processing step into its own class that accepts a <code>Stream</code>, so each step can choose its own memory strategy (chunked reading, streaming, partial reads).</p>
+        </div>
+
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
           <p class="body-text">SRP doesn't just improve code organization — it improves <strong>resource management</strong>. When each step is a separate class, each can optimize memory independently (streaming vs buffering). A monolithic method holds everything in scope.</p>
@@ -2112,6 +2427,7 @@ public class DocumentUploadService(
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Interpreting SRP as "each class should have exactly one public method."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers hear "single responsibility" and think "single method." It's a natural misunderstanding — the word "single" seems to point at quantity. But Robert Martin's actual principle is about actors (stakeholders), not method count. A class that calculates subtotals, applies discounts, and computes tax is serving one actor: the pricing team. All three methods change together when pricing rules change. Splitting them into three separate classes doesn't improve anything — it just scatters related logic across files, making the codebase harder to navigate and understand.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TooGranular.cs</span></div>
             <div class="macos-body">
@@ -2132,7 +2448,7 @@ public class OrderPricingService
             </div>
           </div>
           <p class="body-text"><strong>Why Bad:</strong> Creates a "class explosion" — dozens of trivial classes that are harder to navigate than one cohesive class. SRP is about actors, not method count.</p>
-          <p class="body-text"><strong>Fix:</strong> Group methods by actor. If all methods serve the same stakeholder and operate on the same data, they belong together.</p>
+          <p class="body-text"><strong>Fix:</strong> Group methods by actor. If all methods serve the same stakeholder and operate on the same data, they belong together. The test: "If the pricing rules change, which methods need to change?" If all four methods change together, they belong in one class.</p>
         </div>
       </div>
     </div>
@@ -2145,6 +2461,7 @@ public class OrderPricingService
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Using C# <code><span class="tooltip-trigger">#region<span class="tooltip-content">A C# preprocessor directive that collapses a block of code in the IDE. It's purely cosmetic — the compiler ignores it. If you need regions to navigate a file, the file is too large.</span></span></code> blocks to "organize" responsibilities within a single class instead of actually separating them.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Regions feel like a "quick fix" for messy code. You've got a 500-line class and it's hard to navigate, so you collapse the validation stuff into a region and the database stuff into another region. Now your IDE shows a clean outline — problem solved? Not really. It's like organizing a cluttered room by stuffing things into drawers. The room looks clean, but the mess is still there. The class still has multiple reasons to change, and regions are purely cosmetic — the compiler ignores them entirely.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RegionAbuse.cs</span></div>
             <div class="macos-body">
@@ -2166,7 +2483,7 @@ public class OrderPricingService
             </div>
           </div>
           <p class="body-text"><strong>Why Bad:</strong> Regions hide the problem. The class still has multiple reasons to change. Regions are a code smell that <em>screams</em> "extract these into separate classes."</p>
-          <p class="body-text"><strong>Fix:</strong> Each region becomes its own class. If your IDE needs regions to make a class readable, the class is violating SRP.</p>
+          <p class="body-text"><strong>Fix:</strong> Each region becomes its own class. If your IDE needs regions to make a class readable, the class is violating SRP. A good rule of thumb: the moment you type <code>#region</code>, stop and ask "should this be a separate file instead?"</p>
         </div>
       </div>
     </div>
@@ -2179,6 +2496,7 @@ public class OrderPricingService
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Putting business logic, validation, data access, and notification in <span class="tooltip-trigger">controller action methods<span class="tooltip-content">Methods in an ASP.NET Core controller that handle HTTP requests. They should only translate HTTP → domain calls → HTTP responses. Business logic belongs in services, not controllers.</span></span>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Controllers are the first place you write code in an ASP.NET tutorial. "Hello World" always goes in the controller. So when deadlines are tight, it feels natural to keep adding logic there — "I'll refactor later." But "later" never comes. The controller grows from 10 lines to 100 to 500. Now it validates input, calculates prices, queries the database, sends emails, and returns responses. Every team on the project ends up editing the same controller file, causing merge conflicts and making deployments risky.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodController.cs</span></div>
             <div class="macos-body">
@@ -2216,8 +2534,57 @@ public async Task&lt;IActionResult&gt; CreateOrder(
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> A "service" class that contains both LINQ queries AND business rule calculations.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When you're building a feature, the fastest path from "I need data" to "I need to process data" is a single class. You write a LINQ query, get the results, and immediately run calculations on them. It feels efficient — everything in one place, no extra files, no interfaces. But the problem shows up when you try to write unit tests: you can't test your pricing math without spinning up a database (or an in-memory database), because the business logic is tangled with the data access code.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MixedConcerns.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ LINQ queries AND business rules in the same class
+public class OrderReportService(AppDbContext db)
+{
+    public async Task&lt;ReportData&gt; GenerateMonthlyReport(int month)
+    {
+        // Data access concern (DBA cares about this)
+        var orders = await db.Orders
+            .Where(o =&gt; o.CreatedAt.Month == month)
+            .Include(o =&gt; o.Items)
+            .ToListAsync();
+
+        // Business logic concern (Product team cares about this)
+        var revenue = orders.Sum(o =&gt; o.Items.Sum(i =&gt; i.Price * i.Qty));
+        var avgOrderSize = orders.Average(o =&gt; o.Items.Count);
+        var growth = CalculateGrowthRate(revenue, lastMonthRevenue);
+
+        return new ReportData(revenue, avgOrderSize, growth);
+    }
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SeparatedConcerns.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✓ Data access: one class, one actor (DBA)
+public class OrderRepository(AppDbContext db) : IOrderRepository
+{
+    public async Task&lt;List&lt;Order&gt;&gt; GetByMonthAsync(int month) =&gt;
+        await db.Orders.Where(o =&gt; o.CreatedAt.Month == month)
+            .Include(o =&gt; o.Items).ToListAsync();
+}
+
+// ✓ Business logic: one class, one actor (Product/Finance)
+public class ReportCalculator
+{
+    public ReportData Calculate(List&lt;Order&gt; orders)
+    {
+        var revenue = orders.Sum(o =&gt; o.Items.Sum(i =&gt; i.Price * i.Qty));
+        var avgOrderSize = orders.Average(o =&gt; o.Items.Count);
+        return new ReportData(revenue, avgOrderSize);
+        // ✓ No database needed to test this — pass in a List&lt;Order&gt;
+    }
+}</code></pre>
+            </div>
+          </div>
           <p class="body-text"><strong>Why Bad:</strong> Can't test business rules without a database. Can't change the ORM without rewriting business logic. Changes to query optimization shouldn't require re-testing pricing calculations.</p>
-          <p class="body-text"><strong>Fix:</strong> Repository pattern. Services call repositories for data, then apply business logic. Two classes, two actors (DBA vs Product team).</p>
+          <p class="body-text"><strong>Fix:</strong> Repository pattern. Services call repositories for data, then apply business logic. Two classes, two actors (DBA vs Product team). The connection: the repository returns plain data objects, and the calculator works with those objects. Neither class knows about the other's internals.</p>
         </div>
       </div>
     </div>
@@ -2230,6 +2597,7 @@ public async Task&lt;IActionResult&gt; CreateOrder(
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating <code>IOrderValidator</code>, <code>IOrderPricer</code>, <code>IOrderSaver</code>, <code>IOrderNotifier</code> on day one of an MVP when you have 3 users and one developer.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You read Clean Architecture, watched a YouTube video about SOLID, and got excited. Now every feature starts with 5 interfaces, 5 implementations, and 5 DI registrations. The problem: SRP is a response to <em>pain</em>, not a prediction of pain. On day one of an MVP with one developer and three users, there's only one "actor" — you. Nobody is requesting conflicting changes. Splitting everything upfront adds complexity without any payoff. It's like buying a fire extinguisher for every room in a house you haven't built yet.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PrematureSplit.cs</span></div>
             <div class="macos-body">
@@ -2244,7 +2612,7 @@ public interface IOrderAuditor { Task Audit(Order order); }
             </div>
           </div>
           <p class="body-text"><strong>Why Bad:</strong> Adds navigation overhead, increases file count, and complicates debugging — all for hypothetical future changes that may never happen.</p>
-          <p class="body-text"><strong>Fix:</strong> Start with a simple class. Extract when you feel the <em>pain</em> — when merge conflicts happen, tests become hard to write, or different teams need to change the same file.</p>
+          <p class="body-text"><strong>Fix:</strong> Start with a simple class. Extract when you feel the <em>pain</em> — when merge conflicts happen, tests become hard to write, or different teams need to change the same file. SRP is reactive, not proactive. Split because you have two teams stepping on each other, not because you might someday have two teams.</p>
         </div>
       </div>
     </div>
@@ -2257,6 +2625,7 @@ public interface IOrderAuditor { Task Audit(Order order); }
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating a <code>Helpers</code> or <code>Utilities</code> class that accumulates unrelated static methods.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Every codebase has that one file. It starts innocently: someone needs a date formatter and doesn't know where to put it, so they create <code>Helpers.cs</code>. Then another developer adds a tax calculator. Then another adds an email validator. Six months later, <code>Helpers</code> is 2000 lines with 40 unrelated methods. It's the junk drawer of your codebase — everyone dumps things there because the name is so vague that anything fits. The real problem: "Helpers" is not a responsibility. It's an admission that you didn't know where the code belonged.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HelperHell.cs</span></div>
             <div class="macos-body">
@@ -2290,8 +2659,39 @@ public class EmailValidator { /* ... */ }</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Using <code>static</code> methods for responsibilities that should be injectable (email, logging, file I/O).</p>
-          <p class="body-text"><strong>Why Bad:</strong> Static methods can't be mocked, can't be swapped via DI, and hide the dependency graph. The class <em>appears</em> to have one responsibility but secretly depends on file system, network, or database through static calls.</p>
-          <p class="body-text"><strong>Fix:</strong> Wrap side effects in injectable interfaces. <code>IEmailSender</code>, <code>IFileStorage</code>, <code>IClock</code> — make dependencies explicit.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Static methods are convenient — you call <code>EmailHelper.Send()</code> from anywhere without wiring up DI. It feels faster than creating an interface, an implementation, and a DI registration. But convenience has a price: when you look at a class's constructor, you see its visible dependencies. Static calls are <em>invisible</em> dependencies. A class might look like it only depends on <code>IOrderRepository</code>, but deep inside a method it calls <code>FileHelper.WriteLog()</code> and <code>CacheManager.Get()</code>. Now the class secretly depends on the file system and a cache — you just can't see it from the outside.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HiddenDependencies.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✗ Constructor says "I only need a repository" — but that's a lie
+public class OrderService(IOrderRepository repo)
+{
+    public async Task PlaceOrder(Order order)
+    {
+        await repo.SaveAsync(order);
+        EmailHelper.Send(order.CustomerEmail, "Confirmed");  // ✗ Hidden dependency!
+        FileHelper.WriteLog($"Order {order.Id} placed");      // ✗ Hidden dependency!
+        CacheManager.Invalidate($"orders:{order.CustomerId}"); // ✗ Hidden dependency!
+    }
+}
+
+// ✓ All dependencies are visible in the constructor
+public class OrderService(
+    IOrderRepository repo,
+    IEmailSender email,
+    ILogger&lt;OrderService&gt; logger)
+{
+    public async Task PlaceOrder(Order order)
+    {
+        await repo.SaveAsync(order);
+        await email.SendAsync(order.CustomerEmail, "Confirmed"); // ✓ Visible, mockable
+        logger.LogInformation("Order {Id} placed", order.Id);    // ✓ Visible, mockable
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>Why Bad:</strong> Static methods can't be mocked, can't be swapped via DI, and hide the dependency graph. The class <em>appears</em> to have one responsibility but secretly depends on file system, network, or database through static calls. In unit tests, the static calls will actually send emails or write files — there's no way to prevent it.</p>
+          <p class="body-text"><strong>Fix:</strong> Wrap side effects in injectable interfaces. <code>IEmailSender</code>, <code>IFileStorage</code>, <code>IClock</code> — make dependencies explicit. If a class's constructor has too many parameters after this, that's SRP telling you the class does too much.</p>
         </div>
       </div>
     </div>
@@ -2304,8 +2704,25 @@ public class EmailValidator { /* ... */ }</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Thinking "if I need to fix a typo, that's a reason to change, so even comments violate SRP."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The phrase "one reason to change" is vague enough to be taken too literally. If you interpret "reason to change" as "any reason I might edit this file," then formatting code, fixing typos, updating comments, and refactoring variable names are all "reasons to change." Taken to its extreme, even a class with one method would violate SRP because you might change the method's implementation AND its documentation. This interpretation leads to analysis paralysis — you can't write a class without worrying about SRP.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ReasonToChange.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// These are NOT SRP-relevant "reasons to change":
+// ✗ "I fixed a typo in a comment" — cosmetic, no actor requested it
+// ✗ "I reformatted to match coding standards" — tooling, no actor
+// ✗ "I renamed a variable for clarity" — readability, no actor
+// ✗ "I optimized a LINQ query" — same actor, same responsibility
+
+// These ARE SRP-relevant "reasons to change":
+// ✓ "The finance team changed the tax formula" — actor: Finance
+// ✓ "The UX team changed the email template" — actor: UX/Design
+// ✓ "The DBA changed the table schema" — actor: Infrastructure
+// ✓ "Legal requires a new audit trail" — actor: Compliance</code></pre>
+            </div>
+          </div>
           <p class="body-text"><strong>Why Bad:</strong> "Reason to change" means a <em>stakeholder/actor</em> requesting a functional change. Typo fixes, code formatting, and performance tweaks are not SRP-relevant changes — they don't come from a <em>different actor</em>.</p>
-          <p class="body-text"><strong>Fix:</strong> Remember the refined definition: <strong>responsible to one actor</strong>. Cosmetic edits don't count. Only changes driven by different business stakeholders matter.</p>
+          <p class="body-text"><strong>Fix:</strong> Remember the refined definition: <strong>responsible to one actor</strong>. Cosmetic edits don't count. Only changes driven by different business stakeholders matter. The test: "Which team requested this change?" If the answer is "no team — I just cleaned up the code," it's not an SRP concern.</p>
         </div>
       </div>
     </div>
@@ -2318,6 +2735,7 @@ public class EmailValidator { /* ... */ }</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Adding <code>ILogger</code> to every service and sprinkling log statements throughout business logic.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Logging feels like a "good practice" that belongs everywhere. In tutorials, every class injects <code>ILogger</code> and logs every step. But when you step back and look at the result, your business logic is 30% actual logic and 70% log statements. The log format becomes a second responsibility — when the ops team wants to change from text logs to structured JSON, you're editing every service file. Logging is a <span class="tooltip-trigger">cross-cutting concern<span class="tooltip-content">A concern that spans multiple modules (logging, auth, caching, transactions). Cross-cutting concerns should be handled in a single place (middleware, decorators, pipeline behaviors) — not scattered across every class.</span></span>, and cross-cutting concerns should be handled in one place, not scattered across every class.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LoggingEverywhere.cs</span></div>
             <div class="macos-body">
@@ -2365,6 +2783,7 @@ public class LoggingBehavior&lt;TReq, TRes&gt;(ILogger&lt;LoggingBehavior&lt;TRe
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Naming a class <code>OrderManager</code>, <code>UserHandler</code>, or <code>DataProcessor</code> — vague names that attract every responsibility.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When you're not sure what a class does (or it does too many things), you reach for a generic name. "Manager" can mean anything — create, update, delete, validate, notify, cache, and report. Because the name is vague, every developer feels comfortable adding their code to it. It's like a box labeled "stuff" — everyone puts things in, nobody takes things out. Over time, <code>OrderManager</code> becomes a 1000-line God class with 15 dependencies, and nobody knows what it's "managing" anymore. Specific names like <code>OrderPlacer</code> or <code>ShippingCalculator</code> set a boundary — if your method doesn't place orders, it doesn't go in <code>OrderPlacer</code>.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodNames.cs</span></div>
             <div class="macos-body">
@@ -2709,8 +3128,9 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Is it "do one thing" or something more specific?</div>
         <div class="body-text">
-          <p>SRP states that <strong>a class should have one, and only one, reason to change</strong>. Robert Martin later refined this to: "A module should be responsible to one, and only one, actor." An "actor" is a group of stakeholders who want the same kind of changes.</p>
-          <p>It's commonly misquoted as "a class should do one thing" — but that's not the actual principle. A class can have multiple methods as long as they all serve the same actor.</p>
+          <p>Think of a chef in a restaurant. If the chef cooks the food, takes orders, washes dishes, and does the accounting, any one of those jobs changing would force the chef to adapt. If the health inspector changes kitchen rules, the chef has to change. If the accounting rules change, the chef also has to change. Too many different bosses pulling in different directions.</p>
+          <p>SRP states that <strong>a class should have one, and only one, reason to change</strong>. Robert Martin later refined this to: "A module should be responsible to one, and only one, actor." An "actor" is a group of stakeholders who want the same kind of changes. In our restaurant analogy, the chef should only cook — that way, only kitchen-related changes affect them.</p>
+          <p>It's commonly misquoted as "a class should do one thing" — but that's not the actual principle. A class can have multiple methods as long as they all serve the same actor. A <code>TaxCalculator</code> class can have <code>CalculateSalesTax()</code>, <code>CalculateVAT()</code>, and <code>CalculateGST()</code> — three methods, but one actor (the Finance team).</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The refinement from 'reason to change' to 'actor' in Clean Architecture (2017) was important because 'reason to change' was too vague — it could mean anything. 'Actor' gives a concrete test: who would request this change?"</div>
       </div></div>
@@ -2727,8 +3147,9 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can a class with 10 methods follow SRP?</div>
         <div class="body-text">
-          <p>"Do one thing" is a function-level guideline from Clean Code. SRP operates at the <em>class</em> level and is about <strong>who drives changes</strong>, not what the class does. A <code>PayrollCalculator</code> with methods for base pay, overtime, bonuses, and deductions has 4 methods but ONE actor (Accounting).</p>
-          <p>Conversely, a class with one public method can violate SRP if that method internally mixes responsibilities serving different actors.</p>
+          <p>Imagine a toolbox. "Do one thing" would mean each toolbox should hold exactly one tool. SRP says something different: each toolbox should belong to one person (or team). A carpenter's toolbox can have a hammer, saw, measuring tape, and sandpaper — four tools, but they all serve the same craftsperson. That's fine. What's NOT fine is if the carpenter, electrician, and plumber all share one toolbox — now changing the electrical tools might bury the plumbing tools.</p>
+          <p>"Do one thing" is a function-level guideline from Clean Code — it applies to individual methods. SRP operates at the <em>class</em> level and is about <strong>who drives changes</strong>, not what the class does. A <code>PayrollCalculator</code> with methods for base pay, overtime, bonuses, and deductions has 4 methods but ONE actor (Accounting). All four methods change when payroll rules change.</p>
+          <p>Conversely, a class with one public method can violate SRP if that method internally mixes responsibilities serving different actors. A single <code>ProcessOrder()</code> method that validates, charges payment, sends email, and updates inventory serves four different teams.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Think of cohesion: if all methods operate on the same data for the same stakeholder, they're cohesive. 10 cohesive methods &gt; 10 separate single-method classes."</div>
       </div></div>
@@ -2745,8 +3166,8 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Where in ASP.NET Core do you see one-class-per-concern?</div>
         <div class="body-text">
-          <p>The <strong>middleware pipeline</strong>. Each middleware handles one cross-cutting concern: <code>UseAuthentication()</code> handles auth, <code>UseCors()</code> handles CORS, <code>UseRateLimiting()</code> handles rate limits. They're separate classes in separate files, each with one reason to change.</p>
-          <p>Another example: <code>IOptions&lt;T&gt;</code> separates configuration binding from consumption. Your service receives a typed options object — it doesn't know if it came from appsettings.json or environment variables.</p>
+          <p>The <strong>middleware pipeline</strong> is a perfect example. Think of it like an airport security line — each checkpoint handles one thing. One person checks your boarding pass, another scans your bag, another does the metal detector. In ASP.NET Core, each middleware handles one cross-cutting concern: <code>UseAuthentication()</code> handles auth, <code>UseCors()</code> handles CORS, <code>UseRateLimiting()</code> handles rate limits. They're separate classes in separate files, each with one reason to change.</p>
+          <p>Another example: <code>IOptions&lt;T&gt;</code> separates configuration binding from consumption. Your service receives a typed options object — it doesn't know if it came from appsettings.json, environment variables, or Azure Key Vault. The configuration source is one class's responsibility; using the configuration is another's.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Even the DI container itself follows SRP — registration (what services exist) is separate from resolution (how to create them). You register in Program.cs, resolve via constructor injection."</div>
       </div></div>
@@ -2763,10 +3184,11 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Why are God classes hard to test?</div>
         <div class="body-text">
-          <p>SRP makes classes testable by limiting dependencies. A class with one responsibility typically has 1-2 dependencies, which are easy to mock. A class with 5 responsibilities needs 5+ dependencies — setting up tests becomes painful, and failures are hard to diagnose.</p>
-          <p>The "mock count" smell: if you need 4+ mocks in a test, the class under test probably violates SRP.</p>
+          <p>Think about testing a Swiss Army knife versus testing a single screwdriver. To test the Swiss Army knife, you need to set up scenarios for the blade, the can opener, the corkscrew, the scissors, and the file. To test the screwdriver, you just need a screw. SRP gives you screwdrivers — classes so focused that testing them is trivial.</p>
+          <p>SRP makes classes testable by limiting dependencies. A class with one responsibility typically has 1-2 dependencies, which are easy to mock. A class with 5 responsibilities needs 5+ dependencies — setting up tests becomes painful, and failures are hard to diagnose. When a test with 6 mocks fails, which dependency caused the failure? You have to investigate all 6.</p>
+          <p>The "mock count" smell: if you need 4+ mocks in a test, the class under test probably violates SRP. In a well-designed SRP system, most test files are shorter than the production code they test.</p>
         </div>
-        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I've seen test files that are 3× longer than the production code — all because the class had so many dependencies to mock. After splitting by SRP, each test file was 20 lines."</div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I've seen test files that are 3x longer than the production code — all because the class had so many dependencies to mock. After splitting by SRP, each test file was 20 lines."</div>
       </div></div>
     </div>
 
@@ -2781,8 +3203,9 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What makes methods "belong together" in a class?</div>
         <div class="body-text">
-          <p>Cohesion measures how closely a class's methods relate to each other. High cohesion = all methods work on the same data toward the same purpose. Low cohesion = methods do unrelated things and share nothing.</p>
-          <p>SRP is the OOP principle that formalizes the idea of high cohesion. When a class follows SRP, its methods are naturally cohesive — they all serve the same actor.</p>
+          <p>Imagine a band where everyone plays the same genre — that's high cohesion. A jazz quartet where all four musicians play jazz, improvise together, and respond to each other's cues. Now imagine a "band" with a jazz pianist, a heavy metal drummer, a country singer, and a DJ. They share a stage, but they're not really playing together. That's low cohesion — technically one group, but practically four separate acts.</p>
+          <p>In code, cohesion measures how closely a class's methods relate to each other. High cohesion means all methods work on the same data toward the same purpose. Low cohesion means methods do unrelated things and share nothing — they're just roommates who happen to live in the same file.</p>
+          <p>SRP is the OOP principle that formalizes the idea of high cohesion. When a class follows SRP, its methods are naturally cohesive — they all serve the same actor and typically share the same instance fields. You can even measure this: the LCOM4 metric counts how many disconnected "groups" of methods exist in a class. LCOM4 = 1 means fully cohesive. LCOM4 = 3 means the class can be split into 3 separate classes.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Larry Constantine defined cohesion in the 1970s. SRP is essentially the OOP restatement of 'maximize cohesion' — Robert Martin added the 'actor' dimension to make it testable."</div>
       </div></div>
@@ -2799,8 +3222,9 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What does the name "Manager" tell you about the class's responsibility?</div>
         <div class="body-text">
-          <p>Nothing. "Manager" is too vague — it attracts every order-related responsibility: creation, cancellation, pricing, notification, reporting. It's a naming anti-pattern that signals an SRP violation waiting to happen (or already happening).</p>
-          <p>Better names describe the specific responsibility: <code>OrderPlacer</code>, <code>OrderPricingService</code>, <code>OrderCanceller</code>. If you can't name the one thing the class does, it probably does too many things.</p>
+          <p>Imagine a job title: "Office Manager." What do they do? Everything. They order supplies, schedule meetings, handle HR issues, fix the printer, and organize the holiday party. The title is so vague that any task can be dumped on them. That's exactly what happens with <code>OrderManager</code> in code.</p>
+          <p>The name "Manager" is too vague — it attracts every order-related responsibility: creation, cancellation, pricing, notification, reporting. Six months after creation, it's 800 lines long and every developer on the team has committed to it. It's a naming anti-pattern that signals an SRP violation waiting to happen (or already happening).</p>
+          <p>Better names describe the specific responsibility: <code>OrderPlacer</code>, <code>OrderPricingService</code>, <code>OrderCanceller</code>. These names set boundaries. If your code doesn't place orders, it doesn't belong in <code>OrderPlacer</code>. If you can't name the one thing the class does, it probably does too many things.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Same applies to 'Handler', 'Processor', 'Helper', 'Utility' — all magnets for unrelated code. A good class name should tell you both what it does AND what it doesn't do."</div>
       </div></div>
@@ -2817,8 +3241,9 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What would SRP look like WITHOUT DI?</div>
         <div class="body-text">
-          <p>Without DI, splitting a class into 5 focused classes means the consumer must manually create and wire all 5. That's painful enough that developers resist splitting — they'd rather keep one big class than manage 5 constructors.</p>
-          <p>With .NET's DI container, you register each class once in <code>Program.cs</code>, and the container automatically injects them. The "cost" of SRP drops to near-zero.</p>
+          <p>Imagine you're building with LEGO bricks, but every time you want to use a special piece, you have to go to the store, buy it, bring it home, and assemble it yourself. That's what coding without DI is like. Now imagine a magical bin that automatically provides exactly the right piece when you need it. That's DI — and it makes separating responsibilities painless.</p>
+          <p>Without DI, splitting a class into 5 focused classes means the consumer must manually create and wire all 5. You'd write <code>new OrderService(new OrderRepository(new AppDbContext()), new EmailSender(new SmtpClient()), ...)</code>. That's painful enough that developers resist splitting — they'd rather keep one big class than manage 5 constructors with nested dependencies.</p>
+          <p>With .NET's DI container, you register each class once in <code>Program.cs</code>, and the container automatically injects them wherever they're needed. The "cost" of SRP drops to near-zero. Adding a new focused class is just one line of DI registration. That's why SRP and DI go hand in hand — DI removes the practical friction that makes SRP feel expensive.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "DI is the reason SRP became practical. Before DI containers, SOLID principles were mostly academic. .NET Core's built-in container made SRP the default architecture."</div>
       </div></div>
@@ -2839,11 +3264,63 @@ public class SrpOverheadBenchmark
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you refactor a 2000-line class in one PR?</div>
         <div class="body-text">
-          <p><strong>Step 1:</strong> Identify actors — who are the different stakeholders that cause changes to this class? Group methods by actor.</p>
-          <p><strong>Step 2:</strong> Extract one responsibility at a time. Start with the most painful (most merge conflicts, hardest to test). Create an interface + implementation. Inject the new class into the original.</p>
-          <p><strong>Step 3:</strong> Keep the original class as a <em>facade</em> that delegates to the extracted classes. This maintains backward compatibility while new code uses the focused classes directly.</p>
+          <p>You never refactor a God class in one big bang. Think of it like renovating a house while people are living in it — you do one room at a time, keeping everything functional between changes.</p>
+          <p><strong>Step 1:</strong> Identify actors — who are the different stakeholders that cause changes to this class? Group methods by actor. Look at the constructor parameters as clues: <code>DbContext</code> = data access actor, <code>IEmailSender</code> = notification actor, <code>IMemoryCache</code> = performance actor.</p>
+          <p><strong>Step 2:</strong> Extract one responsibility at a time. Start with the most painful (most merge conflicts, hardest to test). Create an interface + implementation. Inject the new class into the original. This is one PR — small, reviewable, reversible.</p>
+          <p><strong>Step 3:</strong> Keep the original class as a <em>facade</em> that delegates to the extracted classes. This maintains backward compatibility: existing callers don't need to change. New code uses the focused classes directly.</p>
           <p><strong>Step 4:</strong> Over multiple PRs, migrate callers from the facade to the focused classes. Eventually delete the facade.</p>
         </div>
+
+        <!-- SVG: Strangler Fig extraction -->
+        <svg viewBox="0 0 720 160" role="img" aria-label="Diagram showing the step-by-step extraction of responsibilities from a God class using the Strangler Fig pattern" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="srp-q8-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <style>text{font-family:system-ui,-apple-system,sans-serif;font-size:11px;fill:var(--text-primary)}</style>
+          <!-- Step 1: God class -->
+          <rect x="10" y="20" width="140" height="120" rx="8" fill="#e74c3c22" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="80" y="40" text-anchor="middle" font-weight="bold" font-size="10" fill="#e74c3c">God Class</text>
+          <text x="80" y="58" text-anchor="middle" font-size="9">Data Access</text>
+          <text x="80" y="72" text-anchor="middle" font-size="9">Business Logic</text>
+          <text x="80" y="86" text-anchor="middle" font-size="9">Email</text>
+          <text x="80" y="100" text-anchor="middle" font-size="9">Caching</text>
+          <text x="80" y="114" text-anchor="middle" font-size="9">Validation</text>
+          <!-- Arrow -->
+          <line x1="155" y1="80" x2="185" y2="80" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#srp-q8-arr)"/>
+          <!-- Step 2: Partial -->
+          <rect x="190" y="20" width="140" height="90" rx="8" fill="#f39c1222" stroke="#f39c12" stroke-width="1.5"/>
+          <text x="260" y="40" text-anchor="middle" font-weight="bold" font-size="10" fill="#f39c12">Facade</text>
+          <text x="260" y="58" text-anchor="middle" font-size="9">Business Logic</text>
+          <text x="260" y="72" text-anchor="middle" font-size="9">Email</text>
+          <text x="260" y="86" text-anchor="middle" font-size="9">Caching</text>
+          <rect x="190" y="115" width="140" height="25" rx="4" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="260" y="132" text-anchor="middle" font-size="9" fill="#27ae60">DataRepo (extracted)</text>
+          <!-- Arrow -->
+          <line x1="335" y1="80" x2="365" y2="80" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#srp-q8-arr)"/>
+          <!-- Step 3: More -->
+          <rect x="370" y="35" width="140" height="55" rx="8" fill="#f39c1222" stroke="#f39c12" stroke-width="1.5"/>
+          <text x="440" y="52" text-anchor="middle" font-weight="bold" font-size="10" fill="#f39c12">Facade (thin)</text>
+          <text x="440" y="70" text-anchor="middle" font-size="9">delegates only</text>
+          <rect x="370" y="95" width="65" height="22" rx="3" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="402" y="110" text-anchor="middle" font-size="8" fill="#27ae60">Repo</text>
+          <rect x="440" y="95" width="65" height="22" rx="3" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="472" y="110" text-anchor="middle" font-size="8" fill="#27ae60">Email</text>
+          <rect x="370" y="122" width="65" height="22" rx="3" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="402" y="137" text-anchor="middle" font-size="8" fill="#27ae60">Cache</text>
+          <rect x="440" y="122" width="65" height="22" rx="3" fill="#27ae6022" stroke="#27ae60" stroke-width="1"/>
+          <text x="472" y="137" text-anchor="middle" font-size="8" fill="#27ae60">Logic</text>
+          <!-- Arrow -->
+          <line x1="515" y1="80" x2="545" y2="80" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#srp-q8-arr)"/>
+          <!-- Step 4: Clean -->
+          <rect x="550" y="30" width="160" height="120" rx="8" fill="#27ae6022" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="630" y="48" text-anchor="middle" font-weight="bold" font-size="10" fill="#27ae60">SRP Classes</text>
+          <text x="630" y="66" text-anchor="middle" font-size="9">OrderRepository</text>
+          <text x="630" y="82" text-anchor="middle" font-size="9">PricingService</text>
+          <text x="630" y="98" text-anchor="middle" font-size="9">EmailNotifier</text>
+          <text x="630" y="114" text-anchor="middle" font-size="9">CacheDecorator</text>
+          <text x="630" y="130" text-anchor="middle" font-size="9">Orchestrator</text>
+        </svg>
+
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The Strangler Fig pattern works at the class level too. You don't rewrite — you gradually extract and redirect. Each PR is small, reviewable, and backward-compatible."</div>
       </div></div>
     </div>

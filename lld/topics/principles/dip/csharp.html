@@ -1429,21 +1429,63 @@ public class OrderService(IShippingCalculator calc)
 
   <div class="card open">
     <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
-      <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 1: Captive Dependency — Scoped Inside Singleton
+      <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 1: Captive Dependency &mdash; Scoped Inside Singleton
     </h3>
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text">A <span class="tooltip-trigger">multi-tenant<span class="tooltip-content">An application architecture where a single instance serves multiple customers (tenants), each seeing only their own data. Common in SaaS products. Tenant isolation is critical — one tenant must never see another's data. DI scoping (Scoped services per request) is a key mechanism for tenant isolation.</span></span> SaaS app leaked data between tenants. <code>TenantService</code> (Scoped — resolves the current tenant from the HTTP request) was injected into <code>CacheManager</code> (Singleton). The singleton captured the scoped service once at startup, so ALL requests used the first tenant's context. Customer A saw Customer B's data.</p>
+        <p class="body-text">A <span class="tooltip-trigger">multi-tenant<span class="tooltip-content">An application architecture where a single instance serves multiple customers (tenants), each seeing only their own data. Common in SaaS products. Tenant isolation is critical &mdash; one tenant must never see another's data. DI scoping (Scoped services per request) is a key mechanism for tenant isolation.</span></span> SaaS app leaked data between tenants. <code>TenantService</code> (Scoped &mdash; resolves the current tenant from the HTTP request) was injected into <code>CacheManager</code> (Singleton). The singleton captured the scoped service once at startup, so ALL requests used the first tenant's context. Customer A saw Customer B's data.</p>
       </div>
 
+      <p class="body-text">Imagine you run an apartment building where each tenant has their own mailbox. Now imagine you hire a permanent security guard (a Singleton) and on his first day, you hand him the key to Apartment 1's mailbox. "Use this to check mail," you say. The guard uses that same key every single day &mdash; even when Apartment 5's residents ask him to check <em>their</em> mail. He always opens Apartment 1's box. That's a captive dependency: a long-lived service (the guard) holding onto something that was only meant for one short-lived context (one tenant's request).</p>
+
+      <p class="body-text">In this real incident, a multi-tenant SaaS application had a <code>CacheManager</code> registered as a Singleton &mdash; it lived for the entire lifetime of the application. It needed to know which tenant was making the current request, so it took <code>ITenantService</code> through its constructor. The problem? <code>ITenantService</code> was Scoped, meaning it was designed to be created fresh for every HTTP request, reading the tenant ID from the request headers.</p>
+
+      <p class="body-text">But a Singleton is only created once, at application startup. So <code>CacheManager</code> got an <code>ITenantService</code> instance from the very first request &mdash; and held onto it forever. Every subsequent request, no matter which tenant it came from, used that same frozen <code>ITenantService</code>. The tenant ID never changed. Customer A logged in first, and from that point on, every customer's cache lookups used Customer A's tenant ID.</p>
+
+      <p class="body-text">The bug was maddeningly intermittent. QA couldn't reproduce it locally because the dev server restarted between test runs, clearing the Singleton. It only showed up in staging where the server stayed alive across multiple requests from different tenants. It took 4 hours to diagnose because the code <em>looked</em> perfectly reasonable &mdash; it was the lifetime mismatch that was invisible.</p>
+
+      <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing how a Singleton captures a Scoped service, freezing the first tenant's context for all future requests" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+        <defs>
+          <marker id="dip-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          <marker id="dip-b1-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+        </defs>
+        <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Captive Dependency: Singleton Freezes Scoped Service</text>
+
+        <rect x="30" y="45" width="180" height="60" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+        <text x="120" y="70" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">CacheManager</text>
+        <text x="120" y="90" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Singleton (lives forever)</text>
+
+        <rect x="280" y="45" width="180" height="60" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="370" y="70" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">TenantService</text>
+        <text x="370" y="90" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Scoped (should die per request)</text>
+
+        <line x1="210" y1="75" x2="276" y2="75" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#dip-b1-arr-red)"/>
+        <text x="243" y="68" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">captures</text>
+
+        <rect x="530" y="40" width="160" height="30" rx="6" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="610" y="60" text-anchor="middle" fill="#3b82f6" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 1: Tenant A</text>
+        <rect x="530" y="80" width="160" height="30" rx="6" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="610" y="100" text-anchor="middle" fill="#a855f7" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 2: Tenant B</text>
+
+        <line x1="460" y1="75" x2="526" y2="55" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#dip-b1-arr)"/>
+        <line x1="460" y1="75" x2="526" y2="95" stroke="#a855f7" stroke-width="1.5" marker-end="url(#dip-b1-arr)"/>
+
+        <rect x="30" y="140" width="660" height="50" rx="8" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="360" y="162" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Result: TenantService frozen from Request 1</text>
+        <text x="360" y="180" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 2 (Tenant B) gets Tenant A's cache keys &mdash; DATA LEAK</text>
+
+        <rect x="30" y="210" width="660" height="40" rx="8" fill="#0f2a1d" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="360" y="228" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Fix: Inject IServiceScopeFactory &rarr; create a fresh scope per call &rarr; each request gets its own TenantService</text>
+      </svg>
+
       <h3 class="sub">Time to Diagnose</h3>
-      <p class="body-text">4 hours. The bug was intermittent — it only appeared after the second request because the first request correctly set the tenant. QA couldn't reproduce it locally because the dev server restarted between tests.</p>
+      <p class="body-text">4 hours. The bug was intermittent &mdash; it only appeared after the second request because the first request correctly set the tenant. QA couldn't reproduce it locally because the dev server restarted between tests.</p>
 
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
-          <button class="tab-btn active" data-tab="bug1-bad" role="tab">Buggy Code</button>
-          <button class="tab-btn" data-tab="bug1-fix" role="tab">Fix</button>
+          <button class="tab-btn active" data-tab="bug1-bad" role="tab" aria-selected="true">Buggy Code</button>
+          <button class="tab-btn" data-tab="bug1-fix" role="tab" aria-selected="false">Fix</button>
         </div>
         <div class="tab-panel active" id="bug1-bad" role="tabpanel">
           <div class="macos-window">
@@ -1468,6 +1510,7 @@ public class CacheManager
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the constructor &mdash; it takes <code>ITenantService tenant</code> and stores it in a private field. That's perfectly normal for constructor injection. The problem is <em>when</em> this constructor runs. Because <code>CacheManager</code> is a Singleton, this constructor runs exactly once, during the very first request. The <code>ITenantService</code> instance it receives belongs to that first request's scope. After the first request ends, that scoped service is "stale" &mdash; it still holds the first tenant's ID but the request it belonged to is long gone. Every future call to <code>GetAsync</code> uses <code>_tenant.TenantId</code>, which is permanently frozen to the first tenant's value.</p>
         </div>
         <div class="tab-panel" id="bug1-fix" role="tabpanel">
           <div class="macos-window">
@@ -1493,12 +1536,17 @@ public class CacheManager
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of capturing the <code>ITenantService</code> directly, the Singleton now holds an <code>IServiceScopeFactory</code> &mdash; which is itself a Singleton, so there's no lifetime mismatch. Each time <code>GetAsync</code> is called, it creates a brand new scope with <code>CreateScope()</code>, and from that scope, it resolves a fresh <code>ITenantService</code>. That fresh instance reads the current request's tenant, not the first request's. The <code>using</code> keyword ensures the scope is disposed after the call, preventing memory leaks. Now every request gets the correct tenant, every time.</p>
         </div>
       </div>
 
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">A Singleton must <strong>never</strong> inject a Scoped or Transient dependency directly. The lifetime hierarchy is: Singleton (longest) → Scoped → Transient (shortest). A longer-lived service must not capture a shorter-lived one. Use <code>IServiceScopeFactory</code> to create a fresh scope when needed. ASP.NET Core enables <code>ValidateScopes</code> by default in Development (since 2.0) — it catches this at startup.</p>
+        <p class="body-text">A Singleton must <strong>never</strong> inject a Scoped or Transient dependency directly. The lifetime hierarchy is: Singleton (longest) &rarr; Scoped &rarr; Transient (shortest). A longer-lived service must not capture a shorter-lived one. Use <code>IServiceScopeFactory</code> to create a fresh scope when needed. ASP.NET Core enables <code>ValidateScopes</code> by default in Development (since 2.0) &mdash; it catches this at startup.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">Search for any class registered as <code>AddSingleton</code> and check its constructor parameters. If any parameter is a Scoped or Transient service, you have a captive dependency. A quick way to check: enable <code>ValidateScopes = true</code> in your development configuration &mdash; the DI container will throw an <code>InvalidOperationException</code> at startup if it detects a Singleton consuming a Scoped service. Also look for Singleton classes that inject <code>DbContext</code> (which is always Scoped) &mdash; that's the most common captive dependency in real projects.</p>
       </div>
     </div>
   </div>
@@ -1510,13 +1558,63 @@ public class CacheManager
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text">An API endpoint queued a background job to send emails after an order. The job used the injected <code>AppDbContext</code> — but by the time the background thread ran, the HTTP request had ended and the Scoped DbContext was disposed. Result: <code>ObjectDisposedException</code> in production with no email sent and no error visible to the user.</p>
+        <p class="body-text">An API endpoint queued a background job to send emails after an order. The job used the injected <code>AppDbContext</code> &mdash; but by the time the background thread ran, the HTTP request had ended and the Scoped DbContext was disposed. Result: <code>ObjectDisposedException</code> in production with no email sent and no error visible to the user.</p>
       </div>
+
+      <p class="body-text">Think about it like a restaurant. A waiter (the HTTP request) takes your order, hands it to the kitchen, and then clocks out for the night. But the kitchen still needs to look at the order slip (the DbContext) to prepare your food. The problem? When the waiter clocked out, he took the order slip with him and shredded it. The kitchen reaches for the slip and finds nothing &mdash; that's <code>ObjectDisposedException</code>.</p>
+
+      <p class="body-text">In this real production incident, an API endpoint created an order in the database, then spun up a background task with <code>Task.Run</code> to send a confirmation email. The background task needed to look up the customer's email address, so it used the same <code>AppDbContext</code> that the controller was injected with. Seems harmless &mdash; the context is right there in the closure.</p>
+
+      <p class="body-text">But here's the catch: <code>AppDbContext</code> is registered as Scoped, which means ASP.NET Core creates it at the start of the HTTP request and disposes it when the response is sent. The controller returns <code>Ok(orderId)</code> immediately, the response flies back to the client, and the DI scope closes &mdash; disposing the DbContext. Meanwhile, the background thread is still starting up. By the time <code>Task.Run</code> actually executes that <code>FindAsync</code> call, the DbContext is already disposed. The exception was swallowed by the fire-and-forget pattern (<code>_ = Task.Run(...)</code>), so no error appeared in the API response and no one noticed until customers reported missing confirmation emails.</p>
+
+      <p class="body-text">The scariest part: this bug didn't show up in development. The dev machine was fast enough that the background task finished before the scope was disposed. It only appeared under production load where the thread pool was busy and the background task was delayed.</p>
+
+      <svg viewBox="0 0 720 240" role="img" aria-label="Timeline showing HTTP request scope ending while background task is still running, causing ObjectDisposedException" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+        <defs>
+          <marker id="dip-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+        </defs>
+        <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Scoped DbContext Dies Before Background Task Runs</text>
+
+        <!-- Timeline -->
+        <line x1="60" y1="70" x2="680" y2="70" stroke="#475569" stroke-width="2"/>
+        <text x="40" y="74" text-anchor="end" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Time</text>
+
+        <!-- HTTP Request bar -->
+        <rect x="80" y="50" width="300" height="16" rx="4" fill="#14b8a6" opacity="0.3"/>
+        <rect x="80" y="50" width="300" height="16" rx="4" fill="none" stroke="#14b8a6" stroke-width="1.5"/>
+        <text x="230" y="45" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">HTTP Request Scope (DbContext alive)</text>
+
+        <!-- Background task bar -->
+        <rect x="280" y="82" width="380" height="16" rx="4" fill="#ef4444" opacity="0.3"/>
+        <rect x="280" y="82" width="380" height="16" rx="4" fill="none" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="470" y="114" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Background Task (DbContext DISPOSED!)</text>
+
+        <!-- Scope dispose marker -->
+        <line x1="380" y1="40" x2="380" y2="106" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3"/>
+        <text x="380" y="130" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">Scope disposed here</text>
+
+        <!-- Labels on timeline -->
+        <circle cx="100" cy="70" r="4" fill="#14b8a6"/>
+        <text x="100" y="155" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">SaveChanges</text>
+
+        <circle cx="300" cy="70" r="4" fill="#a855f7"/>
+        <text x="300" y="155" text-anchor="middle" fill="#a855f7" font-family="system-ui, -apple-system, sans-serif" font-size="10">Task.Run starts</text>
+
+        <circle cx="380" cy="70" r="4" fill="#f59e0b"/>
+        <text x="380" y="170" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">Ok() returned</text>
+
+        <circle cx="520" cy="90" r="4" fill="#ef4444"/>
+        <text x="520" y="155" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">FindAsync &rarr; BOOM</text>
+
+        <!-- Fix box -->
+        <rect x="60" y="190" width="620" height="40" rx="8" fill="#0f2a1d" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="370" y="215" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Fix: Create a NEW scope inside Task.Run &rarr; each background task gets its own fresh DbContext</text>
+      </svg>
 
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
-          <button class="tab-btn active" data-tab="bug2-bad" role="tab">Buggy Code</button>
-          <button class="tab-btn" data-tab="bug2-fix" role="tab">Fix</button>
+          <button class="tab-btn active" data-tab="bug2-bad" role="tab" aria-selected="true">Buggy Code</button>
+          <button class="tab-btn" data-tab="bug2-fix" role="tab" aria-selected="false">Fix</button>
         </div>
         <div class="tab-panel active" id="bug2-bad" role="tabpanel">
           <div class="macos-window">
@@ -1546,6 +1644,7 @@ public class OrderController : ControllerBase
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The controller injects <code>AppDbContext</code> and <code>IEmailSender</code> &mdash; both Scoped services. After saving the order, it kicks off <code>Task.Run</code> to send an email. The lambda inside <code>Task.Run</code> captures <code>_db</code> and <code>_email</code> from the controller's fields. But notice the <code>_ =</code> at the start &mdash; that's the fire-and-forget pattern. The controller doesn't await the task; it immediately returns <code>Ok(orderId)</code>. As soon as the response is sent, ASP.NET Core disposes the request scope, which disposes <code>_db</code>. When the background thread eventually calls <code>_db.Customers.FindAsync</code>, the DbContext is already dead. Exception thrown, email never sent, nobody knows.</p>
         </div>
         <div class="tab-panel" id="bug2-fix" role="tabpanel">
           <div class="macos-window">
@@ -1581,12 +1680,17 @@ public class OrderController : ControllerBase
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of capturing the controller's DbContext, the background task creates its own DI scope with <code>_scopeFactory.CreateScope()</code>. That scope provides a brand-new <code>AppDbContext</code> and <code>IEmailSender</code> that are completely independent of the HTTP request. Notice that we also capture <code>orderId</code> and <code>customerId</code> as plain values before entering <code>Task.Run</code> &mdash; these are just integers, so they're safe to use anywhere. The <code>using</code> keyword on the scope ensures that the new DbContext and all its resources are properly disposed when the background work is done. The scope's lifetime is now controlled by the task, not by the HTTP request.</p>
         </div>
       </div>
 
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
         <p class="body-text">Scoped services are tied to the HTTP request lifetime. Background work needs its own scope. Better yet, use a proper background queue (<span class="tooltip-trigger"><code>IHostedService</code><span class="tooltip-content">An ASP.NET Core interface for long-running background services. Implementations run alongside the web server and have their own DI scope. Common uses: message queue consumers, scheduled tasks, health checks. Combined with Channel&lt;T&gt; (an async-safe producer/consumer queue), it's the proper way to do background work in ASP.NET Core.</span></span> + <code>Channel&lt;T&gt;</code>) instead of fire-and-forget <code>Task.Run</code>.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">Search for <code>Task.Run</code> and <code>_ = Task</code> (fire-and-forget patterns) inside controllers or services. Then check whether the code inside the task uses any injected services. If it references <code>_db</code>, <code>_repo</code>, or any field that came from constructor injection, you probably have this bug. The same applies to <code>ThreadPool.QueueUserWorkItem</code>, <code>BackgroundJob.Enqueue</code> (Hangfire), or any pattern that runs code after the HTTP response is sent. The fix is always the same: create a new scope inside the background work.</p>
       </div>
     </div>
   </div>
@@ -1601,10 +1705,64 @@ public class OrderController : ControllerBase
         <p class="body-text">Application failed to start with a cryptic <code>StackOverflowException</code>. <code>OrderService</code> depended on <code>IInventoryService</code>, and <code>InventoryService</code> depended on <code>IOrderService</code>. The DI container tried to resolve the cycle infinitely.</p>
       </div>
 
+      <p class="body-text">Picture two people standing in a hallway, each refusing to go first. "After you." "No, after you." "No, I insist, after you." They stand there forever, blocking everyone. That's exactly what happens with a circular dependency: Service A says "I need Service B to be created first," and Service B says "I need Service A to be created first." Neither can exist without the other already existing, so the DI container tries to create A, which triggers creating B, which triggers creating A again, which triggers creating B again... until the call stack overflows and the application crashes.</p>
+
+      <p class="body-text">In this case, <code>OrderService</code> needed <code>IInventoryService</code> because placing an order requires checking stock. Meanwhile, <code>InventoryService</code> needed <code>IOrderService</code> because inventory adjustments needed to look up order details. Both teams thought they were following DIP perfectly &mdash; they were programming to interfaces, using constructor injection, everything by the book. But neither team noticed the cycle because each service was developed independently.</p>
+
+      <p class="body-text">The app worked in unit tests because each service was tested in isolation with mocked dependencies. The cycle only appeared when the real DI container tried to wire everything together at startup. The error message was a <code>StackOverflowException</code> with no useful stack trace &mdash; just thousands of repeated frames showing the container trying to resolve the same two types over and over.</p>
+
+      <p class="body-text">The root cause wasn't a DIP problem &mdash; it was a design problem. When two services depend on each other, it usually means there's a missing concept between them. In this case, that missing concept was a domain event: "an order was placed." Instead of OrderService calling InventoryService directly, it should publish the fact that something happened, and let interested parties react.</p>
+
+      <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing circular dependency between OrderService and InventoryService, and how a Mediator breaks the cycle" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+        <defs>
+          <marker id="dip-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          <marker id="dip-b3-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+        </defs>
+        <text x="180" y="20" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Before: Circular Dependency</text>
+        <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">After: Mediator Breaks Cycle</text>
+
+        <!-- Before: circular arrows -->
+        <rect x="50" y="60" width="150" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="125" y="90" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">OrderService</text>
+
+        <rect x="50" y="160" width="150" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="125" y="190" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">InventoryService</text>
+
+        <line x1="205" y1="95" x2="310" y2="95" stroke="#ef4444" stroke-width="1"/>
+        <path d="M 200 88 Q 240 40 200 88" stroke="none"/>
+        <line x1="200" y1="110" x2="200" y2="156" stroke="#ef4444" stroke-width="2" marker-end="url(#dip-b3-arr)"/>
+        <text x="215" y="140" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">needs</text>
+        <line x1="50" y1="160" x2="50" y2="114" stroke="#ef4444" stroke-width="2" marker-end="url(#dip-b3-arr)"/>
+        <text x="30" y="140" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">needs</text>
+
+        <!-- Infinite loop icon -->
+        <text x="125" y="140" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="22">&#x267B;</text>
+
+        <!-- Divider -->
+        <line x1="360" y1="40" x2="360" y2="250" stroke="#475569" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <!-- After: mediator in middle -->
+        <rect x="400" y="60" width="140" height="50" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+        <text x="470" y="90" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">OrderService</text>
+
+        <rect x="540" y="120" width="140" height="50" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+        <text x="610" y="140" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">IMediator</text>
+        <text x="610" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">(publish event)</text>
+
+        <rect x="400" y="190" width="140" height="50" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+        <text x="470" y="215" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">ReserveStockHandler</text>
+        <text x="470" y="230" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">(handles event)</text>
+
+        <line x1="540" y1="85" x2="540" y2="116" stroke="#22c55e" stroke-width="2" marker-end="url(#dip-b3-arr-g)"/>
+        <line x1="610" y1="170" x2="545" y2="190" stroke="#22c55e" stroke-width="2" marker-end="url(#dip-b3-arr-g)"/>
+        <text x="565" y="103" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">publishes</text>
+        <text x="600" y="186" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">delivers</text>
+      </svg>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
-          <button class="tab-btn active" data-tab="bug3-bad" role="tab">Buggy Code</button>
-          <button class="tab-btn" data-tab="bug3-fix" role="tab">Fix</button>
+          <button class="tab-btn active" data-tab="bug3-bad" role="tab" aria-selected="true">Buggy Code</button>
+          <button class="tab-btn" data-tab="bug3-fix" role="tab" aria-selected="false">Fix</button>
         </div>
         <div class="tab-panel active" id="bug3-bad" role="tabpanel">
           <div class="macos-window">
@@ -1622,6 +1780,7 @@ public class InventoryService : IInventoryService
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> When the DI container tries to create <code>OrderService</code>, it sees the constructor needs <code>IInventoryService</code>. So it tries to create <code>InventoryService</code>. But wait &mdash; <code>InventoryService</code>'s constructor needs <code>IOrderService</code>. So the container tries to create <code>OrderService</code> again. Which needs <code>IInventoryService</code>. Which needs <code>IOrderService</code>. And around and around it goes. The call stack grows deeper with every iteration until it hits the CLR's stack limit (usually around 1MB, roughly 10,000-15,000 frames), and you get a <code>StackOverflowException</code> with no useful information about what went wrong.</p>
         </div>
         <div class="tab-panel" id="bug3-fix" role="tabpanel">
           <div class="macos-window">
@@ -1661,12 +1820,17 @@ public class ReserveStockHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> The cycle is broken because <code>OrderService</code> no longer knows about <code>IInventoryService</code> at all. It only knows about <code>IMediator</code>, a generic message bus. When an order is placed, it publishes an <code>OrderPlacedEvent</code> &mdash; a plain data object saying "this happened." Separately, <code>ReserveStockHandler</code> listens for that event and does the inventory work. Notice that the handler depends on <code>IInventoryRepository</code> (not <code>IInventoryService</code>) &mdash; it only needs the data access piece, not the full service. The two services no longer reference each other. The mediator sits in between and routes events to handlers at runtime, with no compile-time coupling.</p>
         </div>
       </div>
 
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">Circular dependencies mean your abstractions are tangled. Break cycles by: (1) introducing a <span class="tooltip-trigger">mediator<span class="tooltip-content">The Mediator pattern decouples objects so they don't reference each other directly. Instead of A→B and B→A, both A and B talk through a mediator. In .NET, MediatR is the most popular implementation — it uses INotification for events and IRequest for commands.</span></span> (MediatR events), (2) extracting a shared interface, or (3) using <code>Lazy&lt;T&gt;</code> to defer resolution. Option 1 is preferred — it usually reveals a missing domain event.</p>
+        <p class="body-text">Circular dependencies mean your abstractions are tangled. Break cycles by: (1) introducing a <span class="tooltip-trigger">mediator<span class="tooltip-content">The Mediator pattern decouples objects so they don't reference each other directly. Instead of A&rarr;B and B&rarr;A, both A and B talk through a mediator. In .NET, MediatR is the most popular implementation &mdash; it uses INotification for events and IRequest for commands.</span></span> (MediatR events), (2) extracting a shared interface, or (3) using <code>Lazy&lt;T&gt;</code> to defer resolution. Option 1 is preferred &mdash; it usually reveals a missing domain event.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">If your application crashes at startup with a <code>StackOverflowException</code> or an extremely long repeated stack trace, suspect a circular dependency. To find cycles proactively, draw a quick dependency graph: for each service, list what it injects. If you can follow the arrows and end up back where you started, you have a cycle. Tools like NDepend or dotnet-depends can automate this. Also watch for the subtler variant: A &rarr; B &rarr; C &rarr; A (three-way cycle). The longer the chain, the harder it is to spot by reading code alone.</p>
       </div>
     </div>
   </div>
@@ -1681,10 +1845,60 @@ public class ReserveStockHandler : INotificationHandler&lt;OrderPlacedEvent&gt;
         <p class="body-text">Tests passed (using mocked <code>IEmailSender</code>) but production sent real emails during integration tests. The test host registered a fake <code>IEmailSender</code>, but a middleware was resolving <code>EmailSender</code> (the concrete class) directly from the container.</p>
       </div>
 
+      <p class="body-text">Imagine a company has a phone directory (the DI container). There's an entry under "Email Department" (the interface <code>IEmailSender</code>) that points to "John's desk" (<code>EmailSender</code>). During testing, the team redirects "Email Department" to a dummy mailbox. But one employee has John's direct extension written on a sticky note and keeps calling him directly. The test team thinks all email is being intercepted, but John is still getting real calls because someone bypassed the directory.</p>
+
+      <p class="body-text">Here's what happened in practice. The team properly registered <code>IEmailSender</code> with <code>AddScoped&lt;IEmailSender, EmailSender&gt;()</code>. All controllers and services used <code>IEmailSender</code> through constructor injection. Tests replaced <code>IEmailSender</code> with a fake that discarded emails. Everything looked clean.</p>
+
+      <p class="body-text">But somewhere in the codebase, someone also added <code>builder.Services.AddScoped&lt;EmailSender&gt;()</code> &mdash; registering the concrete class directly. And a middleware was resolving <code>GetRequiredService&lt;EmailSender&gt;()</code> (the concrete type, not the interface). This created two completely separate registrations in the container. When tests replaced <code>IEmailSender</code> with a fake, the concrete <code>EmailSender</code> registration was untouched. The middleware happily used the real email sender, sending actual emails to real customers during integration tests.</p>
+
+      <p class="body-text">The team only noticed when a customer replied to a test email asking "What's this about?" The root cause was that two different developers added the registrations at different times, in different PRs, and neither noticed the duplication.</p>
+
+      <svg viewBox="0 0 720 220" role="img" aria-label="Diagram showing two separate registrations in DI container - interface and concrete - where test fakes only replace the interface registration" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+        <defs>
+          <marker id="dip-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          <marker id="dip-b4-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+        </defs>
+        <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Two Registrations = Two Different Objects</text>
+
+        <!-- DI Container -->
+        <rect x="220" y="40" width="280" height="110" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+        <text x="360" y="58" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">DI Container</text>
+
+        <rect x="240" y="68" width="240" height="28" rx="6" fill="#0f2a1d" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="360" y="87" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">IEmailSender &rarr; FakeEmailSender (test)</text>
+
+        <rect x="240" y="106" width="240" height="28" rx="6" fill="#2a1215" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="360" y="125" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">EmailSender &rarr; REAL EmailSender</text>
+
+        <!-- Controller (uses interface) -->
+        <rect x="30" y="55" width="140" height="40" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="100" y="78" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Controller</text>
+        <line x1="170" y1="75" x2="236" y2="82" stroke="#22c55e" stroke-width="2" marker-end="url(#dip-b4-arr)"/>
+        <text x="200" y="68" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="9">IEmailSender</text>
+
+        <!-- Middleware (uses concrete) -->
+        <rect x="30" y="110" width="140" height="40" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="100" y="133" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">Middleware</text>
+        <line x1="170" y1="130" x2="236" y2="120" stroke="#ef4444" stroke-width="2" marker-end="url(#dip-b4-arr-r)"/>
+        <text x="200" y="140" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="9">EmailSender</text>
+
+        <!-- Results -->
+        <rect x="550" y="55" width="140" height="40" rx="8" fill="#0f2a1d" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="620" y="78" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Fake (safe)</text>
+        <line x1="500" y1="82" x2="546" y2="75" stroke="#22c55e" stroke-width="1.5" marker-end="url(#dip-b4-arr)"/>
+
+        <rect x="550" y="110" width="140" height="40" rx="8" fill="#2a1215" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="620" y="133" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">REAL emails sent!</text>
+        <line x1="500" y1="120" x2="546" y2="130" stroke="#ef4444" stroke-width="1.5" marker-end="url(#dip-b4-arr-r)"/>
+
+        <rect x="60" y="170" width="600" height="35" rx="8" fill="#0f2a1d" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="360" y="192" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Fix: Only register via interface. Only resolve via interface. Remove concrete registration.</text>
+      </svg>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
-          <button class="tab-btn active" data-tab="bug4-bad" role="tab">Buggy Code</button>
-          <button class="tab-btn" data-tab="bug4-fix" role="tab">Fix</button>
+          <button class="tab-btn active" data-tab="bug4-bad" role="tab" aria-selected="true">Buggy Code</button>
+          <button class="tab-btn" data-tab="bug4-fix" role="tab" aria-selected="false">Fix</button>
         </div>
         <div class="tab-panel active" id="bug4-bad" role="tabpanel">
           <div class="macos-window">
@@ -1706,6 +1920,7 @@ app.Use(async (ctx, next) =&gt;
 });</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> There are two <code>AddScoped</code> calls. The first one says "when someone asks for <code>IEmailSender</code>, give them an <code>EmailSender</code>." The second one says "when someone asks for <code>EmailSender</code> (the concrete class), also give them an <code>EmailSender</code>." These are separate entries in the container's dictionary. The middleware calls <code>GetRequiredService&lt;EmailSender&gt;()</code> with the concrete type, so it hits the second registration &mdash; the one that tests never replaced. The test team only swapped the <code>IEmailSender</code> entry with a fake, leaving the concrete <code>EmailSender</code> entry completely untouched.</p>
         </div>
         <div class="tab-panel" id="bug4-fix" role="tabpanel">
           <div class="macos-window">
@@ -1723,12 +1938,17 @@ app.Use(async (ctx, next) =&gt;
 });</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> With only one registration (<code>IEmailSender &rarr; EmailSender</code>), every part of the application goes through the same entry in the container. When tests replace <code>IEmailSender</code> with a fake, the middleware uses that fake too &mdash; because the middleware now resolves <code>IEmailSender</code>, not the concrete type. There's only one door into the "email department," and that door is the interface. If you need to redirect traffic, you only need to redirect that one door.</p>
         </div>
       </div>
 
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">Registering both <code>IEmailSender → EmailSender</code> AND <code>EmailSender</code> separately creates <strong>two different registrations</strong>. Code resolving the concrete type bypasses any test fakes. Rule: register via interface, resolve via interface, never register concrete types that have an interface.</p>
+        <p class="body-text">Registering both <code>IEmailSender &rarr; EmailSender</code> AND <code>EmailSender</code> separately creates <strong>two different registrations</strong>. Code resolving the concrete type bypasses any test fakes. Rule: register via interface, resolve via interface, never register concrete types that have an interface.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">Search your <code>Program.cs</code> (and any extension methods called from it) for <code>AddScoped&lt;SomeConcreteClass&gt;()</code> or <code>AddSingleton&lt;SomeConcreteClass&gt;()</code> where <code>SomeConcreteClass</code> implements an interface. If you find both <code>AddScoped&lt;IFoo, Foo&gt;()</code> and <code>AddScoped&lt;Foo&gt;()</code>, you have a duplicate registration. Also search for <code>GetRequiredService&lt;SomeConcreteClass&gt;()</code> &mdash; if the type has an interface, it should be resolved via the interface instead. A code review rule: "never resolve a concrete type that has an interface."</p>
       </div>
     </div>
   </div>
@@ -1743,10 +1963,52 @@ app.Use(async (ctx, next) =&gt;
         <p class="body-text">Code review approved a "DIP-compliant" service. Constructor accepted <code>IOrderRepository</code>. But deep inside one method, the developer wrote <code>new SmtpClient("smtp.company.com")</code>. Tests couldn't mock email sending, and the service silently depended on a specific SMTP server.</p>
       </div>
 
+      <p class="body-text">Think of DIP like customs inspection at an airport. The constructor is the front door &mdash; every dependency that comes through it gets declared and inspected. But imagine a traveler who goes through customs with an empty suitcase (clean constructor), then pulls contraband out of their coat pocket inside the terminal (using <code>new</code> inside a method). The inspection system never saw it. That's what <code>new SmtpClient("smtp.company.com")</code> is &mdash; a smuggled dependency that bypasses the constructor's "customs."</p>
+
+      <p class="body-text">The class looked perfectly DIP-compliant to code reviewers. The constructor took <code>IOrderRepository</code> &mdash; an interface, just like the textbook says. But 40 lines into the <code>CompleteAsync</code> method, there was a <code>new SmtpClient("smtp.company.com")</code> hiding in plain sight. This created a hard dependency on a specific SMTP server that nobody could see by looking at the constructor signature.</p>
+
+      <p class="body-text">The test team wrote unit tests that mocked <code>IOrderRepository</code> perfectly. All tests passed. But they couldn't prevent real emails from being sent during testing, because <code>SmtpClient</code> wasn't injected &mdash; it was created inside the method. The tests couldn't reach it. Even worse, when the SMTP server changed addresses, this service broke silently because the server name was hardcoded in the <code>new</code> call, not in configuration.</p>
+
+      <p class="body-text">This is one of the sneakiest DIP violations because it passes both code review and unit testing. The class <em>looks</em> DIP-compliant (interfaces in constructor, check!) but <em>behaves</em> like a tightly-coupled monolith (hardcoded infrastructure inside methods, fail!).</p>
+
+      <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing a class with a clean constructor (DIP-compliant) but hidden new() calls inside its methods" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+        <defs>
+          <marker id="dip-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          <marker id="dip-b5-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+        </defs>
+        <text x="360" y="20" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Hidden Dependency: Constructor is Clean, Method is Not</text>
+
+        <!-- OrderService box -->
+        <rect x="200" y="40" width="320" height="140" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+        <text x="360" y="60" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">OrderService</text>
+
+        <!-- Constructor zone -->
+        <rect x="220" y="72" width="280" height="30" rx="6" fill="#0f2a1d" stroke="#22c55e" stroke-width="1"/>
+        <text x="360" y="92" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Constructor: IOrderRepository repo</text>
+
+        <!-- Method zone -->
+        <rect x="220" y="112" width="280" height="55" rx="6" fill="#2a1215" stroke="#ef4444" stroke-width="1"/>
+        <text x="360" y="132" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">CompleteAsync() method:</text>
+        <text x="360" y="155" text-anchor="middle" fill="#f87171" font-family="system-ui, -apple-system, sans-serif" font-size="11">new SmtpClient("smtp.company.com")</text>
+
+        <!-- Left: injected (visible) -->
+        <rect x="20" y="72" width="140" height="30" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="90" y="92" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">IOrderRepository</text>
+        <line x1="160" y1="87" x2="216" y2="87" stroke="#22c55e" stroke-width="2" marker-end="url(#dip-b5-arr)"/>
+        <text x="188" y="80" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="9">visible</text>
+
+        <!-- Right: hidden (smuggled) -->
+        <rect x="560" y="120" width="140" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="630" y="138" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">SMTP Server</text>
+        <text x="630" y="153" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="9">hardcoded, untestable</text>
+        <line x1="500" y1="140" x2="556" y2="140" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#dip-b5-arr-r)"/>
+        <text x="528" y="133" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="9">hidden</text>
+      </svg>
+
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
-          <button class="tab-btn active" data-tab="bug5-bad" role="tab">Buggy Code</button>
-          <button class="tab-btn" data-tab="bug5-fix" role="tab">Fix</button>
+          <button class="tab-btn active" data-tab="bug5-bad" role="tab" aria-selected="true">Buggy Code</button>
+          <button class="tab-btn" data-tab="bug5-fix" role="tab" aria-selected="false">Fix</button>
         </div>
         <div class="tab-panel active" id="bug5-bad" role="tabpanel">
           <div class="macos-window">
@@ -1772,6 +2034,7 @@ app.Use(async (ctx, next) =&gt;
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The constructor looks textbook-perfect: one interface parameter, one private field, clean injection. But scroll down to <code>CompleteAsync</code>. After the repository work, the method creates a <code>new SmtpClient("smtp.company.com")</code>. That single <code>new</code> call creates three problems at once. First, the SMTP server address is hardcoded as a string literal &mdash; no configuration, no flexibility. Second, tests can't intercept email sending because there's no interface to mock. Third, the class's constructor signature is misleading &mdash; it says "I only need a repository" when it actually also needs an SMTP server. The constructor is an incomplete ingredient list.</p>
         </div>
         <div class="tab-panel" id="bug5-fix" role="tabpanel">
           <div class="macos-window">
@@ -1799,12 +2062,17 @@ app.Use(async (ctx, next) =&gt;
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> The hidden <code>new SmtpClient()</code> is replaced with an injected <code>IEmailSender</code>. Now the constructor is an honest ingredient list: "I need a repository and an email sender." Tests can mock <code>IEmailSender</code> and verify emails are sent without actually hitting an SMTP server. The SMTP configuration now lives inside the <code>IEmailSender</code> implementation (which reads from <code>IOptions&lt;SmtpOptions&gt;</code>), not hardcoded in business logic. And the <code>CompleteAsync</code> method is simpler &mdash; it just calls <code>_email.SendAsync()</code> without worrying about SMTP details.</p>
         </div>
       </div>
 
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">DIP compliance isn't just about the constructor — it's about the <strong>entire class</strong>. Search for <code>new</code> keyword in business logic. If the newed-up object has side effects (I/O, network, file system), it's a hidden dependency that breaks testability. DTOs and value objects are fine to <code>new</code> up.</p>
+        <p class="body-text">DIP compliance isn't just about the constructor &mdash; it's about the <strong>entire class</strong>. Search for <code>new</code> keyword in business logic. If the newed-up object has side effects (I/O, network, file system), it's a hidden dependency that breaks testability. DTOs and value objects are fine to <code>new</code> up.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">Do a project-wide search for the <code>new</code> keyword inside service and business logic classes (exclude DTOs, models, and test files). For each hit, ask: "Does this object do I/O?" If it touches the network (HttpClient, SmtpClient), the file system (StreamWriter, File.Open), or external services, it's a hidden dependency that should be injected instead. Common culprits: <code>new HttpClient()</code>, <code>new SmtpClient()</code>, <code>new SqlConnection()</code>, <code>File.ReadAllText()</code>. A code review checklist item: "No <code>new</code> on I/O types in business logic."</p>
       </div>
     </div>
   </div>
@@ -1816,13 +2084,58 @@ app.Use(async (ctx, next) =&gt;
     <div class="card-body">
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-        <p class="body-text">A developer injected <code>IServiceProvider</code> into every class and called <code>GetRequiredService&lt;T&gt;()</code> everywhere. "We're using DIP — all dependencies come from the container!" But no constructor signature revealed the true dependencies. The team couldn't tell what a class needed without reading every method.</p>
+        <p class="body-text">A developer injected <code>IServiceProvider</code> into every class and called <code>GetRequiredService&lt;T&gt;()</code> everywhere. "We're using DIP &mdash; all dependencies come from the container!" But no constructor signature revealed the true dependencies. The team couldn't tell what a class needed without reading every method.</p>
       </div>
+
+      <p class="body-text">Imagine you're cooking a recipe, but instead of a clear ingredient list at the top, the recipe just says "Go to the pantry." You start cooking, and in step 3 it says "grab flour from the pantry." Step 7 says "grab sugar from the pantry." Step 12 says "grab that obscure spice you might not have." You can't prepare ingredients ahead of time because you don't know what you need until you're mid-recipe. That's what the Service Locator does &mdash; it replaces a clear ingredient list (constructor injection) with "just ask the pantry (IServiceProvider) whenever you need something."</p>
+
+      <p class="body-text">A developer on the team had read about DIP and understood the idea of "don't create your own dependencies." So they injected <code>IServiceProvider</code> into every class and used <code>GetRequiredService&lt;T&gt;()</code> inside methods whenever they needed something. Technically, no class was using <code>new</code> to create dependencies. Technically, everything came from the DI container. The developer genuinely believed this was proper DIP.</p>
+
+      <p class="body-text">The problem was invisible at first but grew into a maintenance nightmare. When a new developer tried to write tests for <code>InvoiceService</code>, they looked at the constructor: just <code>IServiceProvider</code>. "Easy, I'll mock that." But what should the mock return? To find out, they had to read every line of every method to discover the 4 hidden dependencies scattered across 500 lines. Miss one, and the test crashes with a <code>NullReferenceException</code> at runtime.</p>
+
+      <p class="body-text">Even worse, when someone removed <code>IBlobStorage</code> from the DI container (during a refactor), the compiler didn't catch it. The app compiled perfectly. The bug only appeared when a user actually triggered the invoice generation code path, weeks after the refactor. With constructor injection, the compiler would have caught it immediately &mdash; you can't create an <code>InvoiceService</code> without providing an <code>IBlobStorage</code>.</p>
+
+      <svg viewBox="0 0 720 230" role="img" aria-label="Comparison diagram showing Service Locator hiding dependencies versus Constructor Injection making them explicit" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+        <defs>
+          <marker id="dip-b6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/></marker>
+          <marker id="dip-b6-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+        </defs>
+        <text x="180" y="20" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Service Locator (hidden)</text>
+        <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Constructor Injection (explicit)</text>
+
+        <!-- Left: Service Locator -->
+        <rect x="60" y="40" width="240" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="180" y="62" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">InvoiceService</text>
+        <text x="180" y="80" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">ctor(IServiceProvider sp)</text>
+
+        <rect x="60" y="105" width="240" height="100" rx="8" fill="#1a1a2e" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="180" y="122" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Hidden inside methods:</text>
+        <text x="180" y="140" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">sp.GetRequiredService&lt;IOrderRepository&gt;()</text>
+        <text x="180" y="155" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">sp.GetRequiredService&lt;IPdfGenerator&gt;()</text>
+        <text x="180" y="170" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">sp.GetRequiredService&lt;IBlobStorage&gt;()</text>
+        <text x="180" y="185" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">sp.GetRequiredService&lt;IEmailSender&gt;()</text>
+        <text x="180" y="200" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">Can't see these from outside!</text>
+
+        <!-- Divider -->
+        <line x1="360" y1="30" x2="360" y2="220" stroke="#475569" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <!-- Right: Constructor Injection -->
+        <rect x="420" y="40" width="240" height="105" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+        <text x="540" y="58" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">InvoiceService</text>
+        <text x="540" y="78" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">ctor(IOrderRepository,</text>
+        <text x="540" y="93" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">IPdfGenerator,</text>
+        <text x="540" y="108" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">IBlobStorage, IEmailSender)</text>
+        <text x="540" y="133" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="10">All 4 dependencies visible!</text>
+
+        <rect x="420" y="155" width="240" height="55" rx="8" fill="#0f2a1d" stroke="#22c55e" stroke-width="1"/>
+        <text x="540" y="175" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Compiler catches missing deps</text>
+        <text x="540" y="195" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11">Tests know exactly what to mock</text>
+      </svg>
 
       <div class="tab-container mt-sm">
         <div class="tab-header" role="tablist">
-          <button class="tab-btn active" data-tab="bug6-bad" role="tab">Buggy Code</button>
-          <button class="tab-btn" data-tab="bug6-fix" role="tab">Fix</button>
+          <button class="tab-btn active" data-tab="bug6-bad" role="tab" aria-selected="true">Buggy Code</button>
+          <button class="tab-btn" data-tab="bug6-fix" role="tab" aria-selected="false">Fix</button>
         </div>
         <div class="tab-panel active" id="bug6-bad" role="tabpanel">
           <div class="macos-window">
@@ -1847,6 +2160,7 @@ public class InvoiceService
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The constructor takes just <code>IServiceProvider</code> &mdash; a universal key that can resolve <em>anything</em> from the DI container. Inside the method, four separate <code>GetRequiredService</code> calls pull out the real dependencies one by one. From the outside (looking only at the constructor), this class appears to need just "the container." You have no idea it actually needs a repository, a PDF generator, blob storage, and an email sender. It's like a function that takes <code>object</code> as its only parameter &mdash; technically works, but tells the caller nothing about what it actually expects.</p>
         </div>
         <div class="tab-panel" id="bug6-fix" role="tabpanel">
           <div class="macos-window">
@@ -1882,12 +2196,17 @@ public class InvoiceService
 }</code></pre>
             </div>
           </div>
+          <p class="body-text mt-sm"><strong>Why the fix works:</strong> The constructor now explicitly lists all four dependencies. Anyone looking at this class immediately knows: "It needs a repository, a PDF generator, blob storage, and an email sender." Tests provide mocks for exactly those four interfaces. If you remove <code>IBlobStorage</code> from the DI container, the application won't even start &mdash; the compiler and DI container both enforce completeness. The constructor is an honest contract, not a blank check. And as a bonus, if the constructor grows to 8+ parameters, that's a clear signal the class does too much (SRP violation) &mdash; a signal you'd never see with <code>IServiceProvider</code>.</p>
         </div>
       </div>
 
       <div class="callout callout-info mt-sm">
         <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-        <p class="body-text">The <span class="tooltip-trigger">Service Locator<span class="tooltip-content">An anti-pattern where classes ask a global container for their dependencies at runtime instead of receiving them through the constructor. It hides dependencies, makes testing harder, and defeats the purpose of DIP. Mark Seemann calls it "the opposite of DI" in his book Dependency Injection in .NET.</span></span> pattern is the <strong>opposite</strong> of DIP. It hides dependencies behind IServiceProvider. Use explicit constructor injection — the constructor is your class's <strong>honest list of requirements</strong>. The only place <code>IServiceProvider</code> is acceptable is in factory classes or middleware that must create scopes.</p>
+        <p class="body-text">The <span class="tooltip-trigger">Service Locator<span class="tooltip-content">An anti-pattern where classes ask a global container for their dependencies at runtime instead of receiving them through the constructor. It hides dependencies, makes testing harder, and defeats the purpose of DIP. Mark Seemann calls it "the opposite of DI" in his book Dependency Injection in .NET.</span></span> pattern is the <strong>opposite</strong> of DIP. It hides dependencies behind IServiceProvider. Use explicit constructor injection &mdash; the constructor is your class's <strong>honest list of requirements</strong>. The only place <code>IServiceProvider</code> is acceptable is in factory classes or middleware that must create scopes.</p>
+      </div>
+      <div class="callout callout-warning mt-sm">
+        <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+        <p class="body-text">Search for <code>IServiceProvider</code> in constructor parameters. If you find it in anything other than a factory class, middleware, or scope-creation code, it's likely the Service Locator anti-pattern. Also search for <code>GetRequiredService</code> and <code>GetService</code> calls outside of <code>Program.cs</code> and factory classes. Each one is a hidden dependency that should probably be an explicit constructor parameter. A healthy codebase has <code>IServiceProvider</code> in at most 2-3 classes; if you find it in 20+ classes, you have a systemic Service Locator problem.</p>
       </div>
     </div>
   </div>
@@ -1910,7 +2229,9 @@ public class InvoiceService
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Creating <code>IOrderService</code> for <code>OrderService</code>, <code>IUserService</code> for <code>UserService</code> — one interface per class, 1:1 mapping, zero additional implementations.</p>
+        <p class="body-text"><strong>Mistake:</strong> Creating <code>IOrderService</code> for <code>OrderService</code>, <code>IUserService</code> for <code>UserService</code> &mdash; one interface per class, 1:1 mapping, zero additional implementations.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> Developers learn "depend on abstractions" and interpret it as "every class needs an interface." It feels like the right thing to do &mdash; more interfaces must mean more DIP compliance, right? But DIP says abstractions should represent <em>boundaries</em>, not mirror every class. A pure calculation function that adds up numbers has no side effects, doesn't talk to a database, doesn't send emails. There's nothing to mock, nothing to swap, and no boundary to protect. Wrapping it in an interface just doubles the files (ICalculatorService.cs + CalculatorService.cs) and makes "Go to Definition" take an extra click every time.</p>
+        <p class="body-text">The rule of thumb: if you can't imagine a second implementation, and the class does no I/O, you probably don't need an interface.</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HeaderInterface.cs</span></div>
           <div class="macos-body">
@@ -1929,7 +2250,23 @@ public class CalculatorService : ICalculatorService
           </div>
         </div>
         <p class="body-text"><strong>Why Bad:</strong> Adds navigation overhead, doubles the file count, and provides no testability or swappability benefit. Pure functions don't need interfaces.</p>
-        <p class="body-text"><strong>Fix:</strong> Only create interfaces for dependencies that cross boundaries, have side effects, or need mocking. Pure logic classes can be used directly.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DirectUsage.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Pure logic — just use it directly, no interface needed
+public class PriceCalculator
+{
+    public decimal Calculate(Order order) =&gt; order.Items.Sum(i =&gt; i.Price * i.Quantity);
+}
+
+// In your service — inject directly or even make it static
+public class OrderService(IOrderRepository repo, PriceCalculator calc)
+{
+    public decimal GetTotal(int id) =&gt; calc.Calculate(repo.GetById(id));
+}</code></pre>
+          </div>
+        </div>
+        <p class="body-text"><strong>The connection:</strong> The bad code wraps a pure math function behind an interface nobody will ever swap or mock. The good code uses the calculator directly &mdash; it's just math, and math doesn't need an abstraction layer. Save interfaces for things that actually cross boundaries: databases, APIs, file systems, email providers.</p>
       </div>
     </div>
   </div>
@@ -1941,7 +2278,9 @@ public class CalculatorService : ICalculatorService
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Putting <code>IOrderRepository</code> in the Infrastructure project (next to <code>SqlOrderRepository</code>). Now the Domain project references Infrastructure — the dependency flows <strong>downward</strong>, violating DIP entirely.</p>
+        <p class="body-text"><strong>Mistake:</strong> Putting <code>IOrderRepository</code> in the Infrastructure project (next to <code>SqlOrderRepository</code>). Now the Domain project references Infrastructure &mdash; the dependency flows <strong>downward</strong>, violating DIP entirely.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> It feels natural to keep an interface next to its implementation &mdash; they're related, so they should be in the same folder, right? That's how you organize files in a simpler project. But in a layered or Clean Architecture setup, the interface and its implementation serve different masters. The interface defines what the <em>consumer</em> needs. The implementation satisfies that need using specific technology. If the interface lives in the Infrastructure project, then Domain must add a project reference to Infrastructure just to see it. And now Domain depends on Infrastructure &mdash; the exact opposite of what DIP is trying to achieve.</p>
+        <p class="body-text">The correct mental model: the interface is a "want ad" posted by Domain. It says "I need someone who can save orders." The interface belongs to the one who <em>needs</em> it (Domain), not the one who <em>fulfills</em> it (Infrastructure).</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongProjectLayout.txt</span></div>
           <div class="macos-body">
@@ -1949,17 +2288,20 @@ public class CalculatorService : ICalculatorService
 MyApp.Infrastructure/
 ├── IOrderRepository.cs    // Interface HERE
 ├── SqlOrderRepository.cs  // Implementation HERE
-// Domain must reference Infrastructure to use the interface!
-
-// ✅ Interface lives in the CONSUMER's project
+// Domain must reference Infrastructure to use the interface!</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CorrectProjectLayout.txt</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Interface lives in the CONSUMER's project
 MyApp.Domain/
 ├── IOrderRepository.cs    // Interface HERE — owned by Domain
 MyApp.Infrastructure/
 ├── SqlOrderRepository.cs  // Implementation references Domain</code></pre>
           </div>
         </div>
-        <p class="body-text"><strong>Why Bad:</strong> The whole point of DIP is that high-level modules own the abstraction. If the abstraction lives in Infrastructure, Domain depends on Infrastructure — you've inverted nothing.</p>
-        <p class="body-text"><strong>Fix:</strong> Interfaces go in Domain or Application. Implementations go in Infrastructure. Infrastructure references Domain, never the reverse.</p>
+        <p class="body-text"><strong>The connection:</strong> In the bad layout, Domain &rarr; Infrastructure (wrong direction). In the good layout, Infrastructure &rarr; Domain (correct &mdash; the low-level detail depends on the high-level policy). The only change is moving one file from one project to another, but it completely flips the dependency direction.</p>
       </div>
     </div>
   </div>
@@ -1971,7 +2313,9 @@ MyApp.Infrastructure/
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> A class has 8+ constructor parameters — all properly injected interfaces, but the sheer count signals the class does too much.</p>
+        <p class="body-text"><strong>Mistake:</strong> A class has 8+ constructor parameters &mdash; all properly injected interfaces, but the sheer count signals the class does too much.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> A developer follows DIP perfectly &mdash; every dependency is an interface, every dependency is injected through the constructor. No <code>new</code> keywords hiding anywhere. The code is technically correct, and yet something is deeply wrong. When a constructor has 10 parameters, it means the class has 10 different reasons to change. If the email provider changes, this class changes. If the tax rules change, this class changes. If the PDF template changes, this class changes. That's not one class doing one thing &mdash; it's one class doing <em>everything</em>.</p>
+        <p class="body-text">DIP is not a license to inject the entire world. A bloated constructor is a code smell that says "this class has too many responsibilities." The solution isn't to stop using DIP &mdash; it's to split the class into smaller focused services, or group related dependencies behind a higher-level interface (a Facade).</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverInjection.cs</span></div>
           <div class="macos-body">
@@ -1989,8 +2333,24 @@ public class OrderOrchestrator(
     ITaxCalculator tax) { }</code></pre>
           </div>
         </div>
-        <p class="body-text"><strong>Why Bad:</strong> DIP doesn't mean "inject everything." If a class needs 10 interfaces, it has 10 reasons to change — that's an SRP violation. The class is an orchestrator doing too much.</p>
-        <p class="body-text"><strong>Fix:</strong> Apply the <span class="tooltip-trigger">Facade pattern<span class="tooltip-content">Group related dependencies behind a higher-level interface. Instead of injecting IEmailSender + ISmsSender + IPushNotifier, inject INotificationService that encapsulates all three. This reduces constructor parameters while maintaining DIP.</span></span> to group related dependencies, or decompose the class into smaller focused services.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RefactoredWithFacades.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Group related dependencies behind facades
+public class OrderOrchestrator(
+    IOrderRepository orders,
+    IPricingService pricing,         // wraps: discounts + tax
+    INotificationService notifier,   // wraps: email + sms
+    IDocumentService documents)      // wraps: pdf + blob storage
+{ }
+
+// Each facade is its own focused class
+public class PricingService(IDiscountEngine discounts, ITaxCalculator tax) : IPricingService { }
+public class NotificationService(IEmailSender email, ISmsSender sms) : INotificationService { }
+public class DocumentService(IPdfGenerator pdf, IBlobStorage storage) : IDocumentService { }</code></pre>
+          </div>
+        </div>
+        <p class="body-text"><strong>The connection:</strong> The bad code has 10 parameters &mdash; all valid interfaces, but too many responsibilities in one place. The good code groups related dependencies into facades: pricing stuff together, notification stuff together, document stuff together. The orchestrator drops from 10 to 4 parameters, and each facade is a focused class with its own single responsibility. DIP still applies at every level.</p>
       </div>
     </div>
   </div>
@@ -2002,7 +2362,9 @@ public class OrderOrchestrator(
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Defining an interface that leaks infrastructure details — <code>IRepository&lt;T&gt;</code> with <code>IQueryable&lt;T&gt;</code> return types, or <code>IEmailSender</code> with <code>SmtpSettings</code> parameters.</p>
+        <p class="body-text"><strong>Mistake:</strong> Defining an interface that leaks infrastructure details &mdash; <code>IRepository&lt;T&gt;</code> with <code>IQueryable&lt;T&gt;</code> return types, or <code>IEmailSender</code> with <code>SmtpSettings</code> parameters.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> Developers want to be "flexible" and let callers compose their own queries. Returning <code>IQueryable&lt;T&gt;</code> from a repository seems generous &mdash; callers can filter, sort, and page however they want. But <code>IQueryable</code> is EF Core's query pipeline. It translates LINQ into SQL behind the scenes. Callers don't realize they're writing SQL Server-specific queries through what looks like C# code. When you try to swap the SQL Server implementation for Cosmos DB, those LINQ queries fail because Cosmos DB's <code>IQueryable</code> supports a different subset of operations.</p>
+        <p class="body-text">The interface was supposed to be an abstraction &mdash; a wall that hides infrastructure details. But by returning <code>IQueryable</code>, you punched a giant hole in that wall. The infrastructure detail (the ORM's query engine) leaked right through.</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LeakyAbstraction.cs</span></div>
           <div class="macos-body">
@@ -2011,9 +2373,13 @@ public interface IOrderRepository
 {
     IQueryable&lt;Order&gt; GetAll(); // Callers write LINQ-to-SQL without knowing it
     // Now you can't swap SQL Server for Cosmos DB — IQueryable differs!
-}
-
-// ✅ Clean — returns domain objects, hides the query mechanism
+}</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CleanAbstraction.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Clean — returns domain objects, hides the query mechanism
 public interface IOrderRepository
 {
     Task&lt;IReadOnlyList&lt;Order&gt;&gt; GetByStatusAsync(OrderStatus status);
@@ -2021,8 +2387,7 @@ public interface IOrderRepository
 }</code></pre>
           </div>
         </div>
-        <p class="body-text"><strong>Why Bad:</strong> If the interface leaks infrastructure, swapping implementations becomes impossible. The abstraction is supposed to <strong>hide</strong> the details, not expose them with a thin wrapper.</p>
-        <p class="body-text"><strong>Fix:</strong> Interfaces should use domain types only. No <code>IQueryable</code>, no <code>SqlConnection</code>, no <code>HttpClient</code> in return types or parameters.</p>
+        <p class="body-text"><strong>The connection:</strong> The bad interface returns <code>IQueryable</code>, which is a technology-specific type that exposes the database engine's capabilities. The good interface returns simple domain types (<code>Order</code>, <code>IReadOnlyList&lt;Order&gt;</code>) wrapped in <code>Task</code> for async. The implementation decides <em>how</em> to query; the interface just describes <em>what</em> the caller needs. That's the essence of DIP &mdash; the interface speaks the caller's language, not the implementation's.</p>
       </div>
     </div>
   </div>
@@ -2035,8 +2400,38 @@ public interface IOrderRepository
     <div class="collapsible-content">
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Creating a beautiful interface + implementation, but forgetting to register it in <code>Program.cs</code>. The app compiles but crashes at runtime with <code>InvalidOperationException: No service for type 'IMyService'</code>.</p>
-        <p class="body-text"><strong>Why Bad:</strong> DIP without DI registration means the container can't resolve the dependency. This is a runtime error — the compiler won't catch it.</p>
-        <p class="body-text"><strong>Fix:</strong> Use <span class="tooltip-trigger">Scrutor<span class="tooltip-content">A popular .NET library that adds assembly scanning and decoration to Microsoft's DI container. It can automatically register all classes implementing interfaces by convention. Example: builder.Services.Scan(scan =&gt; scan.FromAssemblyOf&lt;SqlOrderRepository&gt;().AddClasses().AsImplementedInterfaces().WithScopedLifetime()). This eliminates manual registration for most services.</span></span> (Scrutor) or create an <code>AddInfrastructure()</code> extension method per project. Always enable <code>ValidateOnBuild</code> in development to catch missing registrations at startup.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> In C#, the compiler checks types, not DI wiring. You can create <code>INotificationService</code>, write a perfect <code>EmailNotificationService</code>, inject it into a controller's constructor, and the compiler says "looks good!" But the DI container is a separate system that only runs at startup. If you forgot to add <code>services.AddScoped&lt;INotificationService, EmailNotificationService&gt;()</code> in <code>Program.cs</code>, the container doesn't know about it. The app starts, and the first time someone hits the controller, boom &mdash; <code>InvalidOperationException</code>.</p>
+        <p class="body-text">This is especially common in large solutions where teams add new services daily. Each new interface-implementation pair needs a registration line, and it's easy to forget when you're focused on the business logic.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ForgotRegistration.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Interface + implementation exist, but nobody told the container
+public interface INotificationService { Task NotifyAsync(string msg); }
+public class EmailNotificationService : INotificationService { ... }
+
+// Program.cs — oops, forgot to add:
+// builder.Services.AddScoped&lt;INotificationService, EmailNotificationService&gt;();</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AutoRegistration.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Scrutor auto-registers by convention — never forget again
+builder.Services.Scan(scan =&gt; scan
+    .FromAssemblyOf&lt;EmailNotificationService&gt;()
+    .AddClasses()
+    .AsImplementedInterfaces()
+    .WithScopedLifetime());
+
+// Also enable build-time validation to catch stragglers
+builder.Host.UseDefaultServiceProvider(options =&gt;
+{
+    options.ValidateOnBuild = true;  // Catches missing registrations at startup
+    options.ValidateScopes = true;   // Catches captive dependencies
+});</code></pre>
+          </div>
+        </div>
+        <p class="body-text"><strong>The connection:</strong> The bad scenario relies on manual registration for every new service &mdash; and humans forget. The good code uses Scrutor to scan assemblies and auto-register everything that implements an interface. Combined with <code>ValidateOnBuild</code>, the app won't even start if any dependency is missing. You go from "runtime crash in production" to "startup failure in development."</p>
       </div>
     </div>
   </div>
@@ -2049,6 +2444,8 @@ public interface IOrderRepository
     <div class="collapsible-content">
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Registering a DbContext as Singleton ("it's expensive to create!") or a stateless validator as Scoped ("everything should be Scoped!").</p>
+        <p class="body-text"><strong>Why This Happens:</strong> Developers often default to one lifetime for everything without thinking about what each service actually needs. "Make it Scoped because that's what DbContext uses" is the most common reasoning &mdash; but a stateless email validator doesn't need a new instance per request. It does the same thing every time with no internal state. Conversely, making DbContext a Singleton sounds like an optimization ("one instance = less overhead"), but DbContext tracks every entity it loads. As a Singleton, it accumulates tracked entities across <em>all</em> requests, eating more memory over time and causing concurrency exceptions when two requests try to modify the same entity.</p>
+        <p class="body-text">The key question for every service: "Does it hold state that changes per request?" If yes, Scoped. If it's stateless or thread-safe, Singleton. If it needs a fresh instance every time (like an HttpClient message handler), Transient.</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongLifetimes.cs</span></div>
           <div class="macos-body">
@@ -2056,14 +2453,18 @@ public interface IOrderRepository
 builder.Services.AddSingleton&lt;AppDbContext&gt;();
 
 // ❌ Stateless service as Scoped — wastes memory (new instance per request for no reason)
-builder.Services.AddScoped&lt;IEmailValidator, EmailValidator&gt;();
-
-// ✅ Correct lifetimes
+builder.Services.AddScoped&lt;IEmailValidator, EmailValidator&gt;();</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CorrectLifetimes.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Correct lifetimes
 builder.Services.AddScoped&lt;AppDbContext&gt;();           // Scoped: one per request
 builder.Services.AddSingleton&lt;IEmailValidator, EmailValidator&gt;(); // Singleton: stateless, reuse</code></pre>
           </div>
         </div>
-        <p class="body-text"><strong>Fix:</strong> <strong>Scoped</strong> = has per-request state (DbContext, current user). <strong>Singleton</strong> = stateless or thread-safe shared state (validators, config, caches). <strong>Transient</strong> = lightweight, no shared state, needs fresh instance every time.</p>
+        <p class="body-text"><strong>The connection:</strong> The bad code gives DbContext too long a life (Singleton when it should be Scoped) and the validator too short a life (Scoped when it can be Singleton). The good code matches each service's lifetime to its actual behavior: DbContext holds per-request state so it's Scoped, and the validator is pure logic so it's Singleton.</p>
       </div>
     </div>
   </div>
@@ -2075,9 +2476,31 @@ builder.Services.AddSingleton&lt;IEmailValidator, EmailValidator&gt;(); // Singl
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Creating <code>IDateTimeProvider</code>, <code>IGuidFactory</code>, <code>IStringFormatter</code>, <code>IListWrapper&lt;T&gt;</code> — abstracting BCL types that are already stable and side-effect-free.</p>
-        <p class="body-text"><strong>Why Bad:</strong> Every unnecessary interface adds cognitive overhead, makes the codebase harder to navigate, and slows onboarding. Martin himself said DIP applies to <strong>volatile</strong> dependencies, not stable ones.</p>
-        <p class="body-text"><strong>Fix:</strong> Only abstract dependencies that are <strong>volatile</strong> (change frequently), have <strong>side effects</strong> (I/O), or need <strong>mocking</strong> for tests. Exception: <code>IDateTimeProvider</code> IS useful when testing time-dependent logic — but <code>IStringFormatter</code> is not.</p>
+        <p class="body-text"><strong>Mistake:</strong> Creating <code>IDateTimeProvider</code>, <code>IGuidFactory</code>, <code>IStringFormatter</code>, <code>IListWrapper&lt;T&gt;</code> &mdash; abstracting BCL types that are already stable and side-effect-free.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> After learning DIP, some developers go all-in. "Everything should be an interface!" They create abstractions around <code>string.Format()</code>, <code>Guid.NewGuid()</code>, even <code>List&lt;T&gt;</code>. The thinking is: "What if we need to swap out the string formatter someday?" The answer is: you won't. <code>String.Format</code> has worked the same way since .NET 1.0 and it's not going to change. Robert C. Martin himself clarified that DIP targets <strong>volatile</strong> dependencies &mdash; things that change often, have side effects, or connect to external systems. The .NET base class library is the opposite of volatile.</p>
+        <p class="body-text">The exception is worth noting: <code>IDateTimeProvider</code> (or .NET 8's built-in <code>TimeProvider</code>) IS valuable because <code>DateTime.Now</code> is a hidden dependency on the system clock, which makes time-sensitive tests impossible to control. But <code>IStringFormatter</code>? That's just noise.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverAbstraction.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Abstracting stable BCL types — noise, no value
+public interface IGuidFactory { Guid Create(); }
+public interface IStringFormatter { string Format(string template, params object[] args); }
+public interface IListWrapper&lt;T&gt; { void Add(T item); int Count { get; } }</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PragmaticAbstraction.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Only abstract volatile/side-effect dependencies
+// Guid.NewGuid() — just use it directly, it's stable
+var id = Guid.NewGuid();
+
+// DateTime.Now — abstract this one! It's a hidden side effect (system clock)
+public interface ITimeProvider { DateTimeOffset Now { get; } }
+// .NET 8+ has built-in: TimeProvider.System</code></pre>
+          </div>
+        </div>
+        <p class="body-text"><strong>The connection:</strong> The bad code creates interfaces for things that will never change and never need mocking. The good code uses stable BCL types directly and only creates abstractions for things with real side effects (like the system clock). The decision rule: "Will I ever swap this? Do tests need to control this?" If both answers are no, skip the interface.</p>
       </div>
     </div>
   </div>
@@ -2089,9 +2512,43 @@ builder.Services.AddSingleton&lt;IEmailValidator, EmailValidator&gt;(); // Singl
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p class="body-text"><strong>Mistake:</strong> Scattering <code>services.AddScoped&lt;...&gt;()</code> calls throughout the application — in controllers, in domain services, in random utility classes.</p>
-        <p class="body-text"><strong>Why Bad:</strong> The <span class="tooltip-trigger">composition root<span class="tooltip-content">The single location where ALL dependency registrations happen. In ASP.NET Core, this is Program.cs (or extension methods called from Program.cs). Every other class in the application should be completely unaware of the DI container. Only the composition root knows about concrete types and their lifetimes.</span></span> should be the ONE place that knows about all concrete types. If DI configuration leaks into business logic, you've coupled your domain to the container.</p>
-        <p class="body-text"><strong>Fix:</strong> All registrations in <code>Program.cs</code> or in dedicated <code>AddXxx()</code> extension methods organized by project (e.g., <code>AddInfrastructure()</code>, <code>AddApplication()</code>). No business class should ever reference <code>IServiceCollection</code>.</p>
+        <p class="body-text"><strong>Mistake:</strong> Scattering <code>services.AddScoped&lt;...&gt;()</code> calls throughout the application &mdash; in controllers, in domain services, in random utility classes.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> As a project grows, different developers add registrations wherever it feels convenient. A domain service discovers it needs a new dependency, so the developer adds the registration right there in the domain project. A controller needs a special factory, so the registration goes in the controller's folder. Over time, DI registrations are scattered across 15 files in 5 projects. Nobody can answer the question "what's registered and with what lifetime?" without searching the entire solution.</p>
+        <p class="body-text">The <span class="tooltip-trigger">composition root<span class="tooltip-content">The single location where ALL dependency registrations happen. In ASP.NET Core, this is Program.cs (or extension methods called from Program.cs). Every other class in the application should be completely unaware of the DI container. Only the composition root knows about concrete types and their lifetimes.</span></span> should be the ONE place that knows about all concrete types. Business logic should be completely unaware that a DI container even exists.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ScatteredRegistrations.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Registrations scattered across business logic
+public class OrderService
+{
+    public static void Register(IServiceCollection services) // DI leaks into domain
+    {
+        services.AddScoped&lt;IOrderRepository, SqlOrderRepository&gt;();
+        services.AddScoped&lt;OrderService&gt;();
+    }
+}</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrganizedRegistrations.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ All registrations in dedicated extension methods
+public static class InfrastructureExtensions
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
+    {
+        services.AddScoped&lt;IOrderRepository, SqlOrderRepository&gt;();
+        services.AddScoped&lt;IEmailSender, SmtpEmailSender&gt;();
+        return services;
+    }
+}
+
+// Program.cs — the composition root
+builder.Services.AddInfrastructure();
+builder.Services.AddApplication();</code></pre>
+          </div>
+        </div>
+        <p class="body-text"><strong>The connection:</strong> The bad code puts DI registration inside domain classes, coupling them to <code>IServiceCollection</code>. The good code keeps all registrations in dedicated extension methods organized by layer, called from one place (<code>Program.cs</code>). Domain classes never see <code>IServiceCollection</code> &mdash; they only see the interfaces they depend on.</p>
       </div>
     </div>
   </div>
@@ -2104,6 +2561,8 @@ builder.Services.AddSingleton&lt;IEmailValidator, EmailValidator&gt;(); // Singl
     <div class="collapsible-content">
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Injecting <code>IConfiguration</code> directly into services and reading <code>config["Smtp:Host"]</code> with magic strings everywhere.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> <code>IConfiguration</code> is always available in the DI container &mdash; no registration needed. So developers take the path of least resistance: inject <code>IConfiguration</code> and read values with string keys like <code>config["Smtp:Host"]</code>. It works, and it's quick. But it creates three hidden problems. First, the key is a magic string &mdash; typo in the key name? No compiler error, just a null value that crashes at runtime. Second, you can't validate configuration at startup &mdash; missing values are only discovered when the code path runs. Third, testing is painful because you need to build an entire <code>IConfiguration</code> object just to provide one value.</p>
+        <p class="body-text"><code>IConfiguration</code> is an infrastructure detail &mdash; it knows about JSON files, environment variables, and key vaults. Your business service shouldn't need to know any of that. It should just receive a strongly-typed object with the values it needs.</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConfigAntiPattern.cs</span></div>
           <div class="macos-body">
@@ -2115,9 +2574,13 @@ public class EmailSender(IConfiguration config)
         var host = config["Smtp:Host"]; // Magic string, no compile-time safety
         var port = int.Parse(config["Smtp:Port"]!); // Crashes if missing
     }
-}
-
-// ✅ Strongly-typed options with validation
+}</code></pre>
+          </div>
+        </div>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StronglyTypedOptions.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Strongly-typed options with validation
 public class SmtpOptions
 {
     public string Host { get; init; } = "";
@@ -2130,10 +2593,13 @@ public class EmailSender(IOptions&lt;SmtpOptions&gt; options)
     {
         var smtp = options.Value; // Strongly typed, validated at startup
     }
-}</code></pre>
+}
+
+// In Program.cs:
+builder.Services.Configure&lt;SmtpOptions&gt;(builder.Configuration.GetSection("Smtp"));</code></pre>
           </div>
         </div>
-        <p class="body-text"><strong>Fix:</strong> Bind configuration sections to <span class="tooltip-trigger">POCO options classes<span class="tooltip-content">Plain Old CLR Objects that represent a configuration section. Registered with builder.Services.Configure&lt;SmtpOptions&gt;(builder.Configuration.GetSection("Smtp")). Injected as IOptions&lt;SmtpOptions&gt;. Supports validation via DataAnnotations or IValidateOptions&lt;T&gt;. Tested by passing Options.Create(new SmtpOptions { ... }).</span></span> using <code>IOptions&lt;T&gt;</code>. This gives you compile-time safety, validation, and testability — DIP for configuration.</p>
+        <p class="body-text"><strong>The connection:</strong> The bad code depends on a global configuration dictionary with magic string keys. The good code depends on a <span class="tooltip-trigger">POCO options class<span class="tooltip-content">Plain Old CLR Objects that represent a configuration section. Registered with builder.Services.Configure&lt;SmtpOptions&gt;(builder.Configuration.GetSection("Smtp")). Injected as IOptions&lt;SmtpOptions&gt;. Supports validation via DataAnnotations or IValidateOptions&lt;T&gt;. Tested by passing Options.Create(new SmtpOptions { ... }).</span></span> &mdash; a simple object with properties that the compiler can type-check. In tests, you just pass <code>Options.Create(new SmtpOptions { Host = "test", Port = 25 })</code>. No need to build a whole configuration system.</p>
       </div>
     </div>
   </div>
@@ -2146,6 +2612,8 @@ public class EmailSender(IOptions&lt;SmtpOptions&gt; options)
     <div class="collapsible-content">
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Defining synchronous interface methods when implementations will be async, forcing <code>.Result</code> or <code>.GetAwaiter().GetResult()</code> calls that cause deadlocks.</p>
+        <p class="body-text"><strong>Why This Happens:</strong> When the interface was first written, the implementation was synchronous &mdash; maybe it read from an in-memory cache. The interface returned <code>Order?</code> directly. Later, the team swapped to a database implementation. But <code>FindAsync</code> returns <code>Task&lt;Order?&gt;</code>, and the interface demands synchronous <code>Order?</code>. The implementation is forced to bridge the gap with <code>.GetAwaiter().GetResult()</code>. This blocks the calling thread while waiting for the database. In ASP.NET Core, where the thread pool is limited, this blocking can cause deadlocks under load &mdash; all threads are blocked waiting for I/O that can't complete because there are no free threads to handle the callback.</p>
+        <p class="body-text">The lesson: when you design an interface, think about what future implementations might need. Any method that <em>could</em> involve I/O (database, network, file system) should return <code>Task&lt;T&gt;</code> from day one.</p>
         <div class="macos-window mt-sm mb-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncMismatch.cs</span></div>
           <div class="macos-body">
@@ -2162,16 +2630,34 @@ public class SqlOrderRepository : IOrderRepository
         // Forced to block — potential deadlock in ASP.NET!
         return _db.Orders.FindAsync(id).GetAwaiter().GetResult();
     }
-}
-
-// ✅ Async from the start
-public interface IOrderRepository
-{
-    Task&lt;Order?&gt; GetByIdAsync(int id);
 }</code></pre>
           </div>
         </div>
-        <p class="body-text"><strong>Fix:</strong> Design interfaces as <strong><span class="tooltip-trigger">async-first<span class="tooltip-content">Define interface methods returning Task&lt;T&gt; or ValueTask&lt;T&gt; from the start, even if the current implementation is synchronous. Synchronous implementations can return Task.FromResult(). Going from sync→async later is a breaking change that ripples through the entire call chain. Starting async costs nothing.</span></span></strong>. If an implementation happens to be synchronous, it can return <code>Task.FromResult()</code> or <code>ValueTask.FromResult()</code>. Going from sync → async is a breaking change; starting async costs nothing.</p>
+        <div class="macos-window mt-sm mb-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncFirst.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Async from the start — even if current impl is sync
+public interface IOrderRepository
+{
+    Task&lt;Order?&gt; GetByIdAsync(int id);
+}
+
+// Sync implementation? No problem — wrap in Task.FromResult
+public class InMemoryOrderRepository : IOrderRepository
+{
+    public Task&lt;Order?&gt; GetByIdAsync(int id)
+        =&gt; Task.FromResult(_cache.GetValueOrDefault(id));
+}
+
+// Async implementation? Natural fit
+public class SqlOrderRepository : IOrderRepository
+{
+    public async Task&lt;Order?&gt; GetByIdAsync(int id)
+        =&gt; await _db.Orders.FindAsync(id);
+}</code></pre>
+          </div>
+        </div>
+        <p class="body-text"><strong>The connection:</strong> The bad code defines a sync interface that forces async implementations to block, risking deadlocks. The good code defines the interface as <strong><span class="tooltip-trigger">async-first<span class="tooltip-content">Define interface methods returning Task&lt;T&gt; or ValueTask&lt;T&gt; from the start, even if the current implementation is synchronous. Synchronous implementations can return Task.FromResult(). Going from sync to async later is a breaking change that ripples through the entire call chain. Starting async costs nothing.</span></span></strong>. Sync implementations wrap their return value in <code>Task.FromResult()</code> (zero overhead). Async implementations use <code>async/await</code> naturally. Starting async costs nothing; converting from sync to async later is a breaking change that ripples through every caller.</p>
       </div>
     </div>
   </div>
@@ -2440,8 +2926,10 @@ public void AllServices_CanBeResolved()
     </div>
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> In traditional layered architecture, which way do dependencies flow? What changes?</div>
-      <p class="body-text">It inverts the <strong>direction of the dependency arrow</strong>. Traditionally, high-level modules (business logic) depend on low-level modules (database, email). After inversion, both depend on an abstraction owned by the high-level module. The dependency arrow now points <strong>inward</strong> toward the domain, not outward toward infrastructure.</p>
-      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> Mention that it's the <em>source code dependency</em> that inverts — the runtime call still goes from OrderProcessor to SqlOrderRepository, but at compile time, Infrastructure references Domain (not the reverse).</div>
+      <p class="body-text">Think of a traditional office building. The CEO (high-level business logic) has the IT department's direct phone number on speed dial. If the IT department moves offices or changes their number, the CEO's phone needs updating. The CEO <em>depends on</em> IT's details. That's the traditional direction: high-level depends on low-level.</p>
+      <p class="body-text">Now invert it. Instead of the CEO knowing IT's number, the company creates a general "help desk" extension (the abstraction). Both the CEO and the IT department know this extension. If IT moves offices, only the phone system routing changes &mdash; the CEO's speed dial stays the same. The dependency arrow has <strong>flipped</strong>: now IT conforms to the company standard, not the other way around.</p>
+      <p class="body-text">In code terms, DIP inverts the <strong>direction of the source code dependency arrow</strong>. Traditionally, your <code>OrderProcessor</code> (business logic) imports and references <code>SqlOrderRepository</code> (infrastructure). After inversion, both depend on <code>IOrderRepository</code> &mdash; an interface owned by the business logic layer. Infrastructure references Domain, not the reverse. The runtime call still flows from OrderProcessor to SqlOrderRepository, but the <em>compile-time reference</em> has flipped.</p>
+      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> Mention that it's the <em>source code dependency</em> that inverts &mdash; the runtime call still goes from OrderProcessor to SqlOrderRepository, but at compile time, Infrastructure references Domain (not the reverse).</div>
     </div></div>
   </div>
 
@@ -2455,7 +2943,8 @@ public void AllServices_CanBeResolved()
     </div>
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> One is a principle, the other is a technique. Can you have one without the other?</div>
-      <p class="body-text"><strong>DIP</strong> is a design principle — "depend on abstractions." <strong>DI</strong> is a technique — "pass dependencies from outside." You can do DI without DIP (inject concrete classes). You can do DIP without DI (use a factory to create the interface implementation). But in modern .NET, they're used together: DIP defines the interfaces, DI delivers the implementations.</p>
+      <p class="body-text">These two get confused all the time because they share the word "dependency" and often appear together. But they're completely different things. Think of it this way: <strong>DIP</strong> is a <em>rule about direction</em> ("your code should depend on abstractions, not concrete implementations"). <strong>DI</strong> is a <em>delivery mechanism</em> ("pass the thing your code needs from the outside, instead of creating it yourself").</p>
+      <p class="body-text">You can do DI without DIP &mdash; just inject concrete classes directly: <code>new OrderService(new SqlOrderRepository())</code>. That's dependency injection (the repository is passed from outside), but not DIP (you're still depending on the concrete <code>SqlOrderRepository</code>). You can also do DIP without DI &mdash; use a factory method that returns <code>IOrderRepository</code>, and the class calls the factory internally. That's DIP (depending on an abstraction), but not DI (the class creates its own dependency). In modern .NET, they work best together: DIP defines the interfaces, and the DI container delivers the right implementations.</p>
     </div></div>
   </div>
 
@@ -2469,7 +2958,8 @@ public void AllServices_CanBeResolved()
     </div>
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think of a standard that lets you plug in different implementations.</div>
-      <p class="body-text">A wall outlet is the abstraction. Your laptop charger, phone charger, and lamp all depend on the outlet standard — not on each other, and not on the specific wiring behind the wall. The power company (low-level) also conforms to the standard. Neither the appliance nor the power company knows about each other — both depend on the outlet interface.</p>
+      <p class="body-text">A wall outlet is the abstraction. Your laptop charger, phone charger, and lamp all depend on the outlet standard &mdash; not on each other, and not on the specific wiring behind the wall. The power company (low-level) also conforms to the standard. Neither the appliance nor the power company knows about each other &mdash; both depend on the outlet interface.</p>
+      <p class="body-text">Here's another one that might click even better: think about USB-C. Your laptop has a USB-C port (the abstraction). You can plug in a charger, an external monitor, a keyboard, or a hard drive. The laptop doesn't know or care what's on the other end &mdash; it just knows the USB-C standard. And the accessory manufacturers don't need to know your specific laptop model &mdash; they just build to the USB-C spec. Both sides depend on the standard, not on each other. That's DIP in the real world: a shared contract that decouples the "who uses it" from the "who provides it."</p>
     </div></div>
   </div>
 
@@ -2483,7 +2973,8 @@ public void AllServices_CanBeResolved()
     </div>
     <div class="qa-body"><div class="qa-content">
       <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when an interface method returns SqlDataReader?</div>
-      <p class="body-text">It means your interfaces shouldn't leak implementation details. <code>IOrderRepository</code> should return <code>Task&lt;Order?&gt;</code>, not <code>SqlDataReader</code>. If the abstraction mentions SQL, EF, or HTTP specifics, it's tied to a detail — swapping to a different storage becomes impossible because the interface itself is implementation-specific.</p>
+      <p class="body-text">Going back to the USB-C analogy: imagine if the USB-C "standard" said "you must use Samsung's specific wire gauge and Intel's specific chip." That's not really a standard anymore &mdash; it's just Samsung and Intel's implementation dressed up as a standard. Any other manufacturer trying to build a USB-C device would be forced to use Samsung wires.</p>
+      <p class="body-text">The same thing happens in code when an interface like <code>IOrderRepository</code> returns <code>SqlDataReader</code> or <code>IQueryable&lt;T&gt;</code>. Those types are SQL Server-specific or EF Core-specific. The abstraction is supposed to hide <em>how</em> data is stored and only express <em>what</em> data the caller needs. When it leaks infrastructure details, swapping to a different database (or even a different ORM) becomes impossible because the interface itself is tied to a specific implementation. The fix: return domain types like <code>Task&lt;Order?&gt;</code> or <code>Task&lt;IReadOnlyList&lt;Order&gt;&gt;</code> &mdash; types that say nothing about SQL, EF, or HTTP.</p>
     </div></div>
   </div>
 

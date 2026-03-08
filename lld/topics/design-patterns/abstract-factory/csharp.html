@@ -1703,8 +1703,59 @@ Encoding shiftJis = Encoding.GetEncoding("shift_jis"); // New family!</code></pr
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, .NET 7 e-commerce app.</strong> UI rendered a Windows-style button next to a macOS-style checkbox. The checkout page looked broken on production. Root cause: two different factory registrations were injected into the same component.</p>
+          <p class="body-text"><strong>2023, .NET 7 e-commerce app.</strong> The checkout page in production showed a Windows-style button sitting right next to a macOS-style checkbox. It looked like two different apps stitched together. Nobody got an error, no exception was thrown, and all the automated tests passed. But actual customers saw a page that looked broken.</p>
         </div>
+
+        <p class="body-text">Here is what happened step by step. A developer on the team split the UI creation into two separate interfaces: <code>IButtonFactory</code> for making buttons, and <code>ICheckboxFactory</code> for making checkboxes. On the surface, this seems reasonable — each interface has a single job, right? But the problem is that buttons and checkboxes on the same page <strong>must belong to the same visual family</strong> (both Windows-style or both macOS-style). Splitting the factory by product type destroys that guarantee.</p>
+
+        <p class="body-text">During <span class="tooltip-trigger">DI registration<span class="tooltip-content">Dependency Injection registration — telling the DI container which concrete class to use when someone asks for an interface. Done at startup in Program.cs.</span></span>, one developer registered <code>IButtonFactory</code> pointing to the Windows implementation, while a different developer (working on a different feature) registered <code>ICheckboxFactory</code> pointing to the macOS implementation. Neither knew about the other's registration. The container happily resolved both — no complaints.</p>
+
+        <p class="body-text">The checkout page injected both factories through its constructor. When it called <code>btnFactory.Create()</code>, it got a Windows-style button. When it called <code>chkFactory.Create()</code>, it got a macOS-style checkbox. The code compiled, ran without errors, and even passed unit tests (which tested each factory in isolation). But on screen, the result was a mismatched Frankenstein UI.</p>
+
+        <p class="body-text">QA only caught it three hours later because the mismatch was subtle on most screen sizes. On a specific resolution, the Windows button and macOS checkbox had noticeably different heights, causing the layout to break visually. This is exactly the kind of "silent" bug that Abstract Factory is designed to prevent — when it is used correctly.</p>
+
+        <!-- SVG: Mixed vs Consistent Factory Flow -->
+        <svg viewBox="0 0 720 280" role="img" aria-label="Diagram showing how split factories mix families vs how a single factory keeps them consistent" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="af-b1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: Buggy -->
+          <rect x="10" y="10" width="340" height="260" rx="10" fill="var(--bg-secondary)" stroke="#f87171" stroke-width="1.5" opacity="0.5"/>
+          <text x="180" y="36" text-anchor="middle" fill="#f87171" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif">BUGGY: Split Factories</text>
+          <rect x="30" y="55" width="140" height="36" rx="6" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="1"/>
+          <text x="100" y="78" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-family="system-ui, -apple-system, sans-serif">IButtonFactory</text>
+          <rect x="190" y="55" width="140" height="36" rx="6" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="1"/>
+          <text x="260" y="78" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-family="system-ui, -apple-system, sans-serif">ICheckboxFactory</text>
+          <line x1="100" y1="91" x2="100" y2="120" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <line x1="260" y1="91" x2="260" y2="120" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <rect x="40" y="124" width="120" height="32" rx="6" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+          <text x="100" y="145" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">WinButton</text>
+          <rect x="200" y="124" width="120" height="32" rx="6" fill="#a855f7" opacity="0.2" stroke="#a855f7" stroke-width="1"/>
+          <text x="260" y="145" text-anchor="middle" fill="#c084fc" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">MacCheckbox</text>
+          <line x1="100" y1="156" x2="180" y2="200" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <line x1="260" y1="156" x2="180" y2="200" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <rect x="120" y="200" width="120" height="40" rx="8" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="180" y="218" text-anchor="middle" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Checkout Page</text>
+          <text x="180" y="232" text-anchor="middle" fill="#f87171" font-size="9" font-family="system-ui, -apple-system, sans-serif">MIXED families!</text>
+
+          <!-- Right: Fixed -->
+          <rect x="370" y="10" width="340" height="260" rx="10" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5" opacity="0.5"/>
+          <text x="540" y="36" text-anchor="middle" fill="var(--accent-primary)" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif">FIXED: Single Factory</text>
+          <rect x="460" y="55" width="160" height="36" rx="6" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="540" y="78" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">IUIFactory</text>
+          <line x1="500" y1="91" x2="480" y2="120" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <line x1="580" y1="91" x2="600" y2="120" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <rect x="410" y="124" width="120" height="32" rx="6" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+          <text x="470" y="145" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">WinButton</text>
+          <rect x="550" y="124" width="120" height="32" rx="6" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+          <text x="610" y="145" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">WinCheckbox</text>
+          <line x1="470" y1="156" x2="540" y2="200" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <line x1="610" y1="156" x2="540" y2="200" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b1-arr)"/>
+          <rect x="480" y="200" width="120" height="40" rx="8" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="540" y="218" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Checkout Page</text>
+          <text x="540" y="232" text-anchor="middle" fill="var(--accent-primary)" font-size="9" font-family="system-ui, -apple-system, sans-serif">Same family!</text>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">3 hours — visual bug, no crash, only noticed by QA on specific screen resolution.</p>
         <div class="tab-container mt-sm">
@@ -1729,6 +1780,7 @@ public class CheckoutPage(
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The constructor takes two separate factory interfaces — one for buttons, one for checkboxes. This seems clean (one interface per product), but it breaks the core promise of Abstract Factory. Nothing ties these two factories to the same family. The DI container resolves them independently, so one could easily point to the Windows implementation while the other points to macOS. Inside <code>Render()</code>, the two products come from different families, and there is no compile-time or runtime check to catch the mismatch.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1748,11 +1800,16 @@ public class CheckoutPage(IUIFactory factory)
 builder.Services.AddSingleton&lt;IUIFactory, WinFactory&gt;();</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Now the page depends on a single <code>IUIFactory</code>. That one factory is responsible for creating <em>all</em> the UI elements. Since <code>WinFactory</code> only knows how to create Windows-style products, every call to <code>CreateButton()</code> and <code>CreateCheckbox()</code> is guaranteed to produce matching Windows controls. You physically cannot mix families — the factory simply does not have macOS products to hand you.</p>
           </div>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for constructors that inject multiple factory interfaces for products that are supposed to work together (e.g., <code>IButtonFactory</code> + <code>ICheckboxFactory</code>). If those products must belong to the same visual or logical family, they should come from one factory, not separate ones. Also search your DI registrations for the same product type being registered from different family assemblies.</p>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-          <p class="body-text">Never split factory interfaces by product type when products must stay in the same family. Use one <code>IUIFactory</code> that creates all products — that's the whole point of Abstract Factory.</p>
+          <p class="body-text">Never split factory interfaces by product type when products must stay in the same family. Use one <code>IUIFactory</code> that creates all products — that is the whole point of Abstract Factory. One factory, one family, zero mismatches.</p>
         </div>
       </div>
     </div>
@@ -1764,8 +1821,54 @@ builder.Services.AddSingleton&lt;IUIFactory, WinFactory&gt;();</code></pre>
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2022, .NET 6 multi-tenant SaaS.</strong> Singleton factory captured a <span class="tooltip-trigger">scoped<span class="tooltip-content">A DI lifetime where one instance is created per HTTP request (or per scope). Scoped services are disposed when the scope ends.</span></span> <code>DbContext</code>. After 2 hours under load, the app started returning data from the wrong tenant. The <code><span class="tooltip-trigger">DbContext<span class="tooltip-content">Entity Framework Core's main class for database access — manages connections, change tracking, and query execution. Should be scoped per request.</span></span></code> outlived its scope and served stale connection strings.</p>
+          <p class="body-text"><strong>2022, .NET 6 multi-tenant SaaS.</strong> A singleton factory held onto a <span class="tooltip-trigger">scoped<span class="tooltip-content">A DI lifetime where one instance is created per HTTP request (or per scope). Scoped services are disposed when the scope ends.</span></span> <code><span class="tooltip-trigger">DbContext<span class="tooltip-content">Entity Framework Core's main class for database access — manages connections, change tracking, and query execution. Should be scoped per request.</span></span></code>. After two hours under load, the app started returning data from the wrong tenant. Customer A was seeing Customer B's invoices. The root cause: the DbContext was meant to live for one request, but the singleton factory kept it alive forever.</p>
         </div>
+
+        <p class="body-text">To understand this bug, you need to know how <span class="tooltip-trigger">DI lifetimes<span class="tooltip-content">How long the DI container keeps an object alive. Singleton = forever, Scoped = one per request, Transient = new every time.</span></span> work. In .NET, a "scoped" service (like DbContext) is supposed to be created fresh for each HTTP request and thrown away when the request ends. A "singleton" service lives for the entire lifetime of the application — it is created once and shared by every request.</p>
+
+        <p class="body-text">The problem: the factory was registered as a singleton. It received a <code>DbContext</code> through its constructor. The DI container resolved that DbContext when the factory was first created (during the very first request). From that point on, the factory — and its captured DbContext — lived forever. Every subsequent request used the same DbContext, which still had the connection string and tenant context from request number one.</p>
+
+        <p class="body-text">In development, nobody noticed because the developer was always logged in as the same tenant. In production, with hundreds of concurrent users across different tenants, the stale DbContext served data using the wrong tenant's connection. The bug was intermittent (it depended on which tenant's request happened to create the singleton first) and only appeared under concurrent load.</p>
+
+        <p class="body-text">Think of it like this: imagine a restaurant where one waiter (the factory) picks up a notepad (the DbContext) on their first shift and never gets a new one. That notepad has "Table 5, chicken" written on it from Monday. On Tuesday, the waiter still reads from Monday's notepad and brings chicken to the wrong table. The notepad was supposed to be replaced every shift (every request), but because the waiter never leaves (singleton), they never get a fresh one.</p>
+
+        <!-- SVG: Captive Dependency Lifetime Diagram -->
+        <svg viewBox="0 0 720 300" role="img" aria-label="Diagram showing how a singleton factory captures a scoped DbContext and keeps it alive beyond its intended lifetime" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="af-b2-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Timeline -->
+          <text x="360" y="24" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif">Service Lifetimes Over Time</text>
+          <line x1="60" y1="50" x2="680" y2="50" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="50" y="54" text-anchor="end" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">time</text>
+          <text x="160" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Req 1</text>
+          <text x="360" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Req 2</text>
+          <text x="560" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Req 3</text>
+
+          <!-- Singleton Factory bar -->
+          <rect x="100" y="70" width="570" height="30" rx="6" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)" stroke-width="1.2"/>
+          <text x="385" y="90" text-anchor="middle" fill="var(--accent-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">ReportFactory (Singleton) — lives forever</text>
+
+          <!-- Scoped DbContext: SHOULD be per-request -->
+          <text x="50" y="135" text-anchor="end" fill="var(--text-secondary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Should be:</text>
+          <rect x="100" y="120" width="140" height="26" rx="5" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+          <text x="170" y="137" text-anchor="middle" fill="#60a5fa" font-size="10" font-family="system-ui, -apple-system, sans-serif">DbContext (Tenant A)</text>
+          <rect x="300" y="120" width="140" height="26" rx="5" fill="#a855f7" opacity="0.2" stroke="#a855f7" stroke-width="1"/>
+          <text x="370" y="137" text-anchor="middle" fill="#c084fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">DbContext (Tenant B)</text>
+          <rect x="500" y="120" width="140" height="26" rx="5" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="1"/>
+          <text x="570" y="137" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif">DbContext (Tenant C)</text>
+
+          <!-- What actually happens -->
+          <text x="50" y="195" text-anchor="end" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Actually:</text>
+          <rect x="100" y="180" width="570" height="30" rx="6" fill="#f87171" opacity="0.15" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="385" y="200" text-anchor="middle" fill="#f87171" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">SAME DbContext (Tenant A) — captured by singleton, never refreshed!</text>
+
+          <!-- Result -->
+          <rect x="100" y="235" width="570" height="50" rx="8" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="1"/>
+          <text x="385" y="256" text-anchor="middle" fill="#f87171" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Result: Req 2 (Tenant B) gets Tenant A's data!</text>
+          <text x="385" y="274" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Req 3 (Tenant C) also gets Tenant A's data. Wrong tenants everywhere.</text>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">8 hours — intermittent, only under concurrent load, data appeared correct in dev.</p>
         <div class="tab-container mt-sm">
@@ -1793,6 +1896,7 @@ public sealed class ReportFactory : IReportFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The factory is registered as a singleton, so the DI container creates it once and keeps it forever. When the container builds <code>ReportFactory</code>, it injects an <code>AppDbContext</code> — which is scoped (meant for one request). The factory stores it in <code>_db</code>. From now on, every call to <code>CreateReport()</code> from any request uses the same <code>_db</code>. That DbContext still points to the first tenant's database connection. It never gets refreshed because the singleton factory never gets re-created.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1821,7 +1925,12 @@ public sealed class Report(IQueryable&lt;ReportRow&gt; data, IServiceScope scope
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of injecting the DbContext directly, the factory now injects <code>IServiceScopeFactory</code> — a safe singleton service that can create new DI scopes on demand. Every time <code>CreateReport()</code> is called, it opens a fresh scope, gets a brand-new DbContext from that scope (with the correct tenant connection), and passes both to the Report. When the Report is disposed, it disposes the scope, which in turn disposes the DbContext. Fresh context per call, no stale data, no cross-tenant leaks.</p>
           </div>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for any singleton-registered class whose constructor takes a scoped or transient service (like <code>DbContext</code>, <code>HttpClient</code>, or anything request-specific). In development, enable <code>builder.Host.UseDefaultServiceProvider(o => o.ValidateScopes = true)</code> — .NET will throw an exception at startup if it detects a singleton capturing a scoped service.</p>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
@@ -1837,10 +1946,52 @@ public sealed class Report(IQueryable&lt;ReportRow&gt; data, IServiceScope scope
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, .NET 8 multi-platform app.</strong> A new <code>CreateDropdown()</code> method was added to <code>IUIFactory</code>.<br>
-          The <code>WinFactory</code> was updated, but <code>MacFactory</code> was forgotten.<br>
-          The app compiled (default interface method returned <code>null</code>), but crashed at runtime on macOS when the dropdown was used.</p>
+          <p class="body-text"><strong>2023, .NET 8 multi-platform app.</strong> The team added a new <code>CreateDropdown()</code> method to the factory interface. One developer updated the Windows factory, but nobody remembered to update the macOS factory. The app compiled without errors, shipped to production, and crashed with a <code>NullReferenceException</code> — but only for users on macOS.</p>
         </div>
+
+        <p class="body-text">Here is the sneaky detail. When the developer added <code>CreateDropdown()</code> to <code>IUIFactory</code>, they gave it a <span class="tooltip-trigger">default interface method<span class="tooltip-content">A C# 8+ feature that lets interfaces provide a method body. Classes that implement the interface don't have to override it — they silently inherit the default. Useful for evolving interfaces without breaking existing code, but dangerous when the default hides missing implementations.</span></span> that returned <code>null!</code>. In C#, a default interface method means existing classes that implement the interface do not have to add the new method — they just silently use the default. That is great for backward compatibility, but terrible when the "default" is a null that crashes at runtime.</p>
+
+        <p class="body-text">The Windows factory (<code>WinFactory</code>) was updated in the same pull request that added the interface method. It properly returned a <code>WinDropdown</code>. But <code>MacFactory</code> was in a different file, maintained by a different team member. Nobody noticed it was missing the override. The compiler was happy — the default method satisfied the contract. All tests on the Windows path passed.</p>
+
+        <p class="body-text">When a macOS user navigated to a page with a dropdown, the app called <code>factory.CreateDropdown()</code> on the Mac factory. The default method returned <code>null!</code>. The next line tried to call a method on that null dropdown — boom, <code>NullReferenceException</code>. The bug only affected one platform and one UI element, making it particularly tricky to catch in testing if you only tested on Windows.</p>
+
+        <p class="body-text">Think of it like a restaurant adding a new dessert to the menu. The head chef at the Downtown location creates the recipe. The Uptown chef never gets the memo. When an Uptown customer orders the dessert, the waiter walks to the kitchen and comes back with nothing. The menu (interface) promises the dessert exists, but the kitchen (factory) cannot actually make it.</p>
+
+        <!-- SVG: Missing Member Across Factories -->
+        <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing WinFactory implementing all products while MacFactory is missing the dropdown" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="af-b3-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Interface -->
+          <rect x="230" y="10" width="260" height="50" rx="8" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="360" y="30" text-anchor="middle" fill="var(--accent-primary)" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">IUIFactory</text>
+          <text x="360" y="48" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">CreateButton() + CreateCheckbox() + CreateDropdown()</text>
+          <line x1="300" y1="60" x2="170" y2="100" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b3-arr)"/>
+          <line x1="420" y1="60" x2="550" y2="100" stroke="var(--text-secondary)" stroke-width="1.2" marker-end="url(#af-b3-arr)"/>
+
+          <!-- WinFactory -->
+          <rect x="40" y="100" width="260" height="140" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+          <text x="170" y="122" text-anchor="middle" fill="var(--accent-primary)" font-size="12" font-weight="600" font-family="system-ui, -apple-system, sans-serif">WinFactory</text>
+          <rect x="60" y="135" width="100" height="28" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="110" y="154" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">WinButton</text>
+          <rect x="170" y="135" width="110" height="28" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="225" y="154" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">WinCheckbox</text>
+          <rect x="60" y="175" width="220" height="28" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="170" y="194" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">WinDropdown</text>
+          <text x="170" y="228" text-anchor="middle" fill="var(--accent-primary)" font-size="20">&#10003;</text>
+
+          <!-- MacFactory -->
+          <rect x="420" y="100" width="260" height="140" rx="8" fill="var(--bg-secondary)" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="550" y="122" text-anchor="middle" fill="#f87171" font-size="12" font-weight="600" font-family="system-ui, -apple-system, sans-serif">MacFactory</text>
+          <rect x="440" y="135" width="100" height="28" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="490" y="154" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">MacButton</text>
+          <rect x="550" y="135" width="110" height="28" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="605" y="154" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">MacCheckbox</text>
+          <rect x="440" y="175" width="220" height="28" rx="5" fill="#f87171" opacity="0.12" stroke="#f87171" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <text x="550" y="194" text-anchor="middle" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">MISSING! Returns null</text>
+          <text x="550" y="228" text-anchor="middle" fill="#f87171" font-size="20">&#10007;</text>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">30 minutes — <code>NullReferenceException</code> in production, but only on macOS clients.</p>
         <div class="tab-container mt-sm">
@@ -1874,6 +2025,7 @@ public sealed class MacFactory : IUIFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The interface defines <code>CreateDropdown()</code> with a default body of <code>=> null!</code>. The <code>null!</code> tells the compiler "trust me, this will not be null" — but it is a lie. <code>WinFactory</code> properly overrides the method and returns a real dropdown. <code>MacFactory</code> does not override it, so when someone calls <code>macFactory.CreateDropdown()</code>, they get the default <code>null!</code> back. The compiler sees no issue because the default satisfies the interface contract. The bug only surfaces at runtime, on the macOS code path, when someone actually tries to use the null dropdown.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1904,7 +2056,12 @@ public void All_Factories_Implement_All_Products()
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Fix 1 removes the default body from <code>CreateDropdown()</code>. Now the interface has an <em>abstract</em> method that every implementing class must provide. The moment you try to compile <code>MacFactory</code> without <code>CreateDropdown()</code>, the compiler screams with an error. You physically cannot ship the app with a missing implementation. Fix 2 adds a belt-and-suspenders test that loops through every factory in the assembly and verifies it produces non-null products. Even if someone reintroduces a default method later, this test catches the null.</p>
           </div>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your factory interfaces for default method bodies — especially ones that return <code>null</code>, <code>null!</code>, or throw <code>NotImplementedException</code>. These are ticking time bombs. Also look for interface methods added in recent commits and cross-reference with all implementing classes to make sure every factory got the update.</p>
         </div>
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
@@ -1920,10 +2077,47 @@ public void All_Factories_Implement_All_Products()
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2024, .NET 8 API.</strong> Factory was registered with key <code>"postgres"</code> but consumer resolved with <code>"postgresql"</code>. No compile-time error. Runtime: <code>InvalidOperationException: No service for type IDbFactory with key 'postgresql'</code>.</p>
+          <p class="body-text"><strong>2024, .NET 8 API.</strong> A factory was registered under the key <code>"postgres"</code>, but a consumer on the other side of the codebase tried to resolve it with <code>"postgresql"</code>. One letter off. No compiler warning, no startup error — the app booted fine. But the moment a user hit the reporting endpoint, it blew up with <code>InvalidOperationException: No service for type IDbFactory with key 'postgresql'</code>.</p>
         </div>
+
+        <p class="body-text">This is the classic "magic string" problem. When you use raw strings as keys to register and resolve services, the compiler cannot check if the strings match. You can spell the key differently in two places and the compiler will not blink. The connection between the registration and the consumer is purely conventional — it only exists in the developer's head.</p>
+
+        <p class="body-text">In this case, the developer who registered the factory wrote <code>"postgres"</code> (the short name). A different developer, working on the reporting feature weeks later, typed <code>"postgresql"</code> (the full name). Both strings are reasonable names for PostgreSQL. Neither developer did anything obviously wrong. But the key mismatch meant the DI container could not find a factory registered under <code>"postgresql"</code> because none existed — the factory was registered under <code>"postgres"</code>.</p>
+
+        <p class="body-text">The bug only triggered in production because the reporting endpoint was rarely used during development. Manual testing focused on the main CRUD operations, which did not use keyed services. The reporting feature sat quietly broken for two weeks before a customer hit it.</p>
+
+        <p class="body-text">Think of it like labeling boxes in a warehouse. You label a box "DB-Postgres" and put it on shelf A. Your coworker comes looking for "DB-PostgreSQL." They search every shelf and find nothing — even though the box they need is right there, labeled slightly differently.</p>
+
+        <!-- SVG: String Key Mismatch -->
+        <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing how a magic string typo causes a registration-resolution mismatch" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="af-b4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- DI Container -->
+          <rect x="210" y="10" width="300" height="60" rx="8" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1.2"/>
+          <text x="360" y="32" text-anchor="middle" fill="var(--text-primary)" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">DI Container Registry</text>
+          <text x="360" y="54" text-anchor="middle" fill="var(--accent-primary)" font-size="11" font-family="monospace">"postgres" &#8594; PostgresFactory</text>
+
+          <!-- Registration side -->
+          <rect x="40" y="110" width="220" height="50" rx="6" fill="var(--accent-primary)" opacity="0.12" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="150" y="132" text-anchor="middle" fill="var(--accent-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Registration</text>
+          <text x="150" y="150" text-anchor="middle" fill="var(--accent-primary)" font-size="11" font-family="monospace">key = "postgres"</text>
+          <line x1="200" y1="110" x2="300" y2="70" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#af-b4-arr)"/>
+
+          <!-- Resolution side -->
+          <rect x="460" y="110" width="220" height="50" rx="6" fill="#f87171" opacity="0.12" stroke="#f87171" stroke-width="1.5"/>
+          <text x="570" y="132" text-anchor="middle" fill="#f87171" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Consumer</text>
+          <text x="570" y="150" text-anchor="middle" fill="#f87171" font-size="11" font-family="monospace">key = "postgresql"</text>
+          <line x1="520" y1="110" x2="420" y2="70" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#af-b4-arr)"/>
+          <text x="490" y="88" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">NOT FOUND!</text>
+
+          <!-- Mismatch highlight -->
+          <rect x="280" y="170" width="160" height="26" rx="5" fill="#f87171" opacity="0.15" stroke="#f87171" stroke-width="1"/>
+          <text x="360" y="188" text-anchor="middle" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">"postgres" &#8800; "postgresql"</text>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">15 minutes — but happened in production because the mismatch was in a rarely-used code path.</p>
+        <p class="body-text">15 minutes once triggered — but the bug sat in production for 2 weeks in a rarely-used code path.</p>
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
             <button class="tab-btn active" data-tab="bug4-bad" role="tab" aria-selected="true" aria-controls="bug4-bad">Buggy Code</button>
@@ -1942,6 +2136,7 @@ public class ReportService(
 { }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The registration uses the string <code>"postgres"</code>. The consumer uses <code>"postgresql"</code> in the <code>[FromKeyedServices]</code> attribute. These are two completely independent strings with no compile-time connection. The DI container registers the factory under one key and the consumer asks for it under a different key. At startup, the container does not validate that all <code>[FromKeyedServices]</code> attributes have matching registrations (unless you explicitly enable validation). So the mismatch hides until the consumer code actually runs.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1965,7 +2160,16 @@ public enum DbProvider { Postgres, SqlServer }
 builder.Services.AddKeyedSingleton&lt;IDbFactory, PostgresFactory&gt;(DbProvider.Postgres);</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> By defining keys as constants in a shared static class (or as an enum), both the registration and the consumer reference the same symbol. If you rename the constant, every usage updates automatically. If you typo the constant name, the compiler catches it immediately. Enums are even safer because they also give you IntelliSense autocomplete and refactoring support. The string is defined in exactly one place — no more copy-paste mismatches.</p>
           </div>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for raw string literals inside <code>AddKeyed*</code> and <code>[FromKeyedServices(...)]</code>. If the same key string appears in more than one place as a raw literal (not a constant reference), it is a mismatch waiting to happen. Also add <code>builder.Host.UseDefaultServiceProvider(o => o.ValidateOnStart = true)</code> to catch unresolvable services at startup instead of at request time.</p>
+        </div>
+        <div class="callout callout-info mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
+          <p class="body-text">Never use raw magic strings for keyed service registration. Define keys as <code>const string</code> in a shared static class or use enums. One source of truth, zero typo bugs.</p>
         </div>
       </div>
     </div>
@@ -1977,10 +2181,48 @@ builder.Services.AddKeyedSingleton&lt;IDbFactory, PostgresFactory&gt;(DbProvider
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2023, .NET 7 modular monolith.</strong> <code>OrderFactory</code> needed <code>IPaymentFactory</code> to create orders with payment info.<br>
-          <code>PaymentFactory</code> needed <code>IOrderFactory</code> to validate order existence.<br>
-          Startup crashed with circular dependency exception.</p>
+          <p class="body-text"><strong>2023, .NET 7 modular monolith.</strong> The app would not start. Every time the team deployed, they got a circular dependency exception at startup. <code>OrderFactory</code> needed <code>IPaymentFactory</code> to create orders with payment info. <code>PaymentFactory</code> needed <code>IOrderFactory</code> to validate that an order exists. Each factory required the other to be constructed first — a chicken-and-egg problem.</p>
         </div>
+
+        <p class="body-text">Imagine two people trying to introduce each other. Alice says "I can't introduce myself until Bob goes first." Bob says "I can't introduce myself until Alice goes first." Neither can ever start. That is exactly what happened with these two factories.</p>
+
+        <p class="body-text">The DI container tried to build <code>OrderFactory</code>. To do that, it needed to inject <code>IPaymentFactory</code>, which meant building <code>PaymentFactory</code>. But <code>PaymentFactory</code> required <code>IOrderFactory</code>, which is what we were trying to build in the first place. The container detected the infinite loop and threw an exception. Unlike the other bugs on this page, this one at least fails loudly at startup — you cannot accidentally ship it to production. But it still blocked the team for two hours because untangling the design required real thought.</p>
+
+        <p class="body-text">The root problem was a design flaw, not a coding mistake. The <code>PaymentFactory</code> did not actually need to create orders — it just needed to <em>look up</em> an existing order to validate it. That "look up" responsibility belonged in a simple repository, not in a factory. By giving <code>PaymentFactory</code> a dependency on the entire <code>IOrderFactory</code>, the team gave it far more power (and coupling) than it needed.</p>
+
+        <!-- SVG: Circular Dependency -->
+        <svg viewBox="0 0 720 220" role="img" aria-label="Diagram showing circular dependency between OrderFactory and PaymentFactory, and the fix using an extracted repository" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="af-b5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+            <marker id="af-b5-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#f87171"/></marker>
+            <marker id="af-b5-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--accent-primary)"/></marker>
+          </defs>
+          <!-- Left: Circular -->
+          <rect x="10" y="10" width="320" height="200" rx="10" fill="var(--bg-secondary)" stroke="#f87171" stroke-width="1" opacity="0.5"/>
+          <text x="170" y="34" text-anchor="middle" fill="#f87171" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">BUGGY: Circular Dependency</text>
+          <rect x="40" y="60" width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="1.2"/>
+          <text x="100" y="85" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-family="system-ui, -apple-system, sans-serif">OrderFactory</text>
+          <rect x="180" y="60" width="130" height="40" rx="6" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="1.2"/>
+          <text x="245" y="85" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-family="system-ui, -apple-system, sans-serif">PaymentFactory</text>
+          <path d="M 160 70 C 170 50, 180 50, 190 70" stroke="#f87171" stroke-width="1.5" fill="none" marker-end="url(#af-b5-arr-r)"/>
+          <path d="M 190 100 C 180 120, 170 120, 160 100" stroke="#f87171" stroke-width="1.5" fill="none" marker-end="url(#af-b5-arr-r)"/>
+          <text x="175" y="135" text-anchor="middle" fill="#f87171" font-size="22">&#8635;</text>
+          <text x="175" y="155" text-anchor="middle" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Infinite loop!</text>
+          <text x="175" y="170" text-anchor="middle" fill="#f87171" font-size="9" font-family="system-ui, -apple-system, sans-serif">Container cannot resolve either</text>
+
+          <!-- Right: Fixed -->
+          <rect x="370" y="10" width="340" height="200" rx="10" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1" opacity="0.5"/>
+          <text x="540" y="34" text-anchor="middle" fill="var(--accent-primary)" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">FIXED: Extract Shared Concern</text>
+          <rect x="390" y="60" width="120" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+          <text x="450" y="85" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-family="system-ui, -apple-system, sans-serif">OrderFactory</text>
+          <rect x="560" y="60" width="130" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1.2"/>
+          <text x="625" y="85" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-family="system-ui, -apple-system, sans-serif">PaymentFactory</text>
+          <rect x="480" y="150" width="140" height="40" rx="6" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="550" y="175" text-anchor="middle" fill="var(--accent-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">IOrderRepository</text>
+          <line x1="450" y1="100" x2="525" y2="150" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#af-b5-arr-g)"/>
+          <line x1="625" y1="100" x2="570" y2="150" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#af-b5-arr-g)"/>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 hours — clear error message, but untangling the design took thought.</p>
         <div class="tab-container mt-sm">
@@ -2012,13 +2254,14 @@ public sealed class PaymentFactory(IOrderFactory orders) : IPaymentFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> <code>OrderFactory</code> takes <code>IPaymentFactory</code> in its constructor because it needs to create a payment when building an order. <code>PaymentFactory</code> takes <code>IOrderFactory</code> because it needs to look up an order when creating a payment. Each class requires the other to exist first. The DI container cannot construct either one without the other already being available — a deadlock at the dependency graph level.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
               <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FixedCircular.cs</span></div>
               <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Break the cycle — use Lazy&lt;T&gt; or extract shared concern
-// Option 1: Lazy injection
+// Option 1: Lazy injection (quick fix)
 public sealed class PaymentFactory(Lazy&lt;IOrderFactory&gt; orders) : IPaymentFactory
 {
     public IPayment CreatePayment(PaymentInfo info)
@@ -2044,7 +2287,16 @@ public sealed class PaymentFactory(IOrderRepository repo) : IPaymentFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Option 1 (Lazy) is a band-aid: wrapping the dependency in <code>Lazy&lt;T&gt;</code> defers resolution until the first time <code>.Value</code> is accessed, breaking the construction-time cycle. But Option 2 is the real fix: the <code>PaymentFactory</code> never needed the full <code>IOrderFactory</code> — it just needed to read an order from storage. By extracting that into <code>IOrderRepository</code>, both factories can depend on the repository without depending on each other. The cycle vanishes because you removed the unnecessary coupling.</p>
           </div>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">If your app crashes at startup with a "circular dependency detected" error, trace the dependency chain in the error message. Ask yourself: does Factory A really need to <em>create</em> via Factory B, or does it just need to <em>read data</em> that B also reads? If it is just reading, extract a shared repository or service that both factories can depend on without depending on each other.</p>
+        </div>
+        <div class="callout callout-info mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
+          <p class="body-text">Circular dependencies between factories almost always signal a design flaw. The right fix is extracting the shared concern into its own service, not working around the cycle with <code>Lazy&lt;T&gt;</code>.</p>
         </div>
       </div>
     </div>
@@ -2056,9 +2308,65 @@ public sealed class PaymentFactory(IOrderRepository repo) : IPaymentFactory
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>2022, .NET 6 high-traffic API.</strong> A singleton factory cached created products in a <code>Dictionary&lt;string, IProduct&gt;</code> for performance.<br>
-          Under concurrent load, the dictionary threw <code>InvalidOperationException</code> — <span class="tooltip-trigger">race condition<span class="tooltip-content">A bug where concurrent threads access shared data and the outcome depends on execution timing — one of the hardest bugs to diagnose.</span></span> on non-thread-safe collection.</p>
+          <p class="body-text"><strong>2022, .NET 6 high-traffic API.</strong> A singleton factory was caching products in a regular <code>Dictionary</code> to avoid re-creating them on every call. Under heavy traffic, the dictionary started throwing random <code>InvalidOperationException</code> errors. The internal data structure was getting corrupted because multiple threads were reading and writing to it at the same time.</p>
         </div>
+
+        <p class="body-text">To understand this bug, you need to know one important rule: a regular <code>Dictionary&lt;TKey, TValue&gt;</code> is <strong>not safe to use from multiple threads at the same time</strong>. It is like a filing cabinet designed for one person. If two people try to file documents simultaneously, papers get mixed up, folders get misfiled, and the whole system breaks down.</p>
+
+        <p class="body-text">The developer's intention was reasonable: creating UI products can be expensive (maybe it involves loading resources, reading configs, etc.), so they wanted to cache the result. The first time <code>CreateButton()</code> is called, it creates a <code>WinButton</code> and stores it in the dictionary. Every subsequent call just returns the cached button. This works perfectly in single-threaded code.</p>
+
+        <p class="body-text">But the factory was registered as a singleton — shared across all threads. When 50 requests hit simultaneously, 50 threads all called <code>CreateButton()</code> at the same time. Multiple threads found the cache empty (the <code>TryGetValue</code> check), created new buttons, and then tried to write to the dictionary simultaneously. <code>Dictionary</code> is not designed for this — its internal hash buckets got corrupted, leading to <span class="tooltip-trigger">race conditions<span class="tooltip-content">A bug where concurrent threads access shared data and the outcome depends on execution timing — one of the hardest bugs to diagnose.</span></span>: infinite loops in bucket chains, lost entries, and eventually exceptions.</p>
+
+        <p class="body-text">The bug was intermittent. In dev (one user, low traffic), it worked perfectly. In staging (moderate load), it occasionally threw a strange exception. In production (peak traffic), it crashed repeatedly. This is the hallmark of a concurrency bug — it only appears under load and is nearly impossible to reproduce on a developer's machine.</p>
+
+        <!-- SVG: Thread Race Condition on Dictionary -->
+        <svg viewBox="0 0 720 250" role="img" aria-label="Diagram showing multiple threads racing to read and write the same Dictionary simultaneously" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="af-b6-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <text x="360" y="24" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif">Multiple Threads Racing on a Non-Thread-Safe Dictionary</text>
+
+          <!-- Threads -->
+          <rect x="40" y="50" width="90" height="30" rx="5" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+          <text x="85" y="70" text-anchor="middle" fill="#60a5fa" font-size="10" font-family="system-ui, -apple-system, sans-serif">Thread 1</text>
+          <rect x="40" y="95" width="90" height="30" rx="5" fill="#a855f7" opacity="0.2" stroke="#a855f7" stroke-width="1"/>
+          <text x="85" y="115" text-anchor="middle" fill="#c084fc" font-size="10" font-family="system-ui, -apple-system, sans-serif">Thread 2</text>
+          <rect x="40" y="140" width="90" height="30" rx="5" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="1"/>
+          <text x="85" y="160" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="system-ui, -apple-system, sans-serif">Thread 3</text>
+
+          <!-- Check step -->
+          <text x="220" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">1. Check cache</text>
+          <line x1="130" y1="65" x2="180" y2="65" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#af-b6-arr)"/>
+          <line x1="130" y1="110" x2="180" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#af-b6-arr)"/>
+          <line x1="130" y1="155" x2="180" y2="155" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#af-b6-arr)"/>
+          <text x="220" y="70" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">empty!</text>
+          <text x="220" y="115" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">empty!</text>
+          <text x="220" y="160" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">empty!</text>
+
+          <!-- Write step -->
+          <text x="380" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">2. Create + Write</text>
+          <line x1="260" y1="65" x2="340" y2="100" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#af-b6-arr)"/>
+          <line x1="260" y1="110" x2="340" y2="110" stroke="#a855f7" stroke-width="1.2" marker-end="url(#af-b6-arr)"/>
+          <line x1="260" y1="155" x2="340" y2="120" stroke="#f59e0b" stroke-width="1.2" marker-end="url(#af-b6-arr)"/>
+
+          <!-- Dictionary -->
+          <rect x="340" y="80" width="140" height="60" rx="8" fill="var(--bg-tertiary)" stroke="#f87171" stroke-width="2"/>
+          <text x="410" y="105" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Dictionary</text>
+          <text x="410" y="125" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">3 simultaneous writes!</text>
+
+          <!-- Result -->
+          <line x1="480" y1="110" x2="540" y2="110" stroke="#f87171" stroke-width="1.5" marker-end="url(#af-b6-arr)"/>
+          <rect x="540" y="80" width="160" height="60" rx="8" fill="#f87171" opacity="0.1" stroke="#f87171" stroke-width="1.5"/>
+          <text x="620" y="100" text-anchor="middle" fill="#f87171" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">CORRUPTION!</text>
+          <text x="620" y="118" text-anchor="middle" fill="#f87171" font-size="9" font-family="system-ui, -apple-system, sans-serif">Bucket chains broken</text>
+          <text x="620" y="132" text-anchor="middle" fill="#f87171" font-size="9" font-family="system-ui, -apple-system, sans-serif">Random exceptions thrown</text>
+
+          <!-- Fix hint -->
+          <rect x="200" y="195" width="320" height="40" rx="8" fill="var(--accent-primary)" opacity="0.1" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="360" y="213" text-anchor="middle" fill="var(--accent-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Fix: ConcurrentDictionary.GetOrAdd()</text>
+          <text x="360" y="228" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Atomic read-or-create in one thread-safe call</text>
+        </svg>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">6 hours — intermittent, only under load, dictionary corruption caused random exceptions.</p>
         <div class="tab-container mt-sm">
@@ -2087,6 +2395,7 @@ public sealed class CachedUIFactory : IUIFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The factory uses a plain <code>Dictionary</code> as its cache. The pattern looks innocent: check if the key exists, and if not, create the product and store it. But between the <code>TryGetValue</code> check and the <code>_cache["btn"] = btn</code> write, another thread can jump in and do the same thing. Two threads write to the same dictionary simultaneously, corrupting its internal structure. Once corrupted, even simple reads can infinite-loop or throw. The fact that this only happens under high concurrency makes it extremely hard to reproduce in development.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -2110,7 +2419,16 @@ public sealed class CachedUIFactory : IUIFactory
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> <code>ConcurrentDictionary</code> is designed for multi-threaded access. Its <code>GetOrAdd()</code> method atomically checks if the key exists and creates the value if it does not — all in one thread-safe operation. No gap between "check" and "write" for another thread to exploit. The <code>FrozenDictionary</code> approach is even better for factories: you build the entire registry at startup (when only one thread is running), then freeze it. A frozen dictionary is completely read-only at runtime, so thread safety is guaranteed with zero locking overhead.</p>
           </div>
+        </div>
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>Dictionary&lt;</code> fields in any class registered as a singleton. If the dictionary is written to after construction (anything other than read-only initialization), it is a potential race condition. Replace with <code>ConcurrentDictionary</code> for read/write caches, or use <code>FrozenDictionary</code> (or <code>ImmutableDictionary</code>) if the data is built once at startup and never modified.</p>
+        </div>
+        <div class="callout callout-info mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
+          <p class="body-text">Singleton factories that cache products must use thread-safe collections. <code>ConcurrentDictionary</code> for dynamic caches, <code>FrozenDictionary</code> for static registries built at startup. Never use <code>Dictionary</code> in a singleton that receives concurrent traffic.</p>
         </div>
       </div>
     </div>
@@ -2134,8 +2452,54 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Cramming all product families into a single class with switch statements.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Every new family modifies the same class. Violates OCP and SRP. The class grows unbounded.</p>
-          <p class="body-text"><strong>Fix:</strong> Each family gets its own sealed Concrete Factory class implementing the shared interface.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> It starts innocently. You have two families — Windows and macOS. You write one factory class with a switch on the platform name. It works, it is simple, and it fits in one file. Then Linux support arrives. Then a "high contrast" accessibility family. Each new family adds another case to every switch statement in the class. Suddenly your "simple" factory is 500 lines long with 4 switch blocks, and every single change risks breaking all other families.</p>
+          <p class="body-text">The deeper reason developers do this is that creating a separate class for each family feels like "too many files." But the trade-off is wrong: a few extra files is far cheaper than one monster file that every developer on the team needs to edit simultaneously.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodFactory.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ God Factory — one class handles ALL families
+public class UIFactory
+{
+    public IButton CreateButton(string platform) => platform switch
+    {
+        "win" => new WinButton(),
+        "mac" => new MacButton(),
+        "linux" => new LinuxButton(),  // keeps growing...
+        _ => throw new ArgumentException(nameof(platform))
+    };
+
+    public ICheckbox CreateCheckbox(string platform) => platform switch
+    {
+        "win" => new WinCheckbox(),
+        "mac" => new MacCheckbox(),
+        "linux" => new LinuxCheckbox(),  // same switch, again...
+        _ => throw new ArgumentException(nameof(platform))
+    };
+    // ... repeat for every product type
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SeparateFactories.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Each family gets its own sealed factory
+public sealed class WinFactory : IUIFactory
+{
+    public IButton CreateButton() => new WinButton();
+    public ICheckbox CreateCheckbox() => new WinCheckbox();
+}
+
+public sealed class MacFactory : IUIFactory
+{
+    public IButton CreateButton() => new MacButton();
+    public ICheckbox CreateCheckbox() => new MacCheckbox();
+}
+
+// Adding Linux? Just add a new class — no existing code changes.
+public sealed class LinuxFactory : IUIFactory { ... }</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The good version follows the <span class="tooltip-trigger">Open/Closed Principle<span class="tooltip-content">Software entities should be open for extension (add new families by adding classes) but closed for modification (existing factory classes never change).</span></span>: adding a new family means adding a new class, not editing an existing one. No switch statements, no risk of breaking Windows when you add Linux.</p>
         </div>
       </div>
     </div>
@@ -2147,9 +2511,22 @@ public sealed class CachedUIFactory : IUIFactory
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> Creating too many families with too many products each — 5 families × 8 products = 40 <span class="tooltip-trigger">concrete<span class="tooltip-content">Implementation classes as opposed to abstract types — the actual classes that get instantiated (e.g., WinButton vs IButton).</span></span> product classes + 5 factory classes.</p>
-          <p class="body-text"><strong>Why Bad:</strong> <span class="tooltip-trigger">Combinatorial explosion<span class="tooltip-content">When the number of classes grows as the product of families × products — 5 families × 8 products = 40 classes, plus factories. Signals the abstraction may be too broad.</span></span> makes the codebase hard to navigate and maintain.</p>
-          <p class="body-text"><strong>Fix:</strong> Question whether all products truly need family-level variation. Often only 2-3 products vary by family; others can be shared.</p>
+          <p class="body-text"><strong>Mistake:</strong> Creating too many families with too many products each — 5 families x 8 products = 40 <span class="tooltip-trigger">concrete<span class="tooltip-content">Implementation classes as opposed to abstract types — the actual classes that get instantiated (e.g., WinButton vs IButton).</span></span> product classes + 5 factory classes.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The pattern works so well for 2 families and 3 products that developers apply it to everything. "We have 5 platforms and 8 UI controls — let's make all 40 combinations!" But often only 2-3 of those products actually differ between families. A scrollbar might look identical on Windows and macOS. A text label might render the same everywhere. Creating family-specific versions of products that do not actually vary is pure waste — 40 classes where 20 would suffice.</p>
+          <p class="body-text">The fix is to ask a simple question for each product: <strong>Does this product actually behave differently across families?</strong> If not, share a single implementation. Only the products that truly vary need family-specific classes. This can dramatically shrink your class count.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SharedProducts.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Only vary what actually differs per family
+public sealed class WinFactory : IUIFactory
+{
+    public IButton CreateButton() => new WinButton();      // Different per family
+    public ICheckbox CreateCheckbox() => new WinCheckbox(); // Different per family
+    public ILabel CreateLabel() => new StandardLabel();     // ✅ Shared — same everywhere
+    public IScrollbar CreateScrollbar() => new StandardScrollbar(); // ✅ Shared
+}</code></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2162,8 +2539,27 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Factory method returns <code>WinButton</code> instead of <code>IButton</code>, or client casts the result to a concrete type.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Defeats the entire purpose of the pattern. Client becomes coupled to a specific family.</p>
-          <p class="body-text"><strong>Fix:</strong> Factory interface return types must always be abstract. Use <span class="tooltip-trigger">sealed<span class="tooltip-content">C# keyword preventing a class from being inherited. Sealed classes improve performance (devirtualization) and clarify design intent.</span></span> on concrete products to prevent accidental downcasting chains.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers know the concrete type and reach for it out of habit. "I know it is a <code>WinButton</code>, so why not use the concrete type? I get IntelliSense for the Windows-specific properties." The problem is that once client code depends on <code>WinButton</code>, you cannot swap in <code>MacButton</code> without changing that code. You have just hard-wired the family into the consumer — the entire point of Abstract Factory was to avoid that.</p>
+          <p class="body-text">Sometimes the leak is not the return type itself, but a <code>(WinButton)</code> cast buried deep in application code. That cast is a time bomb: it works today because you only have Windows, but it explodes the moment you add a second family.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LeakedTypes.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Leaking concrete types
+IButton btn = factory.CreateButton();
+var winBtn = (WinButton)btn; // ❌ Cast couples client to Windows family
+winBtn.ShowWinTaskbar();     // ❌ Windows-only method — breaks on Mac</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CleanAbstraction.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Work entirely through the interface
+IButton btn = factory.CreateButton();
+btn.Paint();   // ✅ Works for every family
+btn.OnClick(); // ✅ Defined on IButton — family-agnostic</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Rule of thumb: if you see a cast to a concrete product type anywhere in code that uses a factory, something is wrong. The client should never know or care which family produced the product. Use <span class="tooltip-trigger">sealed<span class="tooltip-content">C# keyword preventing a class from being inherited. Sealed classes improve performance (devirtualization) and clarify design intent.</span></span> on concrete products to discourage downcasting chains.</p>
         </div>
       </div>
     </div>
@@ -2176,8 +2572,32 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Writing <code>new WinFactory()</code> in application code instead of resolving from the DI container.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Tight coupling to concrete factories. No way to swap families via config or tests.</p>
-          <p class="body-text"><strong>Fix:</strong> Register factories in <code>IServiceCollection</code> and inject via constructor.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers sometimes skip DI because "it is just one factory, I will hard-code it for now." Or they are not familiar with how to register multiple implementations. The result is tight coupling: the code that creates <code>new WinFactory()</code> is permanently married to the Windows family. You cannot swap families via configuration, environment variables, or test doubles.</p>
+          <p class="body-text">This also defeats testability. In unit tests, you want to inject a <code>TestFactory</code> that returns lightweight stub products. If the code hard-codes <code>new WinFactory()</code>, the only way to substitute it is to change the source code itself.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ManualNew.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Hard-coded factory — cannot swap families
+public class Dashboard
+{
+    private readonly IUIFactory _factory = new WinFactory(); // ❌ Tight coupling!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DIInjected.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Let the DI container decide which factory to inject
+public class Dashboard(IUIFactory factory)
+{
+    // Family is decided at registration time — Dashboard doesn't know or care
+}
+
+// In Program.cs — change this ONE line to switch families:
+builder.Services.AddSingleton&lt;IUIFactory, MacFactory&gt;();</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The fix is simple: register the factory in <code>IServiceCollection</code> and inject it via the constructor. The family selection happens once at the composition root — every consumer is blissfully unaware of which family it received.</p>
         </div>
       </div>
     </div>
@@ -2190,8 +2610,25 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating an Abstract Factory with only one <code>Create</code> method.</p>
-          <p class="body-text"><strong>Why Bad:</strong> That's just a Factory Method with extra indirection. No family concept = no need for Abstract Factory.</p>
-          <p class="body-text"><strong>Fix:</strong> Use Factory Method pattern instead. Only escalate to Abstract Factory when you have 2+ related products per family.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Someone reads about Abstract Factory and gets excited. They create <code>INotificationFactory</code> with a single <code>CreateNotification()</code> method. But there is no "family" here — just one product with multiple variants. That is literally what Factory Method does. Abstract Factory exists specifically for the case where you have <strong>multiple products that must stay in sync across families</strong>. With just one product, the "family consistency" guarantee is meaningless.</p>
+          <p class="body-text">Using Abstract Factory for a single product adds an unnecessary layer of indirection: an extra interface, an extra class, and extra complexity — all for zero benefit over Factory Method.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SingleProduct.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Overkill — Abstract Factory for a single product
+public interface INotificationFactory
+{
+    INotification CreateNotification(); // Only one method = no family!
+}
+
+// ✅ Just use Factory Method instead
+public interface INotification { void Send(string message); }
+
+// Register directly — no factory interface needed
+builder.Services.AddSingleton&lt;INotification, EmailNotification&gt;();</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Rule: only escalate to Abstract Factory when you have <strong>2 or more related products per family</strong>. If it is a single product with multiple implementations, Factory Method or plain DI registration is simpler and cleaner.</p>
         </div>
       </div>
     </div>
@@ -2204,8 +2641,37 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Using raw strings for keyed service resolution without constants or enums.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Typos cause runtime failures. No IntelliSense. No refactoring support.</p>
-          <p class="body-text"><strong>Fix:</strong> Define keys as <code>const string</code> in a static class or use enums. Add startup validation that all keys resolve successfully.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Keyed services in .NET 8 are so easy to set up that developers jump straight to raw strings: <code>"postgres"</code>, <code>"sqlserver"</code>, <code>"redis"</code>. It works fine initially. But as the codebase grows and multiple developers register and resolve services in different files, typos creep in. One file says <code>"postgres"</code>, another says <code>"postgresql"</code>, a third says <code>"pg"</code>. All are reasonable names — and all must match exactly.</p>
+          <p class="body-text">Without compile-time validation, these mismatches only surface at runtime. And if the mismatched code is behind a rarely-used feature flag, it might sit in production for weeks before a user triggers it.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RawStrings.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Raw strings — typos hide until runtime
+builder.Services.AddKeyedSingleton&lt;IDbFactory, PgFactory&gt;("postgres");
+builder.Services.AddKeyedSingleton&lt;IDbFactory, SqlFactory&gt;("sqlserver");
+
+// In a different file, weeks later...
+public class ReportService(
+    [FromKeyedServices("postgresql")] IDbFactory db) { } // ❌ Typo! Boom.</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Constants.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Constants or enums — single source of truth
+public static class DbKeys
+{
+    public const string Postgres = "postgres";
+    public const string SqlServer = "sqlserver";
+}
+
+builder.Services.AddKeyedSingleton&lt;IDbFactory, PgFactory&gt;(DbKeys.Postgres);
+
+public class ReportService(
+    [FromKeyedServices(DbKeys.Postgres)] IDbFactory db) { } // ✅ Compile-safe</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Define keys in one place (a static class with <code>const string</code> fields, or an enum). Reference that constant everywhere. The compiler catches typos, IntelliSense auto-completes, and renaming propagates automatically.</p>
         </div>
       </div>
     </div>
@@ -2218,8 +2684,30 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Leaving concrete factories inheritable, leading to unintended inheritance hierarchies.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Someone inherits from <code>WinFactory</code> to "just override one method" — breaks family consistency guarantees.</p>
-          <p class="body-text"><strong>Fix:</strong> Mark all Concrete Factories as <code>sealed</code>. Extend by adding new factories, not inheriting existing ones.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer needs a "slightly different" Windows factory — maybe one that caches products. Instead of creating a new factory class, they inherit from <code>WinFactory</code> and override just <code>CreateButton()</code>. Seems harmless, right? But now the child class returns a cached <code>WinButton</code> from <code>CreateButton()</code> and a fresh <code>WinCheckbox</code> from the parent's <code>CreateCheckbox()</code>. If the cached button holds stale state, the family's products are no longer consistent.</p>
+          <p class="body-text">Inheritance also makes the factory hierarchy brittle. Every change to <code>WinFactory</code> might break its children. The Abstract Factory pattern is designed for extension through <strong>new classes</strong>, not through inheritance of existing ones.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">UnsealedFactory.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Unsealed — allows fragile inheritance
+public class WinFactory : IUIFactory { ... }
+
+public class CachedWinFactory : WinFactory  // ❌ Inherits and partially overrides
+{
+    public override IButton CreateButton() => _cached; // Stale state risk
+    // CreateCheckbox() inherited — mismatch with cached button!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SealedFactory.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Sealed — extend by adding, not inheriting
+public sealed class WinFactory : IUIFactory { ... }
+public sealed class CachedWinFactory : IUIFactory { ... } // Own class, full control</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Mark all concrete factories as <code>sealed</code>. When you need a variation, create a brand new class that implements the interface from scratch. This keeps each factory self-contained and predictable.</p>
         </div>
       </div>
     </div>
@@ -2232,8 +2720,33 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> A method accepts <code>IUIFactory</code> but also takes individual <code>IButton</code> and <code>ICheckbox</code> parameters from elsewhere.</p>
-          <p class="body-text"><strong>Why Bad:</strong> The injected products might come from a different family than the factory, breaking consistency.</p>
-          <p class="body-text"><strong>Fix:</strong> Either use the factory to create all products, or accept pre-created products — never mix both approaches in the same scope.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Performance optimization or convenience. A developer thinks "I already have this button from earlier — why create a new one from the factory?" So they pass the pre-created button alongside the factory. But the pre-created button might be from a different family than the factory. Now you have a Windows button sitting next to a macOS checkbox again — the same "mixed families" problem from Bug 1, just hidden behind a method signature.</p>
+          <p class="body-text">The root issue is that the method signature promises family consistency (by accepting <code>IUIFactory</code>) but then breaks that promise by also accepting individual products from unknown sources.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MixedBoundary.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Mixed sources — button might be from a different family
+public void RenderForm(IUIFactory factory, IButton externalButton)
+{
+    var chk = factory.CreateCheckbox(); // MacCheckbox
+    externalButton.Paint();             // ❌ Could be WinButton!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConsistentBoundary.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Let the factory create everything — guaranteed same family
+public void RenderForm(IUIFactory factory)
+{
+    var btn = factory.CreateButton();   // ✅ Same family
+    var chk = factory.CreateCheckbox(); // ✅ Same family
+    btn.Paint();
+    chk.Paint();
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Pick one approach: either use the factory to create <em>all</em> products, or accept all pre-created products as parameters. Never mix both in the same method — it creates a hole in the family consistency guarantee.</p>
         </div>
       </div>
     </div>
@@ -2246,8 +2759,38 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> A factory interface with <code>CreateButton()</code>, <code>CreateCheckbox()</code>, <code>CreateDropdown()</code>, <code>CreateSlider()</code>, <code>CreateRadio()</code>, ... 10+ methods.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Violates ISP. Most clients only use 2-3 products. Every new product forces all factories to add a method.</p>
-          <p class="body-text"><strong>Fix:</strong> Split into focused factories: <code>IFormControlFactory</code>, <code>ILayoutFactory</code>. Compose when a client needs multiple factories.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The team keeps adding products to the same factory interface as the UI grows. "We need a datepicker? Add <code>CreateDatePicker()</code> to <code>IUIFactory</code>." After a year, the interface has 12 methods. Every concrete factory must implement all 12, even if most clients only use 2-3. This violates the <span class="tooltip-trigger">Interface Segregation Principle<span class="tooltip-content">Clients should not be forced to depend on interfaces they don't use. If your interface has 12 methods and most consumers use 3, the interface is too broad.</span></span> — clients are forced to depend on factory methods they never call.</p>
+          <p class="body-text">Adding a new product also forces every concrete factory to change (add the new method), which means editing files across multiple assemblies and risking merge conflicts.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FatInterface.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Fat interface — 10+ methods, most clients use 2-3
+public interface IUIFactory
+{
+    IButton CreateButton();
+    ICheckbox CreateCheckbox();
+    IDropdown CreateDropdown();
+    ISlider CreateSlider();
+    IRadio CreateRadio();
+    IModal CreateModal();
+    IToast CreateToast();
+    IDatePicker CreateDatePicker();
+    // ... keeps growing
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SplitInterfaces.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Split by cohesion — each client depends only on what it uses
+public interface IInputFactory  { IButton CreateButton(); ICheckbox CreateCheckbox(); }
+public interface ILayoutFactory { IModal CreateModal(); IToast CreateToast(); }
+
+public class FormRenderer(IInputFactory inputs) { ... }        // Needs only inputs
+public class NotificationService(ILayoutFactory layout) { ... } // Needs only layout</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Split the fat interface into smaller, cohesive factory interfaces. Group products by what is used together. A form renderer needs input controls; a notification service needs modals and toasts. Each client depends only on the interface it actually uses.</p>
         </div>
       </div>
     </div>
@@ -2260,8 +2803,40 @@ public sealed class CachedUIFactory : IUIFactory
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Registering the factory in DI but not its product dependencies. Factory creates products that need services not in the container.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Runtime resolution failure deep in the factory's create method — hard to trace back to missing registration.</p>
-          <p class="body-text"><strong>Fix:</strong> Create an extension method like <code>AddUIFamily()</code> that registers the factory AND all its product dependencies as a unit. Add startup <code>ValidateOnStart</code> to catch missing registrations early.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The factory itself is registered fine. But the products it creates have their own dependencies — maybe <code>WinButton</code> needs an <code>IThemeService</code>, or <code>MacCheckbox</code> requires an <code>IAccessibilityProvider</code>. If those dependencies are not also registered in the DI container, the factory's <code>Create</code> method fails with a resolution exception buried deep in the call stack. The error message says "Cannot resolve IThemeService" but gives no hint that the problem started because you forgot to register it alongside the factory.</p>
+          <p class="body-text">This is especially sneaky when different families have different product dependencies. The Windows factory might work perfectly (all its product deps are registered) while the macOS factory crashes because <code>IAccessibilityProvider</code> was never added.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">IncompleteRegistration.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Factory registered, but product dependencies missing
+builder.Services.AddSingleton&lt;IUIFactory, WinFactory&gt;();
+// Forgot: builder.Services.AddSingleton&lt;IThemeService, WinTheme&gt;();
+// WinButton needs IThemeService — runtime crash!</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BundledRegistration.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Bundle factory + all dependencies in one extension method
+public static class WinUIExtensions
+{
+    public static IServiceCollection AddWinUI(this IServiceCollection services)
+    {
+        services.AddSingleton&lt;IUIFactory, WinFactory&gt;();
+        services.AddSingleton&lt;IThemeService, WinTheme&gt;();
+        services.AddSingleton&lt;IIconProvider, WinIcons&gt;();
+        return services;
+    }
+}
+
+// In Program.cs — one call registers everything
+builder.Services.AddWinUI();
+
+// ✅ Add startup validation to catch anything missing
+builder.Host.UseDefaultServiceProvider(o => o.ValidateOnStart = true);</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Create an extension method (like <code>AddWinUI()</code>) that registers the factory <strong>and</strong> all its product dependencies as a bundle. This way, adding a family is a single method call that cannot be partially applied. Enable <code>ValidateOnStart</code> to catch any missing registrations the moment the app boots, not when a user triggers the code path.</p>
         </div>
       </div>
     </div>
@@ -2566,8 +3141,9 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you explain it in one sentence without using the word "factory"?</div>
         <div class="body-text">
-          <p>A creational design pattern that provides an interface for creating <strong>families</strong> of related or dependent objects without specifying their concrete classes. The client works with abstract interfaces only — never knows which concrete products it's using.</p>
-          <p>Key participants: <strong>AbstractFactory</strong> (interface with create methods), <strong>ConcreteFactory</strong> (one per family), <strong>AbstractProduct</strong> (interface per product type), <strong>ConcreteProduct</strong> (specific to each family), and <strong>Client</strong> (uses only abstractions).</p>
+          <p>Think of a furniture store that sells "collections" — a Modern collection (modern sofa + modern table + modern lamp) and a Victorian collection (Victorian sofa + Victorian table + Victorian lamp). You pick a collection, and everything in it is guaranteed to match. You never accidentally get a Victorian lamp with a Modern table. That is the Abstract Factory pattern in a nutshell: you pick a <strong>family</strong>, and the factory gives you matching pieces.</p>
+          <p>In code terms, it is a creational design pattern that provides an interface for creating <strong>families of related objects</strong> without specifying their concrete classes. The client works only with abstract interfaces — it never knows whether it got a Windows button or a macOS button. It just knows it got "a button" that works with the rest of the family.</p>
+          <p>Key participants: <strong>AbstractFactory</strong> (the interface with create methods — like the furniture store catalog), <strong>ConcreteFactory</strong> (one per family — the "Modern" section, the "Victorian" section), <strong>AbstractProduct</strong> (interface per product type — "a sofa," "a table"), <strong>ConcreteProduct</strong> (specific to each family — "Modern Sofa," "Victorian Table"), and <strong>Client</strong> (the customer who shops using abstractions only).</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "It enforces family consistency at the type level — if you have a <code>WinFactory</code>, every product it creates is guaranteed to be Windows-compatible."</div>
       </div></div>
@@ -2582,12 +3158,13 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How many products does each pattern create? How many dimensions of variation?</div>
         <div class="body-text">
+          <p>Here is a simple analogy. Factory Method is like a bakery that makes one thing — bread — but in different varieties (sourdough, rye, whole wheat). You ask the bakery for bread, and the specific bakery decides which kind you get. Abstract Factory is like a meal kit service that gives you a <strong>complete set</strong> of matching items — an appetizer, main course, and dessert that all go together. You pick Italian or Japanese, and the service gives you a coordinated meal, not a random mix.</p>
           <p>Factory Method creates <strong>one product</strong> via one method — subclasses decide which variant. Abstract Factory creates an <strong>entire family</strong> of related products via multiple create methods — the factory decides which family.</p>
           <ul class="qa-list">
-            <li><strong>Factory Method:</strong> One factory method → one product type → multiple variants (vertical)</li>
-            <li><strong>Abstract Factory:</strong> One factory interface → multiple product types → multiple families (horizontal)</li>
+            <li><strong>Factory Method:</strong> One factory method, one product type, multiple variants (vertical variation)</li>
+            <li><strong>Abstract Factory:</strong> One factory interface, multiple product types, multiple families (horizontal variation)</li>
           </ul>
-          <p>Think "one product" vs "coordinated product set." Abstract Factory often <em>uses</em> Factory Methods internally — each <code>CreateButton()</code> is essentially a Factory Method.</p>
+          <p>Think "one product" vs "coordinated product set." Abstract Factory often <em>uses</em> Factory Methods internally — each <code>CreateButton()</code> is essentially a Factory Method inside the larger factory.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Abstract Factory is open for new families (add a class) but closed for new products (interface change). Factory Method is the opposite — easy to add new product variants."</div>
       </div></div>
@@ -2602,8 +3179,13 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think of a .NET class that creates multiple related objects you use together...</div>
         <div class="body-text">
-          <p><code>DbProviderFactory</code> in ADO.NET — the canonical example. Each provider (SQL Server, PostgreSQL, SQLite) ships a concrete factory that creates a family of compatible objects: <code>DbConnection</code>, <code>DbCommand</code>, <code>DbDataAdapter</code>, <code>DbParameter</code>.</p>
-          <p>Other examples: <code>CultureInfo</code> (creates NumberFormatInfo + DateTimeFormatInfo + TextInfo as a locale family), EF Core database providers (<code>UseSqlServer()</code> / <code>UseNpgsql()</code> swap 30+ related services), <code>System.Text.Encoding</code> (creates Encoder + Decoder families).</p>
+          <p>The most famous example is <code>DbProviderFactory</code> in ADO.NET. Think of it this way: when you talk to a database, you need several related objects that must all "speak the same language" — a connection, a command, a data adapter, and parameters. You cannot use a SQL Server connection with a PostgreSQL command. <code>DbProviderFactory</code> solves this by being an Abstract Factory: each provider (SQL Server, PostgreSQL, SQLite) ships its own concrete factory that creates a <em>family</em> of compatible objects. You ask for a connection, you get a <code>SqlConnection</code>. You ask for a command, you get a <code>SqlCommand</code>. Everything matches.</p>
+          <p>Other real examples in .NET:</p>
+          <ul class="qa-list">
+            <li><strong><code>CultureInfo</code></strong> — creates NumberFormatInfo + DateTimeFormatInfo + TextInfo as a locale family. Pick "en-US" and all formatting objects follow American conventions</li>
+            <li><strong>EF Core database providers</strong> — <code>UseSqlServer()</code> vs <code>UseNpgsql()</code> swaps 30+ related services at once</li>
+            <li><strong><code>System.Text.Encoding</code></strong> — creates matching Encoder + Decoder families (UTF-8, ASCII, etc.)</li>
+          </ul>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> Mention that <code>IHttpClientFactory</code> with named clients is AF-like (creates HttpClient + handler pipeline + policies as a family), while plain <code>IHttpClientFactory.CreateClient()</code> is closer to Factory Method.</div>
       </div></div>
@@ -2618,13 +3200,15 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What makes Abstract Factory necessary vs just using multiple Factory Methods?</div>
         <div class="body-text">
-          <p>When your system needs to create families of related objects that must be used together, and you need to swap entire families without modifying client code.</p>
+          <p>The trigger is simple: <strong>you have multiple objects that must come from the same family, and mixing families would break things.</strong> Think of it like buying car parts — you need tires, brake pads, and an oil filter that are all compatible with your specific car model. You would not want a Honda oil filter paired with Toyota brake pads. Abstract Factory ensures the "parts" all come from the same "manufacturer."</p>
+          <p>Use Abstract Factory when:</p>
           <ul class="qa-list">
-            <li>Cross-platform UI — Windows controls must not mix with Mac controls</li>
-            <li>Multi-database support — SQL Server objects must not mix with PostgreSQL objects</li>
-            <li>Multi-cloud abstraction — AWS services must not mix with Azure services</li>
-            <li>White-label theming — brand A components must not mix with brand B</li>
+            <li><strong>Cross-platform UI</strong> — Windows controls must not mix with Mac controls on the same screen</li>
+            <li><strong>Multi-database support</strong> — SQL Server connections must not mix with PostgreSQL commands</li>
+            <li><strong>Multi-cloud abstraction</strong> — AWS storage must not mix with Azure queue services</li>
+            <li><strong>White-label theming</strong> — brand A components must not mix with brand B's color scheme</li>
           </ul>
+          <p>If products from different families can safely mix without problems, you probably do not need Abstract Factory. The pattern adds complexity, so only use it when family consistency is genuinely important.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The trigger is <em>incompatible families</em> — if products from different families can safely mix, you don't need Abstract Factory."</div>
       </div></div>
@@ -2639,8 +3223,14 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What goes wrong if you don't use Abstract Factory in a multi-family system?</div>
         <div class="body-text">
-          <p>It prevents <strong>mixing incompatible products</strong> from different families. Without it, you might accidentally create a SQL Server connection paired with a PostgreSQL command — they compile fine but fail at runtime. Abstract Factory guarantees all products in a set are from the same family.</p>
-          <p>Secondary problems it solves: client code coupling to concrete types, difficulty swapping families (e.g., switching from Windows to Mac UI), and testing difficulties (can't substitute a test family).</p>
+          <p>Imagine plugging a UK appliance into a US outlet — the plug fits (the code compiles), but you fry the device when you turn it on (runtime failure). That is what happens without Abstract Factory: you can easily create a SQL Server connection paired with a PostgreSQL command. They both implement the same interfaces, so the compiler sees no issue. But at runtime, the connection speaks one protocol and the command speaks another — and everything breaks.</p>
+          <p>Abstract Factory solves this by guaranteeing that <strong>all products in a set come from the same family</strong>. You cannot accidentally mix incompatible pieces because the factory only knows how to create its own family's products.</p>
+          <p>Secondary problems it solves:</p>
+          <ul class="qa-list">
+            <li><strong>Client coupling</strong> — without it, client code references concrete types (<code>new SqlConnection()</code>) and becomes impossible to change</li>
+            <li><strong>Swapping families</strong> — switching from Windows to Mac UI requires finding and changing every <code>new WinButton()</code> in the entire codebase</li>
+            <li><strong>Testing</strong> — you cannot substitute a lightweight test family if the code hard-codes production types</li>
+          </ul>
         </div>
       </div></div>
     </div>
@@ -2656,14 +3246,73 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How do you register multiple implementations of the same interface in .NET DI?</div>
         <div class="body-text">
-          <p>Three approaches depending on your .NET version:</p>
+          <p>The challenge is that .NET's built-in DI container normally maps one interface to one implementation. But Abstract Factory often needs multiple factories (one per family) behind the same interface. Here are three approaches depending on your .NET version:</p>
           <ul class="qa-list">
-            <li><strong>.NET 6-7:</strong> Register a <code>Func&lt;string, IUIFactory&gt;</code> delegate that switches on a key</li>
-            <li><strong>.NET 8+:</strong> Use keyed services — <code>services.AddKeyedSingleton&lt;IUIFactory, WinFactory&gt;("win")</code></li>
-            <li><strong>Single family:</strong> Simple — <code>services.AddSingleton&lt;IUIFactory, WinFactory&gt;()</code></li>
+            <li><strong>.NET 6-7:</strong> Register a <code>Func&lt;string, IUIFactory&gt;</code> delegate that acts as a manual switcher</li>
+            <li><strong>.NET 8+:</strong> Use keyed services — the container itself can hold multiple implementations under different keys</li>
+            <li><strong>Single family (simplest):</strong> Just <code>services.AddSingleton&lt;IUIFactory, WinFactory&gt;()</code> — done</li>
           </ul>
-          <p>Clients inject <code>IUIFactory</code> and never know which family they're using. For keyed services, inject with <code>[FromKeyedServices("win")]</code>.</p>
         </div>
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="af-q6-pre8" role="tab" aria-selected="true">.NET 6-7 (Func Workaround)</button>
+            <button class="tab-btn" data-tab="af-q6-net8" role="tab" aria-selected="false">.NET 8+ (Keyed Services)</button>
+          </div>
+          <div class="tab-panel active" id="af-q6-pre8" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PreNet8Registration.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// .NET 6-7: Register a delegate that resolves by key
+builder.Services.AddSingleton&lt;WinFactory&gt;();
+builder.Services.AddSingleton&lt;MacFactory&gt;();
+
+builder.Services.AddSingleton&lt;Func&lt;string, IUIFactory&gt;&gt;(sp => key => key switch
+{
+    "win" => sp.GetRequiredService&lt;WinFactory&gt;(),
+    "mac" => sp.GetRequiredService&lt;MacFactory&gt;(),
+    _ => throw new ArgumentException($"Unknown platform: {key}")
+});
+
+// Consumer injects the resolver delegate
+public class Dashboard(Func&lt;string, IUIFactory&gt; factoryResolver)
+{
+    public void Render(string platform)
+    {
+        var factory = factoryResolver(platform);
+        var btn = factory.CreateButton();
+    }
+}</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="af-q6-net8" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Net8KeyedServices.cs</span></div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// .NET 8+: Built-in keyed services — clean and native
+builder.Services.AddKeyedSingleton&lt;IUIFactory, WinFactory&gt;("win");
+builder.Services.AddKeyedSingleton&lt;IUIFactory, MacFactory&gt;("mac");
+
+// Static key — inject with attribute
+public class Dashboard([FromKeyedServices("win")] IUIFactory factory)
+{
+    public void Render() => factory.CreateButton().Paint();
+}
+
+// Dynamic key — resolve at runtime
+public class DynamicDashboard(IServiceProvider sp)
+{
+    public void Render(string platform)
+    {
+        var factory = sp.GetRequiredKeyedService&lt;IUIFactory&gt;(platform);
+        factory.CreateButton().Paint();
+    }
+}</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="body-text mt-sm">In all cases, the client works with <code>IUIFactory</code> and never knows which family it received. The .NET 8 approach is cleaner because it eliminates the manual delegate and switch statement — the DI container handles the mapping natively.</p>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> Show both the pre-.NET 8 <code>Func</code> workaround and the .NET 8 keyed services approach to demonstrate evolution awareness.</div>
       </div></div>
     </div>
@@ -2677,9 +3326,30 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How does <code>GetFactory("Npgsql")</code> know which class to return?</div>
         <div class="body-text">
-          <p><code>DbProviderFactories.GetFactory(providerName)</code> looks up a registered provider by its invariant name (e.g., "Npgsql"). The returned <code>DbProviderFactory</code> subclass implements <code>CreateConnection()</code>, <code>CreateCommand()</code>, etc. — each returning the provider-specific type.</p>
-          <p>Providers register themselves via <code>DbProviderFactories.RegisterFactory("Npgsql", NpgsqlFactory.Instance)</code> at startup. The factory maintains a static registry (essentially a dictionary of provider names to factory instances).</p>
+          <p>Think of <code>DbProviderFactories</code> as a phone book for database providers. Each provider registers itself under a unique name (like "Npgsql" or "Microsoft.Data.SqlClient"). When you call <code>GetFactory("Npgsql")</code>, it looks up that name in the registry and hands you the PostgreSQL factory. From there, every object the factory creates — connection, command, adapter, parameter — is guaranteed to be PostgreSQL-compatible.</p>
+          <p>Here is how it works step by step:</p>
+          <ol class="qa-list">
+            <li>At startup, providers register: <code>DbProviderFactories.RegisterFactory("Npgsql", NpgsqlFactory.Instance)</code></li>
+            <li>The static registry stores a dictionary of provider names to factory instances</li>
+            <li>Client code calls <code>GetFactory("Npgsql")</code> to get the concrete factory</li>
+            <li>The factory's <code>CreateConnection()</code>, <code>CreateCommand()</code>, etc. return Npgsql-specific types</li>
+          </ol>
         </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DbProviderFactoryUsage.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Register the provider at startup
+DbProviderFactories.RegisterFactory("Npgsql", NpgsqlFactory.Instance);
+
+// Later — client code doesn't know which database it's talking to
+var factory = DbProviderFactories.GetFactory(providerName); // From config
+using var conn = factory.CreateConnection();   // NpgsqlConnection
+using var cmd  = factory.CreateCommand();      // NpgsqlCommand
+cmd.Connection = conn;
+// Everything is guaranteed to be from the same provider family</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm">In .NET Core (unlike .NET Framework), providers must explicitly call <code>RegisterFactory()</code> — there is no machine.config to auto-discover them. This is conceptually identical to how keyed services work: register under a key, resolve by key.</p>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> Mention that in .NET Core, providers must explicitly register (unlike .NET Framework where machine.config handled it), and this is similar to how keyed services work.</div>
       </div></div>
     </div>
@@ -2693,12 +3363,40 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens to all existing ConcreteFactory classes when you add <code>CreateDropdown()</code> to the interface?</div>
         <div class="body-text">
-          <p>This is the pattern's <strong>Achilles' heel</strong>. Adding a new product (e.g., <code>CreateDropdown()</code>) requires modifying the AbstractFactory interface and ALL ConcreteFactory implementations. This violates OCP for the product dimension.</p>
-          <p>Mitigations:</p>
+          <p>This is the pattern's <strong>Achilles' heel</strong>. Adding a new family (like Linux) is easy — you just create a new <code>LinuxFactory</code> class. No existing code changes. But adding a new <em>product</em> (like <code>CreateDropdown()</code>) is painful — you must modify the interface and update every single concrete factory. If you have 5 factories, that is 5 files to edit, 5 tests to update, and 5 chances for merge conflicts.</p>
+
+          <!-- SVG: Open/Closed trade-off -->
+          <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing that Abstract Factory is open for new families (easy) but closed for new products (hard)" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="af-q8-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+            </defs>
+            <!-- Grid header -->
+            <text x="200" y="24" text-anchor="middle" fill="var(--text-muted)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Families</text>
+            <text x="200" y="40" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Win | Mac | Linux</text>
+            <text x="530" y="24" text-anchor="middle" fill="var(--text-muted)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Products</text>
+            <text x="530" y="40" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Button | Checkbox | Dropdown</text>
+
+            <!-- Add Family: easy -->
+            <rect x="40" y="60" width="320" height="55" rx="8" fill="var(--accent-primary)" opacity="0.1" stroke="var(--accent-primary)" stroke-width="1.2"/>
+            <text x="200" y="82" text-anchor="middle" fill="var(--accent-primary)" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">Add New Family (e.g., Linux)</text>
+            <text x="200" y="102" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Just add LinuxFactory class. Zero changes to existing code.</text>
+
+            <!-- Add Product: hard -->
+            <rect x="370" y="60" width="320" height="55" rx="8" fill="#f87171" opacity="0.1" stroke="#f87171" stroke-width="1.2"/>
+            <text x="530" y="82" text-anchor="middle" fill="#f87171" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">Add New Product (e.g., Dropdown)</text>
+            <text x="530" y="102" text-anchor="middle" fill="#f87171" font-size="10" font-family="system-ui, -apple-system, sans-serif">Change interface + ALL concrete factories. OCP violation.</text>
+
+            <!-- Summary -->
+            <rect x="100" y="140" width="520" height="44" rx="8" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+            <text x="360" y="160" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Trade-off: Open for new families, closed for new products.</text>
+            <text x="360" y="176" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Factory Method is the opposite — easy to add product variants, hard to add families.</text>
+          </svg>
+
+          <p>Mitigations when you must add a product:</p>
           <ul class="qa-list">
-            <li><strong><span class="tooltip-trigger">Default interface methods<span class="tooltip-content">C# 8+ feature allowing interfaces to provide method implementations — existing implementing classes aren't forced to add the new method.</span></span> (C# 8+):</strong> <code>IDropdown CreateDropdown() =&gt; new NullDropdown();</code> — existing factories compile without changes</li>
-            <li><strong>Split the interface:</strong> Separate <code>IInputFactory</code> from <code>ILayoutFactory</code></li>
-            <li><strong>Generic create:</strong> <code>T Create&lt;T&gt;() where T : IProduct</code> — but loses compile-time safety</li>
+            <li><strong><span class="tooltip-trigger">Default interface methods<span class="tooltip-content">C# 8+ feature allowing interfaces to provide method implementations — existing implementing classes aren't forced to add the new method.</span></span> (C# 8+):</strong> <code>IDropdown CreateDropdown() =&gt; new NullDropdown();</code> — existing factories compile without changes (but beware: the default might hide missing implementations, as we saw in Bug 3)</li>
+            <li><strong>Split the interface:</strong> Separate <code>IInputFactory</code> from <code>ILayoutFactory</code> — new products go in a new interface</li>
+            <li><strong>Generic create:</strong> <code>T Create&lt;T&gt;() where T : IProduct</code> — but loses compile-time safety for which products each factory supports</li>
           </ul>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Abstract Factory is open for new <em>families</em> (add a class) but closed for new <em>products</em> (interface change). Factory Method is the opposite — this is the key architectural trade-off."</div>
@@ -2714,13 +3412,44 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How do you unit test a <code>Dialog</code> class without real platform controls?</div>
         <div class="body-text">
-          <p>Four approaches:</p>
+          <p>The beauty of Abstract Factory for testing is that you can create a <code>TestFactory</code> that returns lightweight stub products — no real UI, no platform dependencies, no heavy resources. The class under test does not know or care that it received fake products.</p>
+          <p>Four testing approaches:</p>
           <ol class="qa-list">
-            <li><strong>Test double factory:</strong> Create a <code>TestFactory</code> with stub products for unit tests — fast, no platform deps</li>
-            <li><strong>Family consistency tests:</strong> Verify all products from one factory belong to the same family (e.g., all Win products)</li>
+            <li><strong>Test double factory:</strong> Create a <code>TestFactory</code> with stub products — fast, no platform deps</li>
+            <li><strong>Family consistency tests:</strong> Verify all products from one factory belong to the same family</li>
             <li><strong>DI registration tests:</strong> Resolve keyed services and assert correct concrete types</li>
             <li><strong>Integration tests:</strong> <code>WebApplicationFactory</code> replacing production factory with test factory</li>
           </ol>
+        </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FactoryTests.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// 1. Test double factory — lightweight stubs
+public sealed class TestFactory : IUIFactory
+{
+    public IButton CreateButton() => new StubButton();
+    public ICheckbox CreateCheckbox() => new StubCheckbox();
+}
+
+[Fact]
+public void Dialog_Renders_With_Factory_Products()
+{
+    var dialog = new Dialog(new TestFactory()); // No real UI needed
+    dialog.Render();
+    Assert.True(dialog.IsRendered);
+}
+
+// 2. Parameterized family consistency test
+[Theory]
+[InlineData("win")]
+[InlineData("mac")]
+public void All_Products_Are_Non_Null(string key)
+{
+    var factory = _sp.GetRequiredKeyedService&lt;IUIFactory&gt;(key);
+    Assert.NotNull(factory.CreateButton());
+    Assert.NotNull(factory.CreateCheckbox());
+}</code></pre>
+          </div>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I'd write a parameterized test that iterates all registered factory keys, resolves each, creates all products, and verifies type consistency — catches the 'forgot to implement CreateDropdown in LinuxFactory' bug."</div>
       </div></div>
@@ -2748,16 +3477,35 @@ public class AbstractFactoryBenchmarks
         <i class="fa-solid fa-chevron-down qa-chevron"></i>
       </div>
       <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What if macOS has no system tray icon but Windows does? How does the Mac factory handle <code>CreateTrayIcon()</code>?</div>
         <div class="body-text">
-          <p>Four options:</p>
+          <p>Not every product makes sense in every family. Maybe Windows has a system tray icon but macOS does not. Maybe a mobile factory cannot produce a multi-window layout. You need a strategy for "this family does not support this product." There are four options:</p>
           <ol class="qa-list">
-            <li><strong>Null object:</strong> Return a no-op implementation for unsupported products (e.g., <code>NullDropdown</code> that renders nothing)</li>
-            <li><strong>NotSupportedException:</strong> Throw with a clear message — fails fast if misused</li>
-            <li><strong>Split the factory:</strong> Optional products get their own interface — aligns with ISP</li>
-            <li><strong>TryCreate pattern:</strong> <code>bool TryCreateDropdown(out IDropdown? dropdown)</code></li>
+            <li><strong>Null Object:</strong> Return a no-op implementation that does nothing when called. <code>NullTrayIcon</code> silently ignores <code>Show()</code>. Safe when the product is truly optional and skipping it does not break anything.</li>
+            <li><strong>NotSupportedException:</strong> Throw a clear exception. Fails fast if someone calls the unsupported method. Good when mixing is a bug, not a feature.</li>
+            <li><strong>Split the factory (best):</strong> Move optional products into their own interface. <code>ITrayFactory</code> exists only for platforms that support it. Aligns with ISP — clients only depend on what they use.</li>
+            <li><strong>TryCreate pattern:</strong> <code>bool TryCreateTrayIcon(out ITrayIcon? icon)</code> — the caller checks before using.</li>
           </ol>
-          <p>Option 3 is cleanest. Option 1 is pragmatic when null objects are safe. Option 2 is appropriate when mixing is a bug, not a feature.</p>
         </div>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OptionalProducts.cs</span></div>
+          <div class="macos-body">
+<pre><code class="language-csharp">// Option 1: Null Object — safe when product is truly optional
+public sealed class MacFactory : IUIFactory
+{
+    public ITrayIcon CreateTrayIcon() => NullTrayIcon.Instance; // Does nothing
+}
+
+// Option 3: Split interface — cleanest
+public interface IUIFactory { IButton CreateButton(); ICheckbox CreateCheckbox(); }
+public interface ITrayFactory { ITrayIcon CreateTrayIcon(); }
+
+// Windows supports both, macOS only implements IUIFactory
+public sealed class WinFactory : IUIFactory, ITrayFactory { ... }
+public sealed class MacFactory : IUIFactory { ... } // No ITrayFactory</code></pre>
+          </div>
+        </div>
+        <p class="body-text mt-sm">Option 3 (splitting) is the cleanest approach because it makes the capability explicit in the type system. If a class needs a tray icon, it injects <code>ITrayFactory</code> — and only platforms that support it will provide one. No nulls, no exceptions, no surprises.</p>
       </div></div>
     </div>
 
@@ -2793,7 +3541,42 @@ public class AbstractFactoryBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Before .NET 8, how did you register multiple implementations of the same interface?</div>
         <div class="body-text">
-          <p>Keyed services let you register multiple <code>IUIFactory</code> implementations with different keys: <code>AddKeyedSingleton&lt;IUIFactory, WinFactory&gt;("win")</code>. Resolve with <code>[FromKeyedServices("win")]</code> attribute injection or <code>GetRequiredKeyedService&lt;T&gt;(key)</code>.</p>
+          <p>Before .NET 8, registering multiple implementations of the same interface was awkward. You needed workarounds like <code>Func&lt;string, IFactory&gt;</code> delegates or hand-built dictionaries. .NET 8 changed the game with keyed services — the DI container natively supports multiple registrations under different keys.</p>
+
+          <!-- SVG: Before vs After .NET 8 -->
+          <svg viewBox="0 0 720 200" role="img" aria-label="Diagram comparing the old Func workaround with the new keyed services approach in .NET 8" style="width:100%;max-width:720px;margin:1rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="af-q13-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="var(--text-secondary)"/></marker>
+            </defs>
+            <!-- Before -->
+            <rect x="10" y="10" width="340" height="180" rx="8" fill="var(--bg-secondary)" stroke="var(--text-muted)" stroke-width="1" opacity="0.5"/>
+            <text x="180" y="34" text-anchor="middle" fill="var(--text-muted)" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">Before .NET 8</text>
+            <rect x="30" y="50" width="120" height="30" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+            <text x="90" y="70" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Func&lt;string, T&gt;</text>
+            <rect x="30" y="90" width="120" height="30" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+            <text x="90" y="110" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Dictionary&lt;,&gt;</text>
+            <rect x="30" y="130" width="120" height="30" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+            <text x="90" y="150" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Custom Resolver</text>
+            <line x1="150" y1="65" x2="200" y2="100" stroke="var(--text-muted)" stroke-width="1" marker-end="url(#af-q13-arr)"/>
+            <line x1="150" y1="105" x2="200" y2="100" stroke="var(--text-muted)" stroke-width="1" marker-end="url(#af-q13-arr)"/>
+            <line x1="150" y1="145" x2="200" y2="100" stroke="var(--text-muted)" stroke-width="1" marker-end="url(#af-q13-arr)"/>
+            <rect x="200" y="80" width="130" height="40" rx="6" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+            <text x="265" y="104" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">Manual boilerplate</text>
+
+            <!-- After -->
+            <rect x="370" y="10" width="340" height="180" rx="8" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.2" opacity="0.5"/>
+            <text x="540" y="34" text-anchor="middle" fill="var(--accent-primary)" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">.NET 8+ Keyed Services</text>
+            <rect x="420" y="60" width="240" height="40" rx="6" fill="var(--accent-primary)" opacity="0.1" stroke="var(--accent-primary)" stroke-width="1.2"/>
+            <text x="540" y="78" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">DI Container</text>
+            <text x="540" y="93" text-anchor="middle" fill="var(--accent-primary)" font-size="9" font-family="system-ui, -apple-system, sans-serif">"win" → WinFactory | "mac" → MacFactory</text>
+            <rect x="420" y="120" width="110" height="30" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="475" y="140" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">[FromKeyedServices]</text>
+            <rect x="550" y="120" width="110" height="30" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="605" y="140" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-family="system-ui, -apple-system, sans-serif">GetKeyed&lt;T&gt;(key)</text>
+            <text x="540" y="175" text-anchor="middle" fill="var(--accent-primary)" font-size="10" font-weight="600" font-family="system-ui, -apple-system, sans-serif">Zero boilerplate. Native support.</text>
+          </svg>
+
+          <p>Keyed services let you register multiple <code>IUIFactory</code> implementations with different keys. Resolve with <code>[FromKeyedServices("win")]</code> for compile-time keys, or <code>GetRequiredKeyedService&lt;T&gt;(key)</code> for runtime-dynamic keys.</p>
           <p>This eliminates:</p>
           <ul class="qa-list">
             <li>Custom factory resolver classes</li>

@@ -1416,20 +1416,66 @@ public class StubNotification : INotification
       </div>
     </div>
 
-    <p class="body-text mb-md">Real-world bugs caused by LSP violations — each one looked correct in code review but broke in production.</p>
+    <p class="body-text mb-md">Real-world bugs caused by LSP violations. Each one looked perfectly correct during code review, passed all the basic unit tests, and then broke in production. These aren't theoretical examples; they're patterns that come up again and again in real .NET codebases.</p>
 
+    <!-- Bug 1 -->
     <div class="card open">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
-        <i class="fa-solid fa-1 text-red" aria-hidden="true"></i> Bug 1: The Read-Only List That Wasn't
+        <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 1: The Read-Only List That Wasn't
       </h3>
       <div class="card-body">
-        <p class="body-text"><strong>Scenario:</strong> An API endpoint accepted <code>IReadOnlyList&lt;Product&gt;</code> to calculate pricing. A developer passed a <code>List&lt;Product&gt;</code> (which implements <code>IReadOnlyList&lt;T&gt;</code>), but another thread was adding items to the same <code>List</code> concurrently.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Bug1-ReadOnlyList.cs</span>
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>E-commerce pricing service.</strong> The team built a checkout endpoint that calculated order totals. The pricing method accepted an <code>IReadOnlyList&lt;Product&gt;</code> parameter because, logically, a pricing calculation should never modify the product list. Read-only means "hands off," right?</p>
+          <p class="body-text">During development, everything worked. The developer passed in a <code>List&lt;Product&gt;</code> (which implements <code>IReadOnlyList&lt;T&gt;</code>), and the prices came back correct every time. But in production, the application handled many requests at once. One thread calculated pricing while another thread added items to the same shared product list.</p>
+          <p class="body-text">Customers started seeing wrong totals. Sometimes the total was too low (items skipped), sometimes too high (items counted twice), and occasionally the whole request crashed with an <code>IndexOutOfRangeException</code>. The confusing part: the error was intermittent. It only happened under load, making it nearly impossible to reproduce in development.</p>
+          <p class="body-text">The root problem was a subtle misunderstanding. <code>IReadOnlyList&lt;T&gt;</code> is not an immutable collection. It's a read-only <em>view</em> of a collection that might still be mutable underneath. Think of it like a window into a room: just because you can only look through the window doesn't mean nobody inside the room is rearranging furniture. The developer's code trusted that "read-only" meant "can't change," but the actual contract only promises "I won't change it through this particular interface."</p>
+        </div>
+
+        <!-- SVG: ReadOnly vs Immutable -->
+        <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing how IReadOnlyList is just a view while the underlying List is still mutable" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="lsp-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="lsp-b1-rarr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">IReadOnlyList is a VIEW, not a WALL</text>
+
+          <!-- The underlying List -->
+          <rect x="220" y="120" width="280" height="70" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="360" y="150" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">List&lt;Product&gt; (mutable)</text>
+          <text x="360" y="172" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">[Laptop, Phone, Tablet, ...]</text>
+
+          <!-- Thread 1: pricing via IReadOnlyList -->
+          <rect x="20" y="40" width="170" height="60" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="105" y="64" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Thread 1 (Pricing)</text>
+          <text x="105" y="82" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">via IReadOnlyList</text>
+          <line x1="190" y1="70" x2="216" y2="140" stroke="#14b8a6" stroke-width="2" marker-end="url(#lsp-b1-arr)"/>
+          <text x="185" y="110" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10">reads</text>
+
+          <!-- Thread 2: mutating the same list -->
+          <rect x="530" y="40" width="170" height="60" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="615" y="64" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Thread 2 (Loader)</text>
+          <text x="615" y="82" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">via List&lt;T&gt; reference</text>
+          <line x1="530" y1="70" x2="504" y2="140" stroke="#ef4444" stroke-width="2" marker-end="url(#lsp-b1-rarr)"/>
+          <text x="520" y="110" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">mutates!</text>
+
+          <!-- Result -->
+          <rect x="160" y="210" width="400" height="40" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="360" y="235" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12">IndexOutOfRangeException / wrong totals / data corruption</text>
+        </svg>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="lsp-bug1-bad" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="lsp-bug1-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
+          <div class="tab-panel active" id="lsp-bug1-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug1-ReadOnlyList.cs</span>
+              </div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// The pricing method trusts IReadOnlyList — "this collection won't change"
 public decimal CalculateTotal(IReadOnlyList&lt;Product&gt; products)
 {
@@ -1445,175 +1491,490 @@ public decimal CalculateTotal(IReadOnlyList&lt;Product&gt; products)
 // The caller passed a mutable List:
 var products = new List&lt;Product&gt;();
 // Thread 1: CalculateTotal(products);  ← IReadOnlyList reference
-// Thread 2: products.Add(newProduct);  ← Mutating the same list!
-
-// FIX: Snapshot the list before passing it
+// Thread 2: products.Add(newProduct);  ← Mutating the same list!</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>CalculateTotal</code> method looks perfectly safe. It takes an <code>IReadOnlyList</code>, which tells every developer who reads this code: "I'm only reading, not writing." But here's the trap. The caller passes in a regular <code>List&lt;Product&gt;</code>. That list implements <code>IReadOnlyList</code>, so the compiler is happy. But the list is still mutable through the original variable. Thread 1 starts iterating at <code>Count = 5</code>. Midway through the loop, Thread 2 calls <code>products.Add()</code>. Now the internal array might get resized, indices shift, and the loop either reads garbage data, skips items, or crashes with an index out of range.</p>
+          </div>
+          <div class="tab-panel" id="lsp-bug1-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug1-Fix.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// FIX 1: Snapshot the list before passing it — creates a separate copy
 CalculateTotal(products.ToList().AsReadOnly());
-// Or use ImmutableList&lt;T&gt; which is truly immutable</code></pre>
+
+// FIX 2 (better): Use ImmutableList — truly immutable, thread-safe by design
+using System.Collections.Immutable;
+
+var products = ImmutableList&lt;Product&gt;.Empty
+    .Add(laptop)
+    .Add(phone);
+
+// Even if another thread "adds" to this, it creates a NEW list
+// The original never changes — pricing is always consistent
+CalculateTotal(products);</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The first fix takes a snapshot. Calling <code>.ToList()</code> creates a brand-new copy of the list at that moment in time, and <code>.AsReadOnly()</code> wraps it so nobody can mutate the copy either. Thread 2 can keep adding to the original list all it wants; the pricing method has its own private copy. The second fix is even better: <code>ImmutableList&lt;T&gt;</code> never changes, period. If someone "adds" to it, they get a new list object. The original stays frozen. This makes the guarantee structural, not just a convention.</p>
           </div>
         </div>
-        <div class="callout callout-danger mt-sm">
-          <div class="callout-title"><i class="fa-solid fa-skull-crossbones"></i> Root Cause</div>
-          <p class="body-text"><code>IReadOnlyList&lt;T&gt;</code> is a <strong>read-only view</strong>, not an <strong>immutable collection</strong>. The underlying <code>List&lt;T&gt;</code> is still mutable through other references. The contract was "I won't modify it through THIS interface," not "it CAN'T be modified." LSP technically holds (the interface doesn't promise immutability), but the developer's <em>expectation</em> was violated.</p>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for methods that accept <code>IReadOnlyList&lt;T&gt;</code> or <code>IReadOnlyCollection&lt;T&gt;</code> but are called with regular <code>List&lt;T&gt;</code> arguments, especially in multi-threaded contexts (controllers, background services, parallel loops). If you see a mutable list being shared between threads, even through a read-only interface, you've found this bug.</p>
         </div>
       </div>
     </div>
 
+    <!-- Bug 2 -->
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-2 text-red" aria-hidden="true"></i> Bug 2: The Repository That Returned Tracked Entities
+        <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 2: The Repository That Returned Tracked Entities
       </h3>
       <div class="card-body">
-        <p class="body-text"><strong>Scenario:</strong> A <code>CachedOrderRepository</code> decorator returned cached <code>Order</code> objects. But these were EF Core <span class="tooltip-trigger">tracked entities<span class="tooltip-content">EF Core's change tracker monitors entities loaded from the database. If you modify a tracked entity and call SaveChanges(), the changes are persisted automatically. Returning tracked entities from a cache means multiple callers share the same object reference — one caller's changes affect everyone.</span></span> — modifying them in one request affected all subsequent requests.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Bug2-TrackedEntities.cs</span>
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>Order management API.</strong> The team wrapped their <code>IOrderRepository</code> with a caching decorator to speed up reads. The idea was simple: first request loads from the database, every request after that gets it from an in-memory dictionary. The decorator implemented the same interface, so it was a clean drop-in replacement.</p>
+          <p class="body-text">For the first few days, everything looked great. Response times dropped from 50ms to 1ms. But then the support team started getting strange reports: customers said their orders showed incorrect statuses. One customer's order showed "Shipped" even though it was just placed. Another customer's discount was being applied to orders from completely different accounts.</p>
+          <p class="body-text">The problem was that the cache stored <em>object references</em>, not copies. When Request 1 fetched Order #42 and changed its status to "Shipped," it was mutating the exact same object sitting in the cache. Request 2 fetched Order #42 and got the already-mutated version. Worse, because these were EF Core tracked entities, some of these accidental mutations got persisted to the database on the next <code>SaveChanges()</code> call.</p>
+          <p class="body-text">The <code>IOrderRepository</code> contract implicitly promises: "each call gives you your own copy to work with." The original SQL-based repository honored this because every database query returns fresh objects. But the caching decorator broke that contract by sharing the same object between every caller.</p>
+        </div>
+
+        <!-- SVG: Shared reference problem -->
+        <svg viewBox="0 0 720 240" role="img" aria-label="Diagram showing how cached objects are shared references, so one caller's mutation affects all callers" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="lsp-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="lsp-b2-rarr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Cache returns the SAME object, not a copy</text>
+
+          <!-- Cache box -->
+          <rect x="250" y="50" width="220" height="60" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="360" y="75" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">Cache Dictionary</text>
+          <text x="360" y="97" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">[42] = Order { Status = "New" }</text>
+
+          <!-- Request 1 -->
+          <rect x="30" y="150" width="200" height="70" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="130" y="175" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Request 1</text>
+          <text x="130" y="195" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Sets Status = "Shipped"</text>
+          <text x="130" y="210" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Mutates the cached object!</text>
+
+          <!-- Request 2 -->
+          <rect x="490" y="150" width="200" height="70" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="590" y="175" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Request 2</text>
+          <text x="590" y="195" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Gets Order #42</text>
+          <text x="590" y="210" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Sees "Shipped" (wrong!)</text>
+
+          <line x1="300" y1="110" x2="160" y2="148" stroke="#ef4444" stroke-width="2" marker-end="url(#lsp-b2-rarr)"/>
+          <line x1="420" y1="110" x2="560" y2="148" stroke="#14b8a6" stroke-width="2" marker-end="url(#lsp-b2-arr)"/>
+          <text x="210" y="128" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">same ref</text>
+          <text x="480" y="128" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10">same ref</text>
+        </svg>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="lsp-bug2-bad" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="lsp-bug2-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// The caching decorator violated LSP by returning shared mutable references
-public class CachedOrderRepository : IOrderRepository
+          <div class="tab-panel active" id="lsp-bug2-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug2-CachedRepo.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public class CachedOrderRepository : IOrderRepository
 {
     private readonly ConcurrentDictionary&lt;int, Order&gt; _cache = new();
     private readonly IOrderRepository _inner;
 
     public async Task&lt;Order?&gt; GetByIdAsync(int id)
     {
+        // ❌ Returns the SAME object reference every time
         return _cache.GetOrAdd(id, _ =&gt; _inner.GetByIdAsync(id).Result);
-        // Returns the SAME object reference every time!
     }
 }
 
-// Request 1: Gets order, sets order.Status = "Shipped"
-// Request 2: Gets "same" order — Status is already "Shipped"!
-// The cache returned a shared reference, not a copy.
-
-// FIX: Return deep copies or use AsNoTracking()
-public async Task&lt;Order?&gt; GetByIdAsync(int id)
-{
-    if (_cache.TryGetValue(id, out var cached))
-        return cached.DeepCopy();  // New instance every time
-
-    var order = await _inner.GetByIdAsync(id);
-    if (order != null) _cache[id] = order.DeepCopy();
-    return order;
-}</code></pre>
+// Request 1: var order = await repo.GetByIdAsync(42);
+//            order.Status = "Shipped";  ← mutates the cached object!
+// Request 2: var order = await repo.GetByIdAsync(42);
+//            order.Status is already "Shipped" — wrong!</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>GetOrAdd</code> call either returns an existing cached object or loads one from the database and caches it. The critical word here is "returns." It returns a <em>reference</em> to the object, not a copy. So when Request 1 gets Order #42 and changes its <code>Status</code> property, it's changing the one and only Order #42 object that's sitting in the cache dictionary. Every future caller who asks for Order #42 gets that same mutated object. The original database repository would return a fresh object per query, so callers never interfered with each other. This caching decorator silently broke that isolation.</p>
           </div>
+          <div class="tab-panel" id="lsp-bug2-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug2-Fix.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">public class CachedOrderRepository : IOrderRepository
+{
+    private readonly ConcurrentDictionary&lt;int, Order&gt; _cache = new();
+    private readonly IOrderRepository _inner;
+
+    public async Task&lt;Order?&gt; GetByIdAsync(int id)
+    {
+        if (_cache.TryGetValue(id, out var cached))
+            return cached.DeepCopy();  // ✅ New instance every time
+
+        var order = await _inner.GetByIdAsync(id);
+        if (order != null)
+            _cache[id] = order.DeepCopy();  // ✅ Cache a copy, not the original
+        return order;
+    }
+}
+
+// Alternative: use AsNoTracking() in the inner repo
+// so EF Core doesn't track the entities at all
+public async Task&lt;Order?&gt; GetByIdAsync(int id) =&gt;
+    await _context.Orders.AsNoTracking().FirstOrDefaultAsync(o =&gt; o.Id == id);</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The key change is returning a <em>deep copy</em> from the cache instead of the cached object itself. Each caller gets their own private copy. If Request 1 sets <code>Status = "Shipped"</code>, it only affects its own copy. The cache still holds the original, untouched version. The alternative approach using <code>AsNoTracking()</code> prevents EF Core from tracking the entity, so even if someone accidentally mutates the object, those changes won't get persisted to the database.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for any <code>ConcurrentDictionary</code> or <code>MemoryCache</code> that stores mutable objects (especially EF Core entities). If a cached object is returned directly to callers without cloning, and those callers modify the object, you have this bug. Also watch for decorator/wrapper repositories that claim to be drop-in replacements for the original.</p>
         </div>
       </div>
     </div>
 
+    <!-- Bug 3 -->
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-3 text-red" aria-hidden="true"></i> Bug 3: The Discount Calculator That Went Negative
+        <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 3: The Discount Calculator That Went Negative
       </h3>
       <div class="card-body">
-        <p class="body-text"><strong>Scenario:</strong> An <code>IDiscountCalculator</code> interface promised "returns a discount between 0% and 100%." A new <code>LoyaltyDiscount</code> implementation calculated negative discounts (surcharges) for inactive customers — valid business logic, but it broke the <span class="tooltip-trigger">postcondition<span class="tooltip-content">The guarantee that the returned discount is between 0% and 100%. Negative values mean the customer pays MORE than the listed price — a surcharge, not a discount. The contract said "discount" which implies a reduction.</span></span>.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Bug3-NegativeDiscount.cs</span>
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>E-commerce checkout service.</strong> The team had a clean interface: <code>IDiscountCalculator</code> with one method that returns a discount percentage between 0% and 100%. Several implementations existed already (volume discounts, seasonal discounts, coupon codes), and they all worked perfectly.</p>
+          <p class="body-text">Then a product manager asked for a "loyalty discount" based on how long a customer had been a member. A developer wrote a simple formula: <code>(years - 2) * 5%</code>. Members for 5+ years got up to 15% off. Sounds reasonable, and the formula is simple. But nobody caught the edge case: brand-new customers with 0 years of membership got <code>(0 - 2) * 5% = -10%</code>. A <em>negative</em> discount.</p>
+          <p class="body-text">The checkout code trusted the contract: <code>finalPrice = total * (1 - discount)</code>. With a -10% discount, the formula became <code>total * 1.10</code>. Customers were being charged 10% <em>more</em> than the listed price. The bug went unnoticed for two days because the team only tested with long-time customers during development. It took a flood of support tickets from new signups to uncover it.</p>
+          <p class="body-text">This is a classic <span class="tooltip-trigger">postcondition<span class="tooltip-content">A postcondition is a guarantee about what a method will return or what state will be true after the method finishes. Here, the contract promises the return value is between 0.0 and 1.0. Any implementation that returns values outside this range has violated the postcondition.</span></span> violation. The interface said "returns a value between 0 and 1." The new implementation returned values outside that range. Every caller that trusted the contract got burned.</p>
+        </div>
+
+        <!-- SVG: Postcondition violation -->
+        <svg viewBox="0 0 720 220" role="img" aria-label="Diagram showing how a negative discount violates the postcondition and causes the price to increase" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="lsp-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          </defs>
+          <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Postcondition: discount must be 0.0 to 1.0</text>
+
+          <!-- Valid range bar -->
+          <rect x="100" y="55" width="520" height="30" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+          <rect x="100" y="55" width="520" height="30" rx="6" fill="#14b8a620"/>
+          <text x="360" y="75" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Valid Range: 0.0 to 1.0</text>
+          <text x="95" y="75" text-anchor="end" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">0.0</text>
+          <text x="625" y="75" text-anchor="start" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">1.0</text>
+
+          <!-- VolumeDiscount (valid) -->
+          <circle cx="200" cy="120" r="6" fill="#14b8a6"/>
+          <text x="200" y="145" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11">VolumeDiscount</text>
+          <text x="200" y="160" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">returns 0.10</text>
+
+          <!-- SeasonalDiscount (valid) -->
+          <circle cx="400" cy="120" r="6" fill="#14b8a6"/>
+          <text x="400" y="145" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11">SeasonalDiscount</text>
+          <text x="400" y="160" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">returns 0.20</text>
+
+          <!-- LoyaltyDiscount (VIOLATION) -->
+          <circle cx="50" cy="120" r="8" fill="#ef4444"/>
+          <text x="50" y="145" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">LoyaltyDiscount</text>
+          <text x="50" y="160" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">returns -0.10</text>
+
+          <!-- Violation arrow -->
+          <line x1="50" y1="168" x2="50" y2="200" stroke="#ef4444" stroke-width="2" marker-end="url(#lsp-b3-arr)"/>
+          <text x="50" y="218" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">OUTSIDE RANGE</text>
+
+          <!-- Danger zone marker -->
+          <rect x="20" y="55" width="80" height="30" rx="6" fill="#ef444420" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,2"/>
+        </svg>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="lsp-bug3-bad" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="lsp-bug3-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
+          <div class="tab-panel active" id="lsp-bug3-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug3-NegativeDiscount.cs</span>
+              </div>
+              <div class="macos-body">
 <pre><code class="language-csharp">public interface IDiscountCalculator
 {
     /// &lt;summary&gt;Returns discount as a percentage (0.0 to 1.0).&lt;/summary&gt;
     decimal CalculateDiscount(Order order, Customer customer);
 }
 
-// ✓ Follows contract
+// ✓ VolumeDiscount follows the contract
 public class VolumeDiscount : IDiscountCalculator
 {
     public decimal CalculateDiscount(Order order, Customer customer) =&gt;
         order.Total &gt; 1000 ? 0.1m : 0m;  // 0% to 10% — always in range
 }
 
-// ✗ Violates postcondition — returns negative value
+// ✗ LoyaltyDiscount violates postcondition
 public class LoyaltyDiscount : IDiscountCalculator
 {
     public decimal CalculateDiscount(Order order, Customer customer)
     {
         var years = customer.MemberSince.YearsSince();
         return years &gt; 5 ? 0.15m : (years - 2) * 0.05m;
-        // New customer (0 years): (0-2) * 0.05 = -0.10 ← NEGATIVE DISCOUNT!
+        // New customer (0 years): (0-2) * 0.05 = -0.10 ← NEGATIVE!
     }
 }
 
 // Caller trusts the contract:
-var finalPrice = order.Total * (1 - discount);  // Negative discount → price INCREASES!
-// Customer sees a price HIGHER than listed — support tickets flood in</code></pre>
+var finalPrice = order.Total * (1 - discount);
+// With discount = -0.10: finalPrice = total * 1.10
+// Customer is charged MORE than listed price!</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The interface XML comment clearly says "returns a percentage between 0.0 and 1.0." The <code>VolumeDiscount</code> obeys this: it returns either 0 or 0.1, always in range. But look at the <code>LoyaltyDiscount</code> formula. For a customer who joined 3 years ago: <code>(3 - 2) * 0.05 = 0.05</code>. Fine. For a 1-year customer: <code>(1 - 2) * 0.05 = -0.05</code>. That's a negative number. The checkout code does <code>total * (1 - discount)</code>, so a negative discount flips the subtraction into addition, increasing the price. The developer was thinking about the math of loyalty tiers and forgot about the contract boundaries.</p>
           </div>
+          <div class="tab-panel" id="lsp-bug3-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug3-Fix.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// FIX 1: Clamp the result to honor the postcondition
+public class LoyaltyDiscount : IDiscountCalculator
+{
+    public decimal CalculateDiscount(Order order, Customer customer)
+    {
+        var years = customer.MemberSince.YearsSince();
+        var raw = years &gt; 5 ? 0.15m : (years - 2) * 0.05m;
+        return Math.Clamp(raw, 0m, 1m);  // ✅ Always within 0.0–1.0
+    }
+}
+
+// FIX 2 (better): Enforce the contract at the interface level
+public abstract class DiscountCalculatorBase : IDiscountCalculator
+{
+    public decimal CalculateDiscount(Order order, Customer customer)
+    {
+        var discount = CalculateRawDiscount(order, customer);
+        if (discount &lt; 0m || discount &gt; 1m)
+            throw new InvalidOperationException(
+                $"Discount {discount} out of valid range [0, 1]");
+        return discount;
+    }
+
+    protected abstract decimal CalculateRawDiscount(
+        Order order, Customer customer);
+}</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The first fix is simple: <code>Math.Clamp</code> ensures the result never goes below 0 or above 1, no matter what the formula produces. The second fix is more robust: it creates a base class that enforces the postcondition for all implementations. Each subclass only needs to override <code>CalculateRawDiscount</code>, and the base class validates the result before returning it. If any implementation returns an out-of-range value, the system catches it immediately instead of silently charging customers the wrong price.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for interface methods with documented ranges (percentages, scores, ratings) and check whether every implementation actually honors those ranges for all possible inputs. Pay special attention to formulas with subtraction or division, which can produce unexpected negative or infinite values. If an interface says "returns 0 to 100," write a test that throws random data at every implementation and asserts the result is within bounds.</p>
         </div>
       </div>
     </div>
 
+    <!-- Bug 4 -->
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-4 text-red" aria-hidden="true"></i> Bug 4: The Logger That Blocked the Thread
+        <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 4: The Logger That Blocked the Thread
       </h3>
       <div class="card-body">
-        <p class="body-text"><strong>Scenario:</strong> <code>ILogger.Log()</code> is expected to be fast and non-blocking. A new <code>DatabaseLogger</code> implementation wrote logs synchronously to a database, blocking the calling thread for 50-200ms per log call. In a hot loop with 1000 log calls, the application became unresponsive.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Bug4-BlockingLogger.cs</span>
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>High-traffic API service.</strong> The team used <code>ILogger</code> throughout their codebase, as every .NET application does. Originally they logged to the console, and everything was fast. Then a manager asked for logs to go to a database for easier querying. A developer created a <code>DatabaseLogger</code> that implemented <code>ILogger</code> and registered it in the DI container.</p>
+          <p class="body-text">In development, the logger worked fine. Requests came in one at a time, each with maybe 5-10 log calls. The database inserts took 30-50ms each, but nobody noticed. Then they deployed to production, where the service handled hundreds of concurrent requests. Each request logged 20-30 messages throughout its lifecycle (entry, validation, business logic, exit).</p>
+          <p class="body-text">Within an hour, the service ground to a halt. Response times shot from 200ms to 15 seconds. The database connection pool was exhausted. Timeouts cascaded through the system. The CPU was barely used, but the threads were all blocked, waiting for database round-trips to complete.</p>
+          <p class="body-text">The <code>ILogger.Log()</code> method has an implicit performance contract: it should be fast and non-blocking. Logging is a cross-cutting concern that gets called everywhere, often in tight loops. The <code>ConsoleLogger</code> honored this (writing to stdout takes microseconds). The <code>DatabaseLogger</code> violated it by making a synchronous network call on every log invocation. Same interface, dramatically different performance characteristics. This is an LSP violation through <em>implicit</em> postconditions that aren't written in code but are essential to the system's behavior.</p>
+        </div>
+
+        <!-- SVG: Performance contract violation -->
+        <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing how ConsoleLogger takes microseconds per call while DatabaseLogger takes 50ms, blocking the thread" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="lsp-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+          </defs>
+          <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Implicit Contract: Log() must be fast</text>
+
+          <!-- Timeline bars -->
+          <text x="30" y="65" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">ConsoleLogger</text>
+          <rect x="160" y="50" width="3" height="25" rx="2" fill="#14b8a6"/>
+          <text x="175" y="67" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">0.01ms</text>
+
+          <text x="30" y="115" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">DatabaseLogger</text>
+          <rect x="160" y="100" width="300" height="25" rx="2" fill="#ef4444"/>
+          <text x="475" y="117" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">50ms (5000x slower!)</text>
+          <text x="200" y="117" fill="#1e293b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">conn.Open()</text>
+          <text x="340" y="117" fill="#1e293b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">ExecuteNonQuery()</text>
+
+          <!-- Impact -->
+          <text x="30" y="160" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Hot path (30 logs)</text>
+          <rect x="160" y="145" width="540" height="25" rx="2" fill="#ef444440" stroke="#ef4444" stroke-width="1"/>
+          <text x="430" y="162" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold">30 x 50ms = 1500ms blocked per request!</text>
+        </svg>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="lsp-bug4-bad" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="lsp-bug4-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
-<pre><code class="language-csharp">// ILogger.Log() — implicit contract: fast, non-blocking, fire-and-forget
+          <div class="tab-panel active" id="lsp-bug4-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug4-BlockingLogger.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ConsoleLogger — honors the implicit performance contract
 public class ConsoleLogger : ILogger
 {
     public void Log&lt;TState&gt;(LogLevel level, EventId id, TState state,
         Exception? ex, Func&lt;TState, Exception?, string&gt; formatter)
     {
-        Console.WriteLine(formatter(state, ex));  // ~0.01ms — fine
+        Console.WriteLine(formatter(state, ex));  // ~0.01ms
     }
 }
 
-// ✗ Violates implicit performance postcondition
+// ✗ DatabaseLogger — violates implicit performance postcondition
 public class DatabaseLogger : ILogger
 {
     public void Log&lt;TState&gt;(LogLevel level, EventId id, TState state,
         Exception? ex, Func&lt;TState, Exception?, string&gt; formatter)
     {
         using var conn = new SqlConnection(_connStr);
-        conn.Open();  // BLOCKING — 20-50ms network round trip
+        conn.Open();                    // BLOCKING — 20-50ms
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "INSERT INTO Logs VALUES (@msg, @level, @time)";
         cmd.Parameters.AddWithValue("@msg", formatter(state, ex));
         cmd.Parameters.AddWithValue("@level", level.ToString());
         cmd.Parameters.AddWithValue("@time", DateTime.UtcNow);
-        cmd.ExecuteNonQuery();  // Another 10-30ms — BLOCKING!
+        cmd.ExecuteNonQuery();          // Another 10-30ms — BLOCKING
     }
-}
-
-// FIX: Use a background channel for non-blocking logging
+}</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at the <code>ConsoleLogger</code> first. It calls <code>Console.WriteLine</code> and returns. Takes about 0.01 milliseconds. Code that uses <code>ILogger</code> assumes this kind of speed. Now look at <code>DatabaseLogger</code>. Every single log call opens a new database connection (20-50ms network round-trip), then executes an INSERT query (another 10-30ms). That's 30-80ms of blocking I/O on every log call. In a request handler that logs 30 times, that's up to 2.4 seconds spent just on logging. The method signature is identical, but the performance characteristics are completely different.</p>
+          </div>
+          <div class="tab-panel" id="lsp-bug4-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug4-Fix.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ BufferedDatabaseLogger — non-blocking write to a channel
 public class BufferedDatabaseLogger : ILogger
 {
-    private readonly Channel&lt;LogEntry&gt; _channel = Channel.CreateBounded&lt;LogEntry&gt;(10_000);
+    private readonly Channel&lt;LogEntry&gt; _channel =
+        Channel.CreateBounded&lt;LogEntry&gt;(10_000);
 
-    public void Log&lt;TState&gt;(/* params */)
+    public void Log&lt;TState&gt;(LogLevel level, EventId id, TState state,
+        Exception? ex, Func&lt;TState, Exception?, string&gt; formatter)
     {
-        _channel.Writer.TryWrite(new LogEntry(/* ... */));  // ~0.001ms — non-blocking
+        // Non-blocking — just drops the entry into an in-memory queue
+        _channel.Writer.TryWrite(new LogEntry
+        {
+            Message = formatter(state, ex),
+            Level = level,
+            Timestamp = DateTime.UtcNow
+        });  // ~0.001ms — as fast as ConsoleLogger
     }
-    // Background task reads from channel and batch-writes to DB
+
+    // A background task reads from the channel and batch-inserts
+    public async Task ProcessLogsAsync(CancellationToken ct)
+    {
+        await foreach (var batch in _channel.Reader.ReadAllAsync(ct).Chunk(100))
+        {
+            await BulkInsertAsync(batch);  // One DB call per 100 logs
+        }
+    }
 }</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The buffered logger separates the "accept the log entry" step from the "write it to the database" step. When your code calls <code>Log()</code>, all it does is drop a small object into an in-memory channel. That takes microseconds, just like the console logger. The expensive database work happens in a separate background task that reads from the channel and batch-inserts entries. This means the calling thread is never blocked, the performance contract is honored, and you still get database persistence.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Watch for interface implementations that add I/O operations (database calls, HTTP requests, file writes) where the original implementations were in-memory or trivially fast. If you're replacing a fast implementation with a slow one through DI, you've probably violated an implicit performance contract. Profile the hot paths and check if any "lightweight" interfaces suddenly have heavyweight implementations.</p>
         </div>
       </div>
     </div>
 
+    <!-- Bug 5 -->
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-5 text-red" aria-hidden="true"></i> Bug 5: The Comparer That Wasn't Transitive
+        <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 5: The Comparer That Wasn't Transitive
       </h3>
       <div class="card-body">
-        <p class="body-text"><strong>Scenario:</strong> A custom <code>IComparer&lt;Product&gt;</code> compared products by price but treated products within $1 of each other as "equal." This broke <span class="tooltip-trigger">transitivity<span class="tooltip-content">Transitivity: if A = B and B = C, then A = C. A comparer that says $10 = $10.50 and $10.50 = $11 but $10 ≠ $11 is not transitive. This causes sorting algorithms (like .NET's Array.Sort) to produce incorrect or even infinite-loop results.</span></span> — <code>$10 ≈ $10.50 ≈ $11</code> but <code>$10 ≠ $11</code>. <code>List.Sort()</code> produced inconsistent orderings.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Bug5-NonTransitive.cs</span>
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>Product catalog service.</strong> The team needed to sort products by price, but with a twist: products within $1 of each other should be considered "the same price" for display purposes. A developer wrote a custom <code>IComparer&lt;Product&gt;</code> that returned 0 (meaning "equal") when the price difference was less than $1.</p>
+          <p class="body-text">In manual testing with small datasets, the sorting looked fine. But in production with thousands of products, the sort produced inconsistent orderings. Sometimes Product A appeared before Product B, and sometimes B appeared before A, depending on the initial order of the list. Occasionally, <code>List.Sort()</code> threw an <code>InvalidOperationException</code> with the message "Failed to compare two elements in the array."</p>
+          <p class="body-text">The problem was a violation of <span class="tooltip-trigger">transitivity<span class="tooltip-content">Transitivity is a mathematical rule: if A equals B and B equals C, then A must equal C. Sorting algorithms rely on this rule to work correctly. If your comparer says $10 = $10.50 and $10.50 = $11 but $10 is NOT equal to $11, the algorithm gets confused because the "equals" relationship is contradictory.</span></span>. The comparer said $10.00 was "equal" to $10.50, and $10.50 was "equal" to $11.00, but $10.00 was NOT equal to $11.00. This is like saying "Alice is the same height as Bob, and Bob is the same height as Carol, but Alice is shorter than Carol." That's a logical contradiction, and sorting algorithms break when they encounter it.</p>
+          <p class="body-text">.NET's sorting algorithm (a modified QuickSort) assumes the comparer follows strict mathematical rules. When those rules are violated, the algorithm can enter inconsistent states: it might infinite-loop, produce wrong orderings, or throw an exception. The <code>IComparer&lt;T&gt;</code> contract demands transitivity, and the fuzzy comparer broke it.</p>
+        </div>
+
+        <!-- SVG: Transitivity violation -->
+        <svg viewBox="0 0 720 200" role="img" aria-label="Diagram showing how the fuzzy comparer breaks transitivity: A=B and B=C but A is not equal to C" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="lsp-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="lsp-b5-rarr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Transitivity: if A = B and B = C, then A must = C</text>
+
+          <!-- Three products -->
+          <circle cx="160" cy="100" r="40" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="160" y="95" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">A</text>
+          <text x="160" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">$10.00</text>
+
+          <circle cx="360" cy="100" r="40" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="360" y="95" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">B</text>
+          <text x="360" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">$10.50</text>
+
+          <circle cx="560" cy="100" r="40" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="560" y="95" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">C</text>
+          <text x="560" y="112" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">$11.00</text>
+
+          <!-- A = B (diff $0.50 < $1) -->
+          <line x1="200" y1="85" x2="320" y2="85" stroke="#14b8a6" stroke-width="2"/>
+          <text x="260" y="78" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">= (diff $0.50)</text>
+
+          <!-- B = C (diff $0.50 < $1) -->
+          <line x1="400" y1="85" x2="520" y2="85" stroke="#14b8a6" stroke-width="2"/>
+          <text x="460" y="78" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">= (diff $0.50)</text>
+
+          <!-- A ≠ C (diff $1.00 >= $1) — BROKEN! -->
+          <path d="M 180 140 Q 360 210 540 140" stroke="#ef4444" stroke-width="2.5" fill="none" stroke-dasharray="6,4"/>
+          <text x="360" y="195" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">A &lt; C (diff $1.00) -- CONTRADICTION!</text>
+        </svg>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="lsp-bug5-bad" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="lsp-bug5-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
+          <div class="tab-panel active" id="lsp-bug5-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug5-FuzzyComparer.cs</span>
+              </div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✗ Violates IComparer&lt;T&gt; contract — not transitive
 public class FuzzyPriceComparer : IComparer&lt;Product&gt;
 {
@@ -1627,12 +1988,22 @@ public class FuzzyPriceComparer : IComparer&lt;Product&gt;
 }
 
 // A=$10, B=$10.50, C=$11
-// Compare(A,B) = 0 (equal — diff is 0.50)
-// Compare(B,C) = 0 (equal — diff is 0.50)
-// Compare(A,C) = -1 (A &lt; C — diff is 1.00)
-// INCONSISTENT! List.Sort() may crash or produce wrong results.
-
-// FIX: Round to buckets if you need "fuzzy" equality
+// Compare(A,B) = 0 (equal — diff is $0.50)
+// Compare(B,C) = 0 (equal — diff is $0.50)
+// Compare(A,C) = -1 (A &lt; C — diff is $1.00)
+// INCONSISTENT! Sort() may crash or produce wrong results.</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The comparer checks whether the price difference is less than $1.00. If so, it says "these two are equal." The problem is that "close enough" doesn't chain properly. Product A ($10.00) is close enough to B ($10.50), and B is close enough to C ($11.00), but A is NOT close enough to C. The sorting algorithm assumes that if it already determined A=B and B=C, it doesn't need to re-check A vs C. But when it eventually does compare A and C (because sorting involves many pair comparisons), it gets a contradictory answer. At that point, the algorithm's internal state is corrupted.</p>
+          </div>
+          <div class="tab-panel" id="lsp-bug5-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug5-Fix.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// ✅ FIX: Round to price buckets — transitive by design
 public class BucketPriceComparer : IComparer&lt;Product&gt;
 {
     public int Compare(Product? x, Product? y)
@@ -1640,38 +2011,99 @@ public class BucketPriceComparer : IComparer&lt;Product&gt;
         if (x is null &amp;&amp; y is null) return 0;
         if (x is null) return -1;
         if (y is null) return 1;
-        var bucketX = Math.Round(x.Price);  // $10.50 → $11
+
+        // Round to nearest dollar: $10.50 → $11, $10.49 → $10
+        var bucketX = Math.Round(x.Price);
         var bucketY = Math.Round(y.Price);
         return bucketX.CompareTo(bucketY);  // Transitive!
     }
-}</code></pre>
+}
+
+// Now: A=$10→bucket $10, B=$10.50→bucket $11, C=$11→bucket $11
+// Compare(A,B) = -1 (A &lt; B) — consistent
+// Compare(B,C) = 0  (B = C) — consistent
+// Compare(A,C) = -1 (A &lt; C) — consistent!
+// Transitivity is preserved.</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of using fuzzy "close enough" comparison, the fix snaps each price to a bucket (the nearest whole dollar). Two items in the same bucket are truly equal, and items in different buckets have a clear ordering. This is transitive because bucket assignment is deterministic: $10.50 always rounds to $11, no matter what other items exist. There's no "sliding window" of closeness. The comparer now satisfies all three mathematical properties that <code>IComparer&lt;T&gt;</code> demands: reflexivity, antisymmetry, and transitivity.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Any custom <code>IComparer&lt;T&gt;</code> or <code>IEqualityComparer&lt;T&gt;</code> that uses a "tolerance" or "close enough" comparison is suspect. If your comparer returns 0 (equal) for items within some threshold, check whether three items at evenly spaced distances could break transitivity. The simplest test: pick three values A, B, C where A is "close to" B and B is "close to" C but A is not "close to" C. If such values exist, your comparer is broken.</p>
         </div>
       </div>
     </div>
 
+    <!-- Bug 6 -->
     <div class="card">
       <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-        <i class="fa-solid fa-6 text-red" aria-hidden="true"></i> Bug 6: The Equality Override That Broke Dictionary
+        <i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> Bug 6: The Equality Override That Broke Dictionary
       </h3>
       <div class="card-body">
-        <p class="body-text"><strong>Scenario:</strong> A developer overrode <code>Equals()</code> on an entity to compare by business key (email) instead of ID. But <code>GetHashCode()</code> still used the ID. This broke <code>Dictionary&lt;TKey, TValue&gt;</code> and <code>HashSet&lt;T&gt;</code> lookups because <span class="tooltip-trigger">hash code consistency<span class="tooltip-content">The .NET contract: if two objects are Equal, they MUST have the same hash code. If Equals() uses email but GetHashCode() uses ID, two objects with the same email but different IDs will be "equal" but have different hash codes. This breaks hash-based collections — you can add the "same" item twice, or fail to find it.</span></span> was violated.</p>
-        <div class="macos-window mt-sm">
-          <div class="macos-titlebar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-            <span class="macos-filename">Bug6-EqualityHashCode.cs</span>
+        <div class="callout callout-danger">
+          <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
+          <p class="body-text"><strong>User management service.</strong> A developer needed to deduplicate users by email address. They overrode <code>Equals()</code> on the <code>User</code> class to compare by email instead of by the default reference equality. So two <code>User</code> objects with the same email would be considered "equal" even if they had different IDs.</p>
+          <p class="body-text">The deduplication logic used a <code>HashSet&lt;User&gt;</code> to filter out duplicates. In testing with a small dataset, it seemed to work. But in production, duplicates kept slipping through. The <code>HashSet</code> was adding users with the same email as if they were different people. Worse, <code>Dictionary&lt;User, List&lt;Order&gt;&gt;</code> lookups were failing: the code would add a user as a key, then try to look them up with a different <code>User</code> object that had the same email but a different ID. The lookup returned nothing.</p>
+          <p class="body-text">The developer had overridden <code>Equals()</code> to use email, but forgot to override <code>GetHashCode()</code>. The default <code>GetHashCode()</code> still used the object's ID (or memory reference). This violates a fundamental contract in .NET: <strong>if two objects are Equal, they must have the same hash code</strong>. Hash-based collections like <code>HashSet</code> and <code>Dictionary</code> check the hash code first to find the right "bucket," and only then call <code>Equals()</code> on items in that bucket. If two equal objects are in different buckets, they'll never be compared.</p>
+          <p class="body-text">Think of it like a filing system. <code>GetHashCode()</code> decides which drawer to put the file in. <code>Equals()</code> checks if two files in the same drawer are the same document. If two copies of the same document end up in different drawers, the system will never realize they're duplicates because it only compares files within the same drawer.</p>
+        </div>
+
+        <!-- SVG: Hash bucket diagram -->
+        <svg viewBox="0 0 720 240" role="img" aria-label="Diagram showing how mismatched Equals and GetHashCode causes objects to land in different buckets, preventing lookup" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+          <defs>
+            <marker id="lsp-b6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            <marker id="lsp-b6-rarr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+          </defs>
+          <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">HashSet Bucket Lookup: Hash Code first, then Equals</text>
+
+          <!-- Bucket 1 -->
+          <rect x="80" y="60" width="200" height="80" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+          <text x="180" y="82" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Bucket #1 (hash=1)</text>
+          <rect x="100" y="95" width="160" height="30" rx="5" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+          <text x="180" y="115" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">User A: Id=1, alice@</text>
+
+          <!-- Bucket 2 -->
+          <rect x="440" y="60" width="200" height="80" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="540" y="82" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Bucket #2 (hash=2)</text>
+          <rect x="460" y="95" width="160" height="30" rx="5" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+          <text x="540" y="115" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">User B: Id=2, alice@</text>
+
+          <!-- Lookup path -->
+          <rect x="200" y="175" width="320" height="45" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="360" y="195" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">set.Contains(userB) = FALSE!</text>
+          <text x="360" y="212" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">B's hash = 2, so it looks in Bucket #2. A is in Bucket #1. Never compared!</text>
+
+          <!-- A.Equals(B) note -->
+          <text x="360" y="52" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">A.Equals(B) = true (same email) but GetHashCode differs (1 vs 2)</text>
+        </svg>
+
+        <div class="tab-container mt-sm">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="lsp-bug6-bad" role="tab" aria-selected="true">Buggy Code</button>
+            <button class="tab-btn" data-tab="lsp-bug6-fix" role="tab" aria-selected="false">Fix</button>
           </div>
-          <div class="macos-body">
+          <div class="tab-panel active" id="lsp-bug6-bad" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug6-Equality.cs</span>
+              </div>
+              <div class="macos-body">
 <pre><code class="language-csharp">public class User
 {
     public int Id { get; set; }
     public string Email { get; set; } = string.Empty;
 
-    // ✗ Equals uses Email, but GetHashCode uses Id — INCONSISTENT!
+    // ✗ Equals uses Email...
     public override bool Equals(object? obj) =&gt;
-        obj is User other &amp;&amp; Email.Equals(other.Email, StringComparison.OrdinalIgnoreCase);
+        obj is User other &amp;&amp;
+        Email.Equals(other.Email, StringComparison.OrdinalIgnoreCase);
 
-    public override int GetHashCode() =&gt; Id.GetHashCode();  // BUG: should use Email
+    // ✗ ...but GetHashCode uses Id — INCONSISTENT!
+    public override int GetHashCode() =&gt; Id.GetHashCode();
 }
 
 // User A: Id=1, Email="alice@test.com"
@@ -1680,13 +2112,45 @@ public class BucketPriceComparer : IComparer&lt;Product&gt;
 // A.GetHashCode() = 1, B.GetHashCode() = 2  ← different buckets!
 
 var set = new HashSet&lt;User&gt; { userA };
-set.Contains(userB);  // FALSE! Even though A.Equals(B) is true!
-// HashSet checks hash code FIRST — different bucket, never calls Equals
-
-// FIX: Always derive hash code from the same fields as Equals
-public override int GetHashCode() =&gt;
-    Email.GetHashCode(StringComparison.OrdinalIgnoreCase);</code></pre>
+set.Contains(userB);  // FALSE! Same email, but different hash bucket</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>Equals</code> method compares by email, so User A (alice@test.com, Id=1) and User B (alice@test.com, Id=2) are considered equal. But <code>GetHashCode</code> still uses the <code>Id</code> field, so A's hash code is 1 and B's hash code is 2. When we add User A to the <code>HashSet</code>, it goes into bucket #1 (based on hash code 1). When we check <code>set.Contains(userB)</code>, the set calculates B's hash code (2), looks in bucket #2, finds it empty, and immediately returns false. It never even calls <code>Equals</code> because the hash codes directed it to the wrong bucket.</p>
           </div>
+          <div class="tab-panel" id="lsp-bug6-fix" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <span class="macos-filename">Bug6-Fix.cs</span>
+              </div>
+              <div class="macos-body">
+<pre><code class="language-csharp">// FIX 1: Override both to use the same fields
+public class User
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+
+    public override bool Equals(object? obj) =&gt;
+        obj is User other &amp;&amp;
+        Email.Equals(other.Email, StringComparison.OrdinalIgnoreCase);
+
+    // ✅ Hash code now uses the same field as Equals
+    public override int GetHashCode() =&gt;
+        Email.GetHashCode(StringComparison.OrdinalIgnoreCase);
+}
+
+// FIX 2 (best): Use a record — auto-generates correct equality
+public record UserRecord(int Id, string Email);
+// Records compare ALL properties and auto-generate matching GetHashCode</code></pre>
+              </div>
+            </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The first fix changes <code>GetHashCode</code> to use the same field as <code>Equals</code>: the email. Now User A and User B both produce the same hash code because they have the same email. They land in the same bucket, <code>Equals</code> is called, and the set correctly identifies them as the same user. The second fix is even better: C# <code>record</code> types automatically generate <code>Equals</code> and <code>GetHashCode</code> from all properties, and they always match. You get correct equality behavior without writing it yourself.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">The C# compiler actually warns about this (CS0659: "class overrides Equals but not GetHashCode"). Make sure this warning is not suppressed. Also search for any class that overrides <code>Equals</code> and check that <code>GetHashCode</code> uses the exact same set of fields. If <code>Equals</code> compares by email but <code>GetHashCode</code> uses Id (or the default), you have this bug. Using <code>record</code> types is the safest path because they make it impossible to get this wrong.</p>
         </div>
       </div>
     </div>
@@ -1702,6 +2166,7 @@ public override int GetHashCode() =&gt;
       </div>
     </div>
 
+    <!-- Pitfall 1 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-1 text-red icon-gap"></i> Inheritance for Code Reuse (Not Behavior)</span>
@@ -1709,15 +2174,60 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Inheriting from a class just to reuse its methods — not because the subtype truly "is-a" base type. A <code>Stack</code> inheriting from <code>List&lt;T&gt;</code> gets <code>Add()</code>, <code>Insert()</code>, <code>RemoveAt()</code> — operations that violate Stack's <span class="tooltip-trigger">LIFO contract<span class="tooltip-content">Last-In-First-Out: a stack only allows Push (add to top) and Pop (remove from top). Inheriting from List exposes Insert-at-index and Remove-at-index, which break the LIFO invariant. Java's Stack class actually makes this mistake — it extends Vector.</span></span>.</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Use <strong><span class="tooltip-trigger">composition<span class="tooltip-content">The "has-a" relationship instead of "is-a". Instead of Stack extending List (inheritance), Stack contains a private List field and only exposes Push/Pop. This way the Stack controls its own public API without inheriting unwanted methods.</span></span></strong>: <code>Stack</code> <em>has-a</em> <code>List&lt;T&gt;</code> internally, but only exposes <code>Push()</code> and <code>Pop()</code>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Inheritance is tempting when you see a class that already has the methods you need. "Why rewrite it? I'll just extend it and get everything for free." That reasoning feels efficient, but it conflates <em>code reuse</em> with <em>behavioral compatibility</em>. Inheritance says "my class IS a kind of that class." If that's not genuinely true in terms of behavior, you'll inherit methods that don't make sense for your type.</p>
+          <p class="body-text">The classic example: making a <code>Stack</code> inherit from <code>List&lt;T&gt;</code>. You get <code>Push</code> and <code>Pop</code> for free (sort of), but you also inherit <code>Insert()</code>, <code>RemoveAt()</code>, and <code>Add()</code>. Those operations let someone stick items in the middle of the stack or remove from arbitrary positions. That completely breaks the <span class="tooltip-trigger">LIFO contract<span class="tooltip-content">Last-In-First-Out: a stack only allows Push (add to top) and Pop (remove from top). Inheriting from List exposes Insert-at-index and Remove-at-index, which break the LIFO invariant. Java's Stack class actually makes this mistake — it extends Vector.</span></span>. A user who treats your Stack as a List will use it in ways your Stack never intended.</p>
+          <p class="body-text">Java made this exact mistake: <code>java.util.Stack</code> extends <code>Vector</code>. Any code that holds a <code>Vector</code> reference to a <code>Stack</code> can call <code>insertElementAt()</code> and break the LIFO ordering. This has been a well-known design flaw since the 1990s.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadInheritance.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Stack inherits from List — exposes operations that break LIFO
+public class MyStack&lt;T&gt; : List&lt;T&gt;
+{
+    public void Push(T item) =&gt; Add(item);
+    public T Pop() { var item = this[^1]; RemoveAt(Count - 1); return item; }
+}
+
+var stack = new MyStack&lt;int&gt;();
+stack.Push(1); stack.Push(2); stack.Push(3);
+stack.Insert(0, 99);  // ← Inherited from List — breaks LIFO!
+// Stack now has [99, 1, 2, 3] — not a valid stack state</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodComposition.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Stack uses composition — only exposes Push and Pop
+public class MyStack&lt;T&gt;
+{
+    private readonly List&lt;T&gt; _items = new();
+
+    public void Push(T item) =&gt; _items.Add(item);
+    public T Pop()
+    {
+        var item = _items[^1];
+        _items.RemoveAt(_items.Count - 1);
+        return item;
+    }
+    public int Count =&gt; _items.Count;
+    // No Insert, no RemoveAt, no Add — LIFO is enforced
+}</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">The difference is simple: with inheritance, you can't un-expose methods the parent class has. With composition, you control exactly which operations exist. The List is a private implementation detail that nobody outside the Stack can touch.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 2 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-2 text-red icon-gap"></i> NotImplementedException in Interface Methods</span>
@@ -1725,15 +2235,56 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Implementing an interface method with <code>throw new NotImplementedException()</code> or <code>throw new NotSupportedException()</code>. This is an <strong>immediate LSP violation</strong> — the interface promises the method works, but the implementation says "nope."</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">If you can't implement all methods, the interface is too broad. Split it (ISP) or use a different abstraction.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You're building a class that needs to implement an interface, but one or two methods don't apply to your situation. The deadline is approaching, so you stub them out with <code>throw new NotImplementedException()</code> or <code>throw new NotSupportedException()</code>. Visual Studio even generates this as the default implementation when you auto-implement an interface. It feels safe because the code compiles, the other methods work, and "nobody calls that method anyway."</p>
+          <p class="body-text">But here's the trap: the interface is a <em>promise</em>. When code accepts an <code>IFileStorage</code>, it trusts that every method works. If <code>Delete()</code> throws <code>NotImplementedException</code>, any code path that calls <code>Delete()</code> will crash at runtime. The compiler can't catch this because the method signature is satisfied; only the behavior is broken. This is LSP at its core: the subtype doesn't honor the contract the interface promises.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadNotImpl.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Implementing an interface but refusing to honor part of the contract
+public class ReadOnlyStorage : IFileStorage
+{
+    public byte[] Read(string path) =&gt; File.ReadAllBytes(path);  // ✅ works
+    public void Write(string path, byte[] data) =&gt;
+        throw new NotSupportedException("Read-only!");           // ❌ bomb
+    public void Delete(string path) =&gt;
+        throw new NotSupportedException("Read-only!");           // ❌ bomb
+}</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodSplit.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Split the interface so each class only promises what it can deliver
+public interface IFileReader { byte[] Read(string path); }
+public interface IFileWriter { void Write(string path, byte[] data); }
+public interface IFileDeletor { void Delete(string path); }
+
+public class ReadOnlyStorage : IFileReader
+{
+    public byte[] Read(string path) =&gt; File.ReadAllBytes(path);  // ✅ only promises Read
+}
+
+public class FullStorage : IFileReader, IFileWriter, IFileDeletor
+{
+    // Implements all three — every method works as expected
+}</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">By splitting the interface (this is the <strong>Interface Segregation Principle</strong> working hand-in-hand with LSP), each class only implements the methods it can actually honor. No more dead methods that explode at runtime.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 3 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-3 text-red icon-gap"></i> Type-Checking the Subtype (<code>is</code>/<code>as</code> Casts)</span>
@@ -1741,15 +2292,61 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">If caller code has <code>if (shape is Circle) { /* special logic */ }</code>, it means <code>Circle</code> isn't truly substitutable for <code>IShape</code>. The caller shouldn't need to know the concrete type — that's the whole point of polymorphism.</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Move the special behavior into the subtype itself via <span class="tooltip-trigger">polymorphic dispatch<span class="tooltip-content">Letting the runtime choose the correct method based on the actual object type, not the reference type. Instead of "if (shape is Circle) doCircleThing()", put doCircleThing() as a virtual method on Circle itself. The caller just calls shape.DoThing() and polymorphism routes to the right implementation.</span></span>. Use <code>virtual</code> methods or the <span class="tooltip-trigger">Visitor pattern<span class="tooltip-content">The Visitor pattern lets you add new operations to a type hierarchy without modifying the types. Instead of casting to check the concrete type, you call Accept(visitor) and the correct overload is dispatched polymorphically — no type checking needed.</span></span> for double-dispatch scenarios.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You receive an interface reference, but one particular implementation needs special handling. Maybe circles need to be drawn differently, or premium customers need an extra step. So you write <code>if (shape is Circle)</code> to check the actual type at runtime. It feels like a quick, practical fix.</p>
+          <p class="body-text">But every <code>is</code> or <code>as</code> check is a red flag. It means the interface abstraction has leaked. If the caller needs to know the concrete type, then the types aren't truly interchangeable. Every time a new subtype is added, someone has to update every <code>if-else</code> chain that checks types. This defeats the entire purpose of using interfaces and polymorphism in the first place.</p>
+          <p class="body-text">Think of it like a restaurant. The waiter shouldn't need to know which brand of oven the kitchen uses. They just say "make this order" and trust the kitchen to figure it out. If the waiter starts checking "is this a gas oven? Then I need to adjust the temperature myself" that's a sign the kitchen isn't doing its job.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadTypeCast.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Caller knows too much about the concrete type
+public void Render(IShape shape)
+{
+    if (shape is Circle c)
+        DrawCircle(c.Radius);       // Special path for Circle
+    else if (shape is Rectangle r)
+        DrawRect(r.Width, r.Height); // Special path for Rectangle
+    // Every new shape = another "else if" here
+}</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodPolymorphism.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Each shape knows how to render itself
+public interface IShape { void Render(ICanvas canvas); }
+
+public class Circle : IShape
+{
+    public double Radius { get; }
+    public void Render(ICanvas canvas) =&gt; canvas.DrawCircle(Radius);
+}
+
+public class Rectangle : IShape
+{
+    public double Width { get; }
+    public double Height { get; }
+    public void Render(ICanvas canvas) =&gt; canvas.DrawRect(Width, Height);
+}
+
+// Caller code — no type checking needed
+public void Render(IShape shape) =&gt; shape.Render(_canvas);</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">In the fixed version, the caller doesn't care what kind of shape it has. It just calls <code>shape.Render()</code> and the right behavior happens automatically. Adding a new shape (like <code>Triangle</code>) requires zero changes to the caller code.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 4 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-4 text-red icon-gap"></i> Confusing "is-a" in Domain vs Code</span>
@@ -1757,15 +2354,70 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">"A square is a rectangle" is true in geometry. In code, if <code>Rectangle</code> has mutable width and height, <code>Square</code> can't be a subtype because it violates the independence invariant. <strong>Domain truth ≠ code truth.</strong></p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Design your hierarchy around <em>behavior</em>, not real-world taxonomy. Ask "can I substitute this everywhere?" not "is this a kind of that?"</p>
+          <p class="body-text"><strong>Why This Happens:</strong> In the real world, a square IS a rectangle (it's a rectangle with equal sides). So it feels natural to make <code>Square</code> extend <code>Rectangle</code> in code. The domain model matches the real world. What could go wrong?</p>
+          <p class="body-text">The problem is that real-world categories are about <em>what things are</em>, but programming hierarchies are about <em>how things behave</em>. A <code>Rectangle</code> with mutable dimensions lets you set width and height independently. A <code>Square</code> can't allow that because both dimensions must always be equal. If Square overrides the width setter to also change the height, then code that says <code>rect.Width = 5; rect.Height = 10; assert(rect.Area == 50)</code> fails when <code>rect</code> is actually a Square (area becomes 100 instead of 50).</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadSquare.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Domain truth ("square is a rectangle") doesn't hold in code
+public class Rectangle
+{
+    public virtual int Width { get; set; }
+    public virtual int Height { get; set; }
+    public int Area =&gt; Width * Height;
+}
+
+public class Square : Rectangle
+{
+    public override int Width
+    {
+        set { base.Width = value; base.Height = value; } // Forces equality
+    }
+    public override int Height
+    {
+        set { base.Width = value; base.Height = value; } // Forces equality
+    }
+}
+
+Rectangle rect = new Square();
+rect.Width = 5;
+rect.Height = 10;
+// Expecting Area = 50, but it's 100 — Height setter overwrote Width!</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodShapes.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Separate types behind a shared interface
+public interface IShape { int Area { get; } }
+
+public record Rectangle(int Width, int Height) : IShape
+{
+    public int Area =&gt; Width * Height;
+}
+
+public record Square(int Side) : IShape
+{
+    public int Area =&gt; Side * Side;
+}
+// No inheritance. No shared setters. No surprises.</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">The fix uses a shared <code>IShape</code> interface and immutable records. Rectangle and Square are separate, independent types. Neither one can break the other's behavior because they don't share any mutable state.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 5 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-5 text-red icon-gap"></i> Silently Weakening Postconditions</span>
@@ -1773,15 +2425,55 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">A <code>GetByIdAsync()</code> that returns <code>null</code> when the base promises a non-null result. Or a <code>Save()</code> that silently doesn't persist (e.g., a "no-op" test double used in production by accident).</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Document postconditions explicitly. Use <span class="tooltip-trigger">nullable reference types<span class="tooltip-content">C# 8+'s nullable reference types let you express "this returns null" (Task&lt;Order?&gt;) vs "this never returns null" (Task&lt;Order&gt;) at the type level. The compiler warns when a non-nullable return type might return null.</span></span> to express nullability at the type level: <code>Task&lt;Order?&gt;</code> vs <code>Task&lt;Order&gt;</code>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> An interface says <code>GetByIdAsync</code> returns an <code>Order</code>. The original SQL implementation always returns a valid order (throws if not found). Then someone writes a new implementation where sometimes the method silently returns <code>null</code>. Or a <code>Save()</code> method that does nothing because it's a test stub that accidentally leaked into production.</p>
+          <p class="body-text">The developer thinks "I'm handling the edge case gracefully by returning null instead of throwing." But the caller was written to trust the original contract. It doesn't check for null. It chains method calls like <code>order.Items.Count</code> and gets a <code>NullReferenceException</code> three layers up the call stack, far from where the real problem is.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadWeakPost.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Silently returns null when base contract promised non-null
+public class CachedRepo : IOrderRepository
+{
+    public async Task&lt;Order&gt; GetByIdAsync(int id)
+    {
+        if (_cache.TryGetValue(id, out var order))
+            return order;
+        return null!;  // ← "null-forgiving" hides the violation from the compiler
+    }
+}
+// Caller: var total = (await repo.GetByIdAsync(42)).Items.Sum(i =&gt; i.Price);
+// NullReferenceException if 42 isn't in cache!</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodExplicitNull.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Make nullability explicit in the return type
+public interface IOrderRepository
+{
+    Task&lt;Order?&gt; GetByIdAsync(int id);  // ← "?" = might be null
+}
+
+// Now every caller MUST handle the null case
+var order = await repo.GetByIdAsync(42);
+if (order is null) { /* handle missing order */ }
+var total = order.Items.Sum(i =&gt; i.Price);  // Compiler warns if null not handled</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">The fix is to make the postcondition honest. If some implementations might return null, make that part of the contract (<code>Order?</code> instead of <code>Order</code>). C# <span class="tooltip-trigger">nullable reference types<span class="tooltip-content">C# 8+'s nullable reference types let you express "this returns null" (Task&lt;Order?&gt;) vs "this never returns null" (Task&lt;Order&gt;) at the type level. The compiler warns when a non-nullable return type might return null, catching potential NullReferenceExceptions at compile time.</span></span> turn this from a runtime surprise into a compile-time warning.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 6 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-6 text-red icon-gap"></i> Breaking the Equals/GetHashCode Contract</span>
@@ -1789,15 +2481,45 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Overriding <code>Equals()</code> without overriding <code>GetHashCode()</code>, or basing them on different fields. This violates the <code>Object</code> base class's contract and breaks <code>Dictionary</code>, <code>HashSet</code>, and LINQ's <code>Distinct()</code>.</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Always override both together. Use <code>record</code> types which auto-generate correct equality based on all properties.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A developer overrides <code>Equals()</code> to compare by business key (email, SKU, etc.) but forgets to override <code>GetHashCode()</code> to match. Or they override both but base them on different fields. It's an easy mistake because the compiler only gives a warning (not an error), and the code seems to work in simple tests.</p>
+          <p class="body-text">The <code>Object</code> class in .NET has a fundamental contract: if two objects are <code>Equal</code>, they must produce the same hash code. Hash-based collections (<code>Dictionary</code>, <code>HashSet</code>, LINQ's <code>Distinct()</code>) rely on this rule to work. They use the hash code to pick a bucket, then use <code>Equals</code> to compare within that bucket. If two "equal" objects land in different buckets, the collection will never realize they're the same.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadEquality.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Equals uses Email, GetHashCode uses Id
+public override bool Equals(object? obj) =&gt;
+    obj is User u &amp;&amp; Email == u.Email;
+public override int GetHashCode() =&gt; Id.GetHashCode(); // WRONG field!</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodEquality.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Both methods use the same field(s)
+public override bool Equals(object? obj) =&gt;
+    obj is User u &amp;&amp; Email.Equals(u.Email, StringComparison.OrdinalIgnoreCase);
+public override int GetHashCode() =&gt;
+    Email.GetHashCode(StringComparison.OrdinalIgnoreCase);
+
+// ✅ BEST: Use a record — correct equality is automatic
+public record User(int Id, string Email);</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">The safest approach: use C# <code>record</code> types. They auto-generate matching <code>Equals</code> and <code>GetHashCode</code> from all properties, making it impossible to get this wrong.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 7 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-7 text-red icon-gap"></i> Mutable State in Subtypes</span>
@@ -1805,15 +2527,51 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">A subtype that introduces mutable state the base class didn't have. Example: a <code>CachingDecorator</code> that introduces a cache dictionary — now the "same" method call returns different results depending on previous calls (stale cache), breaking the base's stateless promise.</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">If the base type's contract implies statelessness, the subtype must honor it. Make caching behavior explicit in the interface or use a separate caching layer.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A decorator or subtype seems like the perfect place to add caching, retry counts, or other stateful behavior. "I'll just wrap the original and cache the results for performance." But if the base type's contract implies that each method call is independent and stateless, introducing hidden state changes the observable behavior.</p>
+          <p class="body-text">For example, a <code>CachingDecorator</code> around a stateless <code>IProductService</code> means the same call now returns different results depending on whether the cache is warm or cold. If another part of the system updates a product in the database, the cache still returns stale data. The original implementation always returned fresh data. That's a behavioral change the caller didn't ask for and doesn't know about.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadMutableState.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Introduces hidden state the base didn't have
+public class CachingProductService : IProductService
+{
+    private readonly Dictionary&lt;int, Product&gt; _cache = new();  // hidden state!
+    private readonly IProductService _inner;
+
+    public Product GetById(int id) =&gt;
+        _cache.TryGetValue(id, out var p) ? p : (_cache[id] = _inner.GetById(id));
+    // First call: fresh. Second call: stale. Third call after DB update: still stale!
+}</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodExplicitCache.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Make caching explicit in the interface
+public interface ICachedProductService : IProductService
+{
+    void InvalidateCache(int id);
+    void InvalidateAll();
+}
+// Now callers KNOW this service caches. They can invalidate when needed.
+// Or use a separate IDistributedCache as a cross-cutting concern.</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">If you need caching, either make it explicit in the interface (so callers know about it and can manage it) or use a dedicated caching layer separate from the business logic interface.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 8 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-8 text-red icon-gap"></i> Hiding Base Members with <code>new</code></span>
@@ -1821,30 +2579,49 @@ public override int GetHashCode() =&gt;
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Using <code>new</code> instead of <code>override</code> to hide a base method. The method called depends on the <strong>reference type</strong>, not the <strong>object type</strong> — leading to different behavior depending on how you hold the reference.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> You want to change what a method does in a derived class, but the base class didn't mark it as <code>virtual</code>. C# lets you "hide" the base method with the <code>new</code> keyword. It compiles without errors. But it creates a trap: the method called depends on the <em>reference type</em> (how you hold the variable), not the <em>object type</em> (what the object actually is).</p>
+          <p class="body-text">This means the exact same object can behave differently depending on whether you hold it as a <code>Base</code> reference or a <code>Derived</code> reference. That directly contradicts substitutability: the whole point of LSP is that the reference type shouldn't matter.</p>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-              <span class="macos-filename">NewHiding.cs</span>
+              <span class="macos-filename">BadNewHiding.cs</span>
             </div>
             <div class="macos-body">
-<pre><code class="language-csharp">public class Base { public virtual string Name() =&gt; "Base"; }
+<pre><code class="language-csharp">// ❌ BAD: "new" hides the base method — behavior depends on reference type
+public class Base { public virtual string Name() =&gt; "Base"; }
 public class Derived : Base { public new string Name() =&gt; "Derived"; }
 
 var d = new Derived();
 Console.WriteLine(d.Name());           // "Derived"
 Console.WriteLine(((Base)d).Name());   // "Base" — DIFFERENT behavior!
-// This violates substitutability — same object, different results</code></pre>
+// Same object, two different answers. That's not substitutable.</code></pre>
             </div>
           </div>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Use <code>override</code> instead of <code>new</code>. If you can't override (base isn't <code>virtual</code>), reconsider the hierarchy.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodOverride.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: "override" uses the runtime type — consistent behavior
+public class Base { public virtual string Name() =&gt; "Base"; }
+public class Derived : Base { public override string Name() =&gt; "Derived"; }
+
+var d = new Derived();
+Console.WriteLine(d.Name());           // "Derived"
+Console.WriteLine(((Base)d).Name());   // "Derived" — SAME behavior!
+// Doesn't matter how you hold the reference — the object type wins.</code></pre>
+            </div>
           </div>
+
+          <p class="body-text mt-sm">Use <code>override</code> instead of <code>new</code>. If the base method isn't <code>virtual</code> and you can't change it, that's a signal you shouldn't be inheriting from that class. Consider composition instead.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 9 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-9 text-red icon-gap"></i> Strengthening Preconditions in Subtypes</span>
@@ -1852,15 +2629,55 @@ Console.WriteLine(((Base)d).Name());   // "Base" — DIFFERENT behavior!
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">A base <code>Process(Order order)</code> accepts any order. A subtype rejects orders below $50. The caller didn't know about this restriction — the $30 order silently fails.</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">If the subtype can't handle all inputs the base accepts, it's not truly a subtype. Either widen the subtype's acceptance or change the interface to include capability checking (like <code>CanProcess()</code>).</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A base method accepts any input (e.g., <code>Process(Order order)</code> works for any order). A developer creates a subtype that adds a business rule: "we only handle orders above $50." The subtype throws an exception or silently skips small orders. The caller had no idea about this restriction because the base type didn't have it.</p>
+          <p class="body-text">This is called "strengthening the precondition." The base says "give me anything," but the subtype says "give me only this specific subset." That breaks substitutability: code that worked with the base type (passing any order) breaks with the subtype (which rejects small orders). LSP's rule is clear: subtypes can accept MORE inputs than the base (weaker preconditions), but never FEWER (stronger preconditions).</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadStrongerPre.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: Subtype demands MORE than the base — strengthened precondition
+public class PremiumProcessor : OrderProcessor
+{
+    public override void Process(Order order)
+    {
+        if (order.Total &lt; 50m)
+            throw new ArgumentException("Order too small");  // Base didn't have this!
+        base.Process(order);
+    }
+}</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodCapability.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Capability checking instead of surprise rejection
+public interface IOrderProcessor
+{
+    bool CanProcess(Order order);  // Let caller ask first
+    void Process(Order order);
+}
+
+public class PremiumProcessor : IOrderProcessor
+{
+    public bool CanProcess(Order order) =&gt; order.Total &gt;= 50m;
+    public void Process(Order order) { /* ... */ }
+}</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">The fix adds a <code>CanProcess()</code> method so callers can check before calling. This is the same pattern .NET's <code>Stream</code> uses with <code>CanRead</code>/<code>CanWrite</code>/<code>CanSeek</code>: capabilities are explicit, not surprise rejections.</p>
         </div>
       </div>
     </div>
 
+    <!-- Pitfall 10 -->
     <div class="collapsible">
       <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
         <span><i class="fa-solid fa-0 text-red icon-gap"></i> Assuming LSP Only Applies to Inheritance</span>
@@ -1868,11 +2685,45 @@ Console.WriteLine(((Base)d).Name());   // "Base" — DIFFERENT behavior!
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">LSP applies to <strong>any subtype relationship</strong> — including interface implementations, decorator wrapping, and even DI registrations. When you register <code>services.AddScoped&lt;IRepo, MyRepo&gt;()</code>, <code>MyRepo</code> must be substitutable for <code>IRepo</code> everywhere.</p>
-          <div class="callout callout-success mt-sm">
-            <div class="callout-title"><i class="fa-solid fa-check"></i> Fix</div>
-            <p class="body-text">Apply LSP thinking to every implementation, not just class inheritance. Ask: "If I swap this implementation with another, will all consumers still work correctly?"</p>
+          <p class="body-text"><strong>Why This Happens:</strong> LSP is often taught using class inheritance examples (Rectangle/Square, Bird/Penguin), so many developers think it only matters when you write <code>class Dog : Animal</code>. But in modern C#, you rarely use class inheritance for polymorphism. You use <em>interfaces</em>. And LSP applies just as strongly to interface implementations.</p>
+          <p class="body-text">Every time you register <code>services.AddScoped&lt;IRepository, SqlRepository&gt;()</code> in your DI container, you're creating a subtype relationship. <code>SqlRepository</code> is being substituted for <code>IRepository</code>. If <code>SqlRepository</code> behaves differently than what <code>IRepository</code> consumers expect (slower, throws different exceptions, returns null when others don't), that's an LSP violation. The same applies to decorators, adapters, mocks, and any wrapper that claims to implement an interface.</p>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">BadAssumption.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ BAD: LSP violation through DI — not inheritance
+services.AddScoped&lt;IEmailSender, FakeEmailSender&gt;();  // For "testing"
+
+public class FakeEmailSender : IEmailSender
+{
+    public Task SendAsync(string to, string body) =&gt;
+        Task.CompletedTask;  // Silently drops emails!
+    // If this leaks to production, no emails go out.
+    // LSP violation: interface says "sends email", implementation doesn't.
+}</code></pre>
+            </div>
           </div>
+
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">GoodDI.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ GOOD: Every DI registration honors the interface contract
+services.AddScoped&lt;IEmailSender, SmtpEmailSender&gt;();    // Production
+services.AddScoped&lt;IEmailSender, SendGridSender&gt;();     // Alternative
+
+// Both actually send emails. Both honor the postcondition.
+// For tests, use a real test framework mock that VERIFIES calls were made,
+// not a silent no-op that hides bugs.</code></pre>
+            </div>
+          </div>
+
+          <p class="body-text mt-sm">The takeaway: any time you swap one implementation for another (through DI, decorators, adapters, or test doubles), ask yourself: "Will every consumer still work correctly with this new implementation?" That question IS the Liskov Substitution Principle.</p>
         </div>
       </div>
     </div>
@@ -2195,7 +3046,8 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">If S is a subtype of T, then objects of type T can be replaced with objects of type S without altering the correctness of the program. In practical terms: code that works with a base type must continue to work correctly with any subtype — no surprises, no exceptions the base didn't throw, no weaker guarantees.</p>
+          <p class="body-text">Think of a rental car service. You book a "sedan" and they give you a Toyota Camry. Next time, they give you a Honda Accord. Both are sedans, both drive the same way, and your trip works fine regardless of which specific car you get. That's LSP: any "sedan" should work wherever a "sedan" is expected.</p>
+          <p class="body-text">In code terms: if your code works with a base type (like <code>IRepository</code>), it should continue to work correctly with ANY implementation of that type (<code>SqlRepository</code>, <code>MongoRepository</code>, <code>InMemoryRepository</code>). No surprises, no unexpected exceptions, no weaker guarantees. The formal definition from Barbara Liskov says: if S is a subtype of T, then objects of type T can be replaced with objects of type S without altering the correctness of the program. In everyday .NET, this means every class that implements an interface must fully honor what that interface promises.</p>
         </div>
       </div>
     </div>
@@ -2207,7 +3059,8 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Square inheriting Rectangle. Rectangle promises width and height can be set independently. Square overrides setters to keep them equal — so <code>rect.Width = 5; rect.Height = 10; assert(rect.Area == 50)</code> fails when <code>rect</code> is actually a Square (area becomes 100). The fix: don't inherit — use a shared <code>IShape</code> interface with separate Rectangle and Square types.</p>
+          <p class="body-text">The Square/Rectangle problem. In geometry class, every square IS a rectangle. So in code, it seems logical to make <code>Square</code> inherit from <code>Rectangle</code>. But here's the trap: a <code>Rectangle</code> lets you set width and height independently. If you set width to 5 and height to 10, you expect the area to be 50. A <code>Square</code> overrides the setters to keep both dimensions equal. So setting height to 10 also sets width to 10, and the area becomes 100 instead of 50.</p>
+          <p class="body-text">Code that says <code>rect.Width = 5; rect.Height = 10; assert(rect.Area == 50)</code> works perfectly with a real Rectangle, but breaks with a Square pretending to be a Rectangle. The fix is simple: don't use inheritance here. Use a shared <code>IShape</code> interface with separate, independent Rectangle and Square types. Domain truth ("a square is a rectangle") doesn't always translate to code truth ("a Square can substitute for a Rectangle").</p>
         </div>
       </div>
     </div>
@@ -2219,7 +3072,8 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">OCP says "extend via new classes." LSP says "those new classes must be substitutable." Without LSP, OCP breaks — you add a new implementation, but it behaves differently than expected, so all callers break. LSP is the <strong>enforcement mechanism</strong> that makes OCP safe.</p>
+          <p class="body-text">Think of them as a team. OCP (Open/Closed Principle) says "extend your system by adding new classes, not by modifying existing ones." LSP says "those new classes better behave correctly when they're swapped in." Without LSP, OCP is dangerous: you add a shiny new <code>PremiumDiscountCalculator</code>, plug it in through dependency injection, and everything breaks because it returns negative values the caller didn't expect.</p>
+          <p class="body-text">LSP is the enforcement mechanism that makes OCP safe. OCP opens the door to new implementations; LSP ensures every new implementation that walks through that door plays by the same rules. Together, they let you extend a system confidently: new classes can be added, and you can trust they won't break existing code.</p>
         </div>
       </div>
     </div>
@@ -2231,7 +3085,9 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Preconditions:</strong> What must be true before a method is called (e.g., argument not null). Subtypes cannot strengthen them — can't demand more from the caller. <strong>Postconditions:</strong> What the method guarantees after returning (e.g., return value ≥ 0). Subtypes cannot weaken them — can't guarantee less. <strong>Invariants:</strong> Properties that remain true throughout an object's lifetime (e.g., Balance ≥ 0). Subtypes must preserve them.</p>
+          <p class="body-text">Imagine a restaurant. The <strong>precondition</strong> is what you need before ordering: you must be seated and have a menu. A subtype (like a fast-food counter) can WEAKEN this: no seating required, just walk up. But it can't STRENGTHEN it: "you also need a reservation and a dress code" would break customers who were fine at regular restaurants.</p>
+          <p class="body-text">The <strong>postcondition</strong> is what you're guaranteed after ordering: you get food that matches your order. A subtype can STRENGTHEN this: "you also get a free dessert." But it can't WEAKEN it: "we might give you someone else's order" violates the promise. The <strong>invariant</strong> is what's always true: "the kitchen is clean." It must hold before, during, and after your meal, in every restaurant type.</p>
+          <p class="body-text">In code: preconditions are input requirements (argument not null), postconditions are output guarantees (return value >= 0), and invariants are properties that always hold (account balance never negative). Subtypes must not demand MORE input, must not guarantee LESS output, and must preserve all invariants.</p>
         </div>
       </div>
     </div>
@@ -2243,7 +3099,8 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><code>System.IO.Stream</code> — the base class has <code>Read()</code>, <code>Write()</code>, and <code>Seek()</code>, but <code>NetworkStream</code> throws <code>NotSupportedException</code> on <code>Seek()</code>. The BCL works around this with <code>CanRead</code>/<code>CanWrite</code>/<code>CanSeek</code> capability flags — a pragmatic compromise that acknowledges the LSP violation.</p>
+          <p class="body-text">The most famous one lives right in .NET's core library: <code>System.IO.Stream</code>. The base class defines <code>Read()</code>, <code>Write()</code>, and <code>Seek()</code>. But <code>NetworkStream</code> throws <code>NotSupportedException</code> if you call <code>Seek()</code>, because you can't jump to an arbitrary position in a network stream the way you can in a file.</p>
+          <p class="body-text">The .NET team acknowledged this LSP violation and added capability flags as a workaround: <code>CanRead</code>, <code>CanWrite</code>, <code>CanSeek</code>. Before calling <code>Seek()</code>, you check <code>stream.CanSeek</code>. It's a pragmatic compromise: rather than splitting Stream into 7 separate interfaces (which would make the API unusable), they document the violation and give callers a way to check capabilities. Not perfect, but practical.</p>
         </div>
       </div>
     </div>
@@ -2255,7 +3112,10 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Three strategies: (1) <strong>Extract interface</strong> — split the fat base into smaller interfaces that each subtype can fully implement (ISP helps here). (2) <strong>Composition over inheritance</strong> — use has-a instead of is-a. (3) <strong>Result pattern</strong> — if failure is possible, make it part of the return type instead of throwing surprise exceptions.</p>
+          <p class="body-text">Three main strategies, and you'll use different ones depending on the situation:</p>
+          <p class="body-text"><strong>1. Extract interface (split the contract).</strong> If an implementation can only do part of what the interface promises, the interface is too broad. Split it into smaller, focused interfaces. A <code>Robot</code> that can't <code>Eat()</code> doesn't implement <code>IFeedable</code>; it only implements <code>IWorkable</code>. This is ISP working together with LSP.</p>
+          <p class="body-text"><strong>2. Composition over inheritance.</strong> If a subclass can't truly substitute for its parent, don't use inheritance. Have the class contain the other as a private field and expose only the operations it can actually support. <code>Stack</code> has-a <code>List</code> rather than inherits from <code>List</code>.</p>
+          <p class="body-text"><strong>3. Result pattern.</strong> If some implementations might fail where others succeed, make failure an explicit part of the contract. Return <code>Result&lt;T&gt;</code> with <code>Success</code>/<code>Failure</code> instead of throwing surprise exceptions. Now every caller handles failure uniformly.</p>
         </div>
       </div>
     </div>
@@ -2267,7 +3127,8 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><code>IReadOnlyList&lt;T&gt;</code> is a <strong>read-only view</strong> — it doesn't expose mutation methods, but the underlying collection can still be mutated through other references. <code>ImmutableList&lt;T&gt;</code> (from System.Collections.Immutable) is truly immutable — no reference can mutate it. For LSP-safe code, prefer <code>ImmutableList&lt;T&gt;</code> when you need a guarantee of no mutation.</p>
+          <p class="body-text">Think of <code>IReadOnlyList&lt;T&gt;</code> like a one-way mirror. From your side (through the interface), you can only look, not touch. But someone on the other side (holding the original <code>List&lt;T&gt;</code> reference) can still rearrange, add, and remove items. You just can't see the mutation methods. The underlying collection IS still mutable.</p>
+          <p class="body-text"><code>ImmutableList&lt;T&gt;</code> (from <code>System.Collections.Immutable</code>) is more like a photograph. The data is frozen in time. Nobody can change it, from any reference. If someone "adds" an item, they get a brand-new list; the original stays unchanged. For truly safe code, especially in multi-threaded scenarios, <code>ImmutableList&lt;T&gt;</code> provides the guarantee that <code>IReadOnlyList&lt;T&gt;</code> merely implies.</p>
         </div>
       </div>
     </div>
@@ -2281,7 +3142,31 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">The <code>out</code> keyword (covariance) allows <code>IEnumerable&lt;Dog&gt;</code> to be used as <code>IEnumerable&lt;Animal&gt;</code> — safe because you only read from it. The <code>in</code> keyword (contravariance) allows <code>IComparer&lt;Animal&gt;</code> as <code>IComparer&lt;Dog&gt;</code> — safe because you only pass values into it. The compiler rejects unsafe variance — e.g., <code>IList&lt;T&gt;</code> is invariant because both reading and writing are possible, and variance would break type safety.</p>
+          <p class="body-text">Generic variance is the compiler's way of enforcing LSP at the type level. It answers the question: "If <code>Dog</code> is a subtype of <code>Animal</code>, is <code>IEnumerable&lt;Dog&gt;</code> a subtype of <code>IEnumerable&lt;Animal&gt;</code>?" The answer depends on how the generic type is used.</p>
+          <p class="body-text"><strong>Covariance</strong> (the <code>out</code> keyword) means "this type parameter only comes OUT of the interface." <code>IEnumerable&lt;out T&gt;</code> only produces T values (via <code>GetEnumerator</code>). Since every Dog is an Animal, reading Dogs and treating them as Animals is always safe. So <code>IEnumerable&lt;Dog&gt;</code> can substitute for <code>IEnumerable&lt;Animal&gt;</code>.</p>
+          <p class="body-text"><strong>Contravariance</strong> (the <code>in</code> keyword) means "this type parameter only goes IN to the interface." <code>IComparer&lt;in T&gt;</code> only consumes T values. A comparer that knows how to compare any Animal certainly knows how to compare Dogs. So <code>IComparer&lt;Animal&gt;</code> can substitute for <code>IComparer&lt;Dog&gt;</code>.</p>
+          <p class="body-text"><code>IList&lt;T&gt;</code> is <strong>invariant</strong> because T goes both in and out. If you could treat <code>IList&lt;Dog&gt;</code> as <code>IList&lt;Animal&gt;</code>, someone could add a <code>Cat</code> to your list of Dogs. The compiler prevents this.</p>
+
+          <!-- SVG: Variance diagram -->
+          <svg viewBox="0 0 720 180" role="img" aria-label="Diagram showing covariance (out) for read-only, contravariance (in) for write-only, and invariant for read-write" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">C# Generic Variance and LSP</text>
+            <!-- Covariance -->
+            <rect x="20" y="45" width="210" height="55" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="125" y="68" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Covariant (out T)</text>
+            <text x="125" y="88" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">IEnumerable&lt;Dog&gt; as Animal</text>
+            <text x="125" y="115" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="10">Read-only = SAFE</text>
+            <!-- Contravariance -->
+            <rect x="255" y="45" width="210" height="55" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+            <text x="360" y="68" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Contravariant (in T)</text>
+            <text x="360" y="88" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">IComparer&lt;Animal&gt; as Dog</text>
+            <text x="360" y="115" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="10">Write-only = SAFE</text>
+            <!-- Invariant -->
+            <rect x="490" y="45" width="210" height="55" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="595" y="68" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Invariant (T)</text>
+            <text x="595" y="88" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">IList&lt;Dog&gt; NOT as Animal</text>
+            <text x="595" y="115" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Read+Write = UNSAFE</text>
+            <text x="360" y="155" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">The compiler enforces LSP by only allowing variance when it's type-safe</text>
+          </svg>
         </div>
       </div>
     </div>
@@ -2293,7 +3178,51 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Write an abstract test class that tests the interface contract — "save then get returns the saved value," "get non-existent returns null," etc. Then create concrete test classes for every implementation (SqlRepo, InMemoryRepo, CachedRepo). Every implementation runs the same tests. If one fails, it violates LSP. This catches violations automatically as new implementations are added.</p>
+          <p class="body-text">Contract tests are the most practical way to enforce LSP in a real codebase. The idea is simple: write one set of tests that verifies the interface's promises, then run those exact same tests against every implementation.</p>
+          <p class="body-text">You create an abstract test class with all the contract tests: "save then get returns the saved value," "get non-existent returns null," "delete removes the item," etc. Then for each implementation, you create a thin concrete test class that just provides the specific implementation to test. Every implementation runs the exact same test suite.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">ContractTests.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Abstract contract test — defines WHAT the interface must do
+public abstract class IOrderRepositoryContractTests
+{
+    protected abstract IOrderRepository CreateSut();
+
+    [Fact]
+    public async Task SaveThenGet_ReturnsSavedOrder()
+    {
+        var sut = CreateSut();
+        var order = new Order { Id = 1, Total = 99.99m };
+        await sut.SaveAsync(order);
+        var result = await sut.GetByIdAsync(1);
+        Assert.Equal(order.Total, result!.Total);
+    }
+
+    [Fact]
+    public async Task GetNonExistent_ReturnsNull()
+    {
+        var sut = CreateSut();
+        var result = await sut.GetByIdAsync(999);
+        Assert.Null(result);
+    }
+}
+
+// Concrete tests — one per implementation
+public class SqlRepoTests : IOrderRepositoryContractTests
+{
+    protected override IOrderRepository CreateSut() =&gt; new SqlOrderRepository(_db);
+}
+
+public class CachedRepoTests : IOrderRepositoryContractTests
+{
+    protected override IOrderRepository CreateSut() =&gt; new CachedOrderRepository(_inner);
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">If any implementation fails any contract test, it violates LSP. The beauty is that this catches violations automatically: when someone adds a new implementation, they just need to create one more concrete test class and all contract tests run against it.</p>
         </div>
       </div>
     </div>
@@ -2305,7 +3234,9 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Yes — if the base type's contract says the method works, throwing <code>NotSupportedException</code> violates the postcondition. However, if the contract explicitly includes a "may throw NotSupportedException" clause (like <code>Stream.Seek()</code> with <code>CanSeek</code>), it's a managed violation. The best fix: split the interface so implementations only need to support methods they can actually handle (ISP).</p>
+          <p class="body-text">Yes, in most cases it is. If an interface says "this method works," and your implementation says "nope, not supported," you've broken the contract. The caller expected the method to do something useful, and instead it blew up.</p>
+          <p class="body-text">However, there's a pragmatic exception. If the interface contract explicitly says "this method MAY throw <code>NotSupportedException</code>, check the capability flag first," then the exception is part of the documented contract, not a surprise. .NET's <code>Stream</code> class does this: <code>Seek()</code> might throw, but the contract says "check <code>CanSeek</code> first." That's not ideal, but it's a managed violation with clear documentation.</p>
+          <p class="body-text">The best fix is to split the interface. Instead of one fat <code>IStream</code> with Read/Write/Seek, create <code>IReadableStream</code>, <code>IWritableStream</code>, and <code>ISeekableStream</code>. Each implementation only promises what it can deliver. No exceptions needed.</p>
         </div>
       </div>
     </div>
@@ -2317,7 +3248,37 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Instead of some implementations throwing exceptions and others succeeding, ALL implementations return a <code>Result&lt;T&gt;</code> with <code>Success</code>/<code>Failure</code> status. The contract explicitly includes failure as a possibility. Every subtype honors the same return type — no surprise exceptions, no violated postconditions. The caller handles all implementations identically: check <code>result.IsSuccess</code>.</p>
+          <p class="body-text">The problem with exceptions is unpredictability. One implementation succeeds, another throws <code>ArgumentException</code>, and a third throws <code>TimeoutException</code>. The caller has no way to know what to expect because the contract doesn't mention exceptions. This is a postcondition violation: different implementations have different failure modes.</p>
+          <p class="body-text">The Result pattern fixes this by making failure an explicit part of the return type. Instead of returning <code>Order</code> or throwing, every implementation returns <code>Result&lt;Order&gt;</code>. This type has two states: <code>Success</code> (with the order) or <code>Failure</code> (with an error message). Now every implementation honors the same contract: "I always return a Result, and you check <code>IsSuccess</code>."</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">ResultPattern.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Contract: always returns Result, never throws
+public interface IPaymentProcessor
+{
+    Task&lt;Result&lt;PaymentReceipt&gt;&gt; ChargeAsync(decimal amount);
+}
+
+// Both implementations honor the same contract
+public class StripeProcessor : IPaymentProcessor
+{
+    public async Task&lt;Result&lt;PaymentReceipt&gt;&gt; ChargeAsync(decimal amount)
+    {
+        try { /* ... */ return Result.Ok(receipt); }
+        catch (StripeException ex) { return Result.Fail(ex.Message); }
+    }
+}
+
+// Caller — works identically for ALL implementations
+var result = await processor.ChargeAsync(99.99m);
+if (result.IsSuccess) ShowReceipt(result.Value);
+else ShowError(result.Error);</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">No surprise exceptions, no special catch blocks for specific implementations. Every processor is truly interchangeable because the contract explicitly includes both success and failure.</p>
         </div>
       </div>
     </div>
@@ -2329,7 +3290,30 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><code>IQueryable&lt;T&gt;</code> inherits from <code>IEnumerable&lt;T&gt;</code>, so any LINQ method that works on <code>IEnumerable</code> should work on <code>IQueryable</code>. But <code>IQueryable</code> translates to SQL, and not all LINQ operations have SQL equivalents. <code>.Last()</code>, custom methods, and in-memory lambdas fail at runtime. The fix: use the Repository pattern with explicit methods instead of exposing raw <code>IQueryable</code>.</p>
+          <p class="body-text"><code>IQueryable&lt;T&gt;</code> inherits from <code>IEnumerable&lt;T&gt;</code>. Since it's a subtype, every LINQ method that works on <code>IEnumerable</code> should also work on <code>IQueryable</code>. But <code>IQueryable</code> translates LINQ expressions to SQL, and SQL doesn't support everything C# does.</p>
+          <p class="body-text">For example, <code>.Last()</code> works fine on any <code>IEnumerable</code> (just iterate to the end). But EF Core's <code>IQueryable</code> can't translate <code>.Last()</code> to SQL because most databases don't have a "give me the last row without ordering" concept. Calling <code>.Last()</code> throws a runtime exception. Similarly, calling <code>.Where(x => MyCustomMethod(x))</code> fails because EF Core can't translate your custom C# method into SQL.</p>
+
+          <!-- SVG: IQueryable LSP violation -->
+          <svg viewBox="0 0 720 170" role="img" aria-label="Diagram showing that IQueryable inherits IEnumerable but not all IEnumerable operations work on IQueryable" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">IQueryable inherits IEnumerable but can't do everything</text>
+            <!-- IEnumerable box -->
+            <rect x="50" y="50" width="260" height="50" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="180" y="72" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">IEnumerable&lt;T&gt;</text>
+            <text x="180" y="90" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">All LINQ works: Where, Select, Last, custom methods</text>
+            <!-- IQueryable box -->
+            <rect x="410" y="50" width="260" height="50" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="540" y="72" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">IQueryable&lt;T&gt; (EF Core)</text>
+            <text x="540" y="90" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Only SQL-translatable LINQ works!</text>
+            <!-- Inheritance arrow -->
+            <line x1="410" y1="75" x2="314" y2="75" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="362" y="70" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">inherits</text>
+            <!-- Failure examples -->
+            <rect x="410" y="115" width="260" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,2"/>
+            <text x="540" y="132" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">.Last() / .ToDictionary() / custom lambdas</text>
+            <text x="540" y="148" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">throw at runtime!</text>
+          </svg>
+
+          <p class="body-text">The fix: don't expose raw <code>IQueryable</code> from your repositories. Instead, use the Repository pattern with explicit methods like <code>GetByIdAsync()</code> and <code>GetPagedAsync()</code>. The LINQ translation happens inside the repository, where you control which operations are used.</p>
         </div>
       </div>
     </div>
@@ -2341,7 +3325,8 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">A <code>sealed</code> class itself can't be subtyped, so it can't have LSP violations through inheritance. But it can still violate LSP if it <strong>implements an interface</strong> and doesn't honor the contract. A <code>sealed class StubLogger : ILogger</code> that silently drops all messages violates <code>ILogger</code>'s postcondition of "message is logged." Sealed prevents subtyping issues but not contract violations.</p>
+          <p class="body-text">Yes. A <code>sealed</code> class can't be inherited from, so it can't have LSP violations through class inheritance. But <code>sealed</code> doesn't prevent it from implementing interfaces incorrectly. If you write <code>sealed class StubLogger : ILogger</code> and the <code>Log()</code> method silently drops all messages, that violates the <code>ILogger</code> contract ("messages are logged").</p>
+          <p class="body-text">The <code>sealed</code> keyword prevents one source of LSP issues (subclassing surprises) but not the other (interface contract violations). In fact, the .NET performance guidelines recommend making classes <code>sealed</code> by default because it enables JIT devirtualization and communicates "this class is not designed for inheritance." But you still need to make sure the sealed class honors every interface it claims to implement.</p>
         </div>
       </div>
     </div>
@@ -2353,7 +3338,31 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Immutable objects eliminate mutation-based LSP violations entirely. The Square/Rectangle problem only exists because setters can be overridden with surprising behavior. With C# records (<code>record Rectangle(int Width, int Height)</code>), there are no setters to override — "resizing" creates a new instance via <code>with</code> expressions, and the original is unchanged. Immutability is the single most effective LSP enforcement tool.</p>
+          <p class="body-text">Immutability is the single most effective tool for preventing LSP violations. Think about it: the Square/Rectangle problem only exists because <code>Rectangle</code> has mutable setters that <code>Square</code> overrides with surprising behavior. The read-only list bug only exists because the underlying collection is mutable. The cached repository bug only exists because cached objects are mutable.</p>
+          <p class="body-text">With C# records, you get immutability by default. <code>record Rectangle(int Width, int Height)</code> has no setters. "Resizing" creates a new instance with <code>with { Width = 10 }</code>, leaving the original unchanged. There's nothing to override, nothing to mutate, nothing to surprise the caller. If every type in your hierarchy is immutable, an entire category of LSP violations simply cannot exist.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">ImmutableLSP.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Immutable records — LSP violations through mutation are impossible
+public record Rectangle(int Width, int Height)
+{
+    public int Area =&gt; Width * Height;
+}
+
+public record Square(int Side)
+{
+    public int Area =&gt; Side * Side;
+}
+
+// "Resizing" creates new instances — originals never change
+var rect = new Rectangle(5, 10);
+var taller = rect with { Height = 20 };  // New object, rect unchanged
+// No setters to override, no mutation surprises</code></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2365,7 +3374,9 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Using <code>new</code> instead of <code>override</code> means the method called depends on the reference type, not the runtime type. <code>Base b = new Derived(); b.Method()</code> calls <code>Base.Method()</code>, not <code>Derived.Method()</code>. This breaks polymorphic substitution — the same object behaves differently depending on how you hold the reference. It's not strictly an LSP violation (the base method IS called), but it defeats the purpose of polymorphism.</p>
+          <p class="body-text">Method hiding with <code>new</code> creates a situation where the same object behaves differently depending on the reference type you use to hold it. If you hold a <code>Derived</code> reference, you call <code>Derived.Method()</code>. If you cast it to <code>Base</code>, you call <code>Base.Method()</code>. Same object, two different behaviors.</p>
+          <p class="body-text">This isn't technically an LSP violation in the strictest sense (when you hold a <code>Base</code> reference, you DO get <code>Base</code>'s behavior, which is correct for the Base type). But it defeats the purpose of polymorphism entirely. The whole point of LSP is that you shouldn't need to care about the actual type behind the reference. Method hiding makes the reference type matter, which creates confusing bugs where behavior changes depending on variable declarations.</p>
+          <p class="body-text">The fix: use <code>override</code> instead of <code>new</code>. With <code>override</code>, the runtime type always wins, regardless of the reference type. If the base method isn't <code>virtual</code> and you can't change it, that's a strong signal you shouldn't be inheriting from it.</p>
         </div>
       </div>
     </div>
@@ -2377,7 +3388,30 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Decorators must honor the same contract as the wrapped instance. A logging decorator should add logging without changing return values. A caching decorator should still return correct data (invalidate cache on writes). A retry decorator should be transparent to the caller — if it exhausts retries, it should throw the same exception type the original would have thrown.</p>
+          <p class="body-text">A decorator wraps another implementation of the same interface, adding behavior (logging, caching, retrying) without changing the contract. Since the decorator IS a subtype (it implements the same interface), it must honor the same promises.</p>
+          <p class="body-text">A <strong>logging decorator</strong> should add log statements but return the exact same values as the wrapped instance. A <strong>caching decorator</strong> should return correct data and invalidate the cache when writes happen. A <strong>retry decorator</strong> should be transparent: if all retries fail, it throws the same exception type the original would have thrown.</p>
+          <p class="body-text">Common mistakes that break LSP in decorators: (1) A caching decorator that returns stale data because it doesn't invalidate on writes. (2) A retry decorator that swallows exceptions and returns a default value. (3) A logging decorator that catches exceptions to log them but forgets to re-throw, silently swallowing errors.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">LSPSafeDecorator.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public class LoggingOrderRepository : IOrderRepository
+{
+    private readonly IOrderRepository _inner;
+    private readonly ILogger _logger;
+
+    public async Task&lt;Order?&gt; GetByIdAsync(int id)
+    {
+        _logger.LogInformation("Getting order {Id}", id);
+        var result = await _inner.GetByIdAsync(id);  // ✅ Same return value
+        _logger.LogInformation("Got order {Id}: {Found}", id, result != null);
+        return result;  // ✅ No transformation, no swallowing
+    }
+}</code></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2389,7 +3423,9 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">ISP prevents LSP violations. If an interface is too broad (e.g., <code>IWorker</code> with <code>Work()</code> and <code>Eat()</code>), a <code>Robot</code> implementing it must throw <code>NotSupportedException</code> on <code>Eat()</code> — violating LSP. Splitting into <code>IWorkable</code> and <code>IFeedable</code> means <code>Robot</code> only implements what it can actually do. ISP eliminates the situations that force LSP violations.</p>
+          <p class="body-text">ISP (Interface Segregation Principle) is LSP's best friend. ISP says "don't force classes to implement methods they can't use." LSP says "every method you implement must work correctly." When an interface is too broad, implementations are forced to stub out methods with <code>throw new NotSupportedException()</code>, which violates LSP.</p>
+          <p class="body-text">For example, an <code>IWorker</code> interface with <code>Work()</code> and <code>Eat()</code> forces a <code>Robot</code> class to implement <code>Eat()</code>. A robot can't eat, so it throws. That's an LSP violation. The ISP fix: split into <code>IWorkable</code> and <code>IFeedable</code>. <code>Robot</code> only implements <code>IWorkable</code>. Now there's no method it can't honor, and LSP is satisfied.</p>
+          <p class="body-text">Think of ISP as a <em>preventive measure</em>: it eliminates the situations that would force LSP violations. If you're constantly finding LSP violations in your codebase, the root cause is often interfaces that are too fat (ISP violation).</p>
         </div>
       </div>
     </div>
@@ -2401,7 +3437,34 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Test the three properties: (1) <strong>Reflexive:</strong> <code>x.Equals(x) == true</code>. (2) <strong>Symmetric:</strong> <code>x.Equals(y) == y.Equals(x)</code>. (3) <strong>Transitive:</strong> if <code>x.Equals(y)</code> and <code>y.Equals(z)</code>, then <code>x.Equals(z)</code>. Plus the <strong>hash code contract:</strong> if <code>x.Equals(y)</code>, then <code>x.GetHashCode() == y.GetHashCode()</code>. Property-based testing with <span class="tooltip-trigger">FsCheck<span class="tooltip-content">A .NET port of Haskell's QuickCheck library. Instead of writing individual test cases, you define properties that must always hold (e.g., "sorting is idempotent") and FsCheck generates hundreds of random inputs to try to find a counterexample. Excellent for testing mathematical contracts like equality and comparison.</span></span> is ideal for this — generate random instances and verify all properties.</p>
+          <p class="body-text">The <code>Object</code> base class defines three mathematical properties for <code>Equals</code> and one critical rule linking it to <code>GetHashCode</code>. Testing all four is your way of ensuring LSP compliance:</p>
+          <p class="body-text"><strong>1. Reflexive:</strong> <code>x.Equals(x)</code> must always be <code>true</code>. <strong>2. Symmetric:</strong> if <code>x.Equals(y)</code> then <code>y.Equals(x)</code>. <strong>3. Transitive:</strong> if <code>x.Equals(y)</code> and <code>y.Equals(z)</code>, then <code>x.Equals(z)</code>. <strong>4. Hash code consistency:</strong> if <code>x.Equals(y)</code>, then <code>x.GetHashCode() == y.GetHashCode()</code>.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">EqualityTests.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">[Theory, MemberData(nameof(EqualPairs))]
+public void Equals_IsSymmetric(User x, User y)
+{
+    Assert.Equal(x.Equals(y), y.Equals(x));
+}
+
+[Theory, MemberData(nameof(EqualPairs))]
+public void EqualObjects_HaveSameHashCode(User x, User y)
+{
+    if (x.Equals(y))
+        Assert.Equal(x.GetHashCode(), y.GetHashCode());
+}
+
+// Best approach: property-based testing with FsCheck
+[Property]
+public Property HashCode_ConsistentWithEquals(User x, User y) =&gt;
+    (x.Equals(y) == false || x.GetHashCode() == y.GetHashCode()).ToProperty();</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">Property-based testing with <span class="tooltip-trigger">FsCheck<span class="tooltip-content">A .NET port of Haskell's QuickCheck library. Instead of writing individual test cases, you define properties that must always hold (e.g., "sorting is idempotent") and FsCheck generates hundreds of random inputs to try to find a counterexample. Excellent for testing mathematical contracts like equality and comparison.</span></span> is ideal here because it generates hundreds of random inputs and checks that all properties hold, instead of relying on you to think of every edge case.</p>
         </div>
       </div>
     </div>
@@ -2415,7 +3478,44 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">If the base contract returns <code>Task&lt;T&gt;</code>, all implementations must: (1) actually be async when I/O is involved (blocking with <code>.Result</code> or <code>.Wait()</code> can deadlock — a postcondition violation). (2) Throw the same exception types wrapped in the Task (not synchronously). (3) Respect cancellation tokens — if the contract has <code>CancellationToken ct</code>, implementations must check it. An implementation that ignores the cancellation token strengthens the precondition ("I only work without cancellation").</p>
+          <p class="body-text">Async methods add several hidden postconditions that implementations must honor. The return type is <code>Task&lt;T&gt;</code>, which carries expectations beyond just "eventually returns a value."</p>
+          <p class="body-text"><strong>Rule 1: Don't block.</strong> If the interface returns <code>Task&lt;T&gt;</code>, callers expect to <code>await</code> it without blocking. An implementation that internally calls <code>.Result</code> or <code>.Wait()</code> can deadlock in ASP.NET or UI contexts. That's a postcondition violation: the caller expected a non-blocking operation and got a deadlock.</p>
+          <p class="body-text"><strong>Rule 2: Exceptions go in the Task.</strong> Async methods should wrap exceptions inside the returned <code>Task</code> (which happens automatically with <code>async/await</code>). If an implementation throws synchronously before the first <code>await</code>, the exception escapes the Task and callers who try-catch the <code>await</code> won't catch it.</p>
+          <p class="body-text"><strong>Rule 3: Honor cancellation tokens.</strong> If the contract includes <code>CancellationToken ct</code>, implementations must periodically check <code>ct.IsCancellationRequested</code> or pass the token to downstream calls. An implementation that ignores the token strengthens the precondition: "I only work without cancellation." Code that depends on timely cancellation (like HTTP request timeouts) will hang.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">AsyncLSP.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public interface IDataFetcher
+{
+    Task&lt;Data&gt; FetchAsync(string url, CancellationToken ct);
+}
+
+// ❌ BAD: Blocks, ignores cancellation, throws synchronously
+public class BadFetcher : IDataFetcher
+{
+    public Task&lt;Data&gt; FetchAsync(string url, CancellationToken ct)
+    {
+        if (url == null) throw new ArgumentNullException();  // ❌ Sync throw
+        var result = _http.GetAsync(url).Result;             // ❌ Blocking
+        return Task.FromResult(Parse(result));               // ❌ Ignores ct
+    }
+}
+
+// ✅ GOOD: Truly async, honors cancellation, exception in Task
+public class GoodFetcher : IDataFetcher
+{
+    public async Task&lt;Data&gt; FetchAsync(string url, CancellationToken ct)
+    {
+        var response = await _http.GetAsync(url, ct);  // ✅ Async + ct
+        ct.ThrowIfCancellationRequested();              // ✅ Checks ct
+        return Parse(await response.Content.ReadAsStringAsync(ct));
+    }
+}</code></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2427,7 +3527,34 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">When you register <code>IEnumerable&lt;INotificationChannel&gt;</code> and inject all implementations, each channel must honor the same contract. If <code>EmailChannel.SendAsync()</code> takes 5 seconds while <code>SmsChannel.SendAsync()</code> takes 100ms, the overall pipeline is bound by the slowest. The LSP-safe approach: define explicit SLA postconditions in the interface ("SendAsync completes within 2 seconds or returns failure") and test each implementation against it.</p>
+          <p class="body-text">When you register multiple implementations of the same interface (like <code>IEnumerable&lt;INotificationChannel&gt;</code>), each implementation is a subtype that must honor the interface contract. The system iterates through all of them, calling the same method on each. If any one behaves differently, the whole pipeline is affected.</p>
+          <p class="body-text">The most common LSP violation here is <strong>performance asymmetry</strong>. If <code>SmsChannel.SendAsync()</code> takes 100ms but <code>EmailChannel.SendAsync()</code> takes 5 seconds, the overall pipeline is bound by the slowest channel. Code that loops through all channels and awaits each one will be unexpectedly slow.</p>
+
+          <!-- SVG: Multi-registration performance -->
+          <svg viewBox="0 0 720 170" role="img" aria-label="Diagram showing how one slow implementation in a multi-registration pipeline slows down the entire system" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="lsp-q20-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">Multi-registration: slowest channel = total time</text>
+            <!-- Pipeline -->
+            <rect x="30" y="50" width="120" height="40" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="90" y="70" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">SMS: 100ms</text>
+            <text x="90" y="85" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Fast</text>
+            <rect x="170" y="50" width="120" height="40" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="230" y="70" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Push: 200ms</text>
+            <text x="230" y="85" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Fast</text>
+            <rect x="310" y="50" width="120" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="370" y="70" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold">Email: 5000ms</text>
+            <text x="370" y="85" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Bottleneck!</text>
+            <!-- Total -->
+            <rect x="460" y="50" width="240" height="40" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="580" y="75" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Total: 5300ms (not 100ms!)</text>
+            <!-- Fix note -->
+            <text x="360" y="130" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Fix: Define SLA postconditions ("SendAsync &lt; 2s") and test each implementation</text>
+            <text x="360" y="150" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Or: Use Task.WhenAll() with per-channel timeouts</text>
+          </svg>
+
+          <p class="body-text">The LSP-safe approach: define explicit SLA postconditions in the interface documentation ("SendAsync must complete within 2 seconds or return a failure result"). Then write contract tests that assert timing for each implementation. If Email is inherently slow, it should return a "queued" result immediately and process in the background.</p>
         </div>
       </div>
     </div>
@@ -2439,7 +3566,27 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Structs can't inherit from other structs, so classical LSP violations don't apply. But structs can implement interfaces — and a struct implementing <code>IDisposable</code> gets boxed when cast to the interface, creating a copy. Disposing the boxed copy doesn't dispose the original. This is a subtle LSP violation because the interface contract says "calling Dispose releases resources," but boxing means the original struct's resources aren't released.</p>
+          <p class="body-text">Structs can't inherit from other structs, so the classic inheritance-based LSP violations don't apply. But structs CAN implement interfaces, and that's where a subtle trap lurks: <strong>boxing</strong>.</p>
+          <p class="body-text">When a struct is cast to an interface, C# creates a boxed copy on the heap. If the struct implements <code>IDisposable</code> and you cast it to <code>IDisposable</code> before calling <code>Dispose()</code>, you're disposing the <em>copy</em>, not the original. The original struct's resources are never released. The interface contract says "calling Dispose releases resources," but boxing breaks this guarantee.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">StructBoxing.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public struct FileHandle : IDisposable
+{
+    private IntPtr _handle;
+    public void Dispose() =&gt; CloseHandle(_handle);
+}
+
+var handle = new FileHandle();
+IDisposable disposable = handle;  // ← BOXING: creates a copy!
+disposable.Dispose();              // Disposes the COPY
+// Original 'handle' is NOT disposed — resource leak!</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The fix: avoid implementing <code>IDisposable</code> on structs, or use the <code>using</code> statement directly with the struct variable (which avoids boxing in modern C#). This is why .NET's own <code>ValueTask</code> exists as a struct but uses special compiler support to avoid boxing issues.</p>
         </div>
       </div>
     </div>
@@ -2451,7 +3598,31 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Event handlers follow a contract: receive the event, process it, don't throw. If one handler in a multicast delegate throws, remaining handlers don't execute. This violates the implicit postcondition that "all handlers are notified." The fix: wrap each handler invocation in try/catch, or use an event aggregator that isolates handler failures. In MediatR, pipeline behaviors should catch and log — not let one handler crash the entire pipeline.</p>
+          <p class="body-text">Event handlers follow an implicit contract: receive the event, process it, and don't throw. If one handler in a <span class="tooltip-trigger">multicast delegate<span class="tooltip-content">In C#, events use multicast delegates that can have multiple subscribers. When the event fires, each subscriber's handler is called in order. If any handler throws an exception, the remaining handlers in the chain never execute.</span></span> throws an exception, all remaining handlers in the chain are skipped. This violates the implicit postcondition that "all subscribers are notified."</p>
+          <p class="body-text">This is an LSP issue because each event handler is a "subtype" of the handler delegate contract. The contract says "handle this event." A handler that throws instead of handling breaks the contract and affects every other handler in the chain.</p>
+
+          <!-- SVG: Event handler chain -->
+          <svg viewBox="0 0 720 160" role="img" aria-label="Diagram showing how one throwing event handler prevents remaining handlers from executing" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <defs>
+              <marker id="lsp-q22-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14b8a6"/></marker>
+            </defs>
+            <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">One throwing handler breaks the entire chain</text>
+            <rect x="30" y="55" width="130" height="40" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="95" y="80" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="11">Handler A</text>
+            <line x1="160" y1="75" x2="190" y2="75" stroke="#14b8a6" stroke-width="2" marker-end="url(#lsp-q22-arr)"/>
+            <rect x="195" y="55" width="130" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="260" y="80" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Handler B (throws!)</text>
+            <rect x="360" y="55" width="130" height="40" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="425" y="80" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11">Handler C (skipped)</text>
+            <rect x="525" y="55" width="130" height="40" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="590" y="80" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="11">Handler D (skipped)</text>
+            <!-- X marks -->
+            <text x="335" y="75" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold">X</text>
+            <text x="500" y="75" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold">X</text>
+            <text x="360" y="130" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Fix: Wrap each handler in try/catch, or use MediatR with pipeline error isolation</text>
+          </svg>
+
+          <p class="body-text">The fix: wrap each handler invocation in a try/catch so one failure doesn't cascade. Or better yet, use an event aggregator (like MediatR) that isolates handler failures. In MediatR, pipeline behaviors should catch and log exceptions from individual handlers without letting them crash the entire notification pipeline.</p>
         </div>
       </div>
     </div>
@@ -2463,7 +3634,35 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Three rules: (1) Design the base class/interface as a <strong>contract first</strong> — document preconditions, postconditions, invariants before writing any implementation. (2) Write contract tests for the base type before creating subtypes. (3) Every time you add a subtype, run the contract tests. If you find yourself needing to add "if this specific subtype, do X" in caller code, you've violated LSP — refactor the hierarchy or switch to composition.</p>
+          <p class="body-text">Designing for LSP compliance is about discipline at the beginning, not fixes at the end. Three rules will save you:</p>
+          <p class="body-text"><strong>1. Contract first.</strong> Before writing any implementation, write down what the base type promises. What inputs does it accept? What does it guarantee about outputs? What invariants must always hold? Write these as XML doc comments or, better, as contract tests.</p>
+          <p class="body-text"><strong>2. Tests before subtypes.</strong> Write the contract test suite (see Q9) before creating any subtype. The tests define the behavioral specification. Any future implementation that passes all tests is LSP-compliant by definition.</p>
+          <p class="body-text"><strong>3. The type-check smell.</strong> If you find yourself writing <code>if (x is SpecificSubtype)</code> in caller code, that's a red flag. It means the subtype isn't truly substitutable and the caller needs special handling. Either fix the subtype's behavior or restructure the hierarchy.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">ContractFirst.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">/// &lt;summary&gt;Payment processor contract.&lt;/summary&gt;
+/// &lt;remarks&gt;
+/// Preconditions: amount &gt; 0, currency is valid ISO code
+/// Postconditions: returns Result (never throws), completes within 5s
+/// Invariants: idempotent — charging same orderId twice = one charge
+/// &lt;/remarks&gt;
+public interface IPaymentProcessor
+{
+    Task&lt;Result&lt;Receipt&gt;&gt; ChargeAsync(
+        decimal amount, string currency, string orderId,
+        CancellationToken ct);
+}
+
+// Now write contract tests BEFORE any implementation:
+[Fact] public async Task Charge_NegativeAmount_ReturnsFailure() { /* ... */ }
+[Fact] public async Task Charge_SameOrderTwice_IsIdempotent() { /* ... */ }
+[Fact] public async Task Charge_CompletesWithinFiveSeconds() { /* ... */ }</code></pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2475,7 +3674,29 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">DIP says "depend on abstractions, not concretions." LSP says "those abstractions must be behaviorally honored by all implementations." DIP without LSP is dangerous — you depend on an interface, but the concrete implementation breaks the contract. Together they form the foundation of reliable DI: DIP gives you the abstraction layer, LSP guarantees that swapping implementations doesn't break anything.</p>
+          <p class="body-text">DIP and LSP are two halves of the same coin. DIP says "depend on abstractions (interfaces), not concrete classes." LSP says "every concrete class that implements that interface must actually behave the way the interface promises."</p>
+          <p class="body-text">DIP without LSP is dangerous. You refactor your code to depend on <code>IRepository</code> instead of <code>SqlRepository</code>. Great, now you can swap implementations. But if the new <code>MongoRepository</code> doesn't honor the same contract (returns items in a different order, throws different exceptions, doesn't support transactions), your code breaks. You've got the abstraction layer that DIP wanted, but the implementations aren't trustworthy.</p>
+
+          <!-- SVG: DIP + LSP relationship -->
+          <svg viewBox="0 0 720 160" role="img" aria-label="Diagram showing how DIP creates the abstraction layer and LSP ensures all implementations honor it" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">DIP + LSP = Safe dependency injection</text>
+            <!-- Interface layer -->
+            <rect x="230" y="42" width="260" height="40" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="360" y="67" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold">IRepository (abstraction)</text>
+            <!-- DIP label -->
+            <text x="120" y="67" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">DIP: depend on this</text>
+            <!-- Implementations -->
+            <rect x="60" y="105" width="150" height="35" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="135" y="127" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">SqlRepository</text>
+            <rect x="285" y="105" width="150" height="35" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="360" y="127" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">MongoRepository</text>
+            <rect x="510" y="105" width="150" height="35" rx="6" fill="#1e293b" stroke="#14b8a6" stroke-width="1.5"/>
+            <text x="585" y="127" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="11">InMemoryRepo</text>
+            <!-- LSP label -->
+            <text x="630" y="67" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">LSP: all honor it</text>
+          </svg>
+
+          <p class="body-text">Together, DIP gives you the abstraction layer, and LSP guarantees that swapping implementations doesn't break anything. This is the foundation of reliable dependency injection: you can confidently register <code>services.AddScoped&lt;IRepository, AnyRepo&gt;()</code> because LSP ensures <code>AnyRepo</code> plays by the rules.</p>
         </div>
       </div>
     </div>
@@ -2487,7 +3708,26 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><span class="tooltip-trigger">API versioning<span class="tooltip-content">The practice of maintaining multiple versions of an API (v1, v2) to allow clients to migrate gradually. Each new version is essentially a "subtype" of the API contract — it must honor existing expectations (backward compatibility) while adding new capabilities.</span></span> is LSP at the service boundary. A v2 API endpoint that accepts the same request as v1 but returns fewer fields violates the postcondition. A v2 that requires new mandatory parameters strengthens the precondition. Backward-compatible API evolution = LSP for HTTP. This is why adding optional fields is safe (weaker preconditions) but removing response fields is breaking (weaker postconditions).</p>
+          <p class="body-text"><span class="tooltip-trigger">API versioning<span class="tooltip-content">The practice of maintaining multiple versions of an API (v1, v2) to allow clients to migrate gradually. Each new version is essentially a "subtype" of the API contract — it must honor existing expectations (backward compatibility) while adding new capabilities.</span></span> is LSP applied at the service boundary instead of the class boundary. A v2 API is essentially a "subtype" of the v1 API. Clients that worked with v1 should continue to work with v2 without changes. That's substitutability across HTTP.</p>
+          <p class="body-text">The LSP rules map directly: a v2 endpoint that requires new mandatory parameters <strong>strengthens the precondition</strong> (clients must send more data). A v2 that returns fewer response fields <strong>weakens the postcondition</strong> (clients get less than they expected). Both are breaking changes that violate backward compatibility, which is LSP for APIs.</p>
+          <p class="body-text">Safe API evolution follows LSP: add optional request fields (weaker preconditions, accepting more), add new response fields (stronger postconditions, giving more), add new endpoints (extending without modifying). Never remove response fields or make request fields mandatory in an existing version.</p>
+
+          <!-- SVG: API versioning LSP -->
+          <svg viewBox="0 0 720 150" role="img" aria-label="Diagram showing safe vs breaking API changes through the lens of LSP preconditions and postconditions" style="width:100%;max-width:720px;margin:1rem auto;display:block;">
+            <text x="360" y="22" text-anchor="middle" fill="#e2e8f0" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold">API Versioning = LSP for HTTP</text>
+            <!-- Safe changes -->
+            <rect x="30" y="45" width="310" height="85" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+            <text x="185" y="67" text-anchor="middle" fill="#14b8a6" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Safe (LSP-compliant)</text>
+            <text x="185" y="87" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">+ Add optional request params (weaker pre)</text>
+            <text x="185" y="103" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">+ Add new response fields (stronger post)</text>
+            <text x="185" y="119" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">+ Add new endpoints (extension)</text>
+            <!-- Breaking changes -->
+            <rect x="380" y="45" width="310" height="85" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+            <text x="535" y="67" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold">Breaking (LSP violation)</text>
+            <text x="535" y="87" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">- New mandatory params (stronger pre)</text>
+            <text x="535" y="103" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">- Remove response fields (weaker post)</text>
+            <text x="535" y="119" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">- Change field types or meanings</text>
+          </svg>
         </div>
       </div>
     </div>
@@ -2499,7 +3739,31 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Add performance assertions to contract tests. Example: <code>Assert.True(stopwatch.Elapsed &lt; TimeSpan.FromMilliseconds(100), "GetByIdAsync must complete within 100ms")</code>. For more rigorous testing, use BenchmarkDotNet to establish baseline metrics for each implementation. If a new decorator makes the hot path 10x slower, the performance contract test catches it before production.</p>
+          <p class="body-text">Implicit postconditions are the sneaky ones. The interface doesn't say "must complete within 100ms," but every caller assumes it. When a new implementation takes 5 seconds instead of 5 milliseconds, the system breaks even though the return value is correct.</p>
+          <p class="body-text">The most practical approach is to add performance assertions to your contract tests. Measure execution time with a <code>Stopwatch</code> and assert it's within acceptable bounds. For more rigorous testing, use <span class="tooltip-trigger">BenchmarkDotNet<span class="tooltip-content">A popular .NET benchmarking library that provides statistically rigorous performance measurements. It handles warm-up, multiple iterations, and statistical analysis automatically, giving you reliable baseline metrics for each implementation.</span></span> to establish baseline metrics for each implementation and flag regressions in CI.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">PerformanceContract.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// Add to your contract test suite
+[Fact]
+public async Task GetByIdAsync_CompletesWithinSLA()
+{
+    var sut = CreateSut();
+    await sut.SaveAsync(new Order { Id = 1, Total = 99m });
+
+    var sw = Stopwatch.StartNew();
+    await sut.GetByIdAsync(1);
+    sw.Stop();
+
+    Assert.True(sw.Elapsed &lt; TimeSpan.FromMilliseconds(100),
+        $"GetByIdAsync took {sw.ElapsedMilliseconds}ms — SLA is 100ms");
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">If a new caching decorator or database migration makes the hot path 10x slower, this test catches it before production. Make implicit postconditions explicit by testing them.</p>
         </div>
       </div>
     </div>
@@ -2511,7 +3775,10 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Structural subtyping</strong> (TypeScript's duck typing): if it has the right methods, it's a subtype. <strong>Behavioral subtyping</strong> (LSP): if it has the right methods AND behaves correctly, it's a subtype. A class that implements <code>ISortStrategy.Sort()</code> but returns items in random order satisfies structural subtyping but violates behavioral subtyping. C# uses nominal typing (you must explicitly implement the interface), but LSP cares about behavior — neither the compiler nor the type system can fully enforce it.</p>
+          <p class="body-text">These are two different ways to decide whether one type can substitute for another.</p>
+          <p class="body-text"><strong>Structural subtyping</strong> (TypeScript's approach, often called "duck typing") only checks the shape: if an object has the right methods with the right signatures, it's a subtype. A class with a <code>Sort(IList&lt;T&gt; items)</code> method structurally matches <code>ISortStrategy</code>, even if the method arranges items randomly instead of sorting them.</p>
+          <p class="body-text"><strong>Behavioral subtyping</strong> (LSP) goes deeper: it checks that the methods actually <em>behave</em> correctly. Having a <code>Sort()</code> method isn't enough; the method must actually sort. Having a <code>Save()</code> method isn't enough; the method must actually persist data.</p>
+          <p class="body-text">C# uses <strong>nominal typing</strong>: you must explicitly say <code>class MySort : ISortStrategy</code>. This is stronger than structural typing (you can't accidentally satisfy an interface) but weaker than behavioral typing (the compiler can't check that <code>Sort()</code> actually sorts). LSP fills that gap: it's a design principle that says "make sure your implementations actually do what the interface promises," which no compiler can fully enforce.</p>
         </div>
       </div>
     </div>
@@ -2523,7 +3790,40 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><span class="tooltip-trigger">Default interface methods<span class="tooltip-content">A C# 8+ feature that allows interfaces to provide method implementations. Existing classes that implement the interface don't need to change — they get the default behavior automatically. This is LSP-friendly because it adds capabilities without breaking existing subtypes.</span></span> let you add new methods to an interface without breaking existing implementations. This is LSP-friendly — existing subtypes still honor the original contract, and the default implementation provides a safe fallback. But be careful: if an implementation overrides the default with different behavior and callers depend on the default's semantics, it can introduce an LSP violation. Test overrides against the same contract tests as the default.</p>
+          <p class="body-text"><span class="tooltip-trigger">Default interface methods<span class="tooltip-content">A C# 8+ feature that allows interfaces to provide method implementations. Existing classes that implement the interface don't need to change — they get the default behavior automatically. This is LSP-friendly because it adds capabilities without breaking existing subtypes.</span></span> are inherently LSP-friendly. They let you add new methods to an interface without breaking existing implementations. Before C# 8, adding a method to <code>IRepository</code> would break every class that implements it. With default methods, existing classes get the default behavior automatically.</p>
+          <p class="body-text">The LSP risk comes when an implementation overrides the default with different semantics. If the default <code>BulkSaveAsync()</code> saves items one by one (safe but slow), and an override saves them in a transaction (fast but different failure mode), callers who depend on the default's "one item fails, others succeed" behavior will get a surprise when the override rolls back everything.</p>
+          <div class="macos-window mt-sm">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">DefaultMethods.cs</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-csharp">public interface IRepository&lt;T&gt;
+{
+    Task SaveAsync(T entity);
+
+    // Default method: safe, LSP-friendly addition
+    async Task BulkSaveAsync(IEnumerable&lt;T&gt; entities)
+    {
+        foreach (var entity in entities)
+            await SaveAsync(entity);  // One at a time — partial success possible
+    }
+}
+
+// Override must honor the SAME contract as the default
+public class SqlRepo : IRepository&lt;Order&gt;
+{
+    public async Task BulkSaveAsync(IEnumerable&lt;Order&gt; entities)
+    {
+        // ⚠️ Wraps in a transaction — ALL or NOTHING
+        // This changes the failure semantics! LSP risk.
+        using var tx = await _db.BeginTransactionAsync();
+        // ...
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text mt-sm">The safest approach: run your contract tests against both the default behavior AND any overrides. If the override changes the observable behavior (not just performance), document the difference clearly.</p>
         </div>
       </div>
     </div>
@@ -2535,7 +3835,12 @@ public decimal Sum(IEnumerable&lt;decimal&gt; values) =&gt; values.Sum();
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text">Pragmatic LSP violations are acceptable when: (1) The violation is <strong>documented and managed</strong> — like Stream's CanSeek/CanRead capability flags. (2) The cost of perfect LSP compliance outweighs the benefit — splitting Stream into 7 interfaces would make the API unusable. (3) The violation is <strong>contained</strong> — all callers check capabilities before calling. The key: LSP violations should be <em>conscious, documented, and tested</em> — not accidental.</p>
+          <p class="body-text">Sometimes perfect LSP compliance costs more than it's worth. The .NET team knew that <code>Stream</code> violates LSP (NetworkStream can't Seek), but splitting Stream into 7 granular interfaces would make the API unusable. Instead, they chose a managed violation with capability flags.</p>
+          <p class="body-text">Pragmatic LSP violations are acceptable when three conditions are met:</p>
+          <p class="body-text"><strong>1. Documented.</strong> The violation is explicitly stated in documentation, XML comments, or capability flags. Nobody should be surprised.</p>
+          <p class="body-text"><strong>2. Contained.</strong> All callers know about it and check for it. If <code>CanSeek</code> is false, nobody calls <code>Seek()</code>. The violation is isolated, not hidden.</p>
+          <p class="body-text"><strong>3. Tested.</strong> There are tests that verify the capability flags are correct and that callers handle both cases (can and can't). If someone accidentally changes <code>CanSeek</code> to return true when it shouldn't, a test catches it.</p>
+          <p class="body-text">The key distinction: <em>accidental</em> LSP violations are always bugs. <em>Conscious, documented, tested</em> LSP violations are engineering tradeoffs. The question isn't "is this a violation?" but "is this violation managed or wild?"</p>
         </div>
       </div>
     </div>

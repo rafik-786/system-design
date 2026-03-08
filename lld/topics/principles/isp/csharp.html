@@ -1537,8 +1537,66 @@ using var file = new FileHandle();           // calls Dispose()</code></pre>
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>E-commerce platform, Black Friday.</strong> A new "gift card" payment processor was added. It implemented <code>IPaymentProcessor</code> with 8 methods but only supported 3. The other 5 threw <code>NotImplementedException</code>. For 3 months it worked — until the promo engine called <code>RefundAsync()</code> on a gift card payment. Crash. During <span class="tooltip-trigger">peak traffic<span class="tooltip-content">Black Friday / Cyber Monday traffic can be 10-50x normal volume. A crash during peak means thousands of failed transactions per minute, potential revenue loss in the hundreds of thousands, and a very stressful on-call rotation.</span></span>.</p>
         </div>
+
+        <p class="body-text">Think of it like handing someone a Swiss Army knife when all they need is a screwdriver. The knife has a blade, a corkscrew, scissors, a file — tools the person will never use. But those tools are still there, and sooner or later someone grabs the wrong one. That is exactly what happened here: the interface promised eight abilities, but the gift card could only deliver three.</p>
+
+        <p class="body-text">The team originally built <code>IPaymentProcessor</code> for credit cards. Credit cards <em>can</em> charge, refund, void, and set up recurring billing. Everything on the interface made sense for that first payment type. Then gift cards came along. Gift cards can charge a balance and check the remaining amount, but they cannot refund (the money goes to a gift card balance, not back to a bank), they cannot void (once redeemed, it is done), and they definitely cannot set up recurring billing. The developer who wrote <code>GiftCardProcessor</code> did the only thing the interface allowed: implement all eight methods, throw <code>NotImplementedException</code> for the five that made no sense, and hope nobody called them.</p>
+
+        <p class="body-text">For three months, that hope held. The checkout flow only called <code>ChargeAsync</code> and <code>GetBalanceAsync</code> — the two methods that actually worked. But the promo engine had a rollback feature: if a promotional discount was applied incorrectly, it would call <code>RefundAsync</code> to reverse the charge. The promo engine did not know (and had no way of knowing) that gift cards could not handle refunds. It received an <code>IPaymentProcessor</code> and called what the interface promised was available.</p>
+
+        <p class="body-text">On Black Friday, a pricing bug applied a 100% discount on gift card purchases. The promo engine kicked in to reverse those transactions. It called <code>RefundAsync</code> on every affected order — including the gift card ones. Boom. <code>NotImplementedException</code> crashed the promo rollback pipeline. The queue backed up, retries piled on, and within minutes the entire payment processing pipeline ground to a halt. Not just gift cards — <em>all</em> payments were stuck behind the failed gift card refund retries.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">45 minutes. The stack trace pointed directly at <code>GiftCardProcessor.RefundAsync()</code>, but the team had to figure out <strong>why</strong> refund was being called on a gift card — the promo engine's rollback logic didn't distinguish between payment types.</p>
+        <p class="body-text">45 minutes. The stack trace pointed directly at <code>GiftCardProcessor.RefundAsync()</code>, but the team had to figure out <strong>why</strong> refund was being called on a gift card — the promo engine's rollback logic did not distinguish between payment types.</p>
+
+        <!-- SVG: Fat interface vs segregated -->
+        <svg viewBox="0 0 720 320" role="img" aria-label="Fat interface funneling all payment types into one contract vs segregated interfaces routing by capability" style="width:100%;max-width:720px;margin:1.2rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="isp-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: Fat interface -->
+          <text x="180" y="22" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Fat Interface (Before)</text>
+          <rect x="60" y="35" width="240" height="40" rx="6" fill="var(--bg-secondary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="180" y="60" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="12" text-anchor="middle">IPaymentProcessor (8 methods)</text>
+          <!-- Implementers -->
+          <rect x="30" y="110" width="130" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="95" y="130" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">CreditCard (8/8)</text>
+          <rect x="180" y="110" width="130" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-red)" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <text x="245" y="130" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">GiftCard (3/8)</text>
+          <line x1="140" y1="75" x2="95" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <line x1="220" y1="75" x2="245" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <!-- Bomb icon area -->
+          <rect x="190" y="155" width="110" height="24" rx="4" fill="var(--text-red)" opacity="0.15"/>
+          <text x="245" y="172" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">5 NotImplemented!</text>
+          <!-- PromoEngine -->
+          <rect x="100" y="200" width="160" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-secondary)" stroke-width="1"/>
+          <text x="180" y="220" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">PromoEngine.Rollback()</text>
+          <line x1="180" y1="142" x2="180" y2="200" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <text x="180" y="255" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">CRASH on RefundAsync()</text>
+
+          <!-- Right: Segregated -->
+          <text x="540" y="22" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Segregated (After)</text>
+          <rect x="420" y="35" width="100" height="32" rx="5" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="470" y="55" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IChargeable</text>
+          <rect x="540" y="35" width="100" height="32" rx="5" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="590" y="55" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IRefundable</text>
+          <rect x="660" y="35" width="100" height="32" rx="5" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="710" y="55" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle" font-size="10">IRecurring</text>
+          <!-- Implementers -->
+          <rect x="420" y="110" width="130" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="485" y="130" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">CreditCard (all 3)</text>
+          <rect x="570" y="110" width="130" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="635" y="130" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">GiftCard (only 1)</text>
+          <line x1="470" y1="67" x2="485" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <line x1="590" y1="67" x2="485" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <line x1="710" y1="67" x2="485" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <line x1="470" y1="67" x2="635" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b1-arr)"/>
+          <!-- PromoEngine -->
+          <rect x="480" y="200" width="180" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="570" y="220" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">PromoEngine(IRefundable)</text>
+          <line x1="590" y1="67" x2="570" y2="200" stroke="var(--accent-primary)" stroke-width="1" marker-end="url(#isp-b1-arr)" stroke-dasharray="4,3"/>
+          <text x="570" y="255" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">GiftCard never reaches here</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1586,6 +1644,7 @@ public class PromoEngine(IPaymentProcessor processor)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Look at <code>IPaymentProcessor</code> — it bundles eight methods into a single contract. That contract works perfectly for credit cards, which can do all eight things. But when the team adds <code>GiftCardProcessor</code>, it can only handle three of those eight methods. The remaining five are dead weight — they compile, they exist, but calling them blows up at runtime. Now look at <code>PromoEngine</code>: it receives an <code>IPaymentProcessor</code> and calls <code>RefundAsync()</code>. The interface says "I can refund," so the promo engine trusts it. The interface lied for gift cards.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1630,12 +1689,18 @@ public class PromoEngine(IRefundable processor)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of one giant contract, we split the payment abilities into three focused interfaces: <code>IChargeable</code> (charge and check balance), <code>IRefundable</code> (refund and void), and <code>IRecurring</code> (subscription management). <code>GiftCardProcessor</code> only implements <code>IChargeable</code> — no lies, no dead methods. The promo engine now asks for <code>IRefundable</code>, not a generic payment processor. The DI container will never inject a gift card into the promo engine because <code>GiftCardProcessor</code> does not implement <code>IRefundable</code>. The compiler enforces what a runtime exception used to police. This is the core promise of ISP: the type system prevents the mistake before the code even runs.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search your codebase for <code>throw new NotImplementedException()</code> and <code>throw new NotSupportedException()</code>. Every hit is a potential time bomb. If a class implements an interface method by throwing, the interface is too fat for that class. Also look for methods that return hardcoded defaults like <code>return null</code>, <code>return false</code>, or <code>return Task.CompletedTask</code> where the caller expects real behavior — those are "silent" versions of the same problem.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-          <p class="body-text"><code>NotImplementedException</code> is a code smell that screams "ISP violation." If an implementer can't meaningfully implement a method, the method shouldn't be in that interface. The compiler should prevent the bug, not a runtime exception.</p>
+          <p class="body-text"><code>NotImplementedException</code> is a code smell that screams "ISP violation." If an implementer cannot meaningfully implement a method, the method should not be in that interface. The compiler should prevent the bug, not a runtime exception.</p>
         </div>
       </div>
     </div>
@@ -1649,8 +1714,60 @@ public class PromoEngine(IRefundable processor)
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Healthcare SaaS, compliance audit.</strong> The logging system had an <code>ILogger</code> with <code>LogInfo()</code>, <code>LogWarning()</code>, <code>LogError()</code>, <code>LogAudit()</code>, and <code>LogMetric()</code>. The <code>ConsoleLogger</code> implemented <code>LogAudit()</code> as a no-op (empty method body). For 6 months, audit events were silently discarded. Discovered during a <span class="tooltip-trigger">HIPAA<span class="tooltip-content">Health Insurance Portability and Accountability Act — US federal law requiring healthcare organizations to protect patient data. HIPAA violations can result in fines from $100 to $50,000 per violation, with annual maximums of $1.5 million per violation category.</span></span> compliance review.</p>
         </div>
+
+        <p class="body-text">Imagine you hire a security guard and tell them: "Watch the front door, watch the cameras, and write down every visitor in the logbook." The guard watches the door and cameras just fine, but quietly ignores the logbook part — never writes a single entry. You would not know anything was wrong until someone asked "Who visited last Tuesday?" and the logbook was blank. That is what a no-op method does. It accepts the call, does absolutely nothing, and nobody finds out until it is too late.</p>
+
+        <p class="body-text">The team built a single <code>ILogger</code> interface with five methods: three for general logging (info, warning, error), one for compliance audit trails, and one for performance metrics. The <code>ConsoleLogger</code> class implemented this interface. Console output is great for info/warning/error — you just print to the terminal. But audit logs need to go to a database (for compliance records), and metrics need to go to a monitoring system (like Prometheus or Datadog). The console cannot do either of those things.</p>
+
+        <p class="body-text">The developer who wrote <code>ConsoleLogger</code> faced a choice: throw an exception (which would crash the app) or write an empty method body (which would keep things running). They chose the empty body. It seemed harmless. The code compiled, tests passed (nobody tested that audit events actually persisted), and the system ran smoothly for six months.</p>
+
+        <p class="body-text">Then came the HIPAA compliance review. Auditors asked for records of who accessed patient data in the last quarter. The team went to the audit table — it was empty. Six months of patient access events, gone. Not corrupted, not encrypted, just never written. The <code>ConsoleLogger</code> had been silently swallowing every audit call. The team spent two weeks doing forensic reconstruction: cross-referencing application logs, database query logs, and access timestamps to rebuild what they could. Some events were unrecoverable. The resulting compliance gap led to a formal remediation plan and additional regulatory scrutiny.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">2 weeks of forensics to determine which audit events were lost and reconstruct them from other system logs. The no-op method compiled and ran without error — the bug was completely invisible.</p>
+
+        <!-- SVG: Silent no-op vs segregated -->
+        <svg viewBox="0 0 720 280" role="img" aria-label="No-op audit method silently discards data versus segregated interface that guarantees a real implementation" style="width:100%;max-width:720px;margin:1.2rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="isp-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: Fat interface path -->
+          <text x="180" y="20" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Fat ILogger (Before)</text>
+          <rect x="80" y="32" width="200" height="36" rx="6" fill="var(--bg-secondary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="180" y="55" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">ILogger (5 methods)</text>
+          <!-- ConsoleLogger -->
+          <rect x="80" y="95" width="200" height="36" rx="6" fill="var(--bg-tertiary)" stroke="var(--text-secondary)" stroke-width="1"/>
+          <text x="180" y="118" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">ConsoleLogger</text>
+          <line x1="180" y1="68" x2="180" y2="95" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b2-arr)"/>
+          <!-- Audit call -->
+          <rect x="60" y="160" width="120" height="30" rx="5" fill="var(--bg-secondary)" stroke="var(--text-secondary)" stroke-width="1"/>
+          <text x="120" y="179" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">LogAudit() call</text>
+          <line x1="160" y1="131" x2="130" y2="160" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b2-arr)"/>
+          <!-- Black hole -->
+          <text x="120" y="215" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="22" text-anchor="middle">/dev/null</text>
+          <text x="120" y="238" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">6 months of lost audit data</text>
+
+          <!-- Right: Segregated -->
+          <text x="540" y="20" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Segregated (After)</text>
+          <rect x="420" y="32" width="110" height="32" rx="5" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="475" y="52" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IAppLogger</text>
+          <rect x="550" y="32" width="110" height="32" rx="5" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="605" y="52" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IAuditLogger</text>
+          <!-- Implementations -->
+          <rect x="420" y="95" width="110" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-secondary)" stroke-width="1"/>
+          <text x="475" y="115" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">ConsoleLogger</text>
+          <rect x="550" y="95" width="110" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="605" y="115" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">SqlAuditLogger</text>
+          <line x1="475" y1="64" x2="475" y2="95" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b2-arr)"/>
+          <line x1="605" y1="64" x2="605" y2="95" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b2-arr)"/>
+          <!-- Audit goes to DB -->
+          <rect x="550" y="160" width="110" height="30" rx="5" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="605" y="179" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">LogAudit() call</text>
+          <line x1="605" y1="127" x2="605" y2="160" stroke="var(--accent-primary)" stroke-width="1" marker-end="url(#isp-b2-arr)"/>
+          <rect x="555" y="210" width="100" height="26" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="605" y="228" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">audit_log table</text>
+          <line x1="605" y1="190" x2="605" y2="210" stroke="var(--accent-primary)" stroke-width="1" marker-end="url(#isp-b2-arr)"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1683,6 +1800,7 @@ public class ConsoleLogger : ILogger
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>ILogger</code> interface mixes three very different concerns — general app logging (info, warning, error), compliance auditing, and performance telemetry. <code>ConsoleLogger</code> can do the first group just fine by printing to the terminal. But it has no database connection for audit trails and no metrics pipeline for telemetry. The developer's solution? Empty method bodies — <code>{ }</code> — that accept the call and do nothing. The problem is not that the code crashes. The problem is exactly the opposite: it runs silently, looks normal, and silently drops critical compliance data on the floor.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1730,7 +1848,13 @@ public class PatientRecordService(IAuditLogger audit)
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Each concern gets its own interface. <code>IAppLogger</code> handles general-purpose logging (console can do this). <code>IAuditLogger</code> handles compliance-critical audit trails (requires database persistence). <code>IMetricsCollector</code> handles telemetry (requires a metrics pipeline). Now <code>ConsoleLogger</code> only implements <code>IAppLogger</code> — no awkward empty methods. <code>PatientRecordService</code> takes <code>IAuditLogger</code> in its constructor. The DI container must provide a class that actually implements audit logging — you cannot accidentally inject a <code>ConsoleLogger</code> because it does not implement <code>IAuditLogger</code>. The type system acts as a guardrail: if nobody registers an <code>IAuditLogger</code>, the app fails to start rather than silently losing data in production.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for empty method bodies (<code>{ }</code>) in classes that implement interfaces. Also look for methods that just <code>return</code>, <code>return null</code>, or <code>return Task.CompletedTask</code> without doing any real work. These "silent no-ops" are harder to catch than <code>NotImplementedException</code> because they produce no errors, no log entries, no warnings — just silently missing behavior. Code reviews should flag any interface method where the implementation body is empty or trivially returns a default.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1747,10 +1871,73 @@ public class PatientRecordService(IAuditLogger audit)
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Monolith with 80 projects, CI pipeline.</strong> Adding a single method to <code>IUserService</code> (a 22-method interface used by 35 projects) triggered a full rebuild of the entire solution. Build time: 12 minutes → 12 minutes for every small change. The team was deploying 3 times a day — losing 36 minutes daily to unnecessary recompilation.</p>
+          <p class="body-text"><strong>Monolith with 80 projects, CI pipeline.</strong> Adding a single method to <code>IUserService</code> (a 22-method interface used by 35 projects) triggered a full rebuild of the entire solution. Build time: 12 minutes for every small change. The team was deploying 3 times a day — losing 36 minutes daily to unnecessary recompilation.</p>
         </div>
+
+        <p class="body-text">Picture a shared Google Doc that 35 people have open. Every time anyone types a single character, everyone's copy refreshes and they lose their place. That is what happens with a fat interface referenced by many projects — any change to the interface forces every project that references it to recompile, even if the change is completely irrelevant to what that project does.</p>
+
+        <p class="body-text">The team had a massive <code>IUserService</code> with 22 methods covering everything user-related: reading users, writing users, authentication, password management, profile updates, avatar uploads, role assignments, and email verification. This single interface lived in a shared "Contracts" assembly that 35 out of 80 projects referenced. It was the backbone of the entire system.</p>
+
+        <p class="body-text">The problem was not a runtime crash — this is a developer productivity bug. When a developer on the authentication team added <code>SendVerificationEmail(int userId)</code> to the interface, the .NET compiler saw that the interface definition changed and recompiled every project that referenced it. The dashboard project (which only ever called <code>GetById</code> and <code>GetPaged</code>) had to recompile. The reporting project (which only called <code>Search</code>) had to recompile. The admin tool, the API gateway, the background workers — all 35 projects recompiled for a method none of them would ever call.</p>
+
+        <p class="body-text">Each full rebuild took 12 minutes in CI. The team deployed three times per day, and nearly every deployment included at least one change to <code>IUserService</code> because it was the central hub for all user operations. Over time, developers started batching their changes to avoid triggering extra builds, which led to bigger, riskier pull requests. The feedback loop — "make a change, see if it works" — went from seconds (incremental compile) to minutes (full rebuild), and everyone felt the slowdown.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">Instant — the build log showed 35 projects recompiling. But the <strong>fix</strong> took 2 weeks: splitting <code>IUserService</code> into <code>IUserReader</code>, <code>IUserWriter</code>, <code>IUserAuthenticator</code>, and <code>IUserProfileUpdater</code> required updating 35 projects' dependency registrations.</p>
+
+        <!-- SVG: Blast radius comparison -->
+        <svg viewBox="0 0 720 260" role="img" aria-label="Fat interface change recompiles 35 projects vs segregated interface change recompiles only 8" style="width:100%;max-width:720px;margin:1.2rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="isp-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: Fat -->
+          <text x="170" y="20" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Fat Interface Change</text>
+          <rect x="90" y="32" width="160" height="34" rx="5" fill="var(--bg-secondary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="170" y="54" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IUserService (22 methods)</text>
+          <!-- Explosion lines -->
+          <line x1="170" y1="66" x2="40" y2="100" stroke="var(--text-red)" stroke-width="1" opacity="0.5"/>
+          <line x1="170" y1="66" x2="90" y2="100" stroke="var(--text-red)" stroke-width="1" opacity="0.5"/>
+          <line x1="170" y1="66" x2="140" y2="100" stroke="var(--text-red)" stroke-width="1" opacity="0.5"/>
+          <line x1="170" y1="66" x2="190" y2="100" stroke="var(--text-red)" stroke-width="1" opacity="0.5"/>
+          <line x1="170" y1="66" x2="240" y2="100" stroke="var(--text-red)" stroke-width="1" opacity="0.5"/>
+          <line x1="170" y1="66" x2="300" y2="100" stroke="var(--text-red)" stroke-width="1" opacity="0.5"/>
+          <!-- Project boxes -->
+          <rect x="15" y="100" width="55" height="24" rx="4" fill="var(--text-red)" opacity="0.15" stroke="var(--text-red)" stroke-width="1"/>
+          <text x="42" y="116" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Dashboard</text>
+          <rect x="78" y="100" width="40" height="24" rx="4" fill="var(--text-red)" opacity="0.15" stroke="var(--text-red)" stroke-width="1"/>
+          <text x="98" y="116" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Auth</text>
+          <rect x="126" y="100" width="45" height="24" rx="4" fill="var(--text-red)" opacity="0.15" stroke="var(--text-red)" stroke-width="1"/>
+          <text x="148" y="116" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Profile</text>
+          <rect x="179" y="100" width="42" height="24" rx="4" fill="var(--text-red)" opacity="0.15" stroke="var(--text-red)" stroke-width="1"/>
+          <text x="200" y="116" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Admin</text>
+          <rect x="229" y="100" width="40" height="24" rx="4" fill="var(--text-red)" opacity="0.15" stroke="var(--text-red)" stroke-width="1"/>
+          <text x="249" y="116" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">API</text>
+          <rect x="277" y="100" width="48" height="24" rx="4" fill="var(--text-red)" opacity="0.15" stroke="var(--text-red)" stroke-width="1"/>
+          <text x="301" y="116" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">+29 more</text>
+          <text x="170" y="152" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">35 projects recompile (12 min)</text>
+
+          <!-- Right: Segregated -->
+          <text x="540" y="20" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Segregated Interface Change</text>
+          <rect x="420" y="32" width="80" height="28" rx="4" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+          <text x="460" y="50" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">IUserReader</text>
+          <rect x="510" y="32" width="70" height="28" rx="4" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1"/>
+          <text x="545" y="50" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">IUserWriter</text>
+          <rect x="590" y="32" width="80" height="28" rx="4" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="630" y="50" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">IUserAuth</text>
+          <!-- Only auth projects recompile -->
+          <line x1="630" y1="60" x2="600" y2="100" stroke="var(--accent-primary)" stroke-width="1"/>
+          <line x1="630" y1="60" x2="660" y2="100" stroke="var(--accent-primary)" stroke-width="1"/>
+          <rect x="575" y="100" width="50" height="24" rx="4" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="600" y="116" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Auth</text>
+          <rect x="635" y="100" width="50" height="24" rx="4" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="660" y="116" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Login</text>
+          <!-- Unaffected -->
+          <rect x="420" y="100" width="60" height="24" rx="4" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1" opacity="0.5"/>
+          <text x="450" y="116" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Dashboard</text>
+          <rect x="490" y="100" width="55" height="24" rx="4" fill="var(--bg-tertiary)" stroke="var(--text-muted)" stroke-width="1" opacity="0.5"/>
+          <text x="517" y="116" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Profile</text>
+          <text x="540" y="152" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">Only 2 projects recompile (2 min)</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1792,6 +1979,7 @@ public interface IUserService
 // But it references IUserService, so ANY change triggers recompile</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> Count those methods — twenty-two of them, spanning four completely different domains: reading, writing, authentication, and profile management. Every project that needs to do <em>anything</em> with users references this one interface. The dashboard only calls three of those twenty-two methods, but because it depends on the full <code>IUserService</code>, it is affected whenever any of the other nineteen methods change. Adding <code>SendVerificationEmail</code> (an authentication concern) forces the dashboard (a read-only concern) to recompile. The interface is the bottleneck — a single point through which all user-related changes flow, dragging unrelated projects along for the ride.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1838,12 +2026,18 @@ public interface IUserProfileUpdater
 // Adding SendVerificationEmail to IUserAuthenticator → only auth module recompiles</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The 22-method monster becomes four focused interfaces, each grouping methods by client role. The dashboard now depends on <code>IUserReader</code> (4 methods). The auth module depends on <code>IUserAuthenticator</code> (5 methods). The profile page depends on <code>IUserProfileUpdater</code> (4 methods). When someone adds <code>SendVerificationEmail</code> to <code>IUserAuthenticator</code>, only the auth-related projects recompile — not the dashboard, not the reporting tool, not the background workers. The blast radius shrinks from 35 projects to the handful that actually consume authentication functionality. Build time drops from 12 minutes to about 2 minutes for a typical change.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Check your CI build times. If a small change to a shared interface triggers a rebuild of your entire solution, that interface is too fat. In Visual Studio, right-click the interface file and choose "Find All References" — if the references span many projects that use completely different subsets of the methods, it is time to split. Another signal: if developers are batching unrelated changes into single PRs because "everything recompiles anyway," the interface boundaries are wrong.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-          <p class="body-text">Fat interfaces don't just cause runtime bugs — they cause <strong>build-time pain</strong>. In large solutions, interface changes cascade through project references. Segregated interfaces limit the <span class="tooltip-trigger">blast radius<span class="tooltip-content">The set of components affected by a change. In software, a smaller blast radius means fewer tests to run, fewer deployments to make, and fewer things that can break. ISP shrinks the blast radius by limiting what each consumer depends on.</span></span> of changes to only the projects that actually use the affected methods.</p>
+          <p class="body-text">Fat interfaces do not just cause runtime bugs — they cause <strong>build-time pain</strong>. In large solutions, interface changes cascade through project references. Segregated interfaces limit the <span class="tooltip-trigger">blast radius<span class="tooltip-content">The set of components affected by a change. In software, a smaller blast radius means fewer tests to run, fewer deployments to make, and fewer things that can break. ISP shrinks the blast radius by limiting what each consumer depends on.</span></span> of changes to only the projects that actually use the affected methods.</p>
         </div>
       </div>
     </div>
@@ -1857,8 +2051,49 @@ public interface IUserProfileUpdater
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Internal admin tool, permissions audit.</strong> The admin panel injected <code>IRepository&lt;User&gt;</code> for a read-only dashboard. A junior developer, seeing <code>Delete()</code> available on the injected interface, added a "Delete User" button thinking it was intended functionality. No authorization check — it just worked. 47 users were accidentally deleted before someone noticed.</p>
         </div>
+
+        <p class="body-text">Imagine giving someone the keys to an entire building when they only need access to one room. Sure, you could just tell them "only go into Room 3," but keys do not come with instructions attached. Sooner or later, curiosity or a misunderstanding leads them into a room they were never supposed to enter. That is what happens when a read-only component receives a full CRUD interface — the "keys" to create, update, and delete are right there, tempting anyone who looks.</p>
+
+        <p class="body-text">The dashboard was designed to display a list of users. It needed exactly one operation: "give me all users." But the developer who wired up the dependency injection registered <code>IRepository&lt;User&gt;</code>, a general-purpose repository with GetAll, GetById, Add, Update, and Delete. The dashboard only called <code>GetAll()</code>, so the extra methods seemed harmless — they were just sitting there, unused.</p>
+
+        <p class="body-text">Then a junior developer was assigned to add some new features to the admin panel. They opened the <code>DashboardController</code>, looked at the injected <code>IRepository&lt;User&gt;</code>, and saw that <code>Delete()</code> was available. "Great," they thought, "the repository already supports deletion, so I can add a Delete User button." They wrote a <code>[HttpDelete]</code> endpoint that called <code>repo.Delete(id)</code>. No authorization check — why would they add one? The interface itself implied that deletion was an expected operation. The code compiled, the code review focused on other aspects, and the feature shipped.</p>
+
+        <p class="body-text">Within the first week, a support agent accidentally clicked "Delete" instead of "View" on the user table and removed 47 active user accounts. There was no confirmation dialog and no soft-delete — the repository's <code>Delete()</code> method was a hard delete. Recovery required a three-hour database restoration from backup, during which the entire system was in read-only mode. The post-mortem found the root cause: the dashboard should never have had access to write operations in the first place.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">Immediate — users called support. Recovery took 3 hours (database restore from backup). Root cause: the dashboard page had access to write operations it should never have seen.</p>
+
+        <!-- SVG: Fat repo exposes dangerous operations -->
+        <svg viewBox="0 0 720 220" role="img" aria-label="Full CRUD interface exposing Delete to read-only dashboard versus read-only interface hiding write operations" style="width:100%;max-width:720px;margin:1.2rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="isp-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: Fat repo -->
+          <text x="170" y="20" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Fat IRepository (Before)</text>
+          <rect x="70" y="32" width="200" height="80" rx="6" fill="var(--bg-secondary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="170" y="52" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IRepository&lt;User&gt;</text>
+          <text x="170" y="70" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">GetAll() GetById()</text>
+          <text x="170" y="86" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">Add() Update() Delete()</text>
+          <text x="170" y="100" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle" opacity="0.7">exposed to dashboard!</text>
+          <!-- Dashboard -->
+          <rect x="90" y="140" width="160" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="170" y="160" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">DashboardController</text>
+          <line x1="170" y1="112" x2="170" y2="140" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b4-arr)"/>
+          <text x="170" y="194" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle">Junior adds Delete button!</text>
+
+          <!-- Right: Read-only -->
+          <text x="540" y="20" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Read-Only Interface (After)</text>
+          <rect x="440" y="32" width="200" height="52" rx="6" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="540" y="52" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IReadRepository&lt;User&gt;</text>
+          <text x="540" y="72" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">GetAll() GetById() Find()</text>
+          <!-- No write methods shown -->
+          <!-- Dashboard -->
+          <rect x="460" y="120" width="160" height="32" rx="5" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="540" y="140" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">DashboardController</text>
+          <line x1="540" y1="84" x2="540" y2="120" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b4-arr)"/>
+          <text x="540" y="178" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle">Delete() does not exist here</text>
+          <text x="540" y="196" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">Compile error if junior tries</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1884,6 +2119,7 @@ public class DashboardController(IRepository&lt;User&gt; repo) : ControllerBase
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>DashboardController</code> constructor takes <code>IRepository&lt;User&gt;</code>. That interface includes <code>GetAll()</code>, <code>GetById()</code>, <code>Add()</code>, <code>Update()</code>, and <code>Delete()</code>. The dashboard only needs reading, but every single write operation is sitting right there in the IntelliSense dropdown. When the junior developer types <code>repo.</code> and sees <code>Delete()</code> in the autocomplete list, it looks like intended functionality. The interface is essentially advertising capabilities the dashboard was never supposed to have. No code review comment or documentation can compete with what IntelliSense suggests.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1900,12 +2136,18 @@ public class DashboardController(IReadRepository&lt;User&gt; repo) : ControllerB
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The dashboard now takes <code>IReadRepository&lt;User&gt;</code>, which only has <code>GetAll()</code>, <code>GetById()</code>, and <code>Find()</code>. There is no <code>Delete()</code> method. If the junior developer types <code>repo.</code>, the autocomplete list shows only read operations. If they try to write <code>repo.Delete(id)</code>, they get a compile error — the method simply does not exist on this interface. The type system acts as a security boundary. The same underlying repository class implements both <code>IReadRepository</code> and <code>IWriteRepository</code>, but the dashboard only sees the read side. This is the Principle of Least Privilege enforced through interface design rather than runtime authorization checks.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for controllers or services that inject a full CRUD repository but only call read methods. Check constructor parameters: if a class takes <code>IRepository&lt;T&gt;</code> but only calls <code>Get*</code> methods, it should take <code>IReadRepository&lt;T&gt;</code> instead. Also audit your API endpoints — if a controller that is supposed to be read-only has <code>[HttpDelete]</code> or <code>[HttpPut]</code> endpoints, the interface gave someone too much power.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
           <div class="callout-title"><i class="fa-solid fa-circle-info"></i> Lesson Learned</div>
-          <p class="body-text">Fat interfaces are a <strong><span class="tooltip-trigger">security risk<span class="tooltip-content">This is the Principle of Least Privilege applied to APIs. Just as users should only have the permissions they need, code components should only have access to the methods they need. Fat interfaces violate this principle by exposing operations (like Delete) to components that should only read.</span></span></strong>. When a consumer has access to methods it shouldn't use, it's only a matter of time before someone calls them. ISP is defense in depth — the interface itself limits what's possible.</p>
+          <p class="body-text">Fat interfaces are a <strong><span class="tooltip-trigger">security risk<span class="tooltip-content">This is the Principle of Least Privilege applied to APIs. Just as users should only have the permissions they need, code components should only have access to the methods they need. Fat interfaces violate this principle by exposing operations (like Delete) to components that should only read.</span></span></strong>. When a consumer has access to methods it should not use, it is only a matter of time before someone calls them. ISP is defense in depth — the interface itself limits what is possible.</p>
         </div>
       </div>
     </div>
@@ -1919,8 +2161,45 @@ public class DashboardController(IReadRepository&lt;User&gt; repo) : ControllerB
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>Fintech startup, test suite.</strong> The <code>IOrderService</code> had 18 methods. Every test class that touched orders had to mock all 18 methods — even though each test typically used 2-3. Test setup was 40+ lines per test. Developers started skipping tests because writing them was painful. Test coverage dropped from 85% to 42% over 6 months.</p>
         </div>
+
+        <p class="body-text">Think about filling out a government form where you need to answer 50 questions, but only 3 apply to your situation. You still have to look at all 50, decide which to skip, write "N/A" in the rest, and hope you did not accidentally skip one that mattered. After a few of these forms, you stop filling them out entirely. That is exactly what happened with unit tests here — the "form" (mock setup) was so long that developers stopped writing tests.</p>
+
+        <p class="body-text">The team used <span class="tooltip-trigger">Moq<span class="tooltip-content">The most popular mocking framework for .NET. Moq creates fake implementations of interfaces for testing. In Strict mode, it requires every method to be explicitly set up — calling an unset method throws an exception. In Loose mode, unset methods return default values, which can hide bugs.</span></span> for unit testing. When you mock an interface in Moq's Strict mode (which is the safer option), you have to tell Moq what every single method should do. If any method gets called without a setup, the test fails with an unhelpful error. For an 18-method interface, that means 18 lines of setup code — even though the test only cares about 2 methods.</p>
+
+        <p class="body-text">Developers responded in predictable ways. Some switched to <code>MockBehavior.Loose</code>, which silently returns null or zero for unconfigured methods — hiding real bugs. Some wrote shared "mock factory" methods that set up all 18 methods with defaults, but those factories became brittle and hard to maintain. Most developers simply stopped writing unit tests for anything order-related. "I will write an integration test later," they said. Later never came.</p>
+
+        <p class="body-text">Over six months, test coverage on the order module dropped from 85% to 42%. Bugs that would have been caught by simple unit tests made it to production. The team blamed "test fatigue" and considered switching entirely to integration tests (which are slower and harder to debug). A senior engineer eventually traced the root cause back to the fat <code>IOrderService</code> interface: the pain was not in testing itself, but in the ceremony required to set up a mock for an interface with 18 methods when you only need 2.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">The team blamed "test fatigue" and considered switching to integration tests. A senior engineer finally identified the root cause: the fat interface made unit testing unreasonably expensive.</p>
+
+        <!-- SVG: Mock setup comparison -->
+        <svg viewBox="0 0 720 200" role="img" aria-label="Fat interface requiring 18 mock setups versus focused interface requiring only 2" style="width:100%;max-width:720px;margin:1.2rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="isp-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: Fat mock -->
+          <text x="170" y="20" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Mock&lt;IOrderService&gt;</text>
+          <rect x="50" y="32" width="240" height="130" rx="6" fill="var(--bg-secondary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="170" y="52" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">Setup GetByIdAsync() -- NEEDED</text>
+          <text x="170" y="67" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">Setup GetDiscountAsync() -- NEEDED</text>
+          <line x1="60" y1="74" x2="280" y2="74" stroke="var(--text-red)" stroke-width="0.5" stroke-dasharray="3,3"/>
+          <text x="170" y="89" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle" opacity="0.6">Setup CreateAsync() -- NOISE</text>
+          <text x="170" y="104" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle" opacity="0.6">Setup UpdateAsync() -- NOISE</text>
+          <text x="170" y="119" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle" opacity="0.6">Setup DeleteAsync() -- NOISE</text>
+          <text x="170" y="134" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle" opacity="0.5">... 12 more NOISE lines ...</text>
+          <text x="170" y="154" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">2 useful + 16 noise = 40+ lines</text>
+          <text x="170" y="185" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle">Developers stop writing tests</text>
+
+          <!-- Right: Focused mock -->
+          <text x="540" y="20" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Mock&lt;IOrderReader&gt;</text>
+          <rect x="430" y="32" width="220" height="60" rx="6" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="540" y="55" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">Setup GetByIdAsync()</text>
+          <text x="540" y="75" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">Setup GetDiscountAsync()</text>
+          <text x="540" y="115" fill="var(--text-muted)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">2 useful + 0 noise = 2 lines</text>
+          <text x="540" y="150" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" text-anchor="middle">Tests are pleasant to write</text>
+          <text x="540" y="170" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">Coverage stays at 85%+</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1950,6 +2229,7 @@ public async Task CalculateTotal_AppliesDiscount()
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The test wants to verify one thing: "does the calculator apply the discount correctly?" To test that, it needs exactly two pieces of data — the order and the discount rate. But because the test depends on <code>IOrderService</code> (18 methods), Moq's Strict mode demands setup for all 18 methods. The first two lines are the actual test setup. Everything after that is noise — boilerplate that has nothing to do with the test's intent. A reader scanning this test cannot easily tell which setups matter and which are just satisfying the mock framework. And if any of those 18 methods' signatures change, this test breaks even though it never called those methods.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -1971,7 +2251,13 @@ public async Task CalculateTotal_AppliesDiscount()
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The <code>OrderCalculator</code> now depends on <code>IOrderReader</code> (just 4 methods: GetById, GetAll, GetDiscount, Search) instead of the 18-method <code>IOrderService</code>. The test mocks only what it calls — two setups for two method calls. There is no noise, no boilerplate, no ceremony. The test reads exactly like its intent: "given this order and this discount, the total should be 90." If someone adds a new write method to <code>IOrderWriter</code>, this test does not break because <code>IOrderReader</code> is unchanged. Developers actually enjoy writing these tests, so they write more of them, and coverage stays high.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Open your test files and look at the mock setup sections. If the setup is longer than the actual test logic (arrange > act + assert), the mocked interface is probably too fat. Another red flag: if many tests use <code>MockBehavior.Loose</code> specifically to avoid setting up unused methods, that is a sign the interface has too many methods for what each consumer actually needs. Count how many <code>Setup()</code> calls versus how many <code>Verify()</code> calls each test has — a big gap means most of that setup is noise.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1990,8 +2276,54 @@ public async Task CalculateTotal_AppliesDiscount()
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
           <p class="body-text"><strong>.NET library, public API.</strong> A library exposed a method returning <code>IList&lt;T&gt;</code>. Consumers called <code>Add()</code> on the result. Internally, the library changed the implementation from <code>List&lt;T&gt;</code> to <code>Array</code> (which also implements <code>IList&lt;T&gt;</code>). <code>Array.Add()</code> throws <code>NotSupportedException</code>. The library's minor version bump broke hundreds of consumers.</p>
         </div>
+
+        <p class="body-text">Imagine a restaurant menu that lists "steak, chicken, fish, and custom orders." You go there every week and order a custom meal. One day the restaurant changes ownership, and the new owner decides they do not do custom orders anymore — but they leave the old menu up. You walk in, order your custom meal, and get told "sorry, we do not do that anymore." The menu (the interface) promised something the kitchen (the implementation) could no longer deliver.</p>
+
+        <p class="body-text">In .NET, <code>IList&lt;T&gt;</code> is a deceptively broad interface. It promises not just reading (indexing, counting, enumerating) but also writing (Add, Remove, Insert). Both <code>List&lt;T&gt;</code> and arrays implement <code>IList&lt;T&gt;</code>. But arrays are fixed-size — you cannot add or remove elements. When you call <code>Add()</code> on an array through the <code>IList&lt;T&gt;</code> interface, it throws <code>NotSupportedException</code> at runtime.</p>
+
+        <p class="body-text">The library originally returned <code>new List&lt;Product&gt;(...)</code> from its <code>GetProducts()</code> method. Consumers discovered they could call <code>Add()</code> on the result to append their own items — useful for customization. This worked because the underlying object was a real <code>List&lt;T&gt;</code> that supports <code>Add()</code>. The library's return type was <code>IList&lt;T&gt;</code>, which includes <code>Add()</code> in its contract, so consumers felt justified in using it.</p>
+
+        <p class="body-text">Then version 1.1 came along. The library author added a caching layer and changed the return to <code>_cache.ToArray()</code> for performance. Arrays are faster for iteration but cannot be resized. The return type was still <code>IList&lt;T&gt;</code> — no structural breaking change. The library followed <span class="tooltip-trigger">semantic versioning<span class="tooltip-content">A versioning convention (MAJOR.MINOR.PATCH) where MINOR version bumps indicate backward-compatible new features. The library used a MINOR bump (v1.0 to v1.1), signaling no breaking changes. But the behavioral change (List to Array) was invisible to semver — the API surface looked the same while the runtime behavior broke.</span></span> and considered this a non-breaking minor change. But hundreds of consumers that called <code>Add()</code> now got <code>NotSupportedException</code> at runtime. The API surface had not changed, but the behavior had — a subtle ISP violation where the return type promised more than the implementation could deliver.</p>
+
         <h3 class="sub">Time to Diagnose</h3>
         <p class="body-text">Immediate — consumers got <code>NotSupportedException</code> on upgrade. But the library had no breaking change in its API surface (still returned <code>IList&lt;T&gt;</code>). The break was <strong>behavioral</strong>, not structural.</p>
+
+        <!-- SVG: IList promise vs reality -->
+        <svg viewBox="0 0 720 200" role="img" aria-label="IList promises Add but Array cannot fulfill it, versus IReadOnlyList that honestly represents read-only capability" style="width:100%;max-width:720px;margin:1.2rem auto;display:block;" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="isp-b6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-secondary)"/></marker>
+          </defs>
+          <!-- Left: IList -->
+          <text x="170" y="20" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Returns IList&lt;T&gt; (Lie)</text>
+          <rect x="60" y="32" width="220" height="50" rx="6" fill="var(--bg-secondary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="170" y="52" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IList&lt;Product&gt;</text>
+          <text x="170" y="70" fill="var(--text-secondary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">this[i], Count, Add(), Remove(), Insert()</text>
+          <!-- v1.0 -->
+          <rect x="40" y="110" width="100" height="30" rx="4" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="90" y="129" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">v1.0: List&lt;T&gt;</text>
+          <text x="90" y="158" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Add() works</text>
+          <line x1="125" y1="82" x2="100" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b6-arr)"/>
+          <!-- v1.1 -->
+          <rect x="165" y="110" width="100" height="30" rx="4" fill="var(--bg-tertiary)" stroke="var(--text-red)" stroke-width="1.5"/>
+          <text x="215" y="129" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">v1.1: Array</text>
+          <text x="215" y="158" fill="var(--text-red)" font-family="system-ui, -apple-system, sans-serif" font-size="9" text-anchor="middle">Add() throws!</text>
+          <line x1="200" y1="82" x2="215" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b6-arr)"/>
+
+          <!-- Right: IReadOnlyList -->
+          <text x="540" y="20" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Returns IReadOnlyList&lt;T&gt; (Truth)</text>
+          <rect x="430" y="32" width="220" height="50" rx="6" fill="var(--bg-secondary)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+          <text x="540" y="52" fill="var(--text-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="11" text-anchor="middle">IReadOnlyList&lt;Product&gt;</text>
+          <text x="540" y="70" fill="var(--text-secondary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">this[i], Count (no Add, no Remove)</text>
+          <!-- Both work -->
+          <rect x="420" y="110" width="100" height="30" rx="4" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="470" y="129" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">v1.0: List&lt;T&gt;</text>
+          <rect x="540" y="110" width="100" height="30" rx="4" fill="var(--bg-tertiary)" stroke="var(--accent-primary)" stroke-width="1"/>
+          <text x="590" y="129" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">v1.1: Array</text>
+          <line x1="500" y1="82" x2="475" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b6-arr)"/>
+          <line x1="565" y1="82" x2="585" y2="110" stroke="var(--text-secondary)" stroke-width="1" marker-end="url(#isp-b6-arr)"/>
+          <text x="540" y="165" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">Both implement IReadOnlyList correctly</text>
+          <text x="540" y="182" fill="var(--accent-primary)" font-family="system-ui, -apple-system, sans-serif" font-size="10" text-anchor="middle">No Add() to break = safe swap</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -2018,6 +2350,7 @@ var products = service.GetProducts();
 products.Add(customProduct);  // 💀 NotSupportedException in v1.1</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The return type says <code>IList&lt;Product&gt;</code>, which includes <code>Add()</code>, <code>Remove()</code>, and <code>Insert()</code> in its contract. Consumers see these methods in IntelliSense and use them. In version 1.0, the underlying object was a <code>List&lt;T&gt;</code>, so <code>Add()</code> worked fine. In version 1.1, the library switches to returning an array for caching performance. Arrays implement <code>IList&lt;T&gt;</code> (for historical .NET compatibility), but they throw <code>NotSupportedException</code> when you call <code>Add()</code> because arrays cannot be resized. The return type "promised" writability; the implementation silently broke that promise.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -2042,7 +2375,13 @@ var editable = service.GetEditableProducts();
 editable.Add(customProduct);  // ✅ Works — explicitly requested writable copy</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Returning <code>IReadOnlyList&lt;T&gt;</code> honestly communicates the capability: "you can read this data by index and check its count, but you cannot modify it." Both <code>List&lt;T&gt;</code> and arrays implement <code>IReadOnlyList&lt;T&gt;</code> fully — no <code>NotSupportedException</code> possible. The library can freely switch between List and Array internally without breaking any consumer, because consumers were never promised write access. For the rare consumer that genuinely needs a mutable copy, a separate method (<code>GetEditableProducts()</code>) explicitly creates and returns a writable <code>List&lt;T&gt;</code>. The intent is clear in both cases — read-only by default, writable only when explicitly requested.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for public methods that return <code>IList&lt;T&gt;</code>, <code>ICollection&lt;T&gt;</code>, or <code>IDictionary&lt;TKey, TValue&gt;</code>. Ask: "do callers actually need to modify this collection?" If not, switch to <code>IReadOnlyList&lt;T&gt;</code>, <code>IReadOnlyCollection&lt;T&gt;</code>, or <code>IReadOnlyDictionary&lt;TKey, TValue&gt;</code>. Also watch for internal methods that return arrays or frozen collections through writable interfaces — those are behavioral lies waiting to break callers.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -2071,8 +2410,10 @@ editable.Add(customProduct);  // ✅ Works — explicitly requested writable cop
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Splitting every interface into single-method interfaces because "ISP says small."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers who just learned ISP often over-correct. They heard "fat interfaces are bad," so they take it to the extreme: every single method gets its own interface. It feels disciplined — "look how focused my interfaces are!" But ISP does not say "small." It says "no client should depend on methods it does not use." If every client uses all the methods, a 10-method interface is perfectly fine.</p>
+          <p class="body-text">The real cost shows up in everyday coding. When a class needs to read, list, and search entities, it should take one interface (<code>IReadRepository&lt;T&gt;</code>), not three separate ones. Over-segregation turns constructor signatures into walls of text, DI registration files into maintenance nightmares, and IntelliSense into a confusing mess of tiny interfaces nobody can keep straight.</p>
           <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverSegregated.cs</span></div>
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverSegregated.cs — Bad</span></div>
             <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Too granular — 6 interfaces for one domain concept
 public interface ICanGetById&lt;T&gt; { T GetById(int id); }
@@ -2090,8 +2431,29 @@ public class OrderService(
     ICanUpdate&lt;Order&gt; updater) { /* ... */ }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Over-segregation creates "interface soup" — dozens of tiny interfaces with unclear boundaries. DI registration becomes nightmarish. Constructor parameter lists explode.</p>
-          <p class="body-text"><strong>Fix:</strong> Group methods by <strong>client role</strong>, not by individual method. <code>IReadRepository&lt;T&gt;</code> (GetById + GetAll + Find) is one cohesive role. <code>IWriteRepository&lt;T&gt;</code> (Add + Update + Delete) is another. Two interfaces, not six.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RoleGrouped.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Grouped by client role — two interfaces cover the same methods
+public interface IReadRepository&lt;T&gt;
+{
+    T GetById(int id);
+    IEnumerable&lt;T&gt; GetAll();
+    IEnumerable&lt;T&gt; Find(Expression&lt;Func&lt;T, bool&gt;&gt; predicate);
+}
+
+public interface IWriteRepository&lt;T&gt;
+{
+    void Add(T entity);
+    void Update(T entity);
+    void Delete(T entity);
+}
+
+// Constructor is clean and clear:
+public class OrderService(IReadRepository&lt;Order&gt; reader, IWriteRepository&lt;Order&gt; writer) { }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad example splits by individual operation — one interface per method. The good example splits by client role — "reading" and "writing" are the two natural groups because some consumers only read while others need to write. The grouping unit is the client's usage pattern, not the individual method.</p>
         </div>
       </div>
     </div>
@@ -2103,9 +2465,36 @@ public class OrderService(
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> Thinking ISP only matters for public APIs. "It's internal, we control all the callers."</p>
-          <p class="body-text"><strong>Why Bad:</strong> Internal fat interfaces create the same problems: phantom dependencies, mock explosion, and cascading recompilation. "Internal" code becomes "legacy" code faster than you think. Today's 3-person team becomes tomorrow's 30-person team using that same interface.</p>
-          <p class="body-text"><strong>Fix:</strong> Apply ISP proportionally. Public APIs: strict segregation. Internal code with 2-3 consumers: use judgment. Single-consumer internal code: don't bother.</p>
+          <p class="body-text"><strong>Mistake:</strong> Thinking ISP only matters for public APIs. "It is internal, we control all the callers."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When a team is small — three developers, one project — it feels like overkill to segregate internal interfaces. "We all know which methods to call," they reason. "We can just agree not to use the wrong ones." That works for about six months, until a new hire joins, or the project grows, or someone leaves and their tribal knowledge walks out the door.</p>
+          <p class="body-text">The deeper problem is that "internal" code ages into "legacy" code faster than anyone expects. Today's internal tool with 3 consumers becomes tomorrow's shared library with 30 consumers. By the time you realize the interface is too fat, splitting it requires changing all 30 call sites. If you had started with focused interfaces, adding the 28th consumer would have been painless.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">InternalFat.cs — Bad</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ "It's internal, nobody else uses it"
+internal interface IOrderEngine
+{
+    Order GetById(int id);
+    void PlaceOrder(Order order);
+    void CancelOrder(int id);
+    decimal CalculateShipping(Order order);
+    void SendConfirmationEmail(Order order);   // Why is email in here?
+    void UpdateInventory(Order order);         // Why is inventory in here?
+}
+// 6 months later: 12 services depend on IOrderEngine. Splitting = pain.</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">InternalFocused.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Proportional ISP — even internal code benefits from clear boundaries
+internal interface IOrderReader { Order GetById(int id); }
+internal interface IOrderWriter { void PlaceOrder(Order order); void CancelOrder(int id); }
+internal interface IShippingCalculator { decimal CalculateShipping(Order order); }
+// Email and inventory have their own services — they don't belong in order</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> You do not need to split every internal interface — that would be over-segregation (Pitfall 1). The rule of thumb: if an internal interface has more than 2-3 consumers using different subsets, split it. If it has a single consumer, leave it alone. Apply ISP proportionally to the code's reach.</p>
         </div>
       </div>
     </div>
@@ -2118,8 +2507,35 @@ public class OrderService(
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Implementing interface methods with <code>throw new NotImplementedException("TODO: implement later")</code> and shipping it.</p>
-          <p class="body-text"><strong>Why Bad:</strong> "Later" never comes. The <code>NotImplementedException</code> sits in production until someone calls that code path — usually at the worst possible time. It compiles, it passes reviews (nobody reads throw-only implementations carefully), and it bombs at runtime.</p>
-          <p class="body-text"><strong>Fix:</strong> If you can't implement a method, <strong>don't implement the interface</strong>. The need for <code>NotImplementedException</code> is the canary in the coal mine — the interface is too fat for this implementer.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Deadlines. The developer needs the class to compile today, even though they have not figured out half the interface yet. Visual Studio even generates <code>throw new NotImplementedException()</code> as the default method body when you "Implement Interface." It feels like a harmless placeholder — "I will come back to this after the sprint."</p>
+          <p class="body-text">The problem is that "later" rarely comes. Sprints pile up. The code gets deployed. Nobody remembers which methods are real and which are land mines. Code reviews rarely scrutinize throw-only methods — they look harmless. Then, months later, a code path triggers the unimplemented method and production crashes. The real solution is not to "implement it later" but to recognize that needing <code>NotImplementedException</code> is a signal: this interface has methods this class cannot and should not implement.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TodoBomb.cs — Bad</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ "I'll implement this later" — narrator: they never did
+public class SmsNotifier : INotificationService
+{
+    public void SendEmail(string to, string body) =&gt; throw new NotImplementedException("TODO");
+    public void SendSms(string to, string body) =&gt; /* actually works */;
+    public void SendPush(string deviceId, string body) =&gt; throw new NotImplementedException("TODO");
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HonestInterface.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Each channel is its own interface — implement only what you can
+public interface ISmsSender { void SendSms(string to, string body); }
+public interface IEmailSender { void SendEmail(string to, string body); }
+public interface IPushSender { void SendPush(string deviceId, string body); }
+
+public class TwilioSmsNotifier : ISmsSender
+{
+    public void SendSms(string to, string body) =&gt; /* actually works, nothing else to implement */;
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> If you find yourself typing <code>NotImplementedException</code>, stop and ask: "Does this class genuinely need to implement this interface, or is the interface asking too much?" The answer almost always is that the interface bundles unrelated capabilities. Split the interface so each class only promises what it can deliver.</p>
         </div>
       </div>
     </div>
@@ -2132,21 +2548,39 @@ public class OrderService(
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Splitting interfaces based on what the <em>implementation</em> can do, rather than what <em>clients</em> need.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When a team decides to apply ISP, they often start from the wrong end. They look at their concrete classes and think: "SqlRepository can do X, Y, Z and RedisCache can do A, B, C — so let us make ISqlOperations and IRedisOperations." This feels logical because it mirrors the technology stack. But ISP is about the consumer's perspective, not the provider's.</p>
+          <p class="body-text">The issue is that clients do not care whether data comes from SQL, Redis, or a flat file. A dashboard wants to read products. A checkout page wants to save orders. Those are the natural interface boundaries — what the client needs to do, not how the server stores data. When interfaces are named after technologies, you cannot swap implementations without changing the interface (and every consumer that depends on it).</p>
           <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ImplementationSplit.cs</span></div>
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ImplementationSplit.cs — Bad</span></div>
             <div class="macos-body">
-<pre><code class="language-csharp">// ❌ Split by what the SERVER can do
-public interface ISqlOperations { /* SQL-specific methods */ }
-public interface IRedisOperations { /* Redis-specific methods */ }
+<pre><code class="language-csharp">// ❌ Split by what the SERVER can do — leaks infrastructure details
+public interface ISqlOperations
+{
+    Product GetProductById(int id);
+    void SaveProduct(Product p);
+    IEnumerable&lt;Product&gt; RunSqlQuery(string sql);  // Leaking SQL!
+}
 
-// ✓ Split by what the CLIENT needs
-public interface IProductReader { Product GetById(int id); }
-public interface IProductWriter { void Save(Product product); }
-// Whether it's SQL or Redis behind the scenes is irrelevant to the client</code></pre>
+public interface IRedisOperations
+{
+    Product GetCachedProduct(string key);
+    void SetCache(string key, Product p, TimeSpan ttl);  // Leaking Redis!
+}</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Implementation-based splits leak infrastructure concerns into the interface. Clients shouldn't know or care if data comes from SQL, Redis, or a carrier pigeon.</p>
-          <p class="body-text"><strong>Fix:</strong> Name interfaces after the <strong>client's role</strong>: <code>IProductReader</code>, <code>IProductWriter</code> — not the storage technology.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ClientFocused.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Split by what the CLIENT needs — implementation is hidden
+public interface IProductReader { Product GetById(int id); IEnumerable&lt;Product&gt; Search(string query); }
+public interface IProductWriter { void Save(Product product); void Delete(int id); }
+
+// Whether it's SQL, Redis, or a carrier pigeon behind the scenes:
+public class SqlProductRepo : IProductReader, IProductWriter { /* SQL implementation */ }
+public class CachedProductRepo : IProductReader { /* Redis-backed, read-only cache */ }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad example names interfaces after the storage technology. The good example names them after the client's role. The question to ask when naming an interface is not "what can this class do?" but "what does the caller need from this dependency?" That question always leads to role-based interfaces.</p>
         </div>
       </div>
     </div>
@@ -2158,9 +2592,11 @@ public interface IProductWriter { void Save(Product product); }
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> Using C# 8 <span class="tooltip-trigger">default interface methods<span class="tooltip-content">A C# 8 feature (2019) that allows interfaces to provide method implementations. Existing implementers get the default behavior without code changes. Useful for interface evolution, but dangerous when used to hide ISP violations — the no-op default still appears in the interface contract.</span></span> to add no-op defaults to a fat interface, thinking "now implementers don't have to implement everything."</p>
+          <p class="body-text"><strong>Mistake:</strong> Using C# 8 <span class="tooltip-trigger">default interface methods<span class="tooltip-content">A C# 8 feature (2019) that allows interfaces to provide method implementations. Existing implementers get the default behavior without code changes. Useful for interface evolution, but dangerous when used to hide ISP violations — the no-op default still appears in the interface contract.</span></span> to add no-op defaults to a fat interface, thinking "now implementers do not have to implement everything."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Default interface methods are genuinely useful for evolving an interface over time — you can add a new method with a sensible default without breaking existing implementers. But developers sometimes use them as a workaround for ISP violations: "Robot cannot eat, so let us add a do-nothing <code>Eat()</code> default and call it done." It feels like a clever shortcut because no class needs to change.</p>
+          <p class="body-text">But the underlying problem has not changed. The interface still says <code>Eat()</code> is available. Callers still see it. If a scheduler calls <code>worker.Eat()</code> expecting the worker to refuel, Robot's no-op default silently does nothing. The caller thinks it worked; the robot never refueled. Default methods are aspirin for interface evolution pain, not a cure for bad interface design.</p>
           <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DefaultMethods.cs</span></div>
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DefaultMethods.cs — Bad</span></div>
             <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Default methods hide the ISP violation — don't fix it
 public interface IWorker
@@ -2178,8 +2614,19 @@ public class Robot : IWorker
 }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Default methods are a <strong>migration tool</strong> — they help evolve interfaces without breaking existing implementers. Using them to paper over ISP violations just hides the problem. Callers still see <code>Eat()</code> on the interface and might call it expecting behavior.</p>
-          <p class="body-text"><strong>Fix:</strong> Use default interface methods for <em>backward compatibility during interface evolution</em>, not for making fat interfaces "work." If an implementer doesn't need a method, the method shouldn't be in its interface.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SplitWorker.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Separate interfaces — Robot only implements what it can do
+public interface IWorkable { void Work(); }
+public interface IFeedable { void Eat(); void TakeBreak(); }
+public interface ISleepable { void Sleep(); }
+
+public class Robot : IWorkable { public void Work() =&gt; /* works */; }
+public class Human : IWorkable, IFeedable, ISleepable { /* all three */ }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> Default methods solve the right problem (interface evolution) but are being used for the wrong problem (hiding ISP violations). If an implementer does not need a method, remove it from that implementer's interface — do not sweep it under the rug with an empty default body.</p>
         </div>
       </div>
     </div>
@@ -2191,9 +2638,32 @@ public class Robot : IWorker
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> Registering one fat interface in DI and injecting it everywhere, because "it's convenient."</p>
-          <p class="body-text"><strong>Why Bad:</strong> Every consumer sees every method. New developers call methods they shouldn't. Testing requires mocking methods nobody uses. The DI container becomes a service locator in disguise.</p>
-          <p class="body-text"><strong>Fix:</strong> Register the concrete type once, then create forwarding registrations for each segregated interface (as shown in Section 6 Sr tab, DI Registration).</p>
+          <p class="body-text"><strong>Mistake:</strong> Registering one fat interface in DI and injecting it everywhere, because "it is convenient."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Registering a single interface is easy — one line in <code>Program.cs</code> and you are done. Registering five segregated interfaces feels like extra work, especially when they all resolve to the same concrete class. Developers often think: "Why register five interfaces when one covers everything? The constructor already shows what I need." But the constructor does not limit what the class <em>can call</em> — it shows what the class <em>receives</em>, which is everything on that fat interface.</p>
+          <p class="body-text">The hidden cost is the same as giving every employee a master key to the building. Sure, it is convenient — one key, one registration. But every employee can now open every door, including ones they should never enter. New developers see all methods in IntelliSense and assume they are fair game. Test mocking becomes painful. And if you ever need to change one part of the interface, every consumer recompiles.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodInterface.cs — Bad</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ One fat registration — every consumer sees everything
+builder.Services.AddScoped&lt;IUserService, UserService&gt;();
+
+// Dashboard only needs reading, but gets delete/update/auth too:
+public class DashboardController(IUserService users) { /* sees 22 methods */ }</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ForwardedDI.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ One concrete registration, forwarded to focused interfaces
+builder.Services.AddScoped&lt;UserService&gt;();
+builder.Services.AddScoped&lt;IUserReader&gt;(sp =&gt; sp.GetRequiredService&lt;UserService&gt;());
+builder.Services.AddScoped&lt;IUserWriter&gt;(sp =&gt; sp.GetRequiredService&lt;UserService&gt;());
+
+// Dashboard only sees reading:
+public class DashboardController(IUserReader users) { /* sees 4 methods */ }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The extra DI registration lines are a one-time cost. The benefit is permanent: every consumer sees only its slice of the functionality. Same underlying instance, different views — like giving out room-specific keycards instead of a master key.</p>
         </div>
       </div>
     </div>
@@ -2206,8 +2676,10 @@ public class Robot : IWorker
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating empty <span class="tooltip-trigger">"marker" interfaces<span class="tooltip-content">Interfaces with zero methods, used only for type-checking or tagging (e.g., Java's Serializable). In C#, attributes ([Serializable], [Readable]) are the idiomatic way to add metadata to types. Marker interfaces should only be used when you need polymorphic behavior.</span></span> for tagging purposes and counting them as ISP compliance.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> In Java, marker interfaces like <code>Serializable</code> are a common pattern — they tag a class as having a certain property. Developers coming from Java (or reading older design books) sometimes bring this pattern into C#. They create empty interfaces like <code>IReadable</code>, <code>IWritable</code>, <code>IDeletable</code> and implement them on their services, thinking this is ISP. "Look, my class only claims to be readable!"</p>
+          <p class="body-text">But an empty interface defines no behavior. You cannot call any method through <code>IReadable</code> because it has no methods. It is just a tag — metadata about the class. In C#, attributes (<code>[Readable]</code>, <code>[Auditable]</code>) are the idiomatic way to attach metadata. ISP is about behavioral contracts — interfaces with methods that callers actually invoke. If there are no methods, it is not an ISP interface; it is a label.</p>
           <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MarkerAbuse.cs</span></div>
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MarkerAbuse.cs — Bad</span></div>
             <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Marker interfaces — no methods, used for type-checking
 public interface IReadable { }
@@ -2216,17 +2688,24 @@ public interface IDeletable { }
 
 public class OrderService : IReadable, IWritable, IDeletable
 {
-    // Interfaces add no contract — just tags
-    // Callers still can't DO anything with IReadable reference
-}
-
-// This is just Java-style marker interfaces — use attributes instead in C#
-[Readable, Writable, Deletable]
-public class OrderService { /* ... */ }</code></pre>
+    // Interfaces add no contract — callers still can't DO anything
+    // via an IReadable reference (no methods to call!)
+}</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Marker interfaces without methods don't define behavior — they're just metadata. In C#, attributes serve this purpose better. ISP is about behavioral contracts, not tags.</p>
-          <p class="body-text"><strong>Fix:</strong> If the interface has no methods, use an attribute. If it has methods, it's a real role interface — that's ISP.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RealRoles.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Real role interfaces with methods — callers can DO something
+public interface IOrderReader { Order GetById(int id); IEnumerable&lt;Order&gt; GetAll(); }
+public interface IOrderWriter { void Create(Order order); void Update(Order order); }
+
+// For pure metadata tagging, use attributes instead:
+[Auditable]
+public class OrderService : IOrderReader, IOrderWriter { /* real methods */ }</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> ISP is about what callers can <em>do</em> through an interface, not what a class <em>claims to be</em>. If the interface has methods, it is a role interface (ISP). If it has no methods, it is metadata (use an attribute).</p>
         </div>
       </div>
     </div>
@@ -2239,8 +2718,29 @@ public class OrderService { /* ... */ }</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Moving each interface into its own <span class="tooltip-trigger">NuGet package<span class="tooltip-content">.NET's package manager (like npm for Node.js). Distributing interfaces as separate NuGet packages means each one gets its own version number, changelog, and release cycle. For most projects, a single MyApp.Abstractions package with all interfaces is far simpler.</span></span> or assembly for "maximum decoupling."</p>
-          <p class="body-text"><strong>Why Bad:</strong> Package management overhead explodes. Versioning becomes a nightmare (updating <code>IReader</code> v2.1 requires checking compatibility with <code>IWriter</code> v2.0). Adds build complexity with zero benefit for small-to-medium projects.</p>
-          <p class="body-text"><strong>Fix:</strong> Keep related interfaces in the same assembly until you have a concrete need to split. A single <code>MyApp.Abstractions</code> project with all interfaces is fine for most apps. Only split into separate packages when different teams or microservices consume different subsets.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> After learning about ISP and clean architecture, developers sometimes go on a decoupling spree. "Each interface should be independently versionable! Each assembly should deploy separately!" They create <code>MyApp.OrderReader</code>, <code>MyApp.OrderWriter</code>, <code>MyApp.OrderValidator</code> as separate NuGet packages, each containing a single interface.</p>
+          <p class="body-text">The overhead is staggering. Each package needs its own version number, changelog, CI pipeline, and dependency graph. Updating <code>IOrderReader</code> to v2.1 requires checking if it is compatible with <code>IOrderWriter</code> v2.0. Build times increase because NuGet needs to resolve all the inter-package dependencies. For a 5-person team with one product, this is massive overengineering. Segregation at the code level (same assembly, different files) gives you 95% of the benefit with 5% of the overhead.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TooManyPackages.csproj — Bad</span></div>
+            <div class="macos-body">
+<pre><code class="language-xml">&lt;!-- ❌ Each interface in its own NuGet package --&gt;
+&lt;PackageReference Include="MyApp.OrderReader" Version="2.1.0" /&gt;
+&lt;PackageReference Include="MyApp.OrderWriter" Version="2.0.3" /&gt;
+&lt;PackageReference Include="MyApp.OrderValidator" Version="1.9.0" /&gt;
+&lt;PackageReference Include="MyApp.OrderNotifier" Version="2.1.1" /&gt;
+&lt;!-- Version compatibility nightmare! 4 packages for 1 domain concept --&gt;</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SingleAbstractions.csproj — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-xml">&lt;!-- ✅ One abstractions package with all interfaces --&gt;
+&lt;PackageReference Include="MyApp.Abstractions" Version="2.1.0" /&gt;
+&lt;!-- All interfaces in one package, segregated at the code level --&gt;
+&lt;!-- Split into separate packages ONLY when different teams/microservices need it --&gt;</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> ISP is about code-level interface design, not package architecture. Keep all interfaces in one <code>MyApp.Abstractions</code> assembly and split by file. Only split into separate packages when different teams or microservices genuinely consume different subsets and deploy independently.</p>
         </div>
       </div>
     </div>
@@ -2253,24 +2753,34 @@ public class OrderService { /* ... */ }</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Creating interface inheritance chains that re-introduce fat interfaces.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers think: "IDeleter needs to find the entity first, so it should extend IReader. And IWriter also needs to read, so it extends IReader too." This reasoning feels object-oriented and DRY — "do not repeat the GetById method." But the result is an inheritance chain where the leaf interface (<code>IDeleter</code>) inherits all methods from every ancestor, becoming a fat interface in disguise.</p>
+          <p class="body-text">A class that needs to delete something but not read or write is forced to depend on <code>IDeleter</code>, which pulls in <code>IWriter.Save()</code> and <code>IReader.GetById()</code>. You have carefully segregated interfaces and then glued them back together through inheritance. The correct approach is to keep role interfaces independent and compose them at the class level — let the implementing class decide which combination it supports.</p>
           <div class="macos-window mt-sm mb-sm">
-            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">InterfaceInheritance.cs</span></div>
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">InterfaceInheritance.cs — Bad</span></div>
             <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Interface inheritance creates a fat super-interface
 public interface IReader&lt;T&gt; { T GetById(int id); }
 public interface IWriter&lt;T&gt; : IReader&lt;T&gt; { void Save(T entity); }
 public interface IDeleter&lt;T&gt; : IWriter&lt;T&gt; { void Delete(int id); }
-// IDeleter now has GetById + Save + Delete — same fat interface!
-
-// ✓ Keep interfaces independent — compose at the class level
+// IDeleter now has GetById + Save + Delete — same fat interface!</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">IndependentInterfaces.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Keep interfaces independent — compose at the class level
 public interface IReader&lt;T&gt; { T GetById(int id); }
 public interface IWriter&lt;T&gt; { void Save(T entity); }
 public interface IDeleter&lt;T&gt; { void Delete(int id); }
-public class UserRepo : IReader&lt;User&gt;, IWriter&lt;User&gt;, IDeleter&lt;User&gt; { }</code></pre>
+
+// The class chooses which roles it supports:
+public class UserRepo : IReader&lt;User&gt;, IWriter&lt;User&gt;, IDeleter&lt;User&gt; { }
+
+// A consumer needing only delete depends on IDeleter — no extra baggage
+public class CleanupService(IDeleter&lt;User&gt; deleter) { /* only sees Delete() */ }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Interface inheritance can undo ISP by creating a hierarchy where the leaf interface includes all ancestor methods. If <code>IDeleter</code> extends <code>IWriter</code> extends <code>IReader</code>, a component needing only delete still gets read + write.</p>
-          <p class="body-text"><strong>Fix:</strong> Keep role interfaces <strong>independent</strong> (no inheritance between them). Only use interface inheritance when there's a genuine "is-a" relationship (e.g., <code>IDuplexPrinter : IPrinter</code> — duplex IS a kind of printing).</p>
+          <p class="body-text"><strong>The connection:</strong> Interface inheritance should only be used when there is a genuine "is-a" relationship (a duplex printer <em>is</em> a printer). For ISP role interfaces, keep them flat and independent. The class, not the interface, decides which roles to combine.</p>
         </div>
       </div>
     </div>
@@ -2282,9 +2792,43 @@ public class UserRepo : IReader&lt;User&gt;, IWriter&lt;User&gt;, IDeleter&lt;Us
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>Mistake:</strong> Thinking ISP only applies to C# <code>interface</code> keyword. Forgetting that base classes, abstract classes, and even method parameter types can be "too fat."</p>
-          <p class="body-text"><strong>Why Bad:</strong> A method accepting <span class="tooltip-trigger"><code>HttpContext</code><span class="tooltip-content">ASP.NET Core's massive context object with ~50 properties: Request, Response, User, Items, Features, Connection, Session, etc. A method that only needs the URL path but accepts HttpContext is coupled to the entire HTTP pipeline. Pass string path instead.</span></span> when it only needs the request path is an ISP violation — it depends on hundreds of members it doesn't use. A constructor taking <code>IConfiguration</code> when it only needs one connection string is the same problem.</p>
-          <p class="body-text"><strong>Fix:</strong> Apply ISP to all dependency boundaries: constructor parameters, method parameters, and return types. Accept the narrowest type that satisfies the requirement. Pass <code>string connectionString</code> instead of <code>IConfiguration</code>. Accept <code>IReadOnlyList&lt;T&gt;</code> instead of <code>List&lt;T&gt;</code>.</p>
+          <p class="body-text"><strong>Mistake:</strong> Thinking ISP only applies to the C# <code>interface</code> keyword. Forgetting that base classes, abstract classes, and even method parameter types can be "too fat."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The word "Interface" is right there in the name — Interface Segregation Principle. Developers naturally assume it only applies to the <code>interface</code> keyword. But the principle is really about dependency contracts: any type boundary where one piece of code depends on another. That includes method parameters, constructor parameters, return types, and abstract base classes.</p>
+          <p class="body-text">The most common example in ASP.NET Core: accepting <code>HttpContext</code> when your method only needs the request path. <code>HttpContext</code> is a massive object with Request, Response, User, Items, Session, and dozens more properties. Your method depends on all of that surface area even though it only reads one string. Similarly, taking <code>IConfiguration</code> (which holds every config key in the system) when you only need one connection string is ISP violation at the parameter level — your class is coupled to the entire configuration system.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FatParameters.cs — Bad</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Parameter is way too wide — depends on hundreds of members
+public string GenerateReport(HttpContext context)
+{
+    var path = context.Request.Path;  // Only uses this one property!
+    return $"Report for {path}";
+}
+
+// ❌ Constructor takes entire config — only needs one string
+public class EmailService(IConfiguration config)
+{
+    private readonly string _smtpHost = config["Smtp:Host"];  // Only uses this!
+}</code></pre>
+            </div>
+          </div>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">NarrowParameters.cs — Good</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Accept exactly what you need — nothing more
+public string GenerateReport(string requestPath)
+{
+    return $"Report for {requestPath}";
+}
+
+// ✅ Inject the specific value, not the entire config
+public class EmailService(SmtpSettings settings)  // Strongly-typed options
+{
+    private readonly string _smtpHost = settings.Host;
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> ISP applies to every dependency boundary, not just the <code>interface</code> keyword. The rule is the same everywhere: accept the narrowest type that satisfies the requirement. This makes methods easier to test (pass a string, not a mocked HttpContext), easier to understand (the parameter list documents exactly what is needed), and easier to reuse (the method works in any context, not just HTTP).</p>
         </div>
       </div>
     </div>

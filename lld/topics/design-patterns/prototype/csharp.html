@@ -1425,10 +1425,43 @@ var stagingFlags = baseFlags.SetItem("beta-search", true);  // "clone + override
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Tuesday 2:30 PM.</strong> E-commerce team ships a "duplicate product" feature. Product managers clone a template product and customize it. Within hours, support tickets flood in: "My template product's tags are changing by themselves!" Investigation reveals every clone shares the same <code>Tags</code> list — modifying one clone modifies all clones AND the template.</p>
+          <p class="body-text"><strong>Tuesday 2:30 PM.</strong> The e-commerce team ships a shiny new "duplicate product" feature. Product managers love it — clone a template product, tweak a few fields, and publish. Easy. Within three hours, support tickets start flooding in: "My template product's tags keep changing on their own!"</p>
         </div>
-        <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">4 hours. The bug was <span class="tooltip-trigger">intermittent<span class="tooltip-content">A bug that only appears sometimes, depending on timing, data, or environment. Shallow copy bugs are often intermittent because they depend on the ORDER of operations: clone A → modify A → clone B → B sees A's changes. If B is cloned before A is modified, the bug doesn't appear.</span></span> — it only manifested when two users cloned the same template within a short window. The shared reference meant mutations were visible across requests.</p>
+
+        <p class="body-text">Here's the story, step by step. The team has a template product in the database with <code>Tags = ["electronics", "sale"]</code>. When a product manager clicks "Duplicate," the system calls <code>template.Clone()</code> to make a copy. The clone method uses <code>MemberwiseClone()</code>, which copies every field. Sounds fine, right?</p>
+
+        <p class="body-text">The trap is that <code>MemberwiseClone()</code> does a <span class="tooltip-trigger">shallow copy<span class="tooltip-content">A copy that duplicates the outer object but shares internal references. Think of it like photocopying a folder of sticky notes — you get a new folder, but the sticky notes inside are the same ones. If someone moves a sticky note in your copy, it disappears from the original too.</span></span>. For simple values like <code>Price = 29.99m</code> or <code>Name = "Widget"</code>, it creates independent copies — great. But for the <code>Tags</code> list, it copies the <em>reference</em> (the arrow pointing to the list), not the list itself. So the template and the clone both point to the exact same list in memory.</p>
+
+        <p class="body-text">User A clones the template and adds <code>"featured"</code> to their product's tags. Because the clone's Tags list IS the template's Tags list, the template now has <code>["electronics", "sale", "featured"]</code>. Five minutes later, User B clones the same template — and their "fresh" clone already has the <code>"featured"</code> tag that User A added. User B adds <code>"clearance"</code>, which also mutates the template. The corruption snowballs with every clone.</p>
+
+        <p class="body-text">The bug was <span class="tooltip-trigger">intermittent<span class="tooltip-content">A bug that only appears sometimes, depending on timing, data, or environment. Shallow copy bugs are often intermittent because they depend on the ORDER of operations: clone A, modify A, clone B — B sees A's changes. If B is cloned before A is modified, the bug doesn't appear.</span></span> — it only showed up when two users cloned the same template in a short window. If only one person cloned, they never noticed the shared reference. It took 4 hours of investigation before someone realized the Tags list was the same object in memory.</p>
+
+        <!-- SVG: Shallow Copy Memory Diagram -->
+        <svg viewBox="0 0 720 300" role="img" aria-label="Diagram showing template and clone sharing the same Tags list in memory" style="width:100%; max-width:720px; margin:1rem auto; display:block;">
+          <defs>
+            <marker id="proto-b1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #06b6d4)"/></marker>
+            <marker id="proto-b1-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Template box -->
+          <rect x="30" y="30" width="200" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="130" y="55" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Template Product</text>
+          <text x="45" y="80" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Name = "Widget"</text>
+          <text x="45" y="100" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Price = 29.99</text>
+          <text x="45" y="120" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Tags = ──────►</text>
+          <!-- Clone box -->
+          <rect x="30" y="180" width="200" height="100" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="130" y="205" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Clone (User A)</text>
+          <text x="45" y="230" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Name = "User A's" ✓ own copy</text>
+          <text x="45" y="252" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Tags = ──────►</text>
+          <!-- Shared list -->
+          <rect x="400" y="100" width="280" height="80" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="540" y="125" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700">SHARED List (one in memory!)</text>
+          <text x="540" y="150" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">["electronics", "sale", "featured", "clearance"]</text>
+          <text x="540" y="170" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Both point here! Mutating one mutates ALL</text>
+          <!-- Arrows -->
+          <line x1="230" y1="115" x2="395" y2="135" stroke="#ef4444" stroke-width="1.5" marker-end="url(#proto-b1-arr-red)"/>
+          <line x1="230" y1="248" x2="395" y2="150" stroke="#ef4444" stroke-width="1.5" marker-end="url(#proto-b1-arr-red)"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1465,6 +1498,7 @@ userB.Tags.Add("clearance");                    // ❌ Also adds to template.Tag
 // The database is now full of products with wrong tags</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>Product</code> class uses <code>MemberwiseClone()</code> which copies all fields at face value. For <code>Name</code> (a string, which is immutable in C#), this is perfectly safe — each clone gets its own independent string. But <code>Tags</code> is a <code>List&lt;string&gt;</code>, which is a mutable reference type. <code>MemberwiseClone()</code> copies the pointer to the list, not the list itself. So <code>template.Tags</code>, <code>userA.Tags</code>, and <code>userB.Tags</code> are all the exact same list object. Adding a tag to any of them adds it to all of them.</p>
           </div>
           <div class="tab-panel" id="bug1-fix" role="tabpanel">
             <div class="macos-window">
@@ -1489,7 +1523,13 @@ userB.Tags.Add("clearance");                    // ❌ Also adds to template.Tag
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> Instead of relying on <code>MemberwiseClone()</code>, the fix manually constructs a new <code>Product</code> and creates brand-new collection instances. <code>new List&lt;string&gt;(this.Tags)</code> creates a fresh list with the same elements — but it's a completely separate list in memory. Adding <code>"featured"</code> to the clone's Tags only affects the clone's list. The template's list stays untouched. The dictionary gets the same treatment. Each clone is now fully independent.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>MemberwiseClone()</code> in your codebase. For every class that uses it, check: does the class have ANY field that's a <code>List&lt;T&gt;</code>, <code>Dictionary&lt;K,V&gt;</code>, array, or custom class? If yes, that field is being shared between original and clone. Write a unit test: clone an object, mutate a collection field on the clone, then assert the original's collection is unchanged.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1507,10 +1547,52 @@ userB.Tags.Add("clearance");                    // ❌ Also adds to template.Tag
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Friday 5:47 PM.</strong> A developer implements <code>ICloneable</code> on a base class <code>Shape</code>. Subclasses <code>Circle</code> and <code>Rectangle</code> inherit the clone. A new developer adds <code>Triangle</code> extending <code>Shape</code> but manually constructs the clone and forgets to copy <code>SideA</code>, <code>SideB</code>, <code>SideC</code>. The cast works — but the cloned triangle has all sides zeroed out. Rendering code draws invisible triangles.</p>
+          <p class="body-text"><strong>Friday 5:47 PM.</strong> A developer implements <code>ICloneable</code> on a base class <code>Shape</code>. Subclasses <code>Circle</code> and <code>Rectangle</code> inherit the clone. A new developer joins the team and adds <code>Triangle</code> extending <code>Shape</code>. Everything compiles, tests pass, the feature ships.</p>
         </div>
-        <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">45 minutes. No exception was thrown — the bug was silent. QA noticed triangles rendering as dots. Tracing back to the clone revealed zeroed-out fields. The root cause: <code>ICloneable.Clone()</code> returns <code>object</code>, so there's no compiler help to verify all fields are copied.</p>
+
+        <p class="body-text">Two weeks later, QA files a bizarre ticket: "Triangles are rendering as tiny dots." Triangles that were cloned from templates appeared on screen as invisible or single-pixel shapes. Non-cloned triangles rendered perfectly.</p>
+
+        <p class="body-text">Here's what happened. The original developer wrote <code>Shape.Clone()</code> using <code>MemberwiseClone()</code>, which copies ALL fields (even subclass fields). That worked fine for <code>Circle</code> and <code>Rectangle</code>. But the new developer looked at the <code>Clone()</code> method, saw it returned <code>object</code>, and thought: "I should override this with a proper implementation." So they manually constructed a new <code>Triangle</code> and copied the base class fields (<code>X</code>, <code>Y</code>, <code>Color</code>) — but forgot <code>SideA</code>, <code>SideB</code>, and <code>SideC</code>.</p>
+
+        <p class="body-text">The <code>Clone()</code> call compiled fine. The cast to <code>Triangle</code> worked at runtime. No exception, no warning, no error. But the cloned triangle's sides were all <code>0.0</code> (the default for <code>double</code>). A triangle with zero-length sides is a dot — or nothing at all. The bug was <em>silent</em>. The return type <code>object</code> gave the compiler nothing to check against, so the missing fields were invisible until QA caught it visually.</p>
+
+        <p class="body-text">Diagnosis took 45 minutes. No exception was thrown, so there was no stack trace to follow. The team had to trace every cloned shape back to its source and compare field values to discover the zeroed-out sides.</p>
+
+        <!-- SVG: ICloneable silent data loss -->
+        <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing ICloneable returns object, losing type information and allowing silent field loss" style="width:100%; max-width:720px; margin:1rem auto; display:block;">
+          <defs>
+            <marker id="proto-b2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #06b6d4)"/></marker>
+            <marker id="proto-b2-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Original Triangle -->
+          <rect x="20" y="30" width="200" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="120" y="55" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Original Triangle</text>
+          <text x="35" y="78" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">X = 10, Y = 20</text>
+          <text x="35" y="96" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Color = "red"</text>
+          <text x="35" y="114" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">SideA = 3, SideB = 4</text>
+          <text x="35" y="132" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">SideC = 5</text>
+          <!-- Arrow through Clone() -->
+          <line x1="225" y1="95" x2="340" y2="95" stroke="var(--text-secondary, #94a3b8)" stroke-width="1.5" marker-end="url(#proto-b2-arr)"/>
+          <text x="283" y="85" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">.Clone()</text>
+          <!-- object black box -->
+          <rect x="345" y="65" width="100" height="55" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="395" y="88" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">object</text>
+          <text x="395" y="108" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="9">no type info!</text>
+          <!-- Arrow through cast -->
+          <line x1="450" y1="95" x2="505" y2="95" stroke="var(--text-secondary, #94a3b8)" stroke-width="1.5" marker-end="url(#proto-b2-arr)"/>
+          <text x="478" y="85" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">(cast)</text>
+          <!-- Cloned Triangle with missing data -->
+          <rect x="510" y="30" width="195" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+          <text x="608" y="55" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Cloned Triangle</text>
+          <text x="525" y="78" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">X = 10, Y = 20 ✓</text>
+          <text x="525" y="96" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Color = "red" ✓</text>
+          <text x="525" y="114" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700">SideA = 0 ✗ LOST</text>
+          <text x="525" y="132" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700">SideB = 0, SideC = 0 ✗</text>
+          <!-- Warning label -->
+          <rect x="180" y="190" width="360" height="45" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="360" y="210" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">No compiler warning! No runtime exception!</text>
+          <text x="360" y="226" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">Silent data loss only caught by visual inspection</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1552,6 +1634,7 @@ Shape shape = GetShapeFromDatabase(); // actually a Triangle
 var copy = (Triangle)shape.Clone();   // ❌ Cast works, but SideA/B/C are all 0!</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The base class <code>Shape</code> implements <code>ICloneable</code>, which forces <code>Clone()</code> to return <code>object</code>. The new developer overrides <code>Clone()</code> in <code>Triangle</code> and manually constructs a new triangle. They remember to copy the base class fields (<code>X</code>, <code>Y</code>, <code>Color</code>), but forget the triangle-specific fields (<code>SideA</code>, <code>SideB</code>, <code>SideC</code>). Because the return type is <code>object</code>, the compiler has no idea what fields should be there. No warning, no error. The <code>double</code> fields default to <code>0.0</code> silently.</p>
           </div>
           <div class="tab-panel" id="bug2-fix" role="tabpanel">
             <div class="macos-window">
@@ -1588,7 +1671,13 @@ Triangle original = new() { X = 0, Y = 0, SideA = 3, SideB = 4, SideC = 5 };
 Triangle copy = original.DeepClone();  // ✅ returns Triangle directly</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> By using a generic <code>IPrototype&lt;T&gt;</code> interface, each class explicitly returns its own concrete type. <code>Triangle.DeepClone()</code> returns <code>Triangle</code>, not <code>object</code>. The caller gets type-safe access without casting. And because the developer is writing <code>Triangle DeepClone()</code> (not <code>object Clone()</code>), it's much more obvious that all Triangle-specific fields need to be included. You can also add a reflection-based test to catch forgotten fields automatically (see Q14 in Interview section).</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for <code>: ICloneable</code> in your codebase. Every class that implements it is at risk. Also search for <code>(SomeType)something.Clone()</code> — any cast after a Clone call means you're relying on runtime safety instead of compile-time safety. Replace with a typed <code>IPrototype&lt;T&gt;</code> interface.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1606,10 +1695,48 @@ Triangle copy = original.DeepClone();  // ✅ returns Triangle directly</code></
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Wednesday 11 AM.</strong> The org-chart system implements deep clone on <code>Employee</code>. Each employee has a <code>Manager</code> (Employee) and a <code>List&lt;Employee&gt; DirectReports</code>. Cloning the CEO triggers infinite recursion: CEO → clone Manager (null, OK) → clone DirectReports → clone VP → clone VP's Manager (CEO) → clone CEO's DirectReports → ... StackOverflow.</p>
+          <p class="body-text"><strong>Wednesday 11 AM.</strong> The HR team reports the org-chart system is crashing. Every time someone tries to duplicate a department, the server crashes with a <code>StackOverflowException</code>. No useful stack trace, no recovery — the whole process dies instantly.</p>
         </div>
-        <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">30 minutes. The StackOverflowException had no meaningful stack trace (it was too deep). Adding a counter to DeepClone revealed the circular dependency.</p>
+
+        <p class="body-text">The system has an <code>Employee</code> class where each employee has a <code>Manager</code> (who is also an Employee) and a list of <code>DirectReports</code> (also Employees). This creates a two-way relationship: the CEO's DirectReports include the VP, and the VP's Manager is the CEO. They point at each other.</p>
+
+        <p class="body-text">When someone clones the CEO, the deep clone method tries to clone every field. It clones the CEO's DirectReports list, which means cloning the VP. Cloning the VP means cloning the VP's Manager, which is... the CEO. So it tries to clone the CEO again. The CEO's DirectReports include the VP again. The VP's Manager is the CEO again. And so on, forever — like two mirrors facing each other creating an infinite reflection.</p>
+
+        <p class="body-text">Think of it like this: imagine photocopying a family tree where every parent card says "see children" and every child card says "see parent." You'd flip back and forth between the same cards forever, never finishing the copy. That's exactly what the code does — it bounces between CEO and VP endlessly until the call stack runs out of space.</p>
+
+        <p class="body-text">The <code>StackOverflowException</code> is particularly nasty because it kills the process immediately — no <code>catch</code> block can save you. It took 30 minutes to diagnose because the exception's stack trace was thousands of identical frames deep, making it hard to see the pattern. Adding a depth counter to the clone method finally revealed the circular dependency.</p>
+
+        <!-- SVG: Circular Reference Infinite Loop -->
+        <svg viewBox="0 0 720 280" role="img" aria-label="Diagram showing circular reference between CEO and VP causing infinite recursion during deep clone" style="width:100%; max-width:720px; margin:1rem auto; display:block;">
+          <defs>
+            <marker id="proto-b3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #06b6d4)"/></marker>
+            <marker id="proto-b3-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- CEO box -->
+          <rect x="80" y="30" width="180" height="80" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="170" y="55" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">CEO</text>
+          <text x="95" y="78" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Manager = null</text>
+          <text x="95" y="96" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">DirectReports = [VP]</text>
+          <!-- VP box -->
+          <rect x="440" y="30" width="180" height="80" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="530" y="55" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">VP</text>
+          <text x="455" y="78" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Manager = CEO</text>
+          <text x="455" y="96" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">DirectReports = [Dev]</text>
+          <!-- Circular arrows -->
+          <path d="M265 55 Q360 20 435 55" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#proto-b3-arr-red)"/>
+          <text x="350" y="18" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">clone DirectReports</text>
+          <path d="M435 85 Q340 120 265 85" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#proto-b3-arr-red)"/>
+          <text x="350" y="135" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">clone Manager</text>
+          <!-- Infinite loop symbol -->
+          <text x="350" y="75" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700">&#x221E;</text>
+          <!-- StackOverflow box -->
+          <rect x="210" y="180" width="300" height="70" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="2"/>
+          <text x="360" y="205" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700">StackOverflowException!</text>
+          <text x="360" y="225" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Clone CEO &#x2192; Clone VP &#x2192; Clone CEO &#x2192; Clone VP &#x2192; ...</text>
+          <text x="360" y="240" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">Process killed. No catch. No recovery.</text>
+          <!-- Arrow down to crash -->
+          <line x1="350" y1="145" x2="350" y2="175" stroke="#ef4444" stroke-width="1.5" marker-end="url(#proto-b3-arr-red)"/>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1643,6 +1770,7 @@ Triangle copy = original.DeepClone();  // ✅ returns Triangle directly</code></
 // Cloning CEO → clones VP → VP clones Manager (CEO) → CEO clones VP → BOOM</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> When we call <code>ceo.DeepClone()</code>, the method creates a new Employee, copies the Name, then tries to clone the Manager (null for CEO, so that's fine). Then it iterates through DirectReports and calls <code>DeepClone()</code> on each one. The VP is in that list, so it clones the VP. The VP's <code>DeepClone()</code> tries to clone its Manager — which is the CEO. And the CEO's clone tries to clone its DirectReports — which includes the VP. Neither side ever stops calling the other. Each call adds a frame to the call stack until the stack overflows.</p>
           </div>
           <div class="tab-panel" id="bug3-fix" role="tabpanel">
             <div class="macos-window">
@@ -1678,7 +1806,13 @@ Triangle copy = original.DeepClone();  // ✅ returns Triangle directly</code></
 // → visited[CEO] already exists → returns the clone, no infinite loop</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The secret weapon is a <code>visited</code> dictionary that remembers every object we've already started cloning. Before cloning anything, we check: "Have I seen this object before?" If yes, return the clone we already created. The critical detail is registering the clone in the dictionary <em>before</em> filling in its child fields. This way, when the VP tries to clone its Manager (the CEO), it finds the CEO's clone already in the dictionary and returns it — breaking the cycle. The empty CEO clone gets its children filled in after the recursive calls return.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Look for classes that reference themselves — either directly (a <code>Manager</code> field of the same type) or indirectly (Parent/Child relationships, graph edges, linked list nodes). If any of these classes have a <code>DeepClone()</code> method without a <code>visited</code> dictionary parameter, they're vulnerable to infinite recursion. Tree structures (where references only go downward) are safe, but any bidirectional relationship is dangerous.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1696,10 +1830,49 @@ Triangle copy = original.DeepClone();  // ✅ returns Triangle directly</code></
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Monday 9 AM.</strong> A WPF application clones a ViewModel that has <code>PropertyChanged</code> event subscribers. After cloning, changing a property on the clone fires the event on the original's subscribers — the UI updates widgets that were bound to the original ViewModel, showing wrong data in the wrong panel.</p>
+          <p class="body-text"><strong>Monday 9 AM.</strong> A desktop app (WPF) has a split-panel view. Users can "duplicate" a panel to compare two configurations side by side. The developer clones the ViewModel to create the second panel. After cloning, editing the Name field in Panel B causes Panel A to update. Typing in Panel B makes Panel A flicker with the same text. Users report the app is "haunted."</p>
         </div>
-        <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">2 hours. The symptoms were bizarre — editing one panel's data changed another panel. Nobody suspected the clone was sharing event handlers with the original.</p>
+
+        <p class="body-text">Here's why this happens. In WPF (and other UI frameworks), when you bind a text box to a ViewModel property, the framework subscribes to the ViewModel's <code>PropertyChanged</code> event. When the property changes, the event fires, and the UI knows to refresh. The original ViewModel had Panel A's UI subscribed to its event.</p>
+
+        <p class="body-text">When the developer cloned the ViewModel using <code>MemberwiseClone()</code>, the event field (which is a <span class="tooltip-trigger">delegate<span class="tooltip-content">A delegate in C# is essentially a pointer to a method (or a list of methods). Events are backed by delegate fields. When you do someEvent += handler, you're adding a method pointer to the delegate's invocation list. MemberwiseClone copies this pointer, so the clone inherits all the original's subscribers.</span></span>) got copied along with everything else. The clone now has a <code>PropertyChanged</code> event that still points to Panel A's update handler. When the clone fires its event (because someone typed in Panel B), Panel A's handler runs and refreshes Panel A's UI with Panel B's data.</p>
+
+        <p class="body-text">Think of it like this: the original ViewModel has a phone number on speed dial — "call Panel A when something changes." When you photocopy the ViewModel, the photocopy still has Panel A's phone number on speed dial. Now the clone calls Panel A every time it changes, confusing everyone.</p>
+
+        <p class="body-text">It took 2 hours to diagnose because the symptom (Panel A updating when you edit Panel B) seemed like a data-binding bug, not a cloning bug. Nobody thought to check whether the event subscribers were shared.</p>
+
+        <!-- SVG: Shared Event Handlers -->
+        <svg viewBox="0 0 720 270" role="img" aria-label="Diagram showing cloned ViewModel still firing original's event handlers" style="width:100%; max-width:720px; margin:1rem auto; display:block;">
+          <defs>
+            <marker id="proto-b4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #06b6d4)"/></marker>
+            <marker id="proto-b4-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Original VM -->
+          <rect x="30" y="30" width="180" height="70" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="120" y="55" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Original ViewModel</text>
+          <text x="120" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">Name = "Panel A"</text>
+          <!-- Clone VM -->
+          <rect x="30" y="160" width="180" height="70" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="120" y="185" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Cloned ViewModel</text>
+          <text x="120" y="208" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">Name = "Panel B"</text>
+          <!-- Shared delegate box -->
+          <rect x="300" y="80" width="170" height="60" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="385" y="103" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">SHARED Delegate</text>
+          <text x="385" y="120" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">PropertyChanged</text>
+          <!-- Panel A UI -->
+          <rect x="550" y="80" width="140" height="60" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="620" y="103" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Panel A UI</text>
+          <text x="620" y="120" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">UpdatePanelA()</text>
+          <!-- Arrows -->
+          <line x1="215" y1="65" x2="295" y2="100" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5" marker-end="url(#proto-b4-arr)"/>
+          <line x1="215" y1="195" x2="295" y2="120" stroke="#ef4444" stroke-width="2" marker-end="url(#proto-b4-arr-red)"/>
+          <line x1="475" y1="110" x2="545" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#proto-b4-arr-red)"/>
+          <!-- Labels -->
+          <text x="253" y="190" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10" transform="rotate(-25, 253, 190)">fires Panel A's handler!</text>
+          <text x="510" y="100" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">calls</text>
+          <!-- Result -->
+          <text x="360" y="250" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Editing Panel B updates Panel A!</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1733,6 +1906,7 @@ var clone = original.Clone();
 clone.Name = "Panel B";  // ❌ Fires UpdatePanelA — wrong panel updates!</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The ViewModel has a <code>PropertyChanged</code> event. When Panel A's UI binds to the original, it subscribes a handler (<code>UpdatePanelA</code>) to this event. <code>MemberwiseClone()</code> copies every field, including the delegate backing the event. The clone now has the same subscriber list. When <code>clone.Name = "Panel B"</code> runs, it invokes <code>PropertyChanged</code>, which calls <code>UpdatePanelA</code> — the wrong panel's refresh method. The clone has no idea it's talking to the wrong audience.</p>
           </div>
           <div class="tab-panel" id="bug4-fix" role="tabpanel">
             <div class="macos-window">
@@ -1759,7 +1933,13 @@ clone.Name = "Panel B";  // ❌ Fires UpdatePanelA — wrong panel updates!</cod
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> After cloning, we explicitly set the event field to <code>null</code>, wiping out the inherited subscriber list. The clone starts with a clean slate — no event subscribers at all. When Panel B's UI binds to this clone, it subscribes its own handler (<code>UpdatePanelB</code>). Now each panel's ViewModel talks only to its own UI. Changing Panel B only updates Panel B.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for any class that has both an <code>event</code> declaration and a <code>Clone()</code>/<code>MemberwiseClone()</code> method. Events in C# are backed by delegate fields that get shallow-copied. Also watch for <code>INotifyPropertyChanged</code>, <code>INotifyCollectionChanged</code>, or any custom event pattern on cloneable classes. After cloning, always null out event fields.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1777,10 +1957,46 @@ clone.Name = "Panel B";  // ❌ Fires UpdatePanelA — wrong panel updates!</cod
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Thursday 3 PM.</strong> An admin dashboard lets managers "duplicate" a training course. The clone copies everything including the primary key <code>Id</code>. When the clone is saved, the database throws a <span class="tooltip-trigger">duplicate key violation<span class="tooltip-content">SQL error when you INSERT a row with a primary key that already exists. In EF Core: Microsoft.Data.SqlClient.SqlException: Violation of PRIMARY KEY constraint 'PK_Courses'. Cannot insert duplicate key in object 'dbo.Courses'.</span></span> — or worse, with some ORMs, it silently UPDATES the original record instead of inserting a new one.</p>
+          <p class="body-text"><strong>Thursday 3 PM.</strong> An admin dashboard lets training managers "duplicate" a course. The clone button works great in development (auto-increment IDs, fresh database). But in production, saving the clone either throws a <span class="tooltip-trigger">duplicate key violation<span class="tooltip-content">SQL error when you INSERT a row with a primary key that already exists. In EF Core: Microsoft.Data.SqlClient.SqlException: Violation of PRIMARY KEY constraint 'PK_Courses'. Cannot insert duplicate key in object 'dbo.Courses'.</span></span> or — even worse — silently overwrites the original course.</p>
         </div>
-        <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">1 hour. The silent-update variant was the worst — the original course was overwritten with the clone's data. No error, no exception, just data loss that was discovered when a student reported their course content had changed.</p>
+
+        <p class="body-text">The clone method copies every field from the original course, including the primary key <code>Id</code>. When you clone Course 42, the clone also has <code>Id = 42</code>. When you try to save this clone to the database, the database sees "you're inserting a new row with Id = 42, but Id = 42 already exists" and throws an error.</p>
+
+        <p class="body-text">But the silent-overwrite scenario is scarier. With some ORM configurations, if the change tracker sees an entity with an existing ID and you call <code>Add()</code>, it might treat it as an update instead of an insert. The original Course 42 gets overwritten with the clone's data. No error. No warning. A student logs in and finds their course content has changed to the cloned version. Data loss discovered by accident.</p>
+
+        <p class="body-text">The same problem extends to child entities. Each course has Modules, and each Module has its own Id. If you clone the course and its modules but keep the same module IDs, saving creates a mess of duplicate keys throughout the entire entity tree.</p>
+
+        <p class="body-text">Think of it like making a photocopy of your passport. The copy has your same passport number, your same photo, your same birthdate. If someone tries to use both passports at the airport, the system flags a duplicate. A clone needs a NEW identity — new passport number, new issue date, everything that makes it uniquely "its own thing."</p>
+
+        <!-- SVG: Duplicate Key Violation -->
+        <svg viewBox="0 0 720 250" role="img" aria-label="Diagram showing cloned entity with same ID causing database conflict" style="width:100%; max-width:720px; margin:1rem auto; display:block;">
+          <defs>
+            <marker id="proto-b5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #06b6d4)"/></marker>
+            <marker id="proto-b5-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Original -->
+          <rect x="30" y="40" width="170" height="80" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="115" y="65" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Original Course</text>
+          <text x="45" y="85" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Id = 42</text>
+          <text x="45" y="103" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Title = "C# Basics"</text>
+          <!-- Clone -->
+          <rect x="30" y="150" width="170" height="80" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="115" y="175" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Cloned Course</text>
+          <text x="45" y="195" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700">Id = 42 ✗ SAME!</text>
+          <text x="45" y="213" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Title = "C# Basics (Copy)"</text>
+          <!-- Database -->
+          <rect x="400" y="60" width="280" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-secondary, #94a3b8)" stroke-width="1"/>
+          <text x="540" y="85" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Database (Courses table)</text>
+          <line x1="415" y1="95" x2="665" y2="95" stroke="var(--text-secondary, #94a3b8)" stroke-width="0.5"/>
+          <text x="440" y="115" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="11">Id=42  "C# Basics"  (exists)</text>
+          <text x="440" y="140" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">INSERT Id=42 ??? CONFLICT!</text>
+          <rect x="415" y="155" width="250" height="28" rx="4" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="540" y="174" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">PK_Courses violation OR silent overwrite</text>
+          <!-- Arrows -->
+          <line x1="205" y1="80" x2="395" y2="100" stroke="var(--accent-primary, #06b6d4)" stroke-width="1" stroke-dasharray="4,3"/>
+          <line x1="205" y1="190" x2="395" y2="135" stroke="#ef4444" stroke-width="2" marker-end="url(#proto-b5-arr-red)"/>
+          <text x="305" y="175" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">db.Add(clone)</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1813,6 +2029,7 @@ db.Courses.Add(clone);
 await db.SaveChangesAsync();                 // ❌ DUPLICATE KEY or overwrites original</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>Clone()</code> method manually copies every field, including <code>Id = this.Id</code>. For a course with Id = 42, the clone also gets Id = 42. When EF Core sees <code>db.Courses.Add(clone)</code>, it tries to INSERT a row with Id = 42 into a table that already has a row with Id = 42. The <code>CreatedAt</code> timestamp is also copied, making it look like the clone was created at the same time as the original — misleading for auditing.</p>
           </div>
           <div class="tab-panel" id="bug5-fix" role="tabpanel">
             <div class="macos-window">
@@ -1848,7 +2065,13 @@ public class Module : IPrototype&lt;Module&gt;
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> The fix simply omits the <code>Id</code> field from the clone constructor. In C#, an unset <code>int</code> defaults to <code>0</code>. EF Core treats an entity with <code>Id = 0</code> as a brand-new entity and lets the database auto-generate a fresh ID. The <code>CreatedAt</code> is set to <code>DateTime.UtcNow</code> so the clone has its own creation timestamp. Crucially, the child Module entities also reset their IDs — every level of the entity tree needs a fresh identity.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">Search for any <code>DeepClone()</code> or <code>Clone()</code> method that copies an <code>Id</code> field. Also check for: <code>Guid</code> primary keys (need <code>Guid.NewGuid()</code>), <code>CreatedAt</code>/<code>UpdatedAt</code> timestamps, <code>RowVersion</code> concurrency tokens, and <code>CreatedBy</code> audit fields. All of these represent identity or metadata about the specific entity, not transferable data. A good practice is to create a unit test that clones an entity and asserts <code>clone.Id == 0</code>.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1866,10 +2089,54 @@ public class Module : IPrototype&lt;Module&gt;
       <div class="card-body">
         <div class="callout callout-danger">
           <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Incident</div>
-          <p class="body-text"><strong>Saturday 1 AM.</strong> A game server's enemy spawner clones prototypes from a shared registry under high load. Thread A reads the prototype's Stats while Thread B is mid-clone, modifying the prototype's temporary state. Spawned enemies appear with corrupted stats — zero health, negative attack, or stats from a completely different enemy type.</p>
+          <p class="body-text"><strong>Saturday 1 AM.</strong> A multiplayer game server starts getting reports of bizarre enemy behavior during peak hours. Goblins spawn with the health of an orc. Orcs appear with zero attack power. Some enemies have stats from completely different enemy types, mixed and matched in impossible combinations. The game is chaos.</p>
         </div>
-        <h3 class="sub">Time to Diagnose</h3>
-        <p class="body-text">6 hours. The corruption only happened under peak load (500+ spawns/second). A <span class="tooltip-trigger">thread-sanitizer<span class="tooltip-content">A tool that detects data races in concurrent code. .NET doesn't have a built-in thread sanitizer like C++ TSan, but you can use stress tests with Environment.ProcessorCount * 4 threads, or tools like JetBrains dotTrace to detect contention.</span></span> stress test finally reproduced it.</p>
+
+        <p class="body-text">The game server has a prototype registry — a dictionary that stores one "template" enemy of each type (goblin, orc, dragon, etc.). When the server needs to spawn a new enemy, it grabs the prototype and calls <code>DeepClone()</code>. This works perfectly with a few players. But during Saturday night peak load, 500+ enemies spawn per second across dozens of threads.</p>
+
+        <p class="body-text">The root problem is twofold. First, a regular <code>Dictionary&lt;string, GameEntity&gt;</code> is <strong>not thread-safe</strong>. When one thread reads from the dictionary while another thread writes to it (updating a prototype), the internal data structure can get corrupted. The reader might get a partially-updated reference — reading half of the old data and half of the new data, creating a Frankenstein entity.</p>
+
+        <p class="body-text">Second, if the <code>DeepClone()</code> method itself has any temporary state (like swapping internal buffers or using a shared temp variable), multiple threads calling it simultaneously on the same prototype can interfere with each other. Thread A starts cloning the goblin, Thread B starts cloning the same goblin half a nanosecond later, and they step on each other's intermediate state.</p>
+
+        <p class="body-text">Think of it like two people trying to photocopy the same document at the same time on the same copier. If person A is mid-copy and person B swaps the document on the glass, person A's copy ends up with half of one document and half of another. The solution is either to use separate copiers (independent cloning) or to ensure only one person uses the copier at a time (thread safety).</p>
+
+        <p class="body-text">It took 6 hours to diagnose because the corruption only happened under peak load — a <span class="tooltip-trigger">thread-sanitizer<span class="tooltip-content">A tool that detects data races in concurrent code. .NET doesn't have a built-in thread sanitizer like C++ TSan, but you can use stress tests with Environment.ProcessorCount * 4 threads, or tools like JetBrains dotTrace to detect contention.</span></span> stress test running dozens of threads finally reproduced the corruption consistently.</p>
+
+        <!-- SVG: Thread Race Condition -->
+        <svg viewBox="0 0 720 280" role="img" aria-label="Diagram showing multiple threads racing to access the same prototype registry" style="width:100%; max-width:720px; margin:1rem auto; display:block;">
+          <defs>
+            <marker id="proto-b6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #06b6d4)"/></marker>
+            <marker id="proto-b6-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ef4444"/></marker>
+          </defs>
+          <!-- Thread A -->
+          <rect x="30" y="30" width="130" height="45" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5"/>
+          <text x="95" y="57" text-anchor="middle" fill="var(--accent-primary, #06b6d4)" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Thread A (Read)</text>
+          <!-- Thread B -->
+          <rect x="30" y="95" width="130" height="45" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+          <text x="95" y="122" text-anchor="middle" fill="#f59e0b" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Thread B (Write)</text>
+          <!-- Thread C -->
+          <rect x="30" y="160" width="130" height="45" rx="6" fill="var(--bg-secondary, #1e293b)" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="95" y="187" text-anchor="middle" fill="#a78bfa" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Thread C (Read)</text>
+          <!-- Registry (unsafe) -->
+          <rect x="300" y="60" width="170" height="100" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+          <text x="385" y="85" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700">Dictionary (unsafe!)</text>
+          <text x="385" y="108" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">"goblin" &#x2192; Goblin proto</text>
+          <text x="385" y="126" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">"orc" &#x2192; Orc proto</text>
+          <text x="385" y="148" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Concurrent access = corruption</text>
+          <!-- Arrows all hitting registry simultaneously -->
+          <line x1="165" y1="52" x2="295" y2="90" stroke="var(--accent-primary, #06b6d4)" stroke-width="1.5" marker-end="url(#proto-b6-arr)"/>
+          <line x1="165" y1="117" x2="295" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#proto-b6-arr-red)"/>
+          <line x1="165" y1="182" x2="295" y2="130" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#proto-b6-arr)"/>
+          <!-- Corrupted output -->
+          <rect x="530" y="60" width="170" height="100" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="615" y="85" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Corrupted Clones</text>
+          <text x="615" y="108" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">Goblin + Orc stats mixed</text>
+          <text x="615" y="126" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">Zero health enemies</text>
+          <text x="615" y="148" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="system-ui, -apple-system, sans-serif" font-size="10">Negative attack values</text>
+          <line x1="475" y1="110" x2="525" y2="110" stroke="#ef4444" stroke-width="1.5" marker-end="url(#proto-b6-arr-red)"/>
+          <!-- Lightning bolt -->
+          <text x="385" y="40" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="18">&#x26A1; RACE CONDITION</text>
+        </svg>
 
         <div class="tab-container mt-sm">
           <div class="tab-header" role="tablist">
@@ -1907,6 +2174,7 @@ public class Module : IPrototype&lt;Module&gt;
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Walking through the buggy code:</strong> The <code>EnemySpawner</code> uses a regular <code>Dictionary</code> to store prototypes. Multiple game threads call <code>Spawn()</code> simultaneously, each reading from the dictionary and calling <code>DeepClone()</code> on the same prototype. Meanwhile, <code>UpdatePrototype()</code> can be called by a configuration reload thread, writing to the dictionary while others are reading. <code>Dictionary</code> is not designed for concurrent access — reading while writing can cause internal array corruption, null references, or returning the wrong value entirely.</p>
           </div>
           <div class="tab-panel" id="bug6-fix" role="tabpanel">
             <div class="macos-window">
@@ -1941,7 +2209,13 @@ public class Module : IPrototype&lt;Module&gt;
 }</code></pre>
               </div>
             </div>
+            <p class="body-text mt-sm"><strong>Why the fix works:</strong> <code>ConcurrentDictionary</code> is specifically designed for multi-threaded access. Its <code>TryGetValue()</code> method is lock-free for reads, meaning hundreds of threads can read simultaneously without blocking each other. Writes use fine-grained (striped) locking that only blocks other writes to the same bucket — readers are never blocked. The <code>AddOrUpdate()</code> call atomically replaces the prototype, so readers always see either the old value or the new value, never a half-written one. And because the <code>DeepClone()</code> method only reads from the prototype (never mutates it), multiple threads can safely clone the same prototype at the same time.</p>
           </div>
+        </div>
+
+        <div class="callout callout-warning mt-sm">
+          <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> How to Spot This in Your Code</div>
+          <p class="body-text">If your prototype registry is a plain <code>Dictionary</code> or <code>List</code> and it's accessed from multiple threads (any Singleton service in ASP.NET Core, any shared registry in a game server, any static cache), it's a ticking time bomb. Search for <code>Dictionary&lt;</code> in Singleton-registered services. Also check whether your <code>DeepClone()</code> method mutates ANY state on the prototype — even temporary state like a buffer swap is dangerous under concurrency.</p>
         </div>
 
         <div class="callout callout-info mt-sm">
@@ -1970,6 +2244,8 @@ public class Module : IPrototype&lt;Module&gt;
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Using <code>MemberwiseClone()</code> without checking if all fields are safe to shallow-copy.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers reach for <code>MemberwiseClone()</code> because it's fast, built-in, and requires zero effort — one line of code copies everything. It feels like the "right" way to clone because it's literally provided by the framework. The problem is that <code>MemberwiseClone()</code> copies fields at face value: for a <code>List&lt;OrderLine&gt;</code>, it copies the reference (the pointer to the list), not the list itself. So the original and clone share the same list. It's like photocopying a sticky note that says "see folder on shelf 3" — both copies point to the same physical folder.</p>
+          <p class="body-text">This trap is especially sneaky because it works perfectly for simple objects (only value types and strings). Developers test with a simple case, see it works, and assume it works for everything. The bug only surfaces when someone mutates a collection or nested object on the clone and the original silently changes too.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ShallowTrap.cs</span></div>
             <div class="macos-body">
@@ -1978,8 +2254,7 @@ public Order Clone() =&gt; (Order)MemberwiseClone();
 // Order.Lines (List&lt;OrderLine&gt;) is now shared between original and clone</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Mutations on the clone silently corrupt the original. The bug is invisible until data inconsistency surfaces in production.</p>
-          <p class="body-text"><strong>Fix:</strong> Audit every field. Value types and immutable types (string, DateTime, int) are safe. Everything else needs explicit deep copying.</p>
+          <p class="body-text"><strong>The connection:</strong> The bad code trusts <code>MemberwiseClone()</code> blindly. The fix is to audit every field in your class: value types (<code>int</code>, <code>decimal</code>, <code>DateTime</code>) and immutable types (<code>string</code>) are safe. Everything else — <code>List&lt;T&gt;</code>, <code>Dictionary&lt;K,V&gt;</code>, arrays, custom classes — needs explicit deep copying with <code>new List&lt;T&gt;(this.Lines)</code> or <code>.Select(x =&gt; x.DeepClone()).ToList()</code>.</p>
         </div>
       </div>
     </div>
@@ -1992,6 +2267,8 @@ public Order Clone() =&gt; (Order)MemberwiseClone();
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Implementing <code>ICloneable</code> because "it's in the framework."</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When you type "clone" into an IDE, IntelliSense helpfully suggests <code>ICloneable</code>. It's an official .NET interface, so it <em>feels</em> like the right thing to do. But <code>ICloneable</code> was designed in .NET 1.0, before generics existed. Its <code>Clone()</code> method returns <code>object</code>, which means every caller must cast the result — and if they cast to the wrong type, the error only shows up at runtime. Worse, the interface says nothing about whether the clone should be deep or shallow. Different .NET classes implement it differently, and callers have no way to know which they're getting.</p>
+          <p class="body-text">Microsoft's own Framework Design Guidelines by Cwalina and Abrams explicitly state: "Do not implement ICloneable." The interface is considered a design mistake that's kept around only for backward compatibility.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ICloneableBroken.cs</span></div>
             <div class="macos-body">
@@ -2003,8 +2280,20 @@ public class Settings : ICloneable
 var copy = (Settings)original.Clone(); // unsafe cast required</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Returns <code>object</code> (requires casting), provides no contract for deep vs shallow, and Microsoft's own Framework Design Guidelines say "Do not implement ICloneable."</p>
-          <p class="body-text"><strong>Fix:</strong> Use <code>IPrototype&lt;T&gt;</code> with a <code>DeepClone()</code> method that returns the concrete type.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TypedPrototype.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Generic interface — type-safe, explicit about deep copy
+public interface IPrototype&lt;out T&gt; where T : class { T DeepClone(); }
+
+public class Settings : IPrototype&lt;Settings&gt;
+{
+    public Settings DeepClone() =&gt; new() { /* ... */ }; // returns Settings, not object
+}
+Settings copy = original.DeepClone(); // no cast needed!</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad code uses <code>ICloneable</code> and forces callers to cast from <code>object</code> — a runtime gamble. The good code uses a generic <code>IPrototype&lt;T&gt;</code> where the return type is baked into the interface. The compiler catches type mismatches at build time, the method name <code>DeepClone()</code> makes the contract explicit, and no casting is needed.</p>
         </div>
       </div>
     </div>
@@ -2017,6 +2306,8 @@ var copy = (Settings)original.Clone(); // unsafe cast required</code></pre>
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Deep-cloning the top-level object but assigning collection references directly.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> When writing a manual <code>DeepClone()</code> method, developers carefully copy simple properties like <code>Name</code> and <code>Price</code>. When they get to a collection property like <code>Tags</code>, they write <code>Tags = this.Tags</code> without thinking twice — it looks the same as copying a string. But strings are immutable (can't be changed after creation), so sharing a string reference is perfectly safe. A <code>List&lt;string&gt;</code>, however, IS mutable — you can add, remove, and modify items. Sharing a list reference means both objects see each other's changes.</p>
+          <p class="body-text">There's also a subtle two-level depth issue: even if you create a new list with <code>new List&lt;T&gt;(this.Items)</code>, if T is a reference type (like a custom <code>OrderLine</code> class), the list is new but the items inside are still shared. You need to clone each item too.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ForgotCollection.cs</span></div>
             <div class="macos-body">
@@ -2025,13 +2316,20 @@ public Product DeepClone() =&gt; new()
 {
     Name = this.Name,
     Tags = this.Tags          // ❌ same List reference!
-};
-
-// ✅ Fix: new List&lt;string&gt;(this.Tags) — or this.Tags.ToList()</code></pre>
+};</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Adding/removing items in the clone's list affects the original.</p>
-          <p class="body-text"><strong>Fix:</strong> Always create new collection instances. For <code>List&lt;T&gt;</code> where T is a reference type, you also need to clone each element: <code>this.Items.Select(i =&gt; i.DeepClone()).ToList()</code>.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ClonedCollection.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ New list with same elements (safe for List&lt;string&gt; since strings are immutable)
+Tags = new List&lt;string&gt;(this.Tags),
+
+// ✅ For List&lt;T&gt; where T is mutable — clone each element too
+Items = this.Items.Select(i =&gt; i.DeepClone()).ToList()</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad code writes <code>Tags = this.Tags</code> which copies the pointer, not the data. The good code writes <code>new List&lt;string&gt;(this.Tags)</code> which creates a brand-new list populated with the same strings. For lists of complex objects, each item also needs its own <code>DeepClone()</code> call — it's turtles all the way down.</p>
         </div>
       </div>
     </div>
@@ -2044,6 +2342,8 @@ public Product DeepClone() =&gt; new()
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Cloning an object that holds <span class="tooltip-trigger">streams<span class="tooltip-content">System.IO.Stream and its subclasses (FileStream, MemoryStream, NetworkStream) represent I/O resources. They maintain internal position counters, buffers, and OS handles. Cloning a stream via MemberwiseClone creates two objects sharing one OS handle — disposing one closes the handle for both.</span></span>, database connections, or HTTP clients.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Some objects hold "resources" — things like file handles, network connections, or database connections that are limited and managed by the operating system. These aren't just data in memory that can be copied. They're like keys to a locked room: copying the key doesn't create a second room. Both keys open the same door. If one person returns the key (disposes the resource), the other person's key is now useless — the room is locked and nobody can get back in.</p>
+          <p class="body-text">Developers fall into this trap when a class mixes data and resources. The data parts (file name, settings, configuration) are perfectly safe to clone. But the resource parts (open FileStream, active SqlConnection) cannot be meaningfully duplicated via memory copy.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DisposableTrap.cs</span></div>
             <div class="macos-body">
@@ -2057,8 +2357,26 @@ public class FileProcessor : IDisposable
 }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Two objects sharing one resource means double-dispose, race conditions, or corrupted streams.</p>
-          <p class="body-text"><strong>Fix:</strong> Either open a NEW resource in the clone's constructor, or don't clone objects with resources — use a factory instead.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SeparateDataFromResources.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Separate clonable data from non-clonable resources
+public record FileProcessorConfig(string FilePath, Encoding Encoding);  // ← clone this
+
+public class FileProcessor : IDisposable
+{
+    private readonly FileStream _stream;  // ← NOT clonable
+    public FileProcessorConfig Config { get; }
+
+    public FileProcessor(FileProcessorConfig config)
+    {
+        Config = config;
+        _stream = File.OpenRead(config.FilePath);  // each instance opens its own stream
+    }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad code clones the whole object, sharing the stream. The good code separates data (config) from resources (stream). Clone the config, then create a new FileProcessor from the cloned config — each instance opens its own stream. If a class implements <code>IDisposable</code>, that's a strong signal it shouldn't be cloned directly.</p>
         </div>
       </div>
     </div>
@@ -2071,8 +2389,23 @@ public class FileProcessor : IDisposable
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Assuming cloning is faster than <code>new</code> without benchmarking.</p>
-          <p class="body-text"><strong>Why Bad:</strong> <code>MemberwiseClone()</code> is fast (~2-5 ns for small objects, more for large ones), but a manual deep clone that creates new lists, dictionaries, and nested objects can be slower than just calling the constructor. Serialization-based cloning (JSON, MessagePack) is dramatically slower — 100-1000x.</p>
-          <p class="body-text"><strong>Fix:</strong> Only use Prototype when the original setup is genuinely expensive (database queries, file I/O, network calls). For simple POCOs, <code>new</code> is fine. Always benchmark with <span class="tooltip-trigger">BenchmarkDotNet<span class="tooltip-content">The standard .NET micro-benchmarking library. It handles warmup, statistical analysis, GC pressure measurement, and memory allocation tracking. Always use it for performance claims — never trust a Stopwatch in a loop.</span></span>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> The Prototype pattern is often taught as a "performance optimization" — skip expensive construction by cloning a pre-built object. This is true when construction involves database queries, file I/O, or network calls (things that take milliseconds). But developers sometimes apply this logic to simple data objects where construction is just setting a few properties (nanoseconds). In that case, <code>new Product { Name = "Widget", Price = 9.99m }</code> is already blazingly fast — there's nothing to optimize.</p>
+          <p class="body-text"><code>MemberwiseClone()</code> itself is very fast (~2-5 nanoseconds). But a manual deep clone that creates new lists, dictionaries, and nested objects allocates a lot of memory and can actually be <em>slower</em> than constructing from scratch. Serialization-based cloning (JSON round-trip) is dramatically slower — 100-1000x. Using Prototype for performance without measuring is cargo-cult programming.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BenchmarkFirst.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Premature optimization — cloning a simple POCO
+var clone = template.DeepClone();  // creates new lists, dicts, nested objects
+
+// ✅ For simple objects, just use new — it's already fast
+var product = new Product { Name = "Widget", Price = 9.99m };
+
+// ✅ Only use Prototype when construction is genuinely expensive:
+// - Loading from database (ms), parsing config files (ms), network calls (ms)
+// - Complex computed state that takes significant CPU time</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> Prototype shines when the <em>setup</em> is expensive, not when the <em>object</em> is complex. If you can construct the object from scratch in microseconds, just use <code>new</code>. Reserve Prototype for objects whose initial state comes from slow external sources. And always measure with <span class="tooltip-trigger">BenchmarkDotNet<span class="tooltip-content">The standard .NET micro-benchmarking library. It handles warmup, statistical analysis, GC pressure measurement, and memory allocation tracking. Always use it for performance claims — never trust a Stopwatch in a loop.</span></span> before claiming a performance benefit.</p>
         </div>
       </div>
     </div>
@@ -2085,6 +2418,7 @@ public class FileProcessor : IDisposable
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Having <code>Clone()</code> return a base class or interface type instead of the concrete type.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Developers define <code>Clone()</code> on the base class (returning <code>Shape</code>), thinking it's more "polymorphic." But this forces every caller to cast the result: <code>var circle = (Circle)shape.Clone()</code>. Casts are dangerous — if someone passes an <code>Ellipse</code> where a <code>Circle</code> was expected, the cast throws at runtime. The compiler can't help you because the return type is just <code>Shape</code>. C# 9 introduced covariant return types specifically to solve this — an overriding method can return a more specific type than the base method declares.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongReturnType.cs</span></div>
             <div class="macos-body">
@@ -2094,13 +2428,22 @@ public class Circle : Shape
     public double Radius { get; set; }
     public Shape Clone() =&gt; new Circle { X = X, Y = Y, Radius = Radius };
 }
-
-// ✅ Returns Circle — no cast needed
-public Circle DeepClone() =&gt; new() { X = X, Y = Y, Radius = Radius };</code></pre>
+var copy = (Circle)shape.Clone();  // ❌ runtime cast — could throw!</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Forces every caller to cast. If someone adds <code>Ellipse : Shape</code>, the cast to <code>Circle</code> fails at runtime.</p>
-          <p class="body-text"><strong>Fix:</strong> Use <code>IPrototype&lt;T&gt;</code> where T is the concrete type. Each class returns itself.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TypedReturn.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Returns Circle — no cast needed, type-safe at compile time
+public class Circle : Shape, IPrototype&lt;Circle&gt;
+{
+    public double Radius { get; set; }
+    public Circle DeepClone() =&gt; new() { X = X, Y = Y, Radius = Radius };
+}
+Circle copy = original.DeepClone();  // ✅ compiler knows it's a Circle</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad code returns <code>Shape</code>, forcing callers to guess (and cast) the actual type. The good code uses <code>IPrototype&lt;Circle&gt;</code> so <code>DeepClone()</code> returns <code>Circle</code> directly. No cast, no guessing, no runtime surprises. The type system does the work for you.</p>
         </div>
       </div>
     </div>
@@ -2113,6 +2456,8 @@ public Circle DeepClone() =&gt; new() { X = X, Y = Y, Radius = Radius };</code><
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Storing mutable prototypes in a registry without protection — someone modifies the template directly instead of cloning first.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> A prototype registry stores template objects that serve as the "master copy" for cloning. The natural instinct is to write a <code>GetPrototype()</code> method that returns the template directly. But if the registry hands out the original object (not a clone), any caller can accidentally modify the template. Imagine a library lending out its only copy of a book — if someone scribbles in the margins, every future borrower sees the scribbles. The library should lend out photocopies, never the original.</p>
+          <p class="body-text">This bug is particularly insidious because the corruption is delayed. Someone sets <code>goblin.Health = 999</code> during testing, and the next 500 goblins all spawn with 999 health. The person who mutated the prototype is long gone from that code path, making the bug extremely hard to trace back to its source.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MutableRegistry.cs</span></div>
             <div class="macos-body">
@@ -2124,8 +2469,18 @@ var goblin = registry.GetPrototype("goblin");
 goblin.Stats.Health = 999;  // ❌ Now EVERY future clone has 999 health</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> One careless mutation corrupts every future clone. Extremely hard to debug because the corruption source is far from the symptom.</p>
-          <p class="body-text"><strong>Fix:</strong> Registry should ONLY expose <code>Clone()</code>, never the prototype itself. Or store immutable prototypes.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SafeRegistry.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Registry only exposes clones — prototype is never directly accessible
+public GameEntity Create(string type) =&gt; _prototypes[type].DeepClone();
+
+// Caller gets an independent copy — mutating it is perfectly safe
+var goblin = registry.Create("goblin");
+goblin.Stats.Health = 999;  // ✅ Only THIS goblin has 999 health</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> The bad code exposes the template directly via <code>GetPrototype()</code>. The good code only exposes a <code>Create()</code> method that returns a clone. The template is an internal implementation detail that no caller can touch. Even a careless developer can't accidentally corrupt the master copy because they never have direct access to it.</p>
         </div>
       </div>
     </div>
@@ -2138,8 +2493,23 @@ goblin.Stats.Health = 999;  // ❌ Now EVERY future clone has 999 health</code><
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Assuming <code>original.Equals(clone)</code> works after cloning.</p>
-          <p class="body-text"><strong>Why Bad:</strong> Default <code>Equals()</code> on classes uses reference equality. <code>original.Equals(clone)</code> is always <code>false</code> even if all properties are identical. If your code uses <code>Contains()</code>, <code>Distinct()</code>, or <code>HashSet&lt;T&gt;</code>, clones won't match originals.</p>
-          <p class="body-text"><strong>Fix:</strong> Override <code>Equals()</code> and <code>GetHashCode()</code> based on <span class="tooltip-trigger">value semantics<span class="tooltip-content">Two objects are "equal" if their property values match, regardless of whether they're the same instance in memory. Records get this for free (compiler-generated). For classes, you must override Equals() to compare properties, and GetHashCode() to return consistent hash codes for equal objects. Without this, HashSet and Dictionary won't find clones.</span></span>, or use C# records which generate these automatically.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> After cloning an object, you'd expect the original and clone to be "equal" since they have identical data. But in C#, the default <code>Equals()</code> on classes uses <em>reference equality</em> — it checks whether two variables point to the exact same object in memory, not whether they have the same values. Since a clone is a different object (at a different memory address), <code>original.Equals(clone)</code> is always <code>false</code>, even though every single property matches.</p>
+          <p class="body-text">This becomes a real problem when you use collections that depend on equality: <code>HashSet&lt;T&gt;.Contains(clone)</code> returns false, <code>list.Distinct()</code> treats clones as different items, and dictionary lookups by object key fail. You think the clone is "the same thing," but C# disagrees.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">EqualityTrap.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ❌ Class with default (reference) equality
+var clone = original.DeepClone();
+original.Equals(clone)   // false! Different objects in memory
+hashSet.Contains(clone)  // false! HashSet uses GetHashCode() + Equals()
+
+// ✅ Use records — they get value equality for free
+public record Product(string Name, decimal Price);
+var clone = original with { };
+original.Equals(clone)   // true! Records compare by property values</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> If your cloned objects need to participate in equality checks (collections, deduplication, comparisons), either override <code>Equals()</code> and <code>GetHashCode()</code> to compare by <span class="tooltip-trigger">value semantics<span class="tooltip-content">Two objects are "equal" if their property values match, regardless of whether they're the same instance in memory. Records get this for free (compiler-generated). For classes, you must override Equals() to compare properties, and GetHashCode() to return consistent hash codes for equal objects.</span></span>, or use C# records which generate value-based equality automatically.</p>
         </div>
       </div>
     </div>
@@ -2152,6 +2522,8 @@ goblin.Stats.Health = 999;  // ❌ Now EVERY future clone has 999 health</code><
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Using JSON serialization for cloning when some properties are marked <code>[JsonIgnore]</code>.</p>
+          <p class="body-text"><strong>Why This Happens:</strong> Serialization-based cloning (serialize to JSON, then deserialize back) is incredibly convenient — it handles nested objects, collections, and complex graphs with zero manual code. Developers reach for it as a "universal deep clone" solution. The trap is that serializers only see properties that are configured for serialization. Properties marked <code>[JsonIgnore]</code> (hidden from API responses for security reasons, like password hashes or internal tokens) are also hidden from the clone. The serializer doesn't know you're cloning — it just does its job of ignoring what you told it to ignore.</p>
+          <p class="body-text">Private fields, calculated properties, and properties with custom converters are also at risk. If the serializer can't see it, it can't clone it. The data is silently lost — no error, no warning.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">JsonIgnoreTrap.cs</span></div>
             <div class="macos-body">
@@ -2168,8 +2540,19 @@ var clone = JsonSerializer.Deserialize&lt;UserProfile&gt;(
 // clone.PasswordHash is "" — data lost!</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> Serialization-based cloning only copies what the serializer sees. Ignored, non-public, or calculated properties are silently dropped.</p>
-          <p class="body-text"><strong>Fix:</strong> Use manual deep clone for types with serialization attributes. Or use separate serialization options for cloning that include all properties.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ManualClonePreferred.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Manual clone copies ALL fields regardless of serialization attributes
+public UserProfile DeepClone() =&gt; new()
+{
+    Name = this.Name,
+    PasswordHash = this.PasswordHash,   // ✅ copied explicitly
+    Avatar = this.Avatar.ToArray()       // ✅ new array, all data preserved
+};</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> Serialization attributes exist to control API responses, not cloning. If you use serialization for cloning, those API-focused attributes leak into your cloning logic, silently dropping fields. Use manual <code>DeepClone()</code> for types with serialization attributes, or create separate <code>JsonSerializerOptions</code> that include all properties (but this gets messy fast). Manual cloning is clearer and safer.</p>
         </div>
       </div>
     </div>
@@ -2182,6 +2565,8 @@ var clone = JsonSerializer.Deserialize&lt;UserProfile&gt;(
       <div class="collapsible-content">
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Cloning a service that has DI-injected dependencies (logger, repository, HttpClient).</p>
+          <p class="body-text"><strong>Why This Happens:</strong> In ASP.NET Core, the <span class="tooltip-trigger">DI container<span class="tooltip-content">Microsoft.Extensions.DependencyInjection — the built-in dependency injection container in ASP.NET Core. It manages object creation, lifetime tracking (Transient = new per request, Scoped = one per HTTP request, Singleton = one for the app), and disposal. Cloned objects bypass this management entirely.</span></span> manages object lifetimes carefully. A <span class="tooltip-trigger">Scoped<span class="tooltip-content">One instance per HTTP request / scope. Created when the scope starts, disposed when it ends. Ideal for DbContext, per-request state.</span></span> service like <code>DbContext</code> is created at the start of an HTTP request and disposed at the end. A <span class="tooltip-trigger">Transient<span class="tooltip-content">A new instance every time the service is requested from the container. No reuse, no sharing.</span></span> service gets a fresh instance each time. When you clone a service, the DI container has no idea the clone exists. It doesn't track the clone's lifetime, doesn't dispose it, and the clone might hold onto Scoped dependencies that have already been disposed.</p>
+          <p class="body-text">Think of it like this: the DI container is a hotel front desk that tracks which rooms are occupied. Cloning a guest (service) without telling the front desk means the hotel doesn't know there's a second person in the building. When checkout time comes, they only evict the registered guest — the clone stays behind, using resources nobody is tracking.</p>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DiCloneTrap.cs</span></div>
             <div class="macos-body">
@@ -2197,8 +2582,22 @@ public class OrderProcessor
 }</code></pre>
             </div>
           </div>
-          <p class="body-text"><strong>Why Bad:</strong> The <span class="tooltip-trigger">DI container<span class="tooltip-content">Microsoft.Extensions.DependencyInjection — the built-in dependency injection container in ASP.NET Core. It manages object creation, lifetime tracking (Transient = new per request, Scoped = one per HTTP request, Singleton = one for the app), and disposal. Cloned objects bypass this management entirely.</span></span> tracks lifetimes (<span class="tooltip-trigger">Scoped<span class="tooltip-content">One instance per HTTP request / scope. Created when the scope starts, disposed when it ends. Ideal for DbContext, per-request state. A cloned Scoped service exists outside the scope lifecycle — the container won't dispose it.</span></span>, <span class="tooltip-trigger">Transient<span class="tooltip-content">A new instance every time the service is requested from the container. No reuse, no sharing. If you need multiple instances, use Transient registration — don't clone a service.</span></span>). A cloned service bypasses this tracking. Scoped services might be used after their scope ends. The container can't dispose cloned instances.</p>
-          <p class="body-text"><strong>Fix:</strong> Don't clone services — only clone data objects (DTOs, entities, value objects). If you need multiple service instances, register them with the DI container and resolve them properly.</p>
+          <div class="macos-window mt-sm mb-sm">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CloneDataNotServices.cs</span></div>
+            <div class="macos-body">
+<pre><code class="language-csharp">// ✅ Only clone DATA objects — never services
+public record OrderData(string Customer, List&lt;LineItem&gt; Items);  // ← clone this
+
+public class OrderProcessor  // ← resolve from DI, never clone
+{
+    private readonly ILogger _logger;
+    private readonly IOrderRepository _repo;
+
+    public void Process(OrderData data) { /* ... */ }
+}</code></pre>
+            </div>
+          </div>
+          <p class="body-text"><strong>The connection:</strong> Prototype is for data objects — DTOs, entities, value objects, configuration. Services with injected dependencies should NEVER be cloned. If you need multiple instances of a service, register it as Transient in the DI container and let the container create each instance properly. The rule of thumb: if a class receives dependencies through its constructor, it's a service and shouldn't be cloned.</p>
         </div>
       </div>
     </div>
@@ -2542,8 +2941,9 @@ public class CloneStrategyBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What problem does Prototype solve that new doesn't?</div>
         <div class="body-text">
-          <p>Prototype is a creational design pattern that creates new objects by copying (cloning) an existing prototypical instance. Instead of calling <code>new ConcreteClass()</code> and configuring from scratch, the client calls <code>prototype.Clone()</code> to get a pre-configured copy.</p>
-          <p>The key benefit: the client doesn't need to know the concrete class — it only depends on the Prototype interface. This decouples object creation from concrete types and avoids repeating expensive setup logic.</p>
+          <p>Think about how a bakery works. To make 50 identical gingerbread cookies, you don't sculpt each one from scratch. You make one perfect cookie cutter (the prototype), then stamp out copies. Each copy starts identical to the original shape, and you can decorate them differently afterward. That's Prototype in a nutshell — create one well-configured object, then copy it whenever you need a similar one.</p>
+          <p>Prototype is a creational design pattern that creates new objects by copying (cloning) an existing instance. Instead of calling <code>new ConcreteClass()</code> and configuring from scratch every time, the client calls <code>prototype.Clone()</code> to get a pre-configured copy. The client doesn't even need to know what concrete class it's dealing with — it just says "give me another one like this."</p>
+          <p>This matters in two situations: (1) when setting up the object is expensive (loading config from a database, parsing files), so you only want to do it once, and (2) when the exact type isn't known at compile time (runtime plugins, dynamic type loading), so you can't write <code>new SpecificType()</code> in your code.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Mention that C# records with 'with' expressions are essentially compiler-generated Prototype — the compiler creates a hidden Clone method and copy constructor automatically."</div>
       </div></div>
@@ -2560,9 +2960,9 @@ public class CloneStrategyBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens to a List&lt;T&gt; field in each type of copy?</div>
         <div class="body-text">
-          <p><strong>Shallow copy</strong> duplicates the top-level object but copies reference-type fields by reference. The original and clone share the same nested objects. Changing a nested object in the clone also changes it in the original.</p>
-          <p><strong>Deep copy</strong> duplicates everything — the top-level object AND all nested objects recursively. The original and clone are completely independent. Changing anything in the clone has zero effect on the original.</p>
-          <p>In C#: <code>MemberwiseClone()</code> is shallow. Manual copy constructors, serialization round-trips, or explicit field cloning give you deep copies.</p>
+          <p>Imagine you have a folder with a document and a sticky note inside. <strong>Shallow copy</strong> is like photocopying just the folder — you get a new folder, but the document and sticky note inside are the same physical items. Move the sticky note in one folder, and it's gone from the other. <strong>Deep copy</strong> is like photocopying the folder AND everything inside it — you get a completely independent set. Nothing you do to one folder affects the other.</p>
+          <p>In code terms: <strong>shallow copy</strong> duplicates the top-level object but copies reference-type fields by reference. The original and clone share the same nested objects (lists, dictionaries, custom classes). Changing a nested object in the clone also changes it in the original. <strong>Deep copy</strong> duplicates everything — the top-level object AND all nested objects recursively. Original and clone are completely independent.</p>
+          <p>In C#: <code>MemberwiseClone()</code> is always shallow. For deep copies, you need manual field copying (<code>new List&lt;string&gt;(this.Tags)</code>), serialization round-trips, or copy constructors. The important nuance: strings and value types (<code>int</code>, <code>DateTime</code>) are safe to shallow-copy because they're either immutable or copied by value automatically. The danger zone is mutable reference types — <code>List&lt;T&gt;</code>, <code>Dictionary&lt;K,V&gt;</code>, arrays, and custom classes.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Note that strings and other immutable types are safe to shallow-copy because they can't be mutated — the 'danger zone' is mutable reference types like List, Dictionary, and custom classes."</div>
       </div></div>
@@ -2579,8 +2979,9 @@ public class CloneStrategyBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What information does the ICloneable.Clone() signature NOT tell you?</div>
         <div class="body-text">
-          <p>Two problems. First, <code>Clone()</code> returns <code>object</code> — callers must cast the result, which is unsafe (wrong casts fail at runtime, not compile time). Second, the interface provides zero guidance on whether the clone should be deep or shallow. Different BCL classes implement it differently: <code>Array.Clone()</code> is shallow, but some classes do deep copies.</p>
-          <p>The Framework Design Guidelines by Cwalina and Abrams explicitly state: "Do not implement ICloneable." The alternative is a custom <code>IPrototype&lt;T&gt;</code> with a typed return and an explicit name like <code>DeepClone()</code>.</p>
+          <p>Imagine ordering food from a menu that just says "food" with no description. You don't know if you're getting a salad or a steak. That's <code>ICloneable</code> — it promises a <code>Clone()</code> method but tells you nothing useful about what you'll get back.</p>
+          <p>Two specific problems. First, <code>Clone()</code> returns <code>object</code> — callers must cast the result (e.g., <code>(MyClass)thing.Clone()</code>), and if they cast to the wrong type, the error only shows up at runtime, not at compile time. Second, the interface says nothing about whether the clone is deep or shallow. Different .NET classes implement it differently: <code>Array.Clone()</code> is shallow, but some classes do deep copies. A caller has no way to know without reading the source code.</p>
+          <p>This is why Microsoft's own Framework Design Guidelines explicitly state: "Do not implement ICloneable." The interface was created in .NET 1.0 before generics existed. If it were designed today, it would be <code>ICloneable&lt;T&gt;</code> with a <code>T Clone()</code> method. The modern alternative is a custom <code>IPrototype&lt;T&gt;</code> with a typed return and an explicit name like <code>DeepClone()</code> that leaves no ambiguity.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Point out that ICloneable predates generics (.NET 1.0) — if it were designed today, it would be ICloneable&lt;T&gt; with a T Clone() method."</div>
       </div></div>
@@ -2597,8 +2998,9 @@ public class CloneStrategyBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Why is it so fast (~2-5 nanoseconds)?</div>
         <div class="body-text">
-          <p><code>MemberwiseClone()</code> is a protected method on <code>System.Object</code>. It's implemented as a native CLR intrinsic — it allocates a new object of the same size and does a raw memory copy of all fields. Value-type fields get independent copies; reference-type fields get copied by reference (they point to the same object).</p>
-          <p>It's extremely fast because it's essentially a <code>memcpy</code> operation at the CLR level — no constructor runs, no field-by-field assignment, just a block memory copy. But this speed comes at the cost of being shallow-only.</p>
+          <p>Think of <code>MemberwiseClone()</code> as a high-speed photocopier for objects. It doesn't read each page one by one — it grabs the entire stack and copies it all in one shot. That's why it's so fast (2-5 nanoseconds for small objects).</p>
+          <p>Technically, <code>MemberwiseClone()</code> is a protected method on <code>System.Object</code> (so every object in C# has it). It's implemented as a native CLR intrinsic — it allocates a new chunk of memory the same size as the original object and does a raw byte-for-byte memory copy. No constructor runs, no field-by-field assignment, just one block copy operation (essentially <code>memcpy</code> at the CLR level).</p>
+          <p>The result: value-type fields (<code>int</code>, <code>decimal</code>, <code>bool</code>) get independent copies. Reference-type fields (<code>List&lt;T&gt;</code>, custom classes) get their <em>pointers</em> copied — they point to the same object in memory. That's what makes it "shallow." It also means no constructor side effects fire — if your constructor logs "object created" or increments a counter, the clone bypasses all of that. It exists without the constructor ever knowing.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Mention that no constructor runs during MemberwiseClone — this can be surprising if your constructor has side effects (logging, validation, incrementing counters)."</div>
       </div></div>
@@ -2615,8 +3017,9 @@ public class CloneStrategyBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How would a client request a clone without knowing the concrete type?</div>
         <div class="body-text">
-          <p>A Prototype Registry is a centralized lookup (typically a <code>Dictionary&lt;string, IPrototype&lt;T&gt;&gt;</code>) that maps string keys to pre-configured prototype instances. The client asks the registry for a clone by name: <code>registry.Create("goblin")</code>. The registry finds the matching prototype, clones it, and returns the copy.</p>
-          <p>This decouples the client from all concrete types — the client only knows about the registry and the prototype interface. New types can be added to the registry at runtime (e.g., loaded from configuration) without any client code changes.</p>
+          <p>Imagine a print shop with a filing cabinet full of document templates. You walk in and say "I need an invoice template." The clerk doesn't hand you the original template — they photocopy it and give you the copy. You fill in your details on the copy while the original stays pristine for the next customer. That filing cabinet is a Prototype Registry.</p>
+          <p>In code, a Prototype Registry is a centralized lookup (typically a <code>Dictionary&lt;string, IPrototype&lt;T&gt;&gt;</code>) that maps string keys to pre-configured prototype instances. The client asks the registry for a clone by name: <code>registry.Create("goblin")</code>. The registry finds the matching prototype, calls <code>DeepClone()</code>, and returns the independent copy.</p>
+          <p>The big advantage: the client is completely decoupled from concrete types. It never writes <code>new Goblin()</code> or <code>new Orc()</code>. It only knows about the registry and the prototype interface. New types can be added to the registry at runtime (loaded from config files, database, or plugins) without touching any client code. In a game server, you could add a new "dragon" enemy type by simply loading a new config entry — zero code changes, zero recompilation.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Mention that the registry should never expose the prototype directly — only expose Clone(). Otherwise callers can accidentally mutate the template."</div>
       </div></div>
@@ -2633,9 +3036,9 @@ public class CloneStrategyBenchmarks
       <div class="qa-body"><div class="qa-content">
         <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What does the 'with' expression actually generate under the hood?</div>
         <div class="body-text">
-          <p>C# 9 records are the language-level implementation of Prototype. When you declare a <code>record</code>, the compiler generates: (1) a protected copy constructor that does a memberwise copy, and (2) a hidden <code>&lt;Clone&gt;$</code> method that calls this copy constructor. The <code>with</code> expression is syntactic sugar for "call Clone, then set specific properties."</p>
-          <p><code>var clone = original with { Name = "New" };</code> compiles to roughly: <code>var temp = original.&lt;Clone&gt;$(); temp.Name = "New"; clone = temp;</code></p>
-          <p>The caveat: records do shallow memberwise cloning. This is safe when all properties are immutable (other records, strings, value types), but dangerous with mutable collections or classes.</p>
+          <p>C# records are the language saying: "Prototype is so useful, we'll bake it into the syntax." When you declare a <code>record</code>, the compiler secretly generates: (1) a protected copy constructor that does a memberwise copy, and (2) a hidden method called <code>&lt;Clone&gt;$</code> that calls this copy constructor. You never see these — they're auto-generated.</p>
+          <p>The <code>with</code> expression is the user-friendly way to clone with modifications: <code>var clone = original with { Name = "New" };</code>. Under the hood, this compiles to roughly: "clone the original, then set Name on the clone." It's Prototype in one line of code, with zero boilerplate.</p>
+          <p>The caveat: records do <em>shallow</em> cloning. This is safe when all properties are immutable (other records, strings, value types) because immutable things can't be changed — sharing is harmless. But if a record has a mutable <code>List&lt;string&gt;</code> property, the <code>with</code> expression shares that list. The same shallow-copy trap as <code>MemberwiseClone()</code>, just with prettier syntax.</p>
         </div>
         <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Distinguish record classes (reference types, shallow clone via with) from record structs (value types, deep copy by default because value types are always copied by value)."</div>
       </div></div>
