@@ -1075,11 +1075,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Scroll to top, fade in, re-init (after assets load)
     window.scrollTo(0, 0);
     headAssets.then(function() {
+      var m = document.querySelector('main');
+      var h = document.querySelector('.hero');
+      // Ensure new content starts hidden + offset, force reflow, then animate in
+      if (m) { m.style.opacity = '0'; m.style.transform = 'translateY(16px)'; }
+      if (h) { h.style.opacity = '0'; h.style.transform = 'translateY(16px)'; }
+      // Force browser to register the hidden state before transitioning
+      void document.body.offsetHeight;
       requestAnimationFrame(function() {
-        var m = document.querySelector('main');
-        var h = document.querySelector('.hero');
-        if (m) m.style.opacity = '';
-        if (h) h.style.opacity = '';
+        if (m) { m.style.opacity = '1'; m.style.transform = ''; }
+        if (h) { h.style.opacity = '1'; h.style.transform = ''; }
       });
       reinit();
     });
@@ -1096,11 +1101,11 @@ document.addEventListener('DOMContentLoaded', () => {
       requestAnimationFrame(function() { loader.style.width = '70%'; });
     });
 
-    // Fade out current content
+    // Fade out + slide down current content
     var main = document.querySelector('main');
     var hero = document.querySelector('.hero');
-    if (main) main.style.opacity = '0';
-    if (hero) hero.style.opacity = '0';
+    if (main) { main.style.opacity = '0'; main.style.transform = 'translateY(12px)'; }
+    if (hero) { hero.style.opacity = '0'; hero.style.transform = 'translateY(12px)'; }
 
     // Start fetch immediately (runs in parallel with fade-out)
     var fetchPromise = fetch(href)
