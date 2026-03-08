@@ -1088,23 +1088,44 @@ document.addEventListener('DOMContentLoaded', () => {
   function navigateTo(href, pushState) {
     if (pushState === undefined) pushState = true;
 
-    // Fade out
+    // Show loading bar
+    var loader = document.createElement('div');
+    loader.className = 'spa-loader';
+    document.body.appendChild(loader);
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() { loader.style.width = '70%'; });
+    });
+
+    // Fade out current content
     var main = document.querySelector('main');
     var hero = document.querySelector('.hero');
     if (main) main.style.opacity = '0';
     if (hero) hero.style.opacity = '0';
 
-    fetch(href)
+    // Start fetch immediately (runs in parallel with fade-out)
+    var fetchPromise = fetch(href)
       .then(function(res) {
         if (!res.ok) throw new Error(res.status);
         return res.text();
-      })
-      .then(function(html) {
+      });
+
+    // Wait for BOTH fade-out (250ms) AND fetch to complete
+    var fadePromise = new Promise(function(resolve) { setTimeout(resolve, 280); });
+
+    Promise.all([fetchPromise, fadePromise])
+      .then(function(results) {
+        // Complete the loader bar
+        loader.style.width = '100%';
+        setTimeout(function() {
+          loader.style.opacity = '0';
+          setTimeout(function() { if (loader.parentNode) loader.remove(); }, 200);
+        }, 150);
+        var html = results[0];
         var doc = new DOMParser().parseFromString(html, 'text/html');
         swapPage(doc, href, pushState);
       })
       .catch(function() {
-        // SPA not available (file:// or network error) — normal nav
+        if (loader.parentNode) loader.remove();
         window.location.href = href;
       });
   }
