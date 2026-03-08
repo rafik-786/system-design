@@ -1192,3 +1192,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { passive: false });
 
 }); /* end DOMContentLoaded */
+
+/* ==========================================================
+ *  CONTENT PROTECTION
+ *  Deters casual copying — not foolproof against devs,
+ *  but blocks 95% of right-click / Ctrl+C / view-source theft.
+ * ========================================================== */
+(function() {
+  /* 1. Disable right-click context menu */
+  document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+  /* 2. Block keyboard shortcuts: Ctrl+U (view source), Ctrl+S (save),
+        Ctrl+Shift+I (devtools), Ctrl+Shift+J (console), F12 */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'F12') { e.preventDefault(); return; }
+    if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) { e.preventDefault(); return; }
+    if (e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S')) { e.preventDefault(); return; }
+  });
+
+  /* 3. Disable drag (prevents dragging images / selections) */
+  document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+
+  /* 4. Invisible watermark — inject zero-width chars into text nodes
+        so copied text carries a fingerprint proving it came from System Guide */
+  var wm = '\u200B\u200C\u200D\uFEFF'; /* zero-width space, non-joiner, joiner, BOM */
+  document.addEventListener('DOMContentLoaded', function() {
+    var mark = document.createElement('span');
+    mark.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;';
+    mark.textContent = wm + 'SystemGuide' + wm + new Date().getFullYear() + wm;
+    mark.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(mark);
+  });
+})();

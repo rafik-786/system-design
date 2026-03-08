@@ -9,6 +9,101 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/styles.css">
 <script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+<style>
+/* ── Compact coming-soon pill list ── */
+.soon-list { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 0; }
+.soon-pill {
+  font-size: 0.72rem; font-weight: 500; padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full); background: var(--bg-secondary);
+  border: 1px solid var(--border-color); color: var(--text-muted);
+}
+
+/* ── Inline "+N upcoming" toggle in category header ── */
+.lld-category { display: flex; align-items: center; justify-content: space-between; }
+.inline-toggle {
+  font-size: 0.65rem; font-weight: 500; color: var(--text-muted); cursor: pointer;
+  background: none; border: 1px solid var(--border-color); border-radius: var(--radius-full);
+  padding: 0.2rem 0.6rem; transition: all 0.2s; white-space: nowrap;
+}
+.inline-toggle:hover { border-color: var(--accent-primary); color: var(--text-secondary); }
+.inline-toggle.active { color: var(--accent-primary); border-color: var(--accent-primary); }
+
+/* ── Case study category headers ── */
+.cs-category {
+  font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);
+  margin-top: 1.25rem; margin-bottom: 0.4rem; padding-left: 0.15rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.cs-category:first-of-type { margin-top: 0.75rem; }
+.cs-cat-count {
+  font-size: 0.6rem; font-weight: 500; color: var(--text-muted);
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-full); padding: 0.1rem 0.45rem;
+}
+
+/* ── Floating Study Next Widget ── */
+.study-float {
+  position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 999;
+  width: 280px; border-radius: var(--radius-md); overflow: hidden;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3); transition: all 0.25s;
+}
+.study-float.minimized { width: auto; }
+.study-float.minimized .sf-body { display: none; }
+.sf-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.6rem 0.75rem; background: rgba(var(--accent-primary-rgb), 0.08);
+  border-bottom: 1px solid var(--glass-border); cursor: pointer; user-select: none;
+}
+.sf-header-left { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
+.sf-step { font-size: 0.6rem; color: var(--text-muted); font-weight: 500; }
+.sf-minimize { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 0.15rem; }
+.sf-body { padding: 0.75rem; }
+.sf-phase { font-size: 0.6rem; color: var(--accent-primary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.3rem; }
+.sf-topic { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.4rem; }
+.sf-actions { display: flex; gap: 0.4rem; }
+.sf-btn {
+  flex: 1; padding: 0.4rem 0; border-radius: var(--radius-full); font-size: 0.7rem;
+  font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; border: none;
+}
+.sf-btn--go {
+  background: var(--accent-primary); color: #fff; text-decoration: none; display: block;
+}
+.sf-btn--go:hover { filter: brightness(1.15); }
+.sf-btn--go.disabled { opacity: 0.4; pointer-events: none; }
+.sf-btn--done {
+  background: rgba(var(--accent-primary-rgb), 0.1); color: var(--accent-primary);
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.2);
+}
+.sf-btn--done:hover { background: rgba(var(--accent-primary-rgb), 0.2); }
+.sf-done-msg { font-size: 0.8rem; color: var(--accent-primary); font-weight: 600; text-align: center; padding: 0.5rem 0; }
+/* ── Full list view ── */
+.sf-list-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 0.15rem 0.3rem; margin-right: 0.1rem; }
+.sf-list-btn:hover { color: var(--accent-primary); }
+.sf-list-wrap { max-height: 340px; overflow-y: auto; padding: 0.5rem 0.6rem; scrollbar-width: thin; }
+.sf-list-wrap::-webkit-scrollbar { width: 4px; }
+.sf-list-wrap::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+.sf-list-phase { font-size: 0.58rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase;
+  letter-spacing: 0.04em; margin: 0.5rem 0 0.2rem; }
+.sf-list-phase:first-child { margin-top: 0; }
+.sf-list-item { font-size: 0.68rem; padding: 0.2rem 0.4rem; border-radius: 4px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 0.35rem; line-height: 1.3; }
+.sf-list-item.done { text-decoration: line-through; opacity: 0.45; }
+.sf-list-item.current { color: var(--accent-primary); font-weight: 700; background: rgba(var(--accent-primary-rgb), 0.08);
+  border-radius: var(--radius-sm); }
+.sf-list-item .sf-li-icon { font-size: 0.55rem; width: 0.7rem; text-align: center; flex-shrink: 0; }
+.sf-reset-btn {
+  display: block; width: 100%; margin-top: 0.75rem; padding: 0.4rem; border: 1px solid rgba(220,38,38,0.25);
+  border-radius: var(--radius-full); background: rgba(220,38,38,0.06); color: #ef4444;
+  font-size: 0.65rem; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.sf-reset-btn:hover { background: rgba(220,38,38,0.15); border-color: rgba(220,38,38,0.4); }
+.study-float.list-open { width: 300px; }
+.study-float.list-open .sf-body { display: none; }
+@media (max-width: 480px) { .study-float { width: calc(100vw - 2rem); right: 1rem; bottom: 1rem; }
+  .study-float.list-open { width: calc(100vw - 2rem); } }
+</style>
 </head>
 <body style="opacity:0">
 
@@ -35,351 +130,118 @@
   </div>
 </div>
 
+<!-- ========== STICKY NAV ========== -->
+<nav class="hub-nav">
+  <a href="#principles" class="hub-nav-pill"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> SOLID</a>
+  <a href="#design-patterns" class="hub-nav-pill"><i class="fa-solid fa-shapes" aria-hidden="true"></i> Patterns</a>
+  <a href="#case-studies" class="hub-nav-pill"><i class="fa-solid fa-flask" aria-hidden="true"></i> Case Studies</a>
+  <a href="#advanced" class="hub-nav-pill"><i class="fa-solid fa-microscope" aria-hidden="true"></i> Advanced</a>
+</nav>
+
 <main class="wiki-container">
 
-  <!-- ========== LEARNING PATH ========== -->
-  <div class="section" id="learning-path">
-    <div class="section-header">
-      <div class="section-icon green"><i class="fa-solid fa-route" aria-hidden="true"></i></div>
-      <div>
-        <div class="section-num">Roadmap</div>
-        <h2 class="section-title"><span class="tooltip-trigger">Learning Path<span class="tooltip-content">A structured study order — SOLID first, then patterns by industry relevance, with case studies interleaved at each stage</span></span></h2>
-      </div>
-    </div>
-
-    <div class="learning-path">
-      <!-- Phase 1: SOLID -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--green">1</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-scale-balanced icon-gap" aria-hidden="true"></i>SOLID Principles</span>
-          <span class="lp-phase-count">5 topics</span>
-        </div>
-        <div class="lp-phase-desc">The foundation everything else builds on. Patterns are solutions to problems SOLID describes — you can't appreciate Factory Method without understanding DIP.</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">1. SRP</span>
-          <span class="lp-topic-pill">2. OCP</span>
-          <span class="lp-topic-pill">3. LSP</span>
-          <span class="lp-topic-pill">4. ISP</span>
-          <span class="lp-topic-pill">5. DIP</span>
-        </div>
-      </div>
-
-      <!-- Phase 2: Tier 1 Gateway Patterns -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--blue">2</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-shapes icon-gap" aria-hidden="true"></i>Tier 1 — Gateway Patterns</span>
-          <span class="lp-phase-count">5 patterns</span>
-        </div>
-        <div class="lp-phase-desc">After this phase, you can build a clean service with configurable behavior, event handling, and proper object creation. Strategy replaces if/else, Singleton teaches why DI exists.</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">1. Strategy</span>
-          <span class="lp-topic-pill">2. Singleton</span>
-          <span class="lp-topic-pill">3. Factory Method</span>
-          <span class="lp-topic-pill">4. Observer</span>
-          <span class="lp-topic-pill">5. Template Method</span>
-        </div>
-      </div>
-
-      <!-- Phase 3: Tier 2 Structural -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--blue">3</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-puzzle-piece icon-gap" aria-hidden="true"></i>Tier 2 — Structural Essentials</span>
-          <span class="lp-phase-count">5 patterns</span>
-        </div>
-        <div class="lp-phase-desc">ASP.NET middleware IS Decorator. Every service class is a Facade. EF lazy loading uses Proxy. These are the patterns you'll touch daily.</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">1. Decorator</span>
-          <span class="lp-topic-pill">2. Adapter</span>
-          <span class="lp-topic-pill">3. Facade</span>
-          <span class="lp-topic-pill">4. Proxy</span>
-          <span class="lp-topic-pill">5. Composite</span>
-        </div>
-      </div>
-
-      <!-- Phase 4: Tier 3 Core -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--blue">4</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-wand-magic-sparkles icon-gap" aria-hidden="true"></i>Tier 3 — Core Creational &amp; Behavioral</span>
-          <span class="lp-phase-count">5 patterns</span>
-        </div>
-        <div class="lp-phase-desc">State machines power half the case studies. Command enables undo/redo and CQRS. Abstract Factory and Builder handle complex object creation.</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">1. State</span>
-          <span class="lp-topic-pill">2. Command</span>
-          <span class="lp-topic-pill">3. Abstract Factory</span>
-          <span class="lp-topic-pill">4. Builder</span>
-          <span class="lp-topic-pill">5. Prototype</span>
-        </div>
-      </div>
-
-      <!-- Case Studies: Starter -->
-      <div class="lp-case-marker"><span><i class="fa-solid fa-flask icon-gap" aria-hidden="true"></i>Starter Case Studies (9) — apply your first 15 patterns</span></div>
-
-      <!-- Phase 5: Tier 4 Advanced Behavioral -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--blue">5</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-arrows-turn-to-dots icon-gap" aria-hidden="true"></i>Tier 4 — Advanced Behavioral</span>
-          <span class="lp-phase-count">4 patterns</span>
-        </div>
-        <div class="lp-phase-desc">Middleware pipelines (Chain of Resp), MediatR hubs (Mediator), LINQ under the hood (Iterator), and serialization snapshots (Memento).</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">1. Chain of Resp</span>
-          <span class="lp-topic-pill">2. Mediator</span>
-          <span class="lp-topic-pill">3. Iterator</span>
-          <span class="lp-topic-pill">4. Memento</span>
-        </div>
-      </div>
-
-      <!-- Case Studies: Intermediate -->
-      <div class="lp-case-marker"><span><i class="fa-solid fa-flask icon-gap" aria-hidden="true"></i>Intermediate Case Studies (21) — multi-pattern systems</span></div>
-
-      <!-- Phase 6: Tier 5 Specialized -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--blue">6</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-gem icon-gap" aria-hidden="true"></i>Tier 5 — Specialized</span>
-          <span class="lp-phase-count">4 patterns</span>
-        </div>
-        <div class="lp-phase-desc">Platform abstractions (Bridge), memory optimization (Flyweight), Roslyn syntax walkers (Visitor), regex/DSLs (Interpreter). Learn these as needed.</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">1. Bridge</span>
-          <span class="lp-topic-pill">2. Flyweight</span>
-          <span class="lp-topic-pill">3. Visitor</span>
-          <span class="lp-topic-pill">4. Interpreter</span>
-        </div>
-      </div>
-
-      <!-- Case Studies: Advanced -->
-      <div class="lp-case-marker"><span><i class="fa-solid fa-flask icon-gap" aria-hidden="true"></i>Advanced &amp; Specialized Case Studies (42) — industry-grade systems</span></div>
-
-      <!-- Phase 7: Advanced Topics -->
-      <div class="lp-phase">
-        <div class="lp-phase-num lp-phase-num--cyan">7</div>
-        <div class="lp-phase-header">
-          <span class="lp-phase-title"><i class="fa-solid fa-microscope icon-gap" aria-hidden="true"></i>Advanced Topics</span>
-          <span class="lp-phase-count">10 topics</span>
-        </div>
-        <div class="lp-phase-desc">Concurrency, DDD, CQRS, Clean Architecture, Event-Driven design — the bridge from LLD to HLD.</div>
-        <div class="lp-phase-topics">
-          <span class="lp-topic-pill">Concurrency</span>
-          <span class="lp-topic-pill">Testing</span>
-          <span class="lp-topic-pill">DI Deep Dive</span>
-          <span class="lp-topic-pill">Repository &amp; UoW</span>
-          <span class="lp-topic-pill">DDD</span>
-          <span class="lp-topic-pill">CQRS</span>
-          <span class="lp-topic-pill">Clean Architecture</span>
-          <span class="lp-topic-pill">Event-Driven</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========== SOLID PRINCIPLES ========== -->
+  <!-- ═══════════════════════════════════════════
+       1. SOLID PRINCIPLES — 5/5 Ready
+       ═══════════════════════════════════════════ -->
   <div class="section" id="principles">
     <div class="section-header">
       <div class="section-icon green"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i></div>
       <div>
-        <div class="section-num">5 Principles</div>
+        <div class="section-num">5 Principles — All Complete</div>
         <h2 class="section-title">SOLID Principles</h2>
       </div>
     </div>
-
     <div class="lld-grid">
-      <a href="topics/principles/srp/csharp.html" class="lld-topic-card lld-topic-card--ready">
-        <span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-s" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Single Responsibility</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/principles/ocp/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-o" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Open/Closed</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/principles/lsp/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-l" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Liskov Substitution</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/principles/isp/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-i" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Interface Segregation</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/principles/dip/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-d" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Dependency Inversion</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
+      <a href="topics/principles/srp/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-s" aria-hidden="true"></i></span><div><span class="lld-topic-name">Single Responsibility</span></div></a>
+      <a href="topics/principles/ocp/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-o" aria-hidden="true"></i></span><div><span class="lld-topic-name">Open / Closed</span></div></a>
+      <a href="topics/principles/lsp/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-l" aria-hidden="true"></i></span><div><span class="lld-topic-name">Liskov Substitution</span></div></a>
+      <a href="topics/principles/isp/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-i" aria-hidden="true"></i></span><div><span class="lld-topic-name">Interface Segregation</span></div></a>
+      <a href="topics/principles/dip/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon lld-topic-icon--green"><i class="fa-solid fa-d" aria-hidden="true"></i></span><div><span class="lld-topic-name">Dependency Inversion</span></div></a>
     </div>
   </div>
 
-  <!-- ========== DESIGN PATTERNS ========== -->
+  <!-- ═══════════════════════════════════════════
+       2. DESIGN PATTERNS — 8 Ready, 15 Upcoming
+       ═══════════════════════════════════════════ -->
   <div class="section" id="design-patterns">
     <div class="section-header">
       <div class="section-icon blue"><i class="fa-solid fa-shapes" aria-hidden="true"></i></div>
       <div>
-        <div class="section-num">23 Patterns</div>
+        <div class="section-num">23 Patterns — 8 Complete</div>
         <h2 class="section-title">GoF Design Patterns</h2>
       </div>
     </div>
 
-    <!-- Creational -->
+    <!-- Creational — 5/5 Ready -->
     <h3 class="lld-category"><i class="fa-solid fa-wand-magic-sparkles icon-gap" aria-hidden="true"></i><span class="tooltip-trigger">Creational Patterns<span class="tooltip-content">Patterns that deal with object creation mechanisms, trying to create objects in a manner suitable to the situation</span></span></h3>
     <div class="lld-grid">
-      <a href="topics/design-patterns/singleton/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-1" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Singleton</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/design-patterns/factory-method/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-industry" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Factory Method</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/design-patterns/abstract-factory/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-city" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Abstract Factory</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/design-patterns/builder/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-hammer" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Builder</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
-      <a href="topics/design-patterns/prototype/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-clone" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Prototype</span>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
-        </div>
-      </a>
+      <a href="topics/design-patterns/singleton/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-1" aria-hidden="true"></i></span><div><span class="lld-topic-name">Singleton</span></div></a>
+      <a href="topics/design-patterns/factory-method/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-industry" aria-hidden="true"></i></span><div><span class="lld-topic-name">Factory Method</span></div></a>
+      <a href="topics/design-patterns/abstract-factory/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-city" aria-hidden="true"></i></span><div><span class="lld-topic-name">Abstract Factory</span></div></a>
+      <a href="topics/design-patterns/builder/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-hammer" aria-hidden="true"></i></span><div><span class="lld-topic-name">Builder</span></div></a>
+      <a href="topics/design-patterns/prototype/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-clone" aria-hidden="true"></i></span><div><span class="lld-topic-name">Prototype</span></div></a>
     </div>
 
-    <!-- Structural -->
-    <h3 class="lld-category"><i class="fa-solid fa-puzzle-piece icon-gap" aria-hidden="true"></i><span class="tooltip-trigger">Structural Patterns<span class="tooltip-content">Patterns that ease design by identifying simple ways to realize relationships between entities</span></span></h3>
+    <!-- Structural — 1/7 Ready -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-puzzle-piece icon-gap" aria-hidden="true"></i><span class="tooltip-trigger">Structural Patterns<span class="tooltip-content">Patterns that ease design by identifying simple ways to realize relationships between entities</span></span></span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'structural-upcoming')">+6 upcoming</button>
+    </h3>
     <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-plug" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Adapter</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-bridge" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Bridge</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Composite</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <a href="topics/design-patterns/decorator/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-gift" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Decorator</span><span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span></div>
-      </a>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-building" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Facade</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-feather" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Flyweight</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Proxy</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
+      <a href="topics/design-patterns/decorator/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-gift" aria-hidden="true"></i></span><div><span class="lld-topic-name">Decorator</span></div></a>
+    </div>
+    <div class="soon-list" id="structural-upcoming" style="display:none;">
+      <span class="soon-pill">Adapter</span>
+      <span class="soon-pill">Bridge</span>
+      <span class="soon-pill">Composite</span>
+      <span class="soon-pill">Facade</span>
+      <span class="soon-pill">Flyweight</span>
+      <span class="soon-pill">Proxy</span>
     </div>
 
-    <!-- Behavioral -->
-    <h3 class="lld-category"><i class="fa-solid fa-arrows-turn-to-dots icon-gap" aria-hidden="true"></i><span class="tooltip-trigger">Behavioral Patterns<span class="tooltip-content">Patterns that identify common communication patterns between objects and increase flexibility in carrying out communication</span></span></h3>
+    <!-- Behavioral — 2/11 Ready -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-arrows-turn-to-dots icon-gap" aria-hidden="true"></i><span class="tooltip-trigger">Behavioral Patterns<span class="tooltip-content">Patterns that identify common communication patterns between objects and increase flexibility in carrying out communication</span></span></span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'behavioral-upcoming')">+9 upcoming</button>
+    </h3>
     <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-link-slash" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Chain of Responsibility</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-terminal" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Command</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-language" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Interpreter</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-forward" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Iterator</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-people-arrows" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Mediator</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Memento</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <a href="topics/design-patterns/observer/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-eye" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Observer</span><span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span></div>
-      </a>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-toggle-on" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">State</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <a href="topics/design-patterns/strategy/csharp.html" class="lld-topic-card">
-        <span class="lld-topic-icon"><i class="fa-solid fa-chess" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Strategy</span><span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span></div>
-      </a>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Template Method</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon"><i class="fa-solid fa-person-walking" aria-hidden="true"></i></span>
-        <div><span class="lld-topic-name">Visitor</span><span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span></div>
-      </div>
+      <a href="topics/design-patterns/observer/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-eye" aria-hidden="true"></i></span><div><span class="lld-topic-name">Observer</span></div></a>
+      <a href="topics/design-patterns/strategy/csharp.html" class="lld-topic-card lld-topic-card--ready"><span class="lld-topic-icon"><i class="fa-solid fa-chess" aria-hidden="true"></i></span><div><span class="lld-topic-name">Strategy</span></div></a>
+    </div>
+    <div class="soon-list" id="behavioral-upcoming" style="display:none;">
+      <span class="soon-pill">Chain of Responsibility</span>
+      <span class="soon-pill">Command</span>
+      <span class="soon-pill">Interpreter</span>
+      <span class="soon-pill">Iterator</span>
+      <span class="soon-pill">Mediator</span>
+      <span class="soon-pill">Memento</span>
+      <span class="soon-pill">State</span>
+      <span class="soon-pill">Template Method</span>
+      <span class="soon-pill">Visitor</span>
     </div>
   </div>
 
-  <!-- ========== CASE STUDIES ========== -->
+  <!-- ═══════════════════════════════════════════
+       3. CASE STUDIES — 1 Ready, 71 Upcoming
+       ═══════════════════════════════════════════ -->
   <div class="section" id="case-studies">
     <div class="section-header">
       <div class="section-icon purple"><i class="fa-solid fa-flask" aria-hidden="true"></i></div>
       <div>
-        <div class="section-num">72 Case Studies</div>
-        <h2 class="section-title">Case Studies</h2>
+        <div class="section-num">72 Case Studies — 1 Complete</div>
+        <h2 class="section-title">OOP Case Studies</h2>
       </div>
+      <button class="inline-toggle" onclick="inlineToggle(this, 'cs-more')" style="margin-left:auto">+63 upcoming</button>
     </div>
 
     <!-- ── Starter (9) ── -->
-    <h3 class="lld-category"><i class="fa-solid fa-seedling icon-gap" aria-hidden="true"></i>Starter — After Tier 3 (15 Patterns)</h3>
+    <div class="cs-category"><i class="fa-solid fa-seedling" aria-hidden="true"></i> Starter <span class="cs-cat-count">9</span></div>
     <div class="lld-grid">
-      <a href="topics/case-studies/parking-lot/csharp.html" class="lld-topic-card" data-tags="strategy factory singleton">
+      <a href="topics/case-studies/parking-lot/csharp.html" class="lld-topic-card lld-topic-card--ready">
         <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-square-parking" aria-hidden="true"></i></span>
         <div>
-          <span class="lld-topic-name">Parking Lot System <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
+          <span class="lld-topic-name">Parking Lot <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
           <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Singleton</span></div>
-          <span class="lld-topic-status lld-topic-status--ready"><i class="fa-solid fa-check-circle" aria-hidden="true"></i> Ready</span>
         </div>
       </a>
       <div class="lld-topic-card lld-topic-card--soon">
@@ -387,7 +249,6 @@
         <div>
           <span class="lld-topic-name">Tic-Tac-Toe <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
           <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
         </div>
       </div>
       <div class="lld-topic-card lld-topic-card--soon">
@@ -395,693 +256,155 @@
         <div>
           <span class="lld-topic-name">Vending Machine <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
           <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-database" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">LRU Cache <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Proxy</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Singleton</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Logging Framework <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Decorator</span><span class="lld-pattern-tag">Singleton</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
         </div>
       </div>
       <div class="lld-topic-card lld-topic-card--soon">
         <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-dice" aria-hidden="true"></i></span>
         <div>
           <span class="lld-topic-name">Snake &amp; Ladder <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
+          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Factory</span></div>
         </div>
       </div>
       <div class="lld-topic-card lld-topic-card--soon">
         <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i></span>
         <div>
           <span class="lld-topic-name">Shopping Cart <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Composite</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
+          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
         </div>
       </div>
       <div class="lld-topic-card lld-topic-card--soon">
         <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-star" aria-hidden="true"></i></span>
         <div>
-          <span class="lld-topic-name">Review &amp; Rating System <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
+          <span class="lld-topic-name">Review &amp; Rating <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
           <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-database" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">LRU Cache <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
+          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Proxy</span><span class="lld-pattern-tag">Strategy</span></div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Logging Framework <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
+          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Decorator</span><span class="lld-pattern-tag">Singleton</span></div>
         </div>
       </div>
       <div class="lld-topic-card lld-topic-card--soon">
         <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plug" aria-hidden="true"></i></span>
         <div>
           <span class="lld-topic-name">Plugin System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Composite</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
+          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Factory</span></div>
         </div>
       </div>
     </div>
 
+    <div id="cs-more" style="display:none">
     <!-- ── Intermediate (21) ── -->
-    <h3 class="lld-category"><i class="fa-solid fa-layer-group icon-gap" aria-hidden="true"></i>Intermediate — After Tier 4 (19 Patterns)</h3>
+    <div class="cs-category"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Intermediate <span class="cs-cat-count">21</span></div>
     <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">ATM System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Chain of Resp</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-heart" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Deck of Cards <span class="lld-difficulty lld-difficulty--easy">Easy</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Iterator</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-traffic-light" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Traffic Signal Control <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-book" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Library Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-hotel" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Hotel Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Builder</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-ticket" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Movie Ticket Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Builder</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-elevator" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Elevator System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-car" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Car Rental System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-utensils" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Restaurant Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Task Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Digital Wallet Service <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bell" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Notification System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Chain of Resp</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Calendar App <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Builder</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Inventory Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Singleton</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-folder-tree" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">In-Memory File System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Iterator</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Rate Limiter <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Proxy</span><span class="lld-pattern-tag">Singleton</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Pub-Sub Messaging <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Mediator</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Course Registration <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bomb" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Minesweeper <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-headset" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Customer Support Ticketing <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Chain of Resp</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-circle-check" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Online Examination System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Factory</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i></span><div><span class="lld-topic-name">ATM System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Chain of Resp</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-heart" aria-hidden="true"></i></span><div><span class="lld-topic-name">Deck of Cards <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Iterator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-traffic-light" aria-hidden="true"></i></span><div><span class="lld-topic-name">Traffic Signal <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Mediator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-book" aria-hidden="true"></i></span><div><span class="lld-topic-name">Library Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Strategy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-hotel" aria-hidden="true"></i></span><div><span class="lld-topic-name">Hotel Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Builder</span><span class="lld-pattern-tag">Strategy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-ticket" aria-hidden="true"></i></span><div><span class="lld-topic-name">Movie Ticket Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Builder</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-elevator" aria-hidden="true"></i></span><div><span class="lld-topic-name">Elevator System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-car" aria-hidden="true"></i></span><div><span class="lld-topic-name">Car Rental <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-utensils" aria-hidden="true"></i></span><div><span class="lld-topic-name">Restaurant Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span><div><span class="lld-topic-name">Task Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span><div><span class="lld-topic-name">Digital Wallet <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bell" aria-hidden="true"></i></span><div><span class="lld-topic-name">Notification System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i></span><div><span class="lld-topic-name">Calendar App <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Composite</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span><div><span class="lld-topic-name">Inventory Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-folder-tree" aria-hidden="true"></i></span><div><span class="lld-topic-name">In-Memory File System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Iterator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i></span><div><span class="lld-topic-name">Rate Limiter <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Proxy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></span><div><span class="lld-topic-name">Pub-Sub Messaging <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Mediator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span><div><span class="lld-topic-name">Course Registration <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bomb" aria-hidden="true"></i></span><div><span class="lld-topic-name">Minesweeper <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Observer</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-headset" aria-hidden="true"></i></span><div><span class="lld-topic-name">Support Ticketing <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Chain of Resp</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-circle-check" aria-hidden="true"></i></span><div><span class="lld-topic-name">Online Examination <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span></div></div></div>
     </div>
 
     <!-- ── Advanced (20) ── -->
-    <h3 class="lld-category"><i class="fa-solid fa-fire icon-gap" aria-hidden="true"></i>Advanced — After All 23 Patterns</h3>
+    <div class="cs-category"><i class="fa-solid fa-fire" aria-hidden="true"></i> Advanced <span class="cs-cat-count">20</span></div>
     <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chess" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Chess Game <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Memento</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-divide" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Splitwise / Expense Sharing <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bag-shopping" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Online Shopping (Amazon) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Abstract Factory</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-taxi" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Ride-Sharing (Uber) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-music" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Music Streaming (Spotify) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Iterator</span><span class="lld-pattern-tag">Decorator</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Stock Brokerage <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Food Delivery (Swiggy) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Chain of Resp</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plane" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Airline Management <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Builder</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Social Network <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-trophy" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">CricInfo / Sports Scoring <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gavel" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Online Auction System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-credit-card" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Payment Gateway (Stripe) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-message" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Chat Application (WhatsApp) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-pen" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Collaborative Text Editor <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Memento</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Task / Job Scheduler <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-rss" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Social Media Feed <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Iterator</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Decorator</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Circuit Breaker <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Proxy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Workflow Engine <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Template Method</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-scale-unbalanced" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Rules Engine <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Interpreter</span><span class="lld-pattern-tag">Chain of Resp</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-timeline" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Event Sourcing System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Memento</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chess" aria-hidden="true"></i></span><div><span class="lld-topic-name">Chess Game <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-divide" aria-hidden="true"></i></span><div><span class="lld-topic-name">Splitwise <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Command</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bag-shopping" aria-hidden="true"></i></span><div><span class="lld-topic-name">Online Shopping <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Abstract Factory</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-taxi" aria-hidden="true"></i></span><div><span class="lld-topic-name">Ride-Sharing (Uber) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Mediator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-music" aria-hidden="true"></i></span><div><span class="lld-topic-name">Music Streaming <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Iterator</span><span class="lld-pattern-tag">Decorator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span><div><span class="lld-topic-name">Stock Brokerage <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Command</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-motorcycle" aria-hidden="true"></i></span><div><span class="lld-topic-name">Food Delivery <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Chain of Resp</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plane" aria-hidden="true"></i></span><div><span class="lld-topic-name">Airline Management <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Builder</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i></span><div><span class="lld-topic-name">Social Network <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Mediator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-trophy" aria-hidden="true"></i></span><div><span class="lld-topic-name">Sports Scoring <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gavel" aria-hidden="true"></i></span><div><span class="lld-topic-name">Online Auction <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-credit-card" aria-hidden="true"></i></span><div><span class="lld-topic-name">Payment Gateway <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-message" aria-hidden="true"></i></span><div><span class="lld-topic-name">Chat App (WhatsApp) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Observer</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-pen" aria-hidden="true"></i></span><div><span class="lld-topic-name">Collaborative Editor <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Memento</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><div><span class="lld-topic-name">Job Scheduler <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">State</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-rss" aria-hidden="true"></i></span><div><span class="lld-topic-name">Social Media Feed <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Iterator</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span><div><span class="lld-topic-name">Circuit Breaker <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Proxy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span><div><span class="lld-topic-name">Workflow Engine <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Command</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-scale-unbalanced" aria-hidden="true"></i></span><div><span class="lld-topic-name">Rules Engine <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Interpreter</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-timeline" aria-hidden="true"></i></span><div><span class="lld-topic-name">Event Sourcing <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Memento</span></div></div></div>
     </div>
 
-    <!-- ── Specialized ── -->
-    <h3 class="lld-category"><i class="fa-solid fa-building-columns icon-gap" aria-hidden="true"></i>Specialized — Industry-Specific Case Studies</h3>
-
-    <!-- Healthcare & HR (4) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-hospital" aria-hidden="true"></i>Healthcare &amp; HR</h3>
+    <!-- ── Specialized (22) ── -->
+    <div class="cs-category"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> Specialized <span class="cs-cat-count">22</span></div>
     <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Appointment Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Factory</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-user-tie" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Employee Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">State</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-money-check-dollar" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Payroll System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Template Method</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-user-lock" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Permission / RBAC <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Chain of Resp</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span><div><span class="lld-topic-name">Appointment Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-user-tie" aria-hidden="true"></i></span><div><span class="lld-topic-name">Employee Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-money-check-dollar" aria-hidden="true"></i></span><div><span class="lld-topic-name">Payroll System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-user-lock" aria-hidden="true"></i></span><div><span class="lld-topic-name">Permission / RBAC <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i></span><div><span class="lld-topic-name">Order &amp; Delivery <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-train" aria-hidden="true"></i></span><div><span class="lld-topic-name">Ticket Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plane-departure" aria-hidden="true"></i></span><div><span class="lld-topic-name">Flight Booking <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-video" aria-hidden="true"></i></span><div><span class="lld-topic-name">Video Platform <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-tv" aria-hidden="true"></i></span><div><span class="lld-topic-name">Streaming Service <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-blog" aria-hidden="true"></i></span><div><span class="lld-topic-name">Blog / CMS <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-house-signal" aria-hidden="true"></i></span><div><span class="lld-topic-name">Smart Home <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-temperature-half" aria-hidden="true"></i></span><div><span class="lld-topic-name">Thermostat Control <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i></span><div><span class="lld-topic-name">Whiteboard App <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-table-cells" aria-hidden="true"></i></span><div><span class="lld-topic-name">Spreadsheet <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-hashtag" aria-hidden="true"></i></span><div><span class="lld-topic-name">HashMap <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gears" aria-hidden="true"></i></span><div><span class="lld-topic-name">Thread Pool <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i></span><div><span class="lld-topic-name">Connection Pool <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-key" aria-hidden="true"></i></span><div><span class="lld-topic-name">Authentication <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-link" aria-hidden="true"></i></span><div><span class="lld-topic-name">URL Shortener <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-server" aria-hidden="true"></i></span><div><span class="lld-topic-name">Key-Value Store <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span><div><span class="lld-topic-name">Autocomplete <span class="lld-difficulty lld-difficulty--medium">Medium</span></span></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span><div><span class="lld-topic-name">Multi-Tenant SaaS <span class="lld-difficulty lld-difficulty--hard">Hard</span></span></div></div>
     </div>
-
-    <!-- Logistics & Reservations (3) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-truck" aria-hidden="true"></i>Logistics &amp; Reservations</h3>
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-truck-fast" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Order &amp; Delivery System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-train" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Train / Bus Ticket Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plane-departure" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Flight Booking System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Builder</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Media & Content (3) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-photo-film" aria-hidden="true"></i>Media &amp; Content</h3>
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-video" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Video Platform (YouTube) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Decorator</span><span class="lld-pattern-tag">Adapter</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-tv" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Streaming Service (Netflix) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Decorator</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-blog" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Blog / CMS Platform <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Template Method</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Strategy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Smart / IoT (2) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-microchip" aria-hidden="true"></i>Smart / IoT</h3>
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-house-signal" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Smart Home System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Facade</span><span class="lld-pattern-tag">State</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-temperature-half" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Thermostat Control <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Mediator</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Design Tools (2) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-palette" aria-hidden="true"></i>Design Tools</h3>
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Whiteboard / Drawing App <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Memento</span><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-table-cells" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Spreadsheet (Excel-like) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Composite</span><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">Visitor</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Classic Data Structures (3) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-cubes" aria-hidden="true"></i>Classic Data Structures</h3>
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-hashtag" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">HashMap Implementation <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Iterator</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gears" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Thread Pool <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Command</span><span class="lld-pattern-tag">State</span><span class="lld-pattern-tag">Template Method</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Connection Pool <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Singleton</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Auth & Infrastructure (5) -->
-    <h3 class="lld-subcategory"><i class="fa-solid fa-server" aria-hidden="true"></i>Auth &amp; Infrastructure</h3>
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-key" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Authentication System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Chain of Resp</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-link" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">URL Shortener <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Factory</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Singleton</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-server" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">In-Memory Key-Value Store <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span><span class="lld-pattern-tag">Factory</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Autocomplete / Typeahead <span class="lld-difficulty lld-difficulty--medium">Medium</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Observer</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name">Multi-Tenant SaaS App <span class="lld-difficulty lld-difficulty--hard">Hard</span></span>
-          <div class="lld-pattern-tags"><span class="lld-pattern-tag">Abstract Factory</span><span class="lld-pattern-tag">Strategy</span><span class="lld-pattern-tag">Proxy</span></div>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-    </div>
+    </div><!-- /cs-more -->
   </div>
 
-  <!-- ========== ADVANCED TOPICS ========== -->
+  <!-- ═══════════════════════════════════════════
+       4. ADVANCED TOPICS — 0/10 Ready
+       ═══════════════════════════════════════════ -->
   <div class="section" id="advanced">
     <div class="section-header">
       <div class="section-icon cyan"><i class="fa-solid fa-microscope" aria-hidden="true"></i></div>
       <div>
-        <div class="section-num">10 Deep Dives</div>
+        <div class="section-num">10 Deep Dives — Coming Soon</div>
         <h2 class="section-title">Advanced Topics</h2>
       </div>
     </div>
-
-    <div class="lld-grid">
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Concurrency Patterns<span class="tooltip-content">async/await, Task, Channel&lt;T&gt;, SemaphoreSlim — essential for every .NET interview</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-vials" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Unit Testing Patterns<span class="tooltip-content">Test doubles, AAA pattern, mocking frameworks — writing testable code</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-syringe" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Dependency Injection Deep Dive<span class="tooltip-content">Lifetimes, scopes, keyed services — mastering the .NET DI container</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-database" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Repository &amp; Unit of Work<span class="tooltip-content">EF Core abstraction debate — when to use, when not to, and alternatives</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Refactoring Patterns<span class="tooltip-content">Extract Method, Replace Conditional with Polymorphism, and other safe transformations</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-gears" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Reflection &amp; Metaprogramming<span class="tooltip-content">Source generators, expression trees, runtime type inspection</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">DDD Tactical Patterns<span class="tooltip-content">Entities, Value Objects, Aggregates, Domain Events — building rich domain models</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-code-branch" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">CQRS<span class="tooltip-content">Command/Query Responsibility Segregation — MediatR, separate read/write models</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-bullseye" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Clean Architecture<span class="tooltip-content">Dependency rule, layers, ports &amp; adapters — structuring enterprise .NET apps</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
-      <div class="lld-topic-card lld-topic-card--soon">
-        <span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></span>
-        <div>
-          <span class="lld-topic-name"><span class="tooltip-trigger">Event-Driven Architecture<span class="tooltip-content">Domain events, integration events — the bridge from LLD to HLD</span></span></span>
-          <span class="lld-topic-status"><i class="fa-solid fa-clock" aria-hidden="true"></i> Coming Soon</span>
-        </div>
-      </div>
+    <div class="soon-list">
+      <span class="soon-pill">Concurrency Patterns</span>
+      <span class="soon-pill">Unit Testing Patterns</span>
+      <span class="soon-pill">DI Deep Dive</span>
+      <span class="soon-pill">Repository &amp; Unit of Work</span>
+      <span class="soon-pill">Refactoring Patterns</span>
+      <span class="soon-pill">Reflection &amp; Metaprogramming</span>
+      <span class="soon-pill">DDD Tactical Patterns</span>
+      <span class="soon-pill">CQRS</span>
+      <span class="soon-pill">Clean Architecture</span>
+      <span class="soon-pill">Event-Driven Architecture</span>
     </div>
   </div>
 
@@ -1109,5 +432,244 @@
 
 <button class="back-to-top" id="backToTop" aria-label="Back to top"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
 <script src="../shared/scripts.js"></script>
+<script>
+/* Inline toggle for "+N upcoming" buttons in category headers */
+function inlineToggle(btn, targetId) {
+  var el = document.getElementById(targetId);
+  var isVisible = el.style.display !== 'none';
+  el.style.display = isVisible ? 'none' : '';
+  btn.classList.toggle('active', !isVisible);
+}
+
+/* ── Study Next Widget ── */
+(function() {
+  var PATH = [
+    /* ══ SOLID Foundations ══ */
+    { phase: 'SOLID Foundations', name: 'SRP — Single Responsibility', url: 'topics/principles/srp/csharp.html' },
+    { phase: 'SOLID Foundations', name: 'OCP — Open / Closed', url: 'topics/principles/ocp/csharp.html' },
+    { phase: 'SOLID Foundations', name: 'LSP — Liskov Substitution', url: 'topics/principles/lsp/csharp.html' },
+    { phase: 'SOLID Foundations', name: 'ISP — Interface Segregation', url: 'topics/principles/isp/csharp.html' },
+    { phase: 'SOLID Foundations', name: 'DIP — Dependency Inversion', url: 'topics/principles/dip/csharp.html' },
+
+    /* ══ Starter Patterns → Practice ══ */
+    { phase: 'Starter Patterns', name: 'Strategy', url: 'topics/design-patterns/strategy/csharp.html' },
+    { phase: 'Starter Patterns', name: 'Singleton', url: 'topics/design-patterns/singleton/csharp.html' },
+    { phase: 'Starter Patterns', name: 'Factory Method', url: 'topics/design-patterns/factory-method/csharp.html' },
+    { phase: 'Starter Patterns', name: 'Observer', url: 'topics/design-patterns/observer/csharp.html' },
+    { phase: 'Starter Patterns', name: 'Template Method', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Parking Lot', url: 'topics/case-studies/parking-lot/csharp.html' },
+    { phase: 'Practice \u00b7 after Starter', name: 'Tic-Tac-Toe', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Vending Machine', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Snake & Ladder', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Shopping Cart', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Review & Rating', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Logging Framework', url: null },
+    { phase: 'Practice \u00b7 after Starter', name: 'Plugin System', url: null },
+
+    /* ══ Structural Patterns → Practice ══ */
+    { phase: 'Structural Patterns', name: 'Decorator', url: 'topics/design-patterns/decorator/csharp.html' },
+    { phase: 'Structural Patterns', name: 'Adapter', url: null },
+    { phase: 'Structural Patterns', name: 'Facade', url: null },
+    { phase: 'Structural Patterns', name: 'Proxy', url: null },
+    { phase: 'Structural Patterns', name: 'Composite', url: null },
+    { phase: 'Practice \u00b7 after Structural', name: 'Notification System', url: null },
+    { phase: 'Practice \u00b7 after Structural', name: 'Library Management', url: null },
+    { phase: 'Practice \u00b7 after Structural', name: 'Restaurant Management', url: null },
+    { phase: 'Practice \u00b7 after Structural', name: 'Task Management', url: null },
+
+    /* ══ Creational Depth → Practice ══ */
+    { phase: 'Creational Depth', name: 'Abstract Factory', url: 'topics/design-patterns/abstract-factory/csharp.html' },
+    { phase: 'Creational Depth', name: 'Builder', url: 'topics/design-patterns/builder/csharp.html' },
+    { phase: 'Creational Depth', name: 'Prototype', url: 'topics/design-patterns/prototype/csharp.html' },
+    { phase: 'Practice \u00b7 after Creational', name: 'ATM System', url: null },
+    { phase: 'Practice \u00b7 after Creational', name: 'Deck of Cards', url: null },
+    { phase: 'Practice \u00b7 after Creational', name: 'Hotel Booking', url: null },
+    { phase: 'Practice \u00b7 after Creational', name: 'Car Rental', url: null },
+
+    /* ══ Behavioral Patterns → Practice ══ */
+    { phase: 'Behavioral Patterns', name: 'State', url: null },
+    { phase: 'Behavioral Patterns', name: 'Command', url: null },
+    { phase: 'Behavioral Patterns', name: 'Chain of Responsibility', url: null },
+    { phase: 'Behavioral Patterns', name: 'Mediator', url: null },
+    { phase: 'Behavioral Patterns', name: 'Iterator', url: null },
+    { phase: 'Behavioral Patterns', name: 'Memento', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Traffic Signal', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Elevator System', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Movie Ticket Booking', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Digital Wallet', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Calendar App', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Minesweeper', url: null },
+    { phase: 'Practice \u00b7 after Behavioral', name: 'Chess Game', url: null },
+
+    /* ══ Specialized Patterns → Practice ══ */
+    { phase: 'Specialized Patterns', name: 'Bridge', url: null },
+    { phase: 'Specialized Patterns', name: 'Flyweight', url: null },
+    { phase: 'Specialized Patterns', name: 'Visitor', url: null },
+    { phase: 'Specialized Patterns', name: 'Interpreter', url: null },
+    { phase: 'Practice \u00b7 after Specialized', name: 'In-Memory File System', url: null },
+    { phase: 'Practice \u00b7 after Specialized', name: 'Spreadsheet', url: null },
+    { phase: 'Practice \u00b7 after Specialized', name: 'Whiteboard App', url: null },
+
+    /* ══ Complex Systems — real-time, multi-service, concurrency ══ */
+    { phase: 'Complex Systems', name: 'Ride-Sharing (Uber)', url: null },
+    { phase: 'Complex Systems', name: 'Food Delivery', url: null },
+    { phase: 'Complex Systems', name: 'Online Shopping', url: null },
+    { phase: 'Complex Systems', name: 'Music Streaming', url: null },
+    { phase: 'Complex Systems', name: 'Stock Brokerage', url: null },
+    { phase: 'Complex Systems', name: 'Social Network', url: null },
+    { phase: 'Complex Systems', name: 'Chat App (WhatsApp)', url: null },
+    { phase: 'Complex Systems', name: 'Collaborative Editor', url: null },
+    { phase: 'Complex Systems', name: 'Online Auction', url: null },
+    { phase: 'Complex Systems', name: 'Splitwise', url: null },
+    { phase: 'Complex Systems', name: 'Social Media Feed', url: null },
+
+    /* ══ Infrastructure — low-level components, internal tools ══ */
+    { phase: 'Infrastructure', name: 'LRU Cache', url: null },
+    { phase: 'Infrastructure', name: 'Rate Limiter', url: null },
+    { phase: 'Infrastructure', name: 'HashMap', url: null },
+    { phase: 'Infrastructure', name: 'Thread Pool', url: null },
+    { phase: 'Infrastructure', name: 'Connection Pool', url: null },
+    { phase: 'Infrastructure', name: 'Key-Value Store', url: null },
+    { phase: 'Infrastructure', name: 'Job Scheduler', url: null },
+    { phase: 'Infrastructure', name: 'Circuit Breaker', url: null },
+    { phase: 'Infrastructure', name: 'Pub-Sub Messaging', url: null },
+    { phase: 'Infrastructure', name: 'Event Sourcing', url: null },
+    { phase: 'Infrastructure', name: 'URL Shortener', url: null },
+    { phase: 'Infrastructure', name: 'Autocomplete', url: null },
+    { phase: 'Infrastructure', name: 'Payment Gateway', url: null },
+    { phase: 'Infrastructure', name: 'Workflow Engine', url: null },
+    { phase: 'Infrastructure', name: 'Rules Engine', url: null },
+
+    /* ══ Booking & Commerce — reservations, transactions, inventory ══ */
+    { phase: 'Booking & Commerce', name: 'Appointment Booking', url: null },
+    { phase: 'Booking & Commerce', name: 'Ticket Booking', url: null },
+    { phase: 'Booking & Commerce', name: 'Flight Booking', url: null },
+    { phase: 'Booking & Commerce', name: 'Airline Management', url: null },
+    { phase: 'Booking & Commerce', name: 'Order & Delivery', url: null },
+    { phase: 'Booking & Commerce', name: 'Inventory Management', url: null },
+
+    /* ══ Enterprise & SaaS — internal business tools ══ */
+    { phase: 'Enterprise & SaaS', name: 'Employee Management', url: null },
+    { phase: 'Enterprise & SaaS', name: 'Payroll System', url: null },
+    { phase: 'Enterprise & SaaS', name: 'Permission / RBAC', url: null },
+    { phase: 'Enterprise & SaaS', name: 'Authentication', url: null },
+    { phase: 'Enterprise & SaaS', name: 'Support Ticketing', url: null },
+    { phase: 'Enterprise & SaaS', name: 'Multi-Tenant SaaS', url: null },
+
+    /* ══ Content & Media — platforms, streaming, publishing ══ */
+    { phase: 'Content & Media', name: 'Video Platform', url: null },
+    { phase: 'Content & Media', name: 'Streaming Service', url: null },
+    { phase: 'Content & Media', name: 'Blog / CMS', url: null },
+    { phase: 'Content & Media', name: 'Course Registration', url: null },
+    { phase: 'Content & Media', name: 'Online Examination', url: null },
+    { phase: 'Content & Media', name: 'Sports Scoring', url: null },
+
+    /* ══ IoT & Simulation — hardware-interfacing, real-world modeling ══ */
+    { phase: 'IoT & Simulation', name: 'Smart Home', url: null },
+    { phase: 'IoT & Simulation', name: 'Thermostat Control', url: null },
+
+    /* ══ Mastery — advanced architecture topics ══ */
+    { phase: 'Mastery', name: 'Concurrency Patterns', url: null },
+    { phase: 'Mastery', name: 'Unit Testing Patterns', url: null },
+    { phase: 'Mastery', name: 'DI Deep Dive', url: null },
+    { phase: 'Mastery', name: 'Repository & Unit of Work', url: null },
+    { phase: 'Mastery', name: 'Refactoring Patterns', url: null },
+    { phase: 'Mastery', name: 'Reflection & Metaprogramming', url: null },
+    { phase: 'Mastery', name: 'DDD Tactical Patterns', url: null },
+    { phase: 'Mastery', name: 'CQRS', url: null },
+    { phase: 'Mastery', name: 'Clean Architecture', url: null },
+    { phase: 'Mastery', name: 'Event-Driven Architecture', url: null }
+  ];
+
+  var KEY = 'lld-study-step';
+  var MIN_KEY = 'lld-study-min';
+  var step = parseInt(localStorage.getItem(KEY) || '0', 10);
+  var minimized = localStorage.getItem(MIN_KEY) === '1';
+  var listOpen = false;
+
+  var el = document.createElement('div');
+  el.className = 'study-float' + (minimized ? ' minimized' : '');
+  document.body.appendChild(el);
+
+  function buildList() {
+    var html = '<div class="sf-list-wrap">';
+    var lastPhase = '';
+    for (var i = 0; i < PATH.length; i++) {
+      var prev = i > 0 ? PATH[i - 1].phase : '';
+      if (PATH[i].phase !== prev) {
+        lastPhase = PATH[i].phase;
+        html += '<div class="sf-list-phase">' + lastPhase + '</div>';
+      }
+      var cls = i < step ? 'sf-list-item done' : i === step ? 'sf-list-item current' : 'sf-list-item';
+      var icon = i < step ? '<i class="fa-solid fa-check sf-li-icon"></i>'
+               : i === step ? '<i class="fa-solid fa-arrow-right sf-li-icon"></i>'
+               : '<span class="sf-li-icon">·</span>';
+      html += '<div class="' + cls + '">' + icon + PATH[i].name + '</div>';
+    }
+    html += '<button class="sf-reset-btn" onclick="event.stopPropagation();window._sfReset()"><i class="fa-solid fa-rotate-left"></i> Reset Progress</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function render() {
+    var done = step >= PATH.length;
+    var t = done ? null : PATH[step];
+    var listIcon = listOpen ? 'fa-xmark' : 'fa-list-ol';
+    el.innerHTML =
+      '<div class="sf-header">' +
+        '<span class="sf-header-left" onclick="window._sfToggleMin()" style="cursor:pointer;flex:1"><i class="fa-solid fa-compass" aria-hidden="true"></i> Study Next' +
+          (done ? '' : ' <span class="sf-step">' + (step + 1) + '/' + PATH.length + '</span>') +
+        '</span>' +
+        '<button class="sf-list-btn" onclick="event.stopPropagation();window._sfToggleList()" title="' + (listOpen ? 'Close list' : 'View all topics') + '"><i class="fa-solid ' + listIcon + '"></i></button>' +
+        '<button class="sf-minimize" onclick="event.stopPropagation();window._sfToggleMin()"><i class="fa-solid fa-minus"></i></button>' +
+      '</div>' +
+      (listOpen ? buildList() : '') +
+      '<div class="sf-body">' +
+        (done
+          ? '<div class="sf-done-msg">All topics completed!</div>'
+          : '<div class="sf-phase">' + t.phase + '</div>' +
+            '<div class="sf-topic">' + t.name + '</div>' +
+            '<div class="sf-actions">' +
+              (t.url
+                ? '<a href="' + t.url + '" class="sf-btn sf-btn--go">Study</a>'
+                : '<span class="sf-btn sf-btn--go disabled">Coming Soon</span>') +
+              '<button class="sf-btn sf-btn--done" onclick="event.stopPropagation();window._sfNext()">Done <i class="fa-solid fa-check"></i></button>' +
+            '</div>'
+        ) +
+      '</div>';
+    el.classList.toggle('list-open', listOpen);
+  }
+
+  window._sfNext = function() {
+    step = Math.min(step + 1, PATH.length);
+    localStorage.setItem(KEY, step);
+    render();
+  };
+
+  window._sfToggleMin = function() {
+    minimized = !minimized;
+    el.classList.toggle('minimized', minimized);
+    localStorage.setItem(MIN_KEY, minimized ? '1' : '0');
+  };
+
+  window._sfReset = function() {
+    if (confirm('Reset all study progress? This cannot be undone.')) {
+      step = 0; localStorage.setItem(KEY, '0'); render();
+    }
+  };
+
+  window._sfToggleList = function() {
+    listOpen = !listOpen;
+    if (listOpen) { minimized = false; el.classList.remove('minimized'); localStorage.setItem(MIN_KEY, '0'); }
+    render();
+    if (listOpen) {
+      var cur = el.querySelector('.sf-list-item.current');
+      if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  };
+
+  render();
+})();
+</script>
 </body>
 </html>

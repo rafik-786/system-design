@@ -117,33 +117,29 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 
 ## 4. LLD HUB — ALL TOPICS & STATUS
 
-### Creational Patterns (5)
-| Pattern | Status | Accent |
-|---------|--------|--------|
-| Singleton | **Ready** | cyan/blue |
-| Factory Method | **Ready** | purple |
-| Abstract Factory | **Ready** | green |
-| Builder | **Ready** | cyan |
-| Prototype | Coming Soon | — |
+### Ready Pages (14 complete)
+| Page | Type | Lines | Tooltips | Accent |
+|------|------|-------|----------|--------|
+| SRP | SOLID | 4,991 | 54 | green |
+| OCP | SOLID | 4,446 | 53 | purple |
+| LSP | SOLID | 4,907 | 48 | cyan |
+| ISP | SOLID | 4,752 | 52 | — |
+| DIP | SOLID | 4,496 | 50 | — |
+| Strategy | Pattern | 5,316 | 45 | purple |
+| Singleton | Pattern | 5,333 | 47 | cyan/blue |
+| Factory Method | Pattern | 5,862 | 49 | purple |
+| Observer | Pattern | 6,503 | 56 | green |
+| Decorator | Pattern | 7,006 | 50 | purple |
+| Abstract Factory | Pattern | 5,415 | 53 | green |
+| Builder | Pattern | 5,321 | 51 | cyan |
+| Prototype | Pattern | 5,071 | 55 | — |
+| Parking Lot | Case Study | 6,709 | 103 | orange |
 
-### Structural Patterns (7)
-Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy — ALL Coming Soon
-
-### Behavioral Patterns (11)
-| Pattern | Status | Accent |
-|---------|--------|--------|
-| Observer | COMPLETE | green |
-| Strategy | COMPLETE | purple |
-Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, State, Template Method, Visitor — ALL Coming Soon
-
-### SOLID Principles (5)
-| Principle | Status | Accent |
-|-----------|--------|--------|
-| Single Responsibility (SRP) | **Ready** | green |
-| Open/Closed (OCP) | **Ready** | purple |
-| Liskov Substitution (LSP) | **Ready** | cyan |
-| Interface Segregation | Coming Soon | — |
-| Dependency Inversion | Coming Soon | — |
+### LLD Hub Features (`lld/index.html`)
+- Floating "Study Next" widget — 110 topics, localStorage persistence, full list view, reset button
+- Case studies: Starter visible, +63 upcoming behind inline toggle
+- Coming-soon items as compact `soon-pill` pills (not full cards)
+- Sticky nav: SOLID | Patterns | Case Studies | Advanced
 
 ### Case Studies (72) — ALL Coming Soon
 
@@ -254,8 +250,30 @@ Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Stat
 9. Clean Architecture — Dependency rule, layers, ports & adapters
 10. Event-Driven Architecture — Domain events, integration events
 
-### Learning Path Order (7 Phases)
-Phase 1: SOLID Principles (5) → Phase 2: Tier 1 Gateway (Strategy, Singleton, Factory Method, Observer, Template Method) → Phase 3: Tier 2 Structural (Decorator, Adapter, Facade, Proxy, Composite) → Phase 4: Tier 3 Core (State, Command, Abstract Factory, Builder, Prototype) → STARTER CASE STUDIES (9) → Phase 5: Tier 4 Behavioral (Chain of Resp, Mediator, Iterator, Memento) → INTERMEDIATE CASE STUDIES (21) → Phase 6: Tier 5 Specialized (Bridge, Flyweight, Visitor, Interpreter) → ADVANCED + SPECIALIZED CASE STUDIES (42) → Phase 7: Advanced Topics (10)
+### Learning Path Order (13 phases — also the CONTENT GENERATION ORDER)
+**Key principle:** Learn patterns → practice immediately → next group. Case studies interleaved, not dumped at end.
+**Content should be built in this exact order** — each new page extends the unbroken playable path.
+
+1. **SOLID Foundations** (5) ✅ all done
+2. **Starter Patterns** (5): Strategy ✅, Singleton ✅, Factory Method ✅, Observer ✅, Template Method ❌
+3. **Practice · after Starter** (8): Parking Lot ✅, Tic-Tac-Toe, Vending Machine, Snake & Ladder, Shopping Cart, Review & Rating, Logging Framework, Plugin System
+4. **Structural Patterns** (5): Decorator ✅, Adapter, Facade, Proxy, Composite
+5. **Practice · after Structural** (4): Notification System, Library Management, Restaurant Management, Task Management
+6. **Creational Depth** (3): Abstract Factory ✅, Builder ✅, Prototype ✅ — all done
+7. **Practice · after Creational** (4): ATM System, Deck of Cards, Hotel Booking, Car Rental
+8. **Behavioral Patterns** (6): State, Command, Chain of Responsibility, Mediator, Iterator, Memento
+9. **Practice · after Behavioral** (7): Traffic Signal, Elevator System, Movie Ticket Booking, Digital Wallet, Calendar App, Minesweeper, Chess Game
+10. **Specialized Patterns** (4): Bridge, Flyweight, Visitor, Interpreter
+11. **Practice · after Specialized** (3): In-Memory File System, Spreadsheet, Whiteboard App
+12. **Complex Systems** (11): Uber, Food Delivery, Online Shopping, Music Streaming, Stock Brokerage, Social Network, WhatsApp, Collaborative Editor, Online Auction, Splitwise, Social Media Feed
+13. **Infrastructure** (15): LRU Cache, Rate Limiter, HashMap, Thread Pool, Connection Pool, Key-Value Store, Job Scheduler, Circuit Breaker, Pub-Sub Messaging, Event Sourcing, URL Shortener, Autocomplete, Payment Gateway, Workflow Engine, Rules Engine
+14. **Booking & Commerce** (6): Appointment Booking, Ticket Booking, Flight Booking, Airline Management, Order & Delivery, Inventory Management
+15. **Enterprise & SaaS** (6): Employee Management, Payroll System, Permission/RBAC, Authentication, Support Ticketing, Multi-Tenant SaaS
+16. **Content & Media** (6): Video Platform, Streaming Service, Blog/CMS, Course Registration, Online Examination, Sports Scoring
+17. **IoT & Simulation** (2): Smart Home, Thermostat Control
+18. **Mastery** (10): Concurrency Patterns, Unit Testing Patterns, DI Deep Dive, Repository & Unit of Work, Refactoring Patterns, Reflection & Metaprogramming, DDD Tactical Patterns, CQRS, Clean Architecture, Event-Driven Architecture
+
+**Next to build:** Template Method → Tic-Tac-Toe → Vending Machine → ...
 
 ---
 
