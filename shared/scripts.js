@@ -1041,6 +1041,29 @@ document.addEventListener('DOMContentLoaded', () => {
       oldFooter.innerHTML = newFooter.innerHTML;
     }
 
+    // Remove page-specific floating widgets (e.g. Study Next on hub)
+    document.querySelectorAll('.study-float').forEach(function(el) { el.remove(); });
+
+    // Execute inline <script> blocks from new page body (for page-specific widgets)
+    var newBodyScripts = doc.querySelectorAll('body > script:not([src])');
+    newBodyScripts.forEach(function(s) {
+      var script = document.createElement('script');
+      script.textContent = s.textContent;
+      document.body.appendChild(script);
+    });
+
+    // Inject inline <style> blocks from new page <head> (page-specific CSS)
+    var newHeadStyles = doc.querySelectorAll('head > style');
+    newHeadStyles.forEach(function(s) {
+      var id = 'spa-page-style';
+      var old = document.getElementById(id);
+      if (old) old.remove();
+      var style = document.createElement('style');
+      style.id = id;
+      style.textContent = s.textContent;
+      document.head.appendChild(style);
+    });
+
     // Load missing <head> assets (scripts + stylesheets) from new page
     var headAssets = loadMissingHeadAssets(doc);
 
