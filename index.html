@@ -16,6 +16,7 @@
 .chal-topic { display: inline-block; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent-primary); background: rgba(var(--accent-primary-rgb), 0.08); border: 1px solid rgba(var(--accent-primary-rgb), 0.15); padding: 0.15rem 0.55rem; border-radius: var(--radius-full); margin-bottom: 0.5rem; }
 .chal-code { background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 1rem 1.1rem; overflow-x: auto; }
 .chal-code pre { margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.55; color: var(--text-secondary); white-space: pre; tab-size: 2; }
+.chal-code .hl-kw { color: #c678dd; } .chal-code .hl-ty { color: #e5c07b; } .chal-code .hl-str { color: #98c379; } .chal-code .hl-cm { color: #5c6370; font-style: italic; } .chal-code .hl-num { color: #d19a66; } .chal-code .hl-fn { color: #61afef; }
 .chal-body { padding: 1rem 1.1rem; }
 .chal-question { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; line-height: 1.45; }
 .chal-options { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -182,7 +183,7 @@
     var html = '<div class="chal-body" style="padding-bottom:0.25rem">' +
       '<span class="chal-topic">' + escHtml(q.topic) + '</span>' +
       '</div>' +
-      '<div class="chal-code"><pre>' + escHtml(q.code) + '</pre></div>' +
+      '<div class="chal-code"><pre>' + hlCs(q.code) + '</pre></div>' +
       '<div class="chal-body">' +
       '<div class="chal-question">' + escHtml(q.question) + '</div>' +
       '<div class="chal-options">';
@@ -219,6 +220,29 @@
 
   function escHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function hlCs(code) {
+    var s = escHtml(code);
+    // comments (// ...)
+    s = s.replace(/(\/\/[^\n]*)/g, '<span class="hl-cm">$1</span>');
+    // comments (/* ... */)
+    s = s.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="hl-cm">$1</span>');
+    // strings
+    s = s.replace(/(&quot;[^&]*?&quot;|"[^"]*?")/g, '<span class="hl-str">$1</span>');
+    // keywords
+    var kws = 'public|private|protected|internal|static|readonly|virtual|override|abstract|sealed|class|interface|enum|struct|new|return|if|else|switch|case|break|default|throw|try|catch|finally|foreach|for|while|var|get|set|void|using|namespace|true|false|null|this|base|async|await|yield';
+    s = s.replace(new RegExp('\\b(' + kws + ')\\b', 'g'), '<span class="hl-kw">$1</span>');
+    // types
+    var types = 'string|int|decimal|double|float|bool|byte|long|char|object|List|Dictionary|IEnumerable|Task|Action|Func|DateTime|TimeSpan|Exception|T';
+    s = s.replace(new RegExp('\\b(' + types + ')\\b', 'g'), '<span class="hl-ty">$1</span>');
+    // I-prefixed interfaces
+    s = s.replace(/\b(I[A-Z][a-zA-Z]+)\b/g, '<span class="hl-ty">$1</span>');
+    // numbers
+    s = s.replace(/\b(\d+\.?\d*m?)\b/g, '<span class="hl-num">$1</span>');
+    // method calls — word followed by (
+    s = s.replace(/\b([A-Z][a-zA-Z]*)\s*\(/g, '<span class="hl-fn">$1</span>(');
+    return s;
   }
 
   loadChallenge();
