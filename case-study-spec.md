@@ -65,7 +65,6 @@ Every case study has exactly 24 sections organized into 6 phases:
 
 **Section 1: The Hook (id="tldr")** — `fa-bolt` blue
 - "What If You Never Had to Memorize a Design Again?" opener
-- The Pact: "Stop and think at each challenge = 80% retention. Just scroll = 20%."
 - The Constraint Game visual: 7 levels with icons and difficulty colors
 - Growing Diagram preview (7 mini-stages)
 - Quick stats: levels, diagrams, challenges, tooltips
@@ -73,7 +72,7 @@ Every case study has exactly 24 sections organized into 6 phases:
 **Adaptation notes:**
 - Levels always go 🟢🟢🟡🟡🟡🔴🔴 (easy → medium → hard)
 - Stats vary per case study but always include: levels, Think First challenges, SVG diagrams, interview questions
-- The "pact" text is IDENTICAL across all case studies (consistency builds trust)
+- No "Pact" callout in case studies (removed per user preference)
 
 ---
 

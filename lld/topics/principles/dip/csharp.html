@@ -17,7 +17,7 @@
 
 <!-- ========== TOP TOOLBAR ========== -->
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2232,9 +2232,51 @@ public class InvoiceService
         <p class="body-text"><strong>Mistake:</strong> Creating <code>IOrderService</code> for <code>OrderService</code>, <code>IUserService</code> for <code>UserService</code> &mdash; one interface per class, 1:1 mapping, zero additional implementations.</p>
         <p class="body-text"><strong>Why This Happens:</strong> Developers learn "depend on abstractions" and interpret it as "every class needs an interface." It feels like the right thing to do &mdash; more interfaces must mean more DIP compliance, right? But DIP says abstractions should represent <em>boundaries</em>, not mirror every class. A pure calculation function that adds up numbers has no side effects, doesn't talk to a database, doesn't send emails. There's nothing to mock, nothing to swap, and no boundary to protect. Wrapping it in an interface just doubles the files (ICalculatorService.cs + CalculatorService.cs) and makes "Go to Definition" take an extra click every time.</p>
         <p class="body-text">The rule of thumb: if you can't imagine a second implementation, and the class does no I/O, you probably don't need an interface.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HeaderInterface.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Header Interface vs Direct Usage -->
+        <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Header interface vs direct usage diagram">
+          <defs>
+            <marker id="dip-p1-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p1-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side -->
+          <text x="130" y="18" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Unnecessary Indirection</text>
+          <rect x="10" y="30" width="110" height="36" rx="6" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="65" y="53" text-anchor="middle" fill="#e74c3c" font-size="11" font-weight="600">OrderService</text>
+          <line x1="120" y1="48" x2="148" y2="48" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p1-arr-red)"/>
+          <rect x="150" y="30" width="110" height="36" rx="6" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="5,3"/>
+          <text x="205" y="53" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">ICalculatorSvc</text>
+          <line x1="205" y1="66" x2="205" y2="88" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p1-arr-red)"/>
+          <rect x="150" y="90" width="110" height="36" rx="6" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="205" y="113" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">CalculatorSvc</text>
+          <text x="130" y="152" text-anchor="middle" fill="#e74c3c" font-size="10">1:1 mapping, extra hop</text>
+          <text x="130" y="166" text-anchor="middle" fill="#e74c3c" font-size="10">for pure math = waste</text>
+          <!-- Divider -->
+          <line x1="270" y1="24" x2="270" y2="170" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side -->
+          <text x="400" y="18" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Direct Usage</text>
+          <rect x="310" y="50" width="110" height="36" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="365" y="73" text-anchor="middle" fill="#27ae60" font-size="11" font-weight="600">OrderService</text>
+          <line x1="420" y1="68" x2="448" y2="68" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p1-arr-grn)"/>
+          <rect x="450" y="50" width="60" height="36" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="480" y="73" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Calc</text>
+          <text x="400" y="120" text-anchor="middle" fill="#27ae60" font-size="10">No interface needed</text>
+          <text x="400" y="134" text-anchor="middle" fill="#27ae60" font-size="10">for pure functions</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p1-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p1-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p1-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HeaderInterface.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Header interface — adds indirection with no value
 public interface ICalculatorService
 {
@@ -2247,12 +2289,14 @@ public class CalculatorService : ICalculatorService
 }
 // No other class implements ICalculatorService
 // No test needs to mock a pure calculation</code></pre>
+              </div>
+            </div>
+            <p class="body-text"><strong>Why Bad:</strong> Adds navigation overhead, doubles the file count, and provides no testability or swappability benefit. Pure functions don't need interfaces.</p>
           </div>
-        </div>
-        <p class="body-text"><strong>Why Bad:</strong> Adds navigation overhead, doubles the file count, and provides no testability or swappability benefit. Pure functions don't need interfaces.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DirectUsage.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p1-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DirectUsage.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Pure logic — just use it directly, no interface needed
 public class PriceCalculator
 {
@@ -2264,6 +2308,8 @@ public class OrderService(IOrderRepository repo, PriceCalculator calc)
 {
     public decimal GetTotal(int id) =&gt; calc.Calculate(repo.GetById(id));
 }</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code wraps a pure math function behind an interface nobody will ever swap or mock. The good code uses the calculator directly &mdash; it's just math, and math doesn't need an abstraction layer. Save interfaces for things that actually cross boundaries: databases, APIs, file systems, email providers.</p>
@@ -2281,24 +2327,71 @@ public class OrderService(IOrderRepository repo, PriceCalculator calc)
         <p class="body-text"><strong>Mistake:</strong> Putting <code>IOrderRepository</code> in the Infrastructure project (next to <code>SqlOrderRepository</code>). Now the Domain project references Infrastructure &mdash; the dependency flows <strong>downward</strong>, violating DIP entirely.</p>
         <p class="body-text"><strong>Why This Happens:</strong> It feels natural to keep an interface next to its implementation &mdash; they're related, so they should be in the same folder, right? That's how you organize files in a simpler project. But in a layered or Clean Architecture setup, the interface and its implementation serve different masters. The interface defines what the <em>consumer</em> needs. The implementation satisfies that need using specific technology. If the interface lives in the Infrastructure project, then Domain must add a project reference to Infrastructure just to see it. And now Domain depends on Infrastructure &mdash; the exact opposite of what DIP is trying to achieve.</p>
         <p class="body-text">The correct mental model: the interface is a "want ad" posted by Domain. It says "I need someone who can save orders." The interface belongs to the one who <em>needs</em> it (Domain), not the one who <em>fulfills</em> it (Infrastructure).</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongProjectLayout.txt</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Wrong vs Correct interface placement -->
+        <svg viewBox="0 0 520 200" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Interface placement: wrong project vs correct project">
+          <defs>
+            <marker id="dip-p2-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p2-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side -->
+          <text x="125" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Wrong Placement</text>
+          <rect x="50" y="28" width="150" height="34" rx="6" fill="#eef" stroke="#6c5ce7" stroke-width="1.5"/>
+          <text x="125" y="49" text-anchor="middle" fill="#6c5ce7" font-size="11" font-weight="600">Domain</text>
+          <line x1="125" y1="62" x2="125" y2="84" stroke="#e74c3c" stroke-width="2" marker-end="url(#dip-p2-arr-red)"/>
+          <text x="150" y="78" fill="#e74c3c" font-size="9" font-weight="600">depends on</text>
+          <rect x="20" y="88" width="210" height="70" rx="6" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="125" y="107" text-anchor="middle" fill="#e74c3c" font-size="11" font-weight="600">Infrastructure</text>
+          <text x="125" y="124" text-anchor="middle" fill="#c0392b" font-size="10">IOrderRepository.cs</text>
+          <text x="125" y="140" text-anchor="middle" fill="#c0392b" font-size="10">SqlOrderRepository.cs</text>
+          <text x="125" y="178" text-anchor="middle" fill="#e74c3c" font-size="10">Domain &rarr; Infra (WRONG!)</text>
+          <!-- Divider -->
+          <line x1="260" y1="10" x2="260" y2="190" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side -->
+          <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Correct Placement</text>
+          <rect x="310" y="28" width="170" height="58" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="395" y="49" text-anchor="middle" fill="#27ae60" font-size="11" font-weight="600">Domain</text>
+          <text x="395" y="68" text-anchor="middle" fill="#1e8449" font-size="10">IOrderRepository.cs</text>
+          <rect x="310" y="118" width="170" height="46" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="395" y="137" text-anchor="middle" fill="#27ae60" font-size="11" font-weight="600">Infrastructure</text>
+          <text x="395" y="153" text-anchor="middle" fill="#1e8449" font-size="10">SqlOrderRepository.cs</text>
+          <line x1="395" y1="118" x2="395" y2="90" stroke="#27ae60" stroke-width="2" marker-end="url(#dip-p2-arr-grn)"/>
+          <text x="430" y="108" fill="#27ae60" font-size="9" font-weight="600">depends on</text>
+          <text x="395" y="184" text-anchor="middle" fill="#27ae60" font-size="10">Infra &rarr; Domain (CORRECT!)</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p2-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p2-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p2-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongProjectLayout.txt</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Interface lives next to implementation
 MyApp.Infrastructure/
 ├── IOrderRepository.cs    // Interface HERE
 ├── SqlOrderRepository.cs  // Implementation HERE
 // Domain must reference Infrastructure to use the interface!</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CorrectProjectLayout.txt</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p2-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CorrectProjectLayout.txt</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Interface lives in the CONSUMER's project
 MyApp.Domain/
 ├── IOrderRepository.cs    // Interface HERE — owned by Domain
 MyApp.Infrastructure/
 ├── SqlOrderRepository.cs  // Implementation references Domain</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> In the bad layout, Domain &rarr; Infrastructure (wrong direction). In the good layout, Infrastructure &rarr; Domain (correct &mdash; the low-level detail depends on the high-level policy). The only change is moving one file from one project to another, but it completely flips the dependency direction.</p>
@@ -2316,9 +2409,72 @@ MyApp.Infrastructure/
         <p class="body-text"><strong>Mistake:</strong> A class has 8+ constructor parameters &mdash; all properly injected interfaces, but the sheer count signals the class does too much.</p>
         <p class="body-text"><strong>Why This Happens:</strong> A developer follows DIP perfectly &mdash; every dependency is an interface, every dependency is injected through the constructor. No <code>new</code> keywords hiding anywhere. The code is technically correct, and yet something is deeply wrong. When a constructor has 10 parameters, it means the class has 10 different reasons to change. If the email provider changes, this class changes. If the tax rules change, this class changes. If the PDF template changes, this class changes. That's not one class doing one thing &mdash; it's one class doing <em>everything</em>.</p>
         <p class="body-text">DIP is not a license to inject the entire world. A bloated constructor is a code smell that says "this class has too many responsibilities." The solution isn't to stop using DIP &mdash; it's to split the class into smaller focused services, or group related dependencies behind a higher-level interface (a Facade).</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverInjection.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Over-injection vs Facades -->
+        <svg viewBox="0 0 520 220" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Constructor over-injection vs facade grouping">
+          <defs>
+            <marker id="dip-p3-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p3-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side -->
+          <text x="120" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">10 Dependencies!</text>
+          <rect x="50" y="26" width="140" height="32" rx="6" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="120" y="47" text-anchor="middle" fill="#e74c3c" font-size="11" font-weight="600">Orchestrator</text>
+          <line x1="30" y1="72" x2="30" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="55" y1="72" x2="65" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="80" y1="72" x2="85" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="105" y1="72" x2="105" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="130" y1="72" x2="125" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="155" y1="72" x2="145" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="180" y1="72" x2="165" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <line x1="205" y1="72" x2="185" y2="58" stroke="#e74c3c" stroke-width="1" marker-end="url(#dip-p3-arr-red)"/>
+          <text x="15" y="84" fill="#c0392b" font-size="8">Repo</text>
+          <text x="42" y="84" fill="#c0392b" font-size="8">Inv</text>
+          <text x="66" y="84" fill="#c0392b" font-size="8">Pay</text>
+          <text x="90" y="84" fill="#c0392b" font-size="8">Email</text>
+          <text x="118" y="84" fill="#c0392b" font-size="8">SMS</text>
+          <text x="143" y="84" fill="#c0392b" font-size="8">PDF</text>
+          <text x="168" y="84" fill="#c0392b" font-size="8">Blob</text>
+          <text x="193" y="84" fill="#c0392b" font-size="8">Audit</text>
+          <text x="120" y="106" text-anchor="middle" fill="#e74c3c" font-size="10">Too many reasons to change</text>
+          <!-- Divider -->
+          <line x1="250" y1="10" x2="250" y2="210" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side -->
+          <text x="390" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">4 Facades</text>
+          <rect x="325" y="26" width="130" height="32" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="390" y="47" text-anchor="middle" fill="#27ae60" font-size="11" font-weight="600">Orchestrator</text>
+          <!-- Facade boxes -->
+          <line x1="345" y1="58" x2="300" y2="80" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p3-arr-grn)"/>
+          <line x1="370" y1="58" x2="370" y2="80" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p3-arr-grn)"/>
+          <line x1="410" y1="58" x2="440" y2="80" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p3-arr-grn)"/>
+          <line x1="430" y1="58" x2="500" y2="80" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p3-arr-grn)"/>
+          <rect x="265" y="82" width="75" height="28" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="302" y="100" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">Repo</text>
+          <rect x="345" y="82" width="75" height="28" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="382" y="100" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">Pricing</text>
+          <rect x="425" y="82" width="75" height="28" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="462" y="100" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">Notifier</text>
+          <!-- Sub-deps -->
+          <text x="382" y="128" text-anchor="middle" fill="#1e8449" font-size="8">Discounts + Tax</text>
+          <text x="462" y="128" text-anchor="middle" fill="#1e8449" font-size="8">Email + SMS</text>
+          <line x1="382" y1="110" x2="382" y2="118" stroke="#27ae60" stroke-width="1"/>
+          <line x1="462" y1="110" x2="462" y2="118" stroke="#27ae60" stroke-width="1"/>
+          <text x="390" y="158" text-anchor="middle" fill="#27ae60" font-size="10">Each facade = focused responsibility</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p3-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p3-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p3-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverInjection.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Too many dependencies — SRP violation disguised as DIP compliance
 public class OrderOrchestrator(
     IOrderRepository orders,
@@ -2331,11 +2487,13 @@ public class OrderOrchestrator(
     IAuditLogger audit,
     IDiscountEngine discounts,
     ITaxCalculator tax) { }</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RefactoredWithFacades.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p3-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RefactoredWithFacades.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Group related dependencies behind facades
 public class OrderOrchestrator(
     IOrderRepository orders,
@@ -2348,6 +2506,8 @@ public class OrderOrchestrator(
 public class PricingService(IDiscountEngine discounts, ITaxCalculator tax) : IPricingService { }
 public class NotificationService(IEmailSender email, ISmsSender sms) : INotificationService { }
 public class DocumentService(IPdfGenerator pdf, IBlobStorage storage) : IDocumentService { }</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code has 10 parameters &mdash; all valid interfaces, but too many responsibilities in one place. The good code groups related dependencies into facades: pricing stuff together, notification stuff together, document stuff together. The orchestrator drops from 10 to 4 parameters, and each facade is a focused class with its own single responsibility. DIP still applies at every level.</p>
@@ -2365,26 +2525,78 @@ public class DocumentService(IPdfGenerator pdf, IBlobStorage storage) : IDocumen
         <p class="body-text"><strong>Mistake:</strong> Defining an interface that leaks infrastructure details &mdash; <code>IRepository&lt;T&gt;</code> with <code>IQueryable&lt;T&gt;</code> return types, or <code>IEmailSender</code> with <code>SmtpSettings</code> parameters.</p>
         <p class="body-text"><strong>Why This Happens:</strong> Developers want to be "flexible" and let callers compose their own queries. Returning <code>IQueryable&lt;T&gt;</code> from a repository seems generous &mdash; callers can filter, sort, and page however they want. But <code>IQueryable</code> is EF Core's query pipeline. It translates LINQ into SQL behind the scenes. Callers don't realize they're writing SQL Server-specific queries through what looks like C# code. When you try to swap the SQL Server implementation for Cosmos DB, those LINQ queries fail because Cosmos DB's <code>IQueryable</code> supports a different subset of operations.</p>
         <p class="body-text">The interface was supposed to be an abstraction &mdash; a wall that hides infrastructure details. But by returning <code>IQueryable</code>, you punched a giant hole in that wall. The infrastructure detail (the ORM's query engine) leaked right through.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LeakyAbstraction.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Leaky vs Clean abstraction -->
+        <svg viewBox="0 0 520 190" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Leaky abstraction vs clean abstraction wall">
+          <defs>
+            <marker id="dip-p4-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p4-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side: wall with hole -->
+          <text x="120" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Leaky Wall</text>
+          <rect x="20" y="34" width="80" height="32" rx="5" fill="#eef" stroke="#6c5ce7" stroke-width="1.2"/>
+          <text x="60" y="54" text-anchor="middle" fill="#6c5ce7" font-size="10" font-weight="600">Caller</text>
+          <!-- Wall with gap -->
+          <rect x="115" y="26" width="10" height="40" rx="2" fill="#e74c3c" opacity="0.7"/>
+          <rect x="115" y="80" width="10" height="40" rx="2" fill="#e74c3c" opacity="0.7"/>
+          <text x="120" y="75" text-anchor="middle" fill="#e74c3c" font-size="18" font-weight="700">~</text>
+          <line x1="100" y1="50" x2="140" y2="50" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="3,2" marker-end="url(#dip-p4-arr-red)"/>
+          <rect x="145" y="34" width="90" height="32" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2"/>
+          <text x="190" y="48" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">IQueryable</text>
+          <text x="190" y="60" text-anchor="middle" fill="#c0392b" font-size="8">leaks through!</text>
+          <text x="120" y="140" text-anchor="middle" fill="#e74c3c" font-size="10">ORM details pass</text>
+          <text x="120" y="154" text-anchor="middle" fill="#e74c3c" font-size="10">straight through the gap</text>
+          <!-- Divider -->
+          <line x1="260" y1="10" x2="260" y2="180" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side: solid wall -->
+          <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Solid Wall</text>
+          <rect x="295" y="44" width="80" height="32" rx="5" fill="#eef" stroke="#6c5ce7" stroke-width="1.2"/>
+          <text x="335" y="64" text-anchor="middle" fill="#6c5ce7" font-size="10" font-weight="600">Caller</text>
+          <!-- Solid wall -->
+          <rect x="390" y="26" width="10" height="94" rx="2" fill="#27ae60" opacity="0.7"/>
+          <line x1="375" y1="60" x2="390" y2="60" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p4-arr-grn)"/>
+          <text x="390" y="70" text-anchor="end" fill="#27ae60" font-size="8">Order, List</text>
+          <rect x="415" y="34" width="90" height="48" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="460" y="52" text-anchor="middle" fill="#27ae60" font-size="9" font-weight="600">SQL / Cosmos</text>
+          <text x="460" y="68" text-anchor="middle" fill="#1e8449" font-size="8">hidden behind wall</text>
+          <text x="395" y="148" text-anchor="middle" fill="#27ae60" font-size="10">Returns domain types only</text>
+          <text x="395" y="162" text-anchor="middle" fill="#27ae60" font-size="10">implementation stays hidden</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p4-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p4-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p4-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LeakyAbstraction.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Leaky — IQueryable exposes the ORM's query provider
 public interface IOrderRepository
 {
     IQueryable&lt;Order&gt; GetAll(); // Callers write LINQ-to-SQL without knowing it
     // Now you can't swap SQL Server for Cosmos DB — IQueryable differs!
 }</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CleanAbstraction.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p4-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CleanAbstraction.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Clean — returns domain objects, hides the query mechanism
 public interface IOrderRepository
 {
     Task&lt;IReadOnlyList&lt;Order&gt;&gt; GetByStatusAsync(OrderStatus status);
     Task&lt;Order?&gt; GetByIdAsync(int id);
 }</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad interface returns <code>IQueryable</code>, which is a technology-specific type that exposes the database engine's capabilities. The good interface returns simple domain types (<code>Order</code>, <code>IReadOnlyList&lt;Order&gt;</code>) wrapped in <code>Task</code> for async. The implementation decides <em>how</em> to query; the interface just describes <em>what</em> the caller needs. That's the essence of DIP &mdash; the interface speaks the caller's language, not the implementation's.</p>
@@ -2402,20 +2614,74 @@ public interface IOrderRepository
         <p class="body-text"><strong>Mistake:</strong> Creating a beautiful interface + implementation, but forgetting to register it in <code>Program.cs</code>. The app compiles but crashes at runtime with <code>InvalidOperationException: No service for type 'IMyService'</code>.</p>
         <p class="body-text"><strong>Why This Happens:</strong> In C#, the compiler checks types, not DI wiring. You can create <code>INotificationService</code>, write a perfect <code>EmailNotificationService</code>, inject it into a controller's constructor, and the compiler says "looks good!" But the DI container is a separate system that only runs at startup. If you forgot to add <code>services.AddScoped&lt;INotificationService, EmailNotificationService&gt;()</code> in <code>Program.cs</code>, the container doesn't know about it. The app starts, and the first time someone hits the controller, boom &mdash; <code>InvalidOperationException</code>.</p>
         <p class="body-text">This is especially common in large solutions where teams add new services daily. Each new interface-implementation pair needs a registration line, and it's easy to forget when you're focused on the business logic.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ForgotRegistration.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Forgot registration vs auto-registration -->
+        <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Missing DI registration vs auto-registration with Scrutor">
+          <defs>
+            <marker id="dip-p5-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p5-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side -->
+          <text x="120" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Manual &amp; Forgotten</text>
+          <rect x="30" y="30" width="90" height="30" rx="5" fill="#eef" stroke="#6c5ce7" stroke-width="1.2"/>
+          <text x="75" y="50" text-anchor="middle" fill="#6c5ce7" font-size="10" font-weight="600">Controller</text>
+          <line x1="75" y1="60" x2="75" y2="78" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p5-arr-red)"/>
+          <text x="102" y="74" fill="#e74c3c" font-size="9">needs</text>
+          <rect x="25" y="80" width="100" height="28" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2" stroke-dasharray="5,3"/>
+          <text x="75" y="98" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">INotificationSvc</text>
+          <rect x="148" y="50" width="90" height="50" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="193" y="70" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">DI Container</text>
+          <text x="193" y="88" text-anchor="middle" fill="#c0392b" font-size="9">??? not found</text>
+          <line x1="125" y1="94" x2="148" y2="80" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <text x="120" y="132" text-anchor="middle" fill="#e74c3c" font-size="11" font-weight="700">BOOM!</text>
+          <text x="120" y="148" text-anchor="middle" fill="#e74c3c" font-size="9">InvalidOperationException</text>
+          <text x="120" y="162" text-anchor="middle" fill="#e74c3c" font-size="9">at runtime</text>
+          <!-- Divider -->
+          <line x1="260" y1="10" x2="260" y2="172" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side -->
+          <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Auto-Registration</text>
+          <rect x="310" y="30" width="170" height="44" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="395" y="48" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Scrutor scans assemblies</text>
+          <text x="395" y="64" text-anchor="middle" fill="#1e8449" font-size="9">auto-wires all interfaces</text>
+          <line x1="345" y1="74" x2="345" y2="92" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p5-arr-grn)"/>
+          <line x1="395" y1="74" x2="395" y2="92" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p5-arr-grn)"/>
+          <line x1="445" y1="74" x2="445" y2="92" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p5-arr-grn)"/>
+          <rect x="310" y="94" width="50" height="24" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="335" y="110" text-anchor="middle" fill="#1e8449" font-size="8">Svc A</text>
+          <rect x="370" y="94" width="50" height="24" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="395" y="110" text-anchor="middle" fill="#1e8449" font-size="8">Svc B</text>
+          <rect x="430" y="94" width="50" height="24" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="455" y="110" text-anchor="middle" fill="#1e8449" font-size="8">Svc C</text>
+          <text x="395" y="142" text-anchor="middle" fill="#27ae60" font-size="10">+ ValidateOnBuild = true</text>
+          <text x="395" y="158" text-anchor="middle" fill="#27ae60" font-size="10">catches misses at startup</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p5-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p5-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p5-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ForgotRegistration.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Interface + implementation exist, but nobody told the container
 public interface INotificationService { Task NotifyAsync(string msg); }
 public class EmailNotificationService : INotificationService { ... }
 
 // Program.cs — oops, forgot to add:
 // builder.Services.AddScoped&lt;INotificationService, EmailNotificationService&gt;();</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AutoRegistration.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p5-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AutoRegistration.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Scrutor auto-registers by convention — never forget again
 builder.Services.Scan(scan =&gt; scan
     .FromAssemblyOf&lt;EmailNotificationService&gt;()
@@ -2429,6 +2695,8 @@ builder.Host.UseDefaultServiceProvider(options =&gt;
     options.ValidateOnBuild = true;  // Catches missing registrations at startup
     options.ValidateScopes = true;   // Catches captive dependencies
 });</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad scenario relies on manual registration for every new service &mdash; and humans forget. The good code uses Scrutor to scan assemblies and auto-register everything that implements an interface. Combined with <code>ValidateOnBuild</code>, the app won't even start if any dependency is missing. You go from "runtime crash in production" to "startup failure in development."</p>
@@ -2446,22 +2714,82 @@ builder.Host.UseDefaultServiceProvider(options =&gt;
         <p class="body-text"><strong>Mistake:</strong> Registering a DbContext as Singleton ("it's expensive to create!") or a stateless validator as Scoped ("everything should be Scoped!").</p>
         <p class="body-text"><strong>Why This Happens:</strong> Developers often default to one lifetime for everything without thinking about what each service actually needs. "Make it Scoped because that's what DbContext uses" is the most common reasoning &mdash; but a stateless email validator doesn't need a new instance per request. It does the same thing every time with no internal state. Conversely, making DbContext a Singleton sounds like an optimization ("one instance = less overhead"), but DbContext tracks every entity it loads. As a Singleton, it accumulates tracked entities across <em>all</em> requests, eating more memory over time and causing concurrency exceptions when two requests try to modify the same entity.</p>
         <p class="body-text">The key question for every service: "Does it hold state that changes per request?" If yes, Scoped. If it's stateless or thread-safe, Singleton. If it needs a fresh instance every time (like an HttpClient message handler), Transient.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongLifetimes.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Wrong vs Correct lifetime selection -->
+        <svg viewBox="0 0 520 200" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Wrong DI lifetime vs correct lifetime selection">
+          <defs>
+            <marker id="dip-p6-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+          </defs>
+          <!-- Table-style layout -->
+          <text x="260" y="18" text-anchor="middle" fill="#555" font-weight="700" font-size="13">Lifetime Cheat Sheet</text>
+          <!-- Headers -->
+          <rect x="20" y="30" width="130" height="28" rx="4" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+          <text x="85" y="49" text-anchor="middle" fill="#555" font-size="10" font-weight="700">Service</text>
+          <rect x="155" y="30" width="110" height="28" rx="4" fill="#fdecea" stroke="#e74c3c" stroke-width="1"/>
+          <text x="210" y="49" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="700">Wrong</text>
+          <rect x="270" y="30" width="110" height="28" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="325" y="49" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="700">Correct</text>
+          <rect x="385" y="30" width="120" height="28" rx="4" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+          <text x="445" y="49" text-anchor="middle" fill="#555" font-size="10" font-weight="700">Why?</text>
+          <!-- Row 1: DbContext -->
+          <rect x="20" y="62" width="130" height="28" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <text x="85" y="81" text-anchor="middle" fill="#333" font-size="10" font-weight="600">DbContext</text>
+          <rect x="155" y="62" width="110" height="28" rx="4" fill="#fdecea" stroke="#e74c3c" stroke-width="1"/>
+          <text x="210" y="81" text-anchor="middle" fill="#e74c3c" font-size="10">Singleton</text>
+          <rect x="270" y="62" width="110" height="28" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="325" y="81" text-anchor="middle" fill="#27ae60" font-size="10">Scoped</text>
+          <rect x="385" y="62" width="120" height="28" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <text x="445" y="81" text-anchor="middle" fill="#555" font-size="9">Tracks per-request state</text>
+          <!-- Row 2: Validator -->
+          <rect x="20" y="94" width="130" height="28" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <text x="85" y="113" text-anchor="middle" fill="#333" font-size="10" font-weight="600">EmailValidator</text>
+          <rect x="155" y="94" width="110" height="28" rx="4" fill="#fdecea" stroke="#e74c3c" stroke-width="1"/>
+          <text x="210" y="113" text-anchor="middle" fill="#e74c3c" font-size="10">Scoped</text>
+          <rect x="270" y="94" width="110" height="28" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="325" y="113" text-anchor="middle" fill="#27ae60" font-size="10">Singleton</text>
+          <rect x="385" y="94" width="120" height="28" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <text x="445" y="113" text-anchor="middle" fill="#555" font-size="9">Stateless, reusable</text>
+          <!-- Row 3: HttpHandler -->
+          <rect x="20" y="126" width="130" height="28" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <text x="85" y="145" text-anchor="middle" fill="#333" font-size="10" font-weight="600">HttpHandler</text>
+          <rect x="155" y="126" width="110" height="28" rx="4" fill="#fdecea" stroke="#e74c3c" stroke-width="1"/>
+          <text x="210" y="145" text-anchor="middle" fill="#e74c3c" font-size="10">Singleton</text>
+          <rect x="270" y="126" width="110" height="28" rx="4" fill="#eafaf1" stroke="#27ae60" stroke-width="1"/>
+          <text x="325" y="145" text-anchor="middle" fill="#27ae60" font-size="10">Transient</text>
+          <rect x="385" y="126" width="120" height="28" rx="4" fill="#fff" stroke="#ddd" stroke-width="1"/>
+          <text x="445" y="145" text-anchor="middle" fill="#555" font-size="9">Fresh per use</text>
+          <!-- Decision rule -->
+          <text x="260" y="178" text-anchor="middle" fill="#555" font-size="10" font-style="italic">Holds state? Scoped. Stateless? Singleton. Fresh each time? Transient.</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p6-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p6-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p6-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongLifetimes.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ DbContext as Singleton — tracks entities across requests, memory leaks, concurrency bugs
 builder.Services.AddSingleton&lt;AppDbContext&gt;();
 
 // ❌ Stateless service as Scoped — wastes memory (new instance per request for no reason)
 builder.Services.AddScoped&lt;IEmailValidator, EmailValidator&gt;();</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CorrectLifetimes.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p6-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">CorrectLifetimes.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Correct lifetimes
 builder.Services.AddScoped&lt;AppDbContext&gt;();           // Scoped: one per request
 builder.Services.AddSingleton&lt;IEmailValidator, EmailValidator&gt;(); // Singleton: stateless, reuse</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code gives DbContext too long a life (Singleton when it should be Scoped) and the validator too short a life (Scoped when it can be Singleton). The good code matches each service's lifetime to its actual behavior: DbContext holds per-request state so it's Scoped, and the validator is pure logic so it's Singleton.</p>
@@ -2479,18 +2807,63 @@ builder.Services.AddSingleton&lt;IEmailValidator, EmailValidator&gt;(); // Singl
         <p class="body-text"><strong>Mistake:</strong> Creating <code>IDateTimeProvider</code>, <code>IGuidFactory</code>, <code>IStringFormatter</code>, <code>IListWrapper&lt;T&gt;</code> &mdash; abstracting BCL types that are already stable and side-effect-free.</p>
         <p class="body-text"><strong>Why This Happens:</strong> After learning DIP, some developers go all-in. "Everything should be an interface!" They create abstractions around <code>string.Format()</code>, <code>Guid.NewGuid()</code>, even <code>List&lt;T&gt;</code>. The thinking is: "What if we need to swap out the string formatter someday?" The answer is: you won't. <code>String.Format</code> has worked the same way since .NET 1.0 and it's not going to change. Robert C. Martin himself clarified that DIP targets <strong>volatile</strong> dependencies &mdash; things that change often, have side effects, or connect to external systems. The .NET base class library is the opposite of volatile.</p>
         <p class="body-text">The exception is worth noting: <code>IDateTimeProvider</code> (or .NET 8's built-in <code>TimeProvider</code>) IS valuable because <code>DateTime.Now</code> is a hidden dependency on the system clock, which makes time-sensitive tests impossible to control. But <code>IStringFormatter</code>? That's just noise.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverAbstraction.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Stable vs Volatile dependency decision -->
+        <svg viewBox="0 0 520 200" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Decision diagram: abstract volatile dependencies, use stable ones directly">
+          <defs>
+            <marker id="dip-p7-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#555"/>
+            </marker>
+          </defs>
+          <!-- Decision diamond -->
+          <text x="260" y="18" text-anchor="middle" fill="#555" font-weight="700" font-size="13">Should I Abstract This?</text>
+          <polygon points="260,30 360,70 260,110 160,70" fill="#fff3cd" stroke="#f39c12" stroke-width="1.5"/>
+          <text x="260" y="66" text-anchor="middle" fill="#856404" font-size="10" font-weight="600">Side effects?</text>
+          <text x="260" y="78" text-anchor="middle" fill="#856404" font-size="10" font-weight="600">Swappable?</text>
+          <!-- No branch (left) -->
+          <line x1="160" y1="70" x2="80" y2="70" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p7-arr)"/>
+          <text x="120" y="62" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="700">NO</text>
+          <rect x="10" y="55" width="70" height="30" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="45" y="74" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Use directly</text>
+          <!-- Examples under No -->
+          <text x="45" y="102" text-anchor="middle" fill="#555" font-size="9">Guid.NewGuid()</text>
+          <text x="45" y="116" text-anchor="middle" fill="#555" font-size="9">string.Format()</text>
+          <text x="45" y="130" text-anchor="middle" fill="#555" font-size="9">List&lt;T&gt;</text>
+          <text x="45" y="148" text-anchor="middle" fill="#27ae60" font-size="9" font-weight="600">Stable BCL types</text>
+          <!-- Yes branch (right) -->
+          <line x1="360" y1="70" x2="430" y2="70" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p7-arr)"/>
+          <text x="395" y="62" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="700">YES</text>
+          <rect x="432" y="55" width="78" height="30" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2"/>
+          <text x="471" y="74" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">Abstract it!</text>
+          <!-- Examples under Yes -->
+          <text x="471" y="102" text-anchor="middle" fill="#555" font-size="9">DateTime.Now</text>
+          <text x="471" y="116" text-anchor="middle" fill="#555" font-size="9">Database access</text>
+          <text x="471" y="130" text-anchor="middle" fill="#555" font-size="9">Email / HTTP</text>
+          <text x="471" y="148" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">Volatile / I/O</text>
+          <!-- Bottom note -->
+          <text x="260" y="182" text-anchor="middle" fill="#555" font-size="10" font-style="italic">DIP targets volatile dependencies, not everything.</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p7-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p7-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p7-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OverAbstraction.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Abstracting stable BCL types — noise, no value
 public interface IGuidFactory { Guid Create(); }
 public interface IStringFormatter { string Format(string template, params object[] args); }
 public interface IListWrapper&lt;T&gt; { void Add(T item); int Count { get; } }</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PragmaticAbstraction.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p7-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PragmaticAbstraction.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Only abstract volatile/side-effect dependencies
 // Guid.NewGuid() — just use it directly, it's stable
 var id = Guid.NewGuid();
@@ -2498,6 +2871,8 @@ var id = Guid.NewGuid();
 // DateTime.Now — abstract this one! It's a hidden side effect (system clock)
 public interface ITimeProvider { DateTimeOffset Now { get; } }
 // .NET 8+ has built-in: TimeProvider.System</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code creates interfaces for things that will never change and never need mocking. The good code uses stable BCL types directly and only creates abstractions for things with real side effects (like the system clock). The decision rule: "Will I ever swap this? Do tests need to control this?" If both answers are no, skip the interface.</p>
@@ -2515,9 +2890,59 @@ public interface ITimeProvider { DateTimeOffset Now { get; } }
         <p class="body-text"><strong>Mistake:</strong> Scattering <code>services.AddScoped&lt;...&gt;()</code> calls throughout the application &mdash; in controllers, in domain services, in random utility classes.</p>
         <p class="body-text"><strong>Why This Happens:</strong> As a project grows, different developers add registrations wherever it feels convenient. A domain service discovers it needs a new dependency, so the developer adds the registration right there in the domain project. A controller needs a special factory, so the registration goes in the controller's folder. Over time, DI registrations are scattered across 15 files in 5 projects. Nobody can answer the question "what's registered and with what lifetime?" without searching the entire solution.</p>
         <p class="body-text">The <span class="tooltip-trigger">composition root<span class="tooltip-content">The single location where ALL dependency registrations happen. In ASP.NET Core, this is Program.cs (or extension methods called from Program.cs). Every other class in the application should be completely unaware of the DI container. Only the composition root knows about concrete types and their lifetimes.</span></span> should be the ONE place that knows about all concrete types. Business logic should be completely unaware that a DI container even exists.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ScatteredRegistrations.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Scattered vs Centralized registrations -->
+        <svg viewBox="0 0 520 200" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Scattered DI registrations vs centralized composition root">
+          <defs>
+            <marker id="dip-p8-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p8-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side: scattered -->
+          <text x="120" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Scattered Everywhere</text>
+          <rect x="20" y="30" width="80" height="28" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2"/>
+          <text x="60" y="48" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">OrderSvc</text>
+          <text x="60" y="70" text-anchor="middle" fill="#c0392b" font-size="8">Register()</text>
+          <rect x="110" y="30" width="80" height="28" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2"/>
+          <text x="150" y="48" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">UserSvc</text>
+          <text x="150" y="70" text-anchor="middle" fill="#c0392b" font-size="8">Register()</text>
+          <rect x="50" y="82" width="80" height="28" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2"/>
+          <text x="90" y="100" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">PaymentSvc</text>
+          <text x="90" y="120" text-anchor="middle" fill="#c0392b" font-size="8">Register()</text>
+          <text x="120" y="150" text-anchor="middle" fill="#e74c3c" font-size="10">DI knowledge leaks into</text>
+          <text x="120" y="164" text-anchor="middle" fill="#e74c3c" font-size="10">every business class</text>
+          <!-- Divider -->
+          <line x1="250" y1="10" x2="250" y2="190" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side: centralized -->
+          <text x="390" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">One Composition Root</text>
+          <rect x="335" y="30" width="110" height="36" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="2"/>
+          <text x="390" y="48" text-anchor="middle" fill="#27ae60" font-size="11" font-weight="700">Program.cs</text>
+          <text x="390" y="60" text-anchor="middle" fill="#1e8449" font-size="8">all wiring here</text>
+          <line x1="350" y1="66" x2="320" y2="90" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p8-arr-grn)"/>
+          <line x1="390" y1="66" x2="390" y2="90" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p8-arr-grn)"/>
+          <line x1="430" y1="66" x2="460" y2="90" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p8-arr-grn)"/>
+          <rect x="280" y="92" width="80" height="24" rx="4" fill="#fff" stroke="#27ae60" stroke-width="1"/>
+          <text x="320" y="108" text-anchor="middle" fill="#1e8449" font-size="9">AddInfra()</text>
+          <rect x="365" y="92" width="52" height="24" rx="4" fill="#fff" stroke="#27ae60" stroke-width="1"/>
+          <text x="391" y="108" text-anchor="middle" fill="#1e8449" font-size="9">AddApp()</text>
+          <rect x="422" y="92" width="80" height="24" rx="4" fill="#fff" stroke="#27ae60" stroke-width="1"/>
+          <text x="462" y="108" text-anchor="middle" fill="#1e8449" font-size="9">AddDomain()</text>
+          <text x="390" y="140" text-anchor="middle" fill="#27ae60" font-size="10">Business classes never see</text>
+          <text x="390" y="154" text-anchor="middle" fill="#27ae60" font-size="10">IServiceCollection</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p8-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p8-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p8-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ScatteredRegistrations.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Registrations scattered across business logic
 public class OrderService
 {
@@ -2527,11 +2952,13 @@ public class OrderService
         services.AddScoped&lt;OrderService&gt;();
     }
 }</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrganizedRegistrations.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p8-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrganizedRegistrations.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ All registrations in dedicated extension methods
 public static class InfrastructureExtensions
 {
@@ -2546,6 +2973,8 @@ public static class InfrastructureExtensions
 // Program.cs — the composition root
 builder.Services.AddInfrastructure();
 builder.Services.AddApplication();</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code puts DI registration inside domain classes, coupling them to <code>IServiceCollection</code>. The good code keeps all registrations in dedicated extension methods organized by layer, called from one place (<code>Program.cs</code>). Domain classes never see <code>IServiceCollection</code> &mdash; they only see the interfaces they depend on.</p>
@@ -2563,9 +2992,54 @@ builder.Services.AddApplication();</code></pre>
         <p class="body-text"><strong>Mistake:</strong> Injecting <code>IConfiguration</code> directly into services and reading <code>config["Smtp:Host"]</code> with magic strings everywhere.</p>
         <p class="body-text"><strong>Why This Happens:</strong> <code>IConfiguration</code> is always available in the DI container &mdash; no registration needed. So developers take the path of least resistance: inject <code>IConfiguration</code> and read values with string keys like <code>config["Smtp:Host"]</code>. It works, and it's quick. But it creates three hidden problems. First, the key is a magic string &mdash; typo in the key name? No compiler error, just a null value that crashes at runtime. Second, you can't validate configuration at startup &mdash; missing values are only discovered when the code path runs. Third, testing is painful because you need to build an entire <code>IConfiguration</code> object just to provide one value.</p>
         <p class="body-text"><code>IConfiguration</code> is an infrastructure detail &mdash; it knows about JSON files, environment variables, and key vaults. Your business service shouldn't need to know any of that. It should just receive a strongly-typed object with the values it needs.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConfigAntiPattern.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Magic strings vs Strongly-typed options -->
+        <svg viewBox="0 0 520 190" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Magic string config vs strongly-typed IOptions">
+          <defs>
+            <marker id="dip-p9-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p9-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side -->
+          <text x="120" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Magic Strings</text>
+          <rect x="30" y="30" width="90" height="30" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.2"/>
+          <text x="75" y="49" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">EmailSender</text>
+          <line x1="75" y1="60" x2="75" y2="80" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p9-arr-red)"/>
+          <rect x="25" y="82" width="100" height="40" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="75" y="98" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">IConfiguration</text>
+          <text x="75" y="112" text-anchor="middle" fill="#c0392b" font-size="8">["Smtp:Host"] ??</text>
+          <rect x="140" y="82" width="90" height="40" rx="5" fill="#fff3cd" stroke="#f39c12" stroke-width="1.2"/>
+          <text x="185" y="98" text-anchor="middle" fill="#856404" font-size="9" font-weight="600">JSON / ENV</text>
+          <text x="185" y="112" text-anchor="middle" fill="#856404" font-size="8">Key Vault</text>
+          <line x1="125" y1="102" x2="140" y2="102" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="120" y="148" text-anchor="middle" fill="#e74c3c" font-size="10">Typo in key = null at runtime</text>
+          <text x="120" y="164" text-anchor="middle" fill="#e74c3c" font-size="10">No compile-time safety</text>
+          <!-- Divider -->
+          <line x1="255" y1="10" x2="255" y2="180" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side -->
+          <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Strongly-Typed Options</text>
+          <rect x="340" y="30" width="110" height="30" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="395" y="49" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">EmailSender</text>
+          <line x1="395" y1="60" x2="395" y2="80" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p9-arr-grn)"/>
+          <rect x="340" y="82" width="110" height="40" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+          <text x="395" y="98" text-anchor="middle" fill="#27ae60" font-size="9" font-weight="700">IOptions&lt;Smtp&gt;</text>
+          <text x="395" y="114" text-anchor="middle" fill="#1e8449" font-size="8">.Host  .Port</text>
+          <text x="395" y="148" text-anchor="middle" fill="#27ae60" font-size="10">Compiler checks types</text>
+          <text x="395" y="164" text-anchor="middle" fill="#27ae60" font-size="10">Validated at startup</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p9-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p9-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p9-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConfigAntiPattern.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Raw IConfiguration — magic strings, no validation, hard to test
 public class EmailSender(IConfiguration config)
 {
@@ -2575,11 +3049,13 @@ public class EmailSender(IConfiguration config)
         var port = int.Parse(config["Smtp:Port"]!); // Crashes if missing
     }
 }</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StronglyTypedOptions.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p9-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">StronglyTypedOptions.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Strongly-typed options with validation
 public class SmtpOptions
 {
@@ -2597,6 +3073,8 @@ public class EmailSender(IOptions&lt;SmtpOptions&gt; options)
 
 // In Program.cs:
 builder.Services.Configure&lt;SmtpOptions&gt;(builder.Configuration.GetSection("Smtp"));</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code depends on a global configuration dictionary with magic string keys. The good code depends on a <span class="tooltip-trigger">POCO options class<span class="tooltip-content">Plain Old CLR Objects that represent a configuration section. Registered with builder.Services.Configure&lt;SmtpOptions&gt;(builder.Configuration.GetSection("Smtp")). Injected as IOptions&lt;SmtpOptions&gt;. Supports validation via DataAnnotations or IValidateOptions&lt;T&gt;. Tested by passing Options.Create(new SmtpOptions { ... }).</span></span> &mdash; a simple object with properties that the compiler can type-check. In tests, you just pass <code>Options.Create(new SmtpOptions { Host = "test", Port = 25 })</code>. No need to build a whole configuration system.</p>
@@ -2614,9 +3092,57 @@ builder.Services.Configure&lt;SmtpOptions&gt;(builder.Configuration.GetSection("
         <p class="body-text"><strong>Mistake:</strong> Defining synchronous interface methods when implementations will be async, forcing <code>.Result</code> or <code>.GetAwaiter().GetResult()</code> calls that cause deadlocks.</p>
         <p class="body-text"><strong>Why This Happens:</strong> When the interface was first written, the implementation was synchronous &mdash; maybe it read from an in-memory cache. The interface returned <code>Order?</code> directly. Later, the team swapped to a database implementation. But <code>FindAsync</code> returns <code>Task&lt;Order?&gt;</code>, and the interface demands synchronous <code>Order?</code>. The implementation is forced to bridge the gap with <code>.GetAwaiter().GetResult()</code>. This blocks the calling thread while waiting for the database. In ASP.NET Core, where the thread pool is limited, this blocking can cause deadlocks under load &mdash; all threads are blocked waiting for I/O that can't complete because there are no free threads to handle the callback.</p>
         <p class="body-text">The lesson: when you design an interface, think about what future implementations might need. Any method that <em>could</em> involve I/O (database, network, file system) should return <code>Task&lt;T&gt;</code> from day one.</p>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncMismatch.cs</span></div>
-          <div class="macos-body">
+
+        <!-- SVG: Sync interface deadlock vs async-first design -->
+        <svg viewBox="0 0 520 210" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Sync interface causing deadlock vs async-first interface design">
+          <defs>
+            <marker id="dip-p10-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/>
+            </marker>
+            <marker id="dip-p10-arr-grn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10z" fill="#27ae60"/>
+            </marker>
+          </defs>
+          <!-- Bad side: deadlock -->
+          <text x="120" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Sync Interface + Async Impl</text>
+          <rect x="40" y="28" width="160" height="28" rx="5" fill="#eef" stroke="#6c5ce7" stroke-width="1.2"/>
+          <text x="120" y="46" text-anchor="middle" fill="#6c5ce7" font-size="10" font-weight="600">IRepo: Order? GetById()</text>
+          <line x1="120" y1="56" x2="120" y2="74" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p10-arr-red)"/>
+          <rect x="30" y="76" width="180" height="28" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="1.5"/>
+          <text x="120" y="94" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">SqlRepo: .GetAwaiter().GetResult()</text>
+          <line x1="120" y1="104" x2="120" y2="122" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#dip-p10-arr-red)"/>
+          <rect x="55" y="124" width="130" height="34" rx="5" fill="#fdecea" stroke="#e74c3c" stroke-width="2"/>
+          <text x="120" y="140" text-anchor="middle" fill="#e74c3c" font-size="11" font-weight="700">DEADLOCK</text>
+          <text x="120" y="152" text-anchor="middle" fill="#c0392b" font-size="8">Thread blocked waiting for I/O</text>
+          <text x="120" y="178" text-anchor="middle" fill="#e74c3c" font-size="10">All threads block under load</text>
+          <!-- Divider -->
+          <line x1="260" y1="10" x2="260" y2="200" stroke="#555" stroke-width="1" stroke-dasharray="4,4"/>
+          <!-- Good side: async-first -->
+          <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Async-First Interface</text>
+          <rect x="300" y="28" width="190" height="28" rx="5" fill="#eef" stroke="#6c5ce7" stroke-width="1.2"/>
+          <text x="395" y="46" text-anchor="middle" fill="#6c5ce7" font-size="10" font-weight="600">IRepo: Task&lt;Order?&gt; GetByIdAsync()</text>
+          <!-- Two implementations -->
+          <line x1="350" y1="56" x2="330" y2="76" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p10-arr-grn)"/>
+          <line x1="440" y1="56" x2="460" y2="76" stroke="#27ae60" stroke-width="1.5" marker-end="url(#dip-p10-arr-grn)"/>
+          <rect x="275" y="78" width="120" height="40" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="335" y="96" text-anchor="middle" fill="#27ae60" font-size="9" font-weight="600">InMemoryRepo</text>
+          <text x="335" y="110" text-anchor="middle" fill="#1e8449" font-size="8">Task.FromResult()</text>
+          <rect x="405" y="78" width="110" height="40" rx="5" fill="#eafaf1" stroke="#27ae60" stroke-width="1.2"/>
+          <text x="460" y="96" text-anchor="middle" fill="#27ae60" font-size="9" font-weight="600">SqlRepo</text>
+          <text x="460" y="110" text-anchor="middle" fill="#1e8449" font-size="8">await FindAsync()</text>
+          <text x="395" y="146" text-anchor="middle" fill="#27ae60" font-size="10">Both fit naturally</text>
+          <text x="395" y="162" text-anchor="middle" fill="#27ae60" font-size="10">No blocking, no deadlocks</text>
+        </svg>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="dip-p10-bad" role="tab" aria-selected="true">&#10060; Bad</button>
+            <button class="tab-btn" data-tab="dip-p10-good" role="tab" aria-selected="false">&#9989; Good</button>
+          </div>
+          <div class="tab-panel active" id="dip-p10-bad" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncMismatch.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ❌ Sync interface forces blocking calls
 public interface IOrderRepository
 {
@@ -2631,11 +3157,13 @@ public class SqlOrderRepository : IOrderRepository
         return _db.Orders.FindAsync(id).GetAwaiter().GetResult();
     }
 }</code></pre>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="macos-window mt-sm mb-sm">
-          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncFirst.cs</span></div>
-          <div class="macos-body">
+          <div class="tab-panel" id="dip-p10-good" role="tabpanel">
+            <div class="macos-window mt-sm mb-sm">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">AsyncFirst.cs</span></div>
+              <div class="macos-body">
 <pre><code class="language-csharp">// ✅ Async from the start — even if current impl is sync
 public interface IOrderRepository
 {
@@ -2655,6 +3183,8 @@ public class SqlOrderRepository : IOrderRepository
     public async Task&lt;Order?&gt; GetByIdAsync(int id)
         =&gt; await _db.Orders.FindAsync(id);
 }</code></pre>
+              </div>
+            </div>
           </div>
         </div>
         <p class="body-text"><strong>The connection:</strong> The bad code defines a sync interface that forces async implementations to block, risking deadlocks. The good code defines the interface as <strong><span class="tooltip-trigger">async-first<span class="tooltip-content">Define interface methods returning Task&lt;T&gt; or ValueTask&lt;T&gt; from the start, even if the current implementation is synchronous. Synchronous implementations can return Task.FromResult(). Going from sync to async later is a breaking change that ripples through the entire call chain. Starting async costs nothing.</span></span></strong>. Sync implementations wrap their return value in <code>Task.FromResult()</code> (zero overhead). Async implementations use <code>async/await</code> naturally. Starting async costs nothing; converting from sync to async later is a breaking change that ripples through every caller.</p>

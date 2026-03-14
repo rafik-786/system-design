@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 15 complete pages (Singleton, Factory Method, Abstract Factory, Builder, Prototype, SRP, OCP, LSP, ISP, DIP, Strategy, Observer, Decorator, Parking Lot), 95 coming soon.
+**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 17 complete pages (Singleton, Factory Method, Abstract Factory, Builder, Prototype, SRP, OCP, LSP, ISP, DIP, Strategy, Observer, Decorator, Template Method, Parking Lot, Tic-Tac-Toe), 93 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -134,6 +134,8 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 | Builder | Pattern | 5,321 | 51 | cyan |
 | Prototype | Pattern | 5,071 | 55 | — |
 | Parking Lot | Case Study | 6,709 | 103 | orange |
+| Tic-Tac-Toe | Case Study | 9,183 | ~120 | purple |
+| Template Method | Pattern | 7,395 | 49 | cyan |
 
 ### LLD Hub Features (`lld/index.html`)
 - Floating "Study Next" widget — 110 topics, localStorage persistence, full list view, reset button
@@ -145,7 +147,7 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 
 **Starter (9)** — after Phase 4 (15 patterns):
 1. Parking Lot System (Easy) — **Ready** — Strategy, Result Pattern, Singleton (DI), Decorator | accent: orange, 4902 lines, 60 tooltips, 13 SVGs ← ENRICHED
-2. Tic-Tac-Toe (Easy) — Strategy, State, Observer
+2. Tic-Tac-Toe (Easy) — **Ready** — State, Command, Strategy | accent: purple, 9183 lines, ~120 tooltips, 59 SVGs
 3. Vending Machine (Easy) — State, Strategy
 4. LRU Cache (Medium) — Proxy, Strategy, Singleton
 5. Logging Framework (Medium) — Decorator, Singleton, Strategy
@@ -255,8 +257,8 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 **Content should be built in this exact order** — each new page extends the unbroken playable path.
 
 1. **SOLID Foundations** (5) ✅ all done
-2. **Starter Patterns** (5): Strategy ✅, Singleton ✅, Factory Method ✅, Observer ✅, Template Method ❌
-3. **Practice · after Starter** (8): Parking Lot ✅, Tic-Tac-Toe, Vending Machine, Snake & Ladder, Shopping Cart, Review & Rating, Logging Framework, Plugin System
+2. **Starter Patterns** (5): Strategy ✅, Singleton ✅, Factory Method ✅, Observer ✅, Template Method ✅
+3. **Practice · after Starter** (8): Parking Lot ✅, Tic-Tac-Toe ✅, Vending Machine, Snake & Ladder, Shopping Cart, Review & Rating, Logging Framework, Plugin System
 4. **Structural Patterns** (5): Decorator ✅, Adapter, Facade, Proxy, Composite
 5. **Practice · after Structural** (4): Notification System, Library Management, Restaurant Management, Task Management
 6. **Creational Depth** (3): Abstract Factory ✅, Builder ✅, Prototype ✅ — all done
@@ -273,7 +275,7 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 17. **IoT & Simulation** (2): Smart Home, Thermostat Control
 18. **Mastery** (10): Concurrency Patterns, Unit Testing Patterns, DI Deep Dive, Repository & Unit of Work, Refactoring Patterns, Reflection & Metaprogramming, DDD Tactical Patterns, CQRS, Clean Architecture, Event-Driven Architecture
 
-**Next to build:** Template Method → Tic-Tac-Toe → Vending Machine → ...
+**Next to build:** Vending Machine → Snake & Ladder → Shopping Cart → ...
 
 ---
 

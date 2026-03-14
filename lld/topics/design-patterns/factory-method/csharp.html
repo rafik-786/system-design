@@ -17,7 +17,7 @@
 
 <!-- ========== TOP TOOLBAR ========== -->
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2462,6 +2462,34 @@ public class NotificationFactory(IEnumerable&lt;INotification&gt; notifications)
           <p class="body-text"><strong>Mistake:</strong> Creating <code>INotificationFactory</code> when there's only one <code>INotification</code> implementation.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer reads about Factory Method and thinks "every object creation should go through a factory." They create <code>INotificationFactory</code> even though the only notification type is <code>EmailNotification</code>. It feels like "good architecture" — until you realize the factory always returns the same type. There's no decision point, no runtime choice, no polymorphism. It's a wrapper that does nothing useful.</p>
           <p class="body-text">The second reason is "future-proofing." Developers think "we might add SMS later." That's a valid thought, but you're paying the complexity cost now for a feature that might never arrive. When you actually need a second type, creating a factory takes 5 minutes. There's no need to pre-build the abstraction.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Factory for a single type adds a useless layer between caller and the one implementation">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <!-- Bad side -->
+            <text x="175" y="22" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Pointless Factory</text>
+            <rect x="20" y="34" width="100" height="36" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="70" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Caller</text>
+            <line x1="120" y1="52" x2="148" y2="52" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fp1-arr)"/>
+            <rect x="148" y="34" width="115" height="36" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="205" y="57" text-anchor="middle" fill="#ef4444" font-size="10">INotifFactory</text>
+            <line x1="263" y1="52" x2="291" y2="52" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fp1-arr)"/>
+            <rect x="291" y="34" width="55" height="36" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="318" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Email</text>
+            <text x="175" y="92" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Only 1 type — factory adds nothing</text>
+            <!-- Good side -->
+            <text x="530" y="22" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Direct Injection</text>
+            <rect x="420" y="34" width="100" height="36" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="470" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Caller</text>
+            <line x1="520" y1="52" x2="560" y2="52" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fp1-arr2)"/>
+            <rect x="560" y="34" width="120" height="36" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="620" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">INotification</text>
+            <text x="530" y="92" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">No middleman needed</text>
+            <!-- Divider -->
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <defs>
+              <marker id="fp1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp1-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Unnecessary.cs — ❌ Over-engineering</span></div>
             <div class="macos-body">
@@ -2511,6 +2539,36 @@ public class OrderService(INotification notification)
           <p class="body-text"><strong>Mistake:</strong> One factory that creates 15 different unrelated types — notifications, reports, validators, parsers.</p>
           <p class="body-text"><strong>Why This Happens:</strong> It starts innocently. Someone creates a <code>ServiceFactory</code> to build notifications. Then another developer needs a factory for reports and thinks "we already have a factory — I'll just add a method." A third developer adds validator creation. Before long, one class is responsible for creating everything in the system.</p>
           <p class="body-text">This violates the <span class="tooltip-trigger">Single Responsibility Principle<span class="tooltip-content">A class should have only one reason to change. If a factory creates 15 types, it has 15 reasons to change.</span></span>. Every time any team member adds a new type, they modify this one class. It becomes a merge conflict magnet, a testing nightmare, and a 500-line file that nobody wants to touch.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="One god factory creating everything vs focused factories each handling one family">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ God Factory</text>
+            <rect x="100" y="30" width="150" height="34" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="175" y="52" text-anchor="middle" fill="#ef4444" font-size="11">ServiceFactory</text>
+            <line x1="100" y1="64" x2="40" y2="90" stroke="#ef4444" stroke-width="1"/>
+            <line x1="145" y1="64" x2="115" y2="90" stroke="#ef4444" stroke-width="1"/>
+            <line x1="200" y1="64" x2="195" y2="90" stroke="#ef4444" stroke-width="1"/>
+            <line x1="250" y1="64" x2="275" y2="90" stroke="#ef4444" stroke-width="1"/>
+            <text x="40" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Notif</text>
+            <text x="115" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Report</text>
+            <text x="195" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Validator</text>
+            <text x="275" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Parser</text>
+            <text x="175" y="132" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">15 reasons to change</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Focused Factories</text>
+            <rect x="400" y="35" width="90" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="445" y="53" text-anchor="middle" fill="#22c55e" font-size="9">NotifFactory</text>
+            <rect x="500" y="35" width="90" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="545" y="53" text-anchor="middle" fill="#22c55e" font-size="9">ReportFactory</text>
+            <rect x="600" y="35" width="90" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="645" y="53" text-anchor="middle" fill="#22c55e" font-size="9">ValidatorFactory</text>
+            <line x1="445" y1="61" x2="445" y2="85" stroke="#22c55e" stroke-width="1"/>
+            <line x1="545" y1="61" x2="545" y2="85" stroke="#22c55e" stroke-width="1"/>
+            <line x1="645" y1="61" x2="645" y2="85" stroke="#22c55e" stroke-width="1"/>
+            <text x="445" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Notif</text>
+            <text x="545" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Report</text>
+            <text x="645" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Validator</text>
+            <text x="540" y="132" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">1 reason to change each</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodFactory.cs — ❌ Dumping ground</span></div>
             <div class="macos-body">
@@ -2555,6 +2613,34 @@ public class ValidatorFactory : IValidatorFactory { ... }
           <p class="body-text"><strong>Mistake:</strong> Factory returns <code>object</code> and callers cast: <code>var report = (PdfReport)factory.Create("pdf");</code></p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer doesn't want to create an interface for the products. It feels like "extra work" to define <code>IReport</code>, so they return <code>object</code> instead. Or they use <code>dynamic</code> to avoid the cast. Either way, the compiler can't help you — all type checking happens at runtime, meaning bugs that could be caught at compile time only show up in production.</p>
           <p class="body-text">The irony is that the whole point of Factory Method is to decouple the caller from concrete types. But if the caller casts the result back to a concrete type, you've defeated the purpose entirely. The caller now knows exactly what type it's getting, and you've just added a factory layer that provides no benefit.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Returning object forces runtime casting vs returning a typed interface gives compile-time safety">
+            <rect x="0" y="0" width="700" height="130" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Returns object</text>
+            <rect x="30" y="32" width="90" height="32" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="75" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Factory</text>
+            <line x1="120" y1="48" x2="158" y2="48" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fp3-arr)"/>
+            <rect x="158" y="32" width="70" height="32" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="193" y="53" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">object</text>
+            <line x1="228" y1="48" x2="258" y2="48" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="243" y="40" fill="#ef4444" font-size="9">(cast)</text>
+            <rect x="258" y="32" width="85" height="32" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="300" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">PdfReport</text>
+            <text x="175" y="86" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Runtime crash if wrong cast</text>
+            <line x1="365" y1="10" x2="365" y2="120" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Returns IReport</text>
+            <rect x="400" y="32" width="90" height="32" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="445" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Factory</text>
+            <line x1="490" y1="48" x2="528" y2="48" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fp3-arr2)"/>
+            <rect x="528" y="32" width="80" height="32" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="568" y="53" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">IReport</text>
+            <line x1="608" y1="48" x2="638" y2="48" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fp3-arr2)"/>
+            <text x="668" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Caller</text>
+            <text x="540" y="86" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Compiler catches misuse</text>
+            <defs>
+              <marker id="fp3-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp3-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Untyped.cs — ❌ No compile-time safety</span></div>
             <div class="macos-body">
@@ -2602,6 +2688,34 @@ byte[] bytes = report.Generate(data); // type-safe!</code></pre>
           <p class="body-text"><strong>Mistake:</strong> <code>PaymentProcessor.Create("stripe")</code> as a static method.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Static methods feel convenient. No need to inject anything, no interface, no DI registration. Just call <code>ClassName.Method()</code> from anywhere. It's the path of least resistance, and for simple utilities like <code>int.Parse()</code> or <code>DateTime.Now</code>, it works fine.</p>
           <p class="body-text">But for business logic factories — things that create payment processors, report generators, or notification services — static methods are a trap. You can't mock a static method in unit tests. You can't inject dependencies into a static context. Every class that calls <code>PaymentProcessor.Create()</code> is now <span class="tooltip-trigger">tightly coupled<span class="tooltip-content">When components depend directly on concrete implementations rather than abstractions, making changes ripple through the codebase</span></span> to that concrete class. Swapping out the implementation requires changing every call site.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Static factory cannot be mocked in tests vs instance-based factory can be swapped">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Static — Can't Mock</text>
+            <rect x="50" y="32" width="110" height="32" rx="6" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="105" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">OrderService</text>
+            <line x1="160" y1="48" x2="188" y2="48" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fp4-arr)"/>
+            <rect x="188" y="32" width="145" height="32" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="260" y="53" text-anchor="middle" fill="#ef4444" font-size="10">static Create("stripe")</text>
+            <rect x="85" y="82" width="130" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="150" y="101" text-anchor="middle" fill="#ef4444" font-size="10">Unit Test — stuck!</text>
+            <line x1="215" y1="96" x2="240" y2="96" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="270" y="101" fill="#ef4444" font-size="16">✕</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Instance — Mockable</text>
+            <rect x="400" y="32" width="110" height="32" rx="6" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="455" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">OrderService</text>
+            <line x1="510" y1="48" x2="538" y2="48" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fp4-arr2)"/>
+            <rect x="538" y="32" width="140" height="32" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="608" y="53" text-anchor="middle" fill="#22c55e" font-size="10">IFactory (injected)</text>
+            <rect x="435" y="82" width="130" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="500" y="101" text-anchor="middle" fill="#22c55e" font-size="10">Unit Test — mock!</text>
+            <line x1="565" y1="96" x2="590" y2="96" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="610" y="101" fill="#22c55e" font-size="16">✓</text>
+            <defs>
+              <marker id="fp4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp4-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Static.cs — ❌ Untestable</span></div>
             <div class="macos-body">
@@ -2662,6 +2776,35 @@ public class OrderService(IPaymentProcessorFactory factory)
           <p class="body-text"><strong>Mistake:</strong> Factory returns <code>INotification</code> but callers <span class="tooltip-trigger">downcast<span class="tooltip-content">Casting a base type reference to a derived type — a code smell that often indicates a leaky abstraction</span></span> to <code>EmailNotification</code> to access <code>.AttachmentPath</code>.</p>
           <p class="body-text"><strong>Why This Happens:</strong> The interface was designed before all the requirements were known. Later, someone needs a feature that's specific to one concrete type (like adding an attachment to emails). Instead of updating the interface, they cast the returned object to the concrete type. It's quick, it works, and it quietly undermines the entire factory pattern.</p>
           <p class="body-text">The problem snowballs. Once one developer downcasts, others copy the pattern. Soon you have 20 places in the codebase doing <code>(EmailNotification)factory.Create("email")</code>. Now you can't change the concrete type without breaking all those cast sites. The factory's abstraction has leaked — callers know exactly what's behind the interface.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Downcasting past the interface breaks abstraction vs working through the interface keeps things clean">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Leaking Concrete Type</text>
+            <rect x="20" y="34" width="90" height="30" rx="6" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="65" y="54" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Factory</text>
+            <line x1="110" y1="49" x2="138" y2="49" stroke="var(--accent-primary)" stroke-width="1.5" marker-end="url(#fp5-arr)"/>
+            <rect x="138" y="34" width="90" height="30" rx="6" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1.5"/>
+            <text x="183" y="54" text-anchor="middle" fill="var(--accent-primary)" font-size="10">INotification</text>
+            <path d="M228,49 L258,49" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#fp5-arrR)"/>
+            <text x="243" y="40" fill="#ef4444" font-size="8">(cast)</text>
+            <rect x="258" y="34" width="90" height="30" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="303" y="54" text-anchor="middle" fill="#ef4444" font-size="9">EmailNotif</text>
+            <text x="303" y="82" text-anchor="middle" fill="#ef4444" font-size="9">.AttachmentPath</text>
+            <text x="175" y="118" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Abstraction broken — caller knows concrete type</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Enrich the Interface</text>
+            <rect x="400" y="34" width="90" height="30" rx="6" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="445" y="54" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Factory</text>
+            <line x1="490" y1="49" x2="518" y2="49" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fp5-arrG)"/>
+            <rect x="518" y="30" width="160" height="38" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="598" y="47" text-anchor="middle" fill="#22c55e" font-size="10">IAttachableNotification</text>
+            <text x="598" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">.AttachmentPath</text>
+            <text x="540" y="118" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">No cast needed — interface covers all needs</text>
+            <defs>
+              <marker id="fp5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="var(--accent-primary)"/></marker>
+              <marker id="fp5-arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp5-arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Leaky.cs — ❌ Downcasting defeats the factory</span></div>
             <div class="macos-body">
@@ -2708,6 +2851,36 @@ if (notification is IAttachableNotification attachable)
           <p class="body-text"><strong>Mistake:</strong> Factory constructor calls database, sends HTTP requests, or pre-loads data during <code>Create()</code>.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer wants the factory product to be "ready to use" the moment it's created. So they put database calls, HTTP requests, or file I/O inside the factory's <code>Create()</code> method. The intent is good — nobody wants to call <code>product.Initialize()</code> separately. But the cost is paid at creation time, which blocks the thread and slows down DI resolution.</p>
           <p class="body-text">This is especially dangerous when the factory is resolved during startup. If <code>Create()</code> makes a database call and the database is slow (or down), the entire application startup blocks. In Kubernetes, the health check fails, the pod gets killed, Kubernetes restarts it, the database is still slow, and you're in a restart loop.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Factory doing heavy IO during Create blocks startup vs cheap creation with lazy loading on first use">
+            <rect x="0" y="0" width="700" height="130" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Heavy Create()</text>
+            <rect x="30" y="32" width="80" height="28" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="70" y="51" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Create()</text>
+            <line x1="110" y1="46" x2="130" y2="46" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp6-arr)"/>
+            <rect x="130" y="32" width="50" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.2"/>
+            <text x="155" y="50" text-anchor="middle" fill="#ef4444" font-size="9">DB</text>
+            <line x1="180" y1="46" x2="200" y2="46" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp6-arr)"/>
+            <rect x="200" y="32" width="55" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.2"/>
+            <text x="227" y="50" text-anchor="middle" fill="#ef4444" font-size="9">HTTP</text>
+            <line x1="255" y1="46" x2="275" y2="46" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp6-arr)"/>
+            <rect x="275" y="32" width="55" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.2"/>
+            <text x="302" y="50" text-anchor="middle" fill="#ef4444" font-size="9">File IO</text>
+            <text x="175" y="82" text-anchor="middle" fill="#ef4444" font-size="10">2 sec to create one object!</text>
+            <text x="175" y="100" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Startup blocked, k8s restart loop</text>
+            <line x1="365" y1="10" x2="365" y2="120" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Cheap Create, Lazy Load</text>
+            <rect x="410" y="32" width="80" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="450" y="51" text-anchor="middle" fill="#22c55e" font-size="10">Create()</text>
+            <line x1="490" y1="46" x2="520" y2="46" stroke="#22c55e" stroke-width="1.5" marker-end="url(#fp6-arr2)"/>
+            <text x="545" y="42" fill="#22c55e" font-size="10">instant</text>
+            <rect x="410" y="72" width="240" height="28" rx="5" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="530" y="91" text-anchor="middle" fill="var(--accent-primary)" font-size="10">DB/HTTP on first use (lazy)</text>
+            <text x="540" y="118" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Startup fast, I/O deferred</text>
+            <defs>
+              <marker id="fp6-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp6-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">HeavyCreation.cs — ❌ Slow factory</span></div>
             <div class="macos-body">
@@ -2759,6 +2932,36 @@ public class PdfGenerator(AppDbContext db, HttpClient http) : IReportGenerator
           <p class="body-text"><strong>Mistake:</strong> Factory creates it, caller uses it, nobody disposes it. 200K exports/day with undisposed <code>MemoryStream</code>s.</p>
           <p class="body-text"><strong>Why This Happens:</strong> When you resolve a service from the DI container normally, the container tracks it and disposes it at the end of the scope. Developers get used to this — "DI handles disposal." But factory-created objects are different. The factory builds them manually with <code>new</code>, so the DI container doesn't know they exist. Nobody tracks them, nobody disposes them.</p>
           <p class="body-text">The confusion is understandable: DI-resolved objects are managed by the container, but factory-created objects are unmanaged. It's the caller's responsibility to dispose them, but nothing in the code makes that obvious unless the product interface extends <code>IDisposable</code>.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Factory creates object that is never disposed causing memory leak vs using statement ensures disposal">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ No Dispose</text>
+            <rect x="30" y="34" width="80" height="28" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="70" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Factory</text>
+            <line x1="110" y1="48" x2="140" y2="48" stroke="var(--accent-primary)" stroke-width="1.2" marker-end="url(#fp7-arr)"/>
+            <rect x="140" y="34" width="80" height="28" rx="5" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1.2"/>
+            <text x="180" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Exporter</text>
+            <line x1="220" y1="48" x2="250" y2="48" stroke="#ef4444" stroke-width="1.2"/>
+            <text x="275" y="53" fill="#ef4444" font-size="10">scope ends</text>
+            <rect x="70" y="76" width="210" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="175" y="95" text-anchor="middle" fill="#ef4444" font-size="10">MemoryStream leaked! x200K/day</text>
+            <text x="175" y="125" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">OOM crash at 3 AM</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ using var = auto-dispose</text>
+            <rect x="400" y="34" width="80" height="28" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="440" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Factory</text>
+            <line x1="480" y1="48" x2="510" y2="48" stroke="#22c55e" stroke-width="1.2" marker-end="url(#fp7-arr2)"/>
+            <rect x="510" y="34" width="80" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="550" y="53" text-anchor="middle" fill="#22c55e" font-size="10">Exporter</text>
+            <line x1="590" y1="48" x2="620" y2="48" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="650" y="53" fill="#22c55e" font-size="10">scope ends</text>
+            <rect x="440" y="76" width="180" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="530" y="95" text-anchor="middle" fill="#22c55e" font-size="10">Dispose() called automatically</text>
+            <text x="540" y="125" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Memory freed every time</text>
+            <defs>
+              <marker id="fp7-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="var(--accent-primary)"/></marker>
+              <marker id="fp7-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Leaked.cs — ❌ No disposal</span></div>
             <div class="macos-body">
@@ -2798,6 +3001,38 @@ return File(bytes, "application/pdf");
           <p class="body-text"><strong>Mistake:</strong> Adding a new enum value without updating the factory. The switch falls through to <code>default</code> which returns <code>null</code>.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer adds <code>ExportFormat.Markdown</code> to the enum, creates a <code>MarkdownExporter</code> class, registers it in DI — and forgets to add the case to the factory's switch statement. The switch falls through to the default case, which returns <code>null</code> (or worse, silently does nothing). The bug doesn't show up until someone actually requests a Markdown export in production.</p>
           <p class="body-text">C# switch expressions can catch this at compile time, but only if you enable the right analyzer rule. Without it, adding a new enum value is a silent change that can break the factory.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Adding a new enum value without updating the switch causes silent null vs throwing in default catches it immediately">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Silent Fallthrough</text>
+            <rect x="20" y="32" width="65" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="52" y="49" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Pdf</text>
+            <rect x="95" y="32" width="65" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="127" y="49" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Excel</text>
+            <rect x="170" y="32" width="85" height="24" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="212" y="49" text-anchor="middle" fill="#ef4444" font-size="9">Markdown</text>
+            <text x="290" y="49" fill="#ef4444" font-size="11">NEW!</text>
+            <line x1="175" y1="56" x2="175" y2="80" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp8-arr)"/>
+            <rect x="100" y="80" width="150" height="26" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="175" y="98" text-anchor="middle" fill="#ef4444" font-size="10">default: return null</text>
+            <line x1="175" y1="106" x2="175" y2="126" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp8-arr)"/>
+            <text x="175" y="140" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">NullReferenceException in prod</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Fail Fast</text>
+            <rect x="390" y="32" width="65" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="422" y="49" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Pdf</text>
+            <rect x="465" y="32" width="65" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="497" y="49" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Excel</text>
+            <rect x="540" y="32" width="85" height="24" rx="4" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="2"/>
+            <text x="582" y="49" text-anchor="middle" fill="var(--accent-primary)" font-size="9">Markdown</text>
+            <line x1="540" y1="56" x2="540" y2="80" stroke="#22c55e" stroke-width="1.2" marker-end="url(#fp8-arr2)"/>
+            <rect x="440" y="80" width="200" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="540" y="98" text-anchor="middle" fill="#22c55e" font-size="10">default: throw + CS8509</text>
+            <text x="540" y="130" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Compiler refuses to build</text>
+            <defs>
+              <marker id="fp8-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp8-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Incomplete.cs — ❌ Silent null return</span></div>
             <div class="macos-body">
@@ -2843,6 +3078,40 @@ public IExporter Create(ExportFormat format) =&gt; format switch
           <p class="body-text"><strong>Mistake:</strong> Factory catches creation exceptions and returns <code>null</code> or a no-op fallback instead of failing fast.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer doesn't want the factory to crash the application. They wrap the creation logic in a try/catch and return a "safe" fallback — a no-op implementation that does nothing. The intent is resilience: "if Stripe is down, at least the app doesn't crash." But the side effect is far worse than a crash.</p>
           <p class="body-text">Imagine a payment factory that catches all exceptions and returns a <code>NoOpProcessor</code>. When Stripe's API is temporarily unreachable, every order goes through without being charged. The customer gets the product for free. Nobody notices until end-of-day reconciliation shows $0 revenue. A 500 error would have been infinitely better — the customer would retry, or customer support would intervene. Silent data loss is always worse than a loud failure.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Swallowing exceptions returns NoOp processor causing zero revenue vs failing fast lets caller handle error properly">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Exception Swallowed</text>
+            <rect x="30" y="32" width="90" height="28" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="75" y="51" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Create()</text>
+            <line x1="120" y1="46" x2="145" y2="46" stroke="#ef4444" stroke-width="1.2"/>
+            <text x="165" y="42" fill="#ef4444" font-size="10">Stripe</text>
+            <text x="165" y="55" fill="#ef4444" font-size="10">down!</text>
+            <line x1="195" y1="46" x2="215" y2="46" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp9-arr)"/>
+            <rect x="215" y="32" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="275" y="51" text-anchor="middle" fill="#ef4444" font-size="10">catch → NoOp</text>
+            <line x1="275" y1="60" x2="275" y2="82" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp9-arr)"/>
+            <rect x="175" y="82" width="200" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="275" y="101" text-anchor="middle" fill="#ef4444" font-size="10">Orders go through FREE — $0 rev</text>
+            <text x="175" y="135" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Nobody knows until end-of-day report</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Fail Fast</text>
+            <rect x="410" y="32" width="90" height="28" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="455" y="51" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Create()</text>
+            <line x1="500" y1="46" x2="525" y2="46" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="545" y="42" fill="#ef4444" font-size="10">Stripe</text>
+            <text x="545" y="55" fill="#ef4444" font-size="10">down!</text>
+            <line x1="575" y1="46" x2="600" y2="46" stroke="#22c55e" stroke-width="1.2" marker-end="url(#fp9-arr2)"/>
+            <rect x="600" y="32" width="80" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="640" y="51" text-anchor="middle" fill="#22c55e" font-size="10">throw!</text>
+            <line x1="540" y1="60" x2="540" y2="82" stroke="#22c55e" stroke-width="1.2" marker-end="url(#fp9-arr2)"/>
+            <rect x="430" y="82" width="220" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="540" y="101" text-anchor="middle" fill="#22c55e" font-size="10">500 error → customer retries</text>
+            <text x="540" y="135" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Loud failure = immediate awareness</text>
+            <defs>
+              <marker id="fp9-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp9-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Swallowed.cs — ❌ Silent failures</span></div>
             <div class="macos-body">
@@ -2887,6 +3156,33 @@ public IPaymentProcessor Create(string provider)
           <p class="body-text"><strong>Mistake:</strong> Factory reads raw <code>IConfiguration</code> and knows the exact JSON structure — key names, nesting, types.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Injecting <code>IConfiguration</code> is easy — it's always available in the DI container, and you can read any key with a string path like <code>config["Exporters:Pdf:StorageConnection"]</code>. No need to create a settings class, no need to set up options binding. It works on the first try.</p>
           <p class="body-text">But now your factory is tightly coupled to the exact shape of your JSON config file. Rename a key? The factory silently gets <code>null</code>. Move a section to a different nesting level? Same thing. The factory has no way to validate the config at startup — it just reads strings and hopes for the best. This is the exact problem the <span class="tooltip-trigger">Options pattern<span class="tooltip-content">A .NET pattern for accessing configuration using strongly-typed classes injected via IOptions&lt;T&gt;.</span></span> was designed to solve.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Factory reading raw config strings gets silent null on key rename vs typed options class catches errors at startup">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Magic Strings</text>
+            <rect x="20" y="34" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="80" y="53" text-anchor="middle" fill="#ef4444" font-size="9">config["Pdf:Conn"]</text>
+            <line x1="140" y1="48" x2="165" y2="48" stroke="#ef4444" stroke-width="1.2" marker-end="url(#fp10-arr)"/>
+            <rect x="165" y="34" width="100" height="28" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="215" y="53" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">appsettings</text>
+            <text x="215" y="82" text-anchor="middle" fill="#ef4444" font-size="10">Key renamed?</text>
+            <line x1="215" y1="88" x2="215" y2="108" stroke="#ef4444" stroke-width="1" marker-end="url(#fp10-arr)"/>
+            <text x="215" y="122" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="bold">null</text>
+            <text x="280" y="122" fill="#ef4444" font-size="10" font-style="italic">silent failure</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Typed Options</text>
+            <rect x="390" y="34" width="130" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="455" y="53" text-anchor="middle" fill="#22c55e" font-size="9">IOptions&lt;Settings&gt;</text>
+            <line x1="520" y1="48" x2="545" y2="48" stroke="#22c55e" stroke-width="1.2" marker-end="url(#fp10-arr2)"/>
+            <rect x="545" y="34" width="130" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="610" y="53" text-anchor="middle" fill="#22c55e" font-size="9">ValidateOnStart</text>
+            <text x="540" y="82" text-anchor="middle" fill="#22c55e" font-size="10">Config wrong?</text>
+            <line x1="540" y1="88" x2="540" y2="108" stroke="#22c55e" stroke-width="1" marker-end="url(#fp10-arr2)"/>
+            <text x="540" y="122" text-anchor="middle" fill="#22c55e" font-size="11" font-weight="bold">App refuses to start</text>
+            <defs>
+              <marker id="fp10-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="fp10-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MagicStrings.cs — ❌ Coupled to JSON shape</span></div>
             <div class="macos-body">

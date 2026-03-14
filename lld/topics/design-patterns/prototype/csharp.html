@@ -17,7 +17,7 @@
 
 <!-- ========== TOP TOOLBAR ========== -->
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2246,6 +2246,32 @@ public class Module : IPrototype&lt;Module&gt;
           <p class="body-text"><strong>Mistake:</strong> Using <code>MemberwiseClone()</code> without checking if all fields are safe to shallow-copy.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Developers reach for <code>MemberwiseClone()</code> because it's fast, built-in, and requires zero effort — one line of code copies everything. It feels like the "right" way to clone because it's literally provided by the framework. The problem is that <code>MemberwiseClone()</code> copies fields at face value: for a <code>List&lt;OrderLine&gt;</code>, it copies the reference (the pointer to the list), not the list itself. So the original and clone share the same list. It's like photocopying a sticky note that says "see folder on shelf 3" — both copies point to the same physical folder.</p>
           <p class="body-text">This trap is especially sneaky because it works perfectly for simple objects (only value types and strings). Developers test with a simple case, see it works, and assume it works for everything. The bug only surfaces when someone mutates a collection or nested object on the clone and the original silently changes too.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="MemberwiseClone copies references not data — original and clone share the same list">
+            <rect x="10" y="10" width="330" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="175" y="32" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">MemberwiseClone (Shallow)</text>
+            <rect x="30" y="44" width="100" height="26" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="80" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Original</text>
+            <rect x="220" y="44" width="100" height="26" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="270" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Clone</text>
+            <rect x="115" y="88" width="120" height="26" rx="4" fill="#ef4444" fill-opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+            <text x="175" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">List&lt;OrderLine&gt;</text>
+            <line x1="80" y1="70" x2="155" y2="88" stroke="#ef4444" stroke-width="1.5"/>
+            <line x1="270" y1="70" x2="195" y2="88" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="175" y="132" text-anchor="middle" fill="#ef4444" font-size="11" font-style="italic">Same list — mutate one, both change!</text>
+            <rect x="380" y="10" width="310" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="32" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">Deep Clone (Safe)</text>
+            <rect x="395" y="44" width="100" height="26" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="445" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Original</text>
+            <rect x="575" y="44" width="100" height="26" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="625" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Clone</text>
+            <rect x="395" y="88" width="100" height="26" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="445" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">List A</text>
+            <rect x="575" y="88" width="100" height="26" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="625" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">List B (copy)</text>
+            <line x1="445" y1="70" x2="445" y2="88" stroke="#22c55e" stroke-width="1.5"/>
+            <line x1="625" y1="70" x2="625" y2="88" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="535" y="132" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Independent lists — fully isolated</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ShallowTrap.cs</span></div>
             <div class="macos-body">
@@ -2269,6 +2295,18 @@ public Order Clone() =&gt; (Order)MemberwiseClone();
           <p class="body-text"><strong>Mistake:</strong> Implementing <code>ICloneable</code> because "it's in the framework."</p>
           <p class="body-text"><strong>Why This Happens:</strong> When you type "clone" into an IDE, IntelliSense helpfully suggests <code>ICloneable</code>. It's an official .NET interface, so it <em>feels</em> like the right thing to do. But <code>ICloneable</code> was designed in .NET 1.0, before generics existed. Its <code>Clone()</code> method returns <code>object</code>, which means every caller must cast the result — and if they cast to the wrong type, the error only shows up at runtime. Worse, the interface says nothing about whether the clone should be deep or shallow. Different .NET classes implement it differently, and callers have no way to know which they're getting.</p>
           <p class="body-text">Microsoft's own Framework Design Guidelines by Cwalina and Abrams explicitly state: "Do not implement ICloneable." The interface is considered a design mistake that's kept around only for backward compatibility.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="ICloneable returns object requiring unsafe cast versus generic IPrototype returns typed result">
+            <rect x="10" y="10" width="310" height="110" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="32" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">ICloneable.Clone()</text>
+            <text x="165" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Returns: object</text>
+            <text x="165" y="78" text-anchor="middle" fill="#ef4444" font-size="11">(Settings)obj.Clone()</text>
+            <text x="165" y="108" text-anchor="middle" fill="#ef4444" font-size="11" font-style="italic">Unsafe cast + deep/shallow unknown</text>
+            <rect x="380" y="10" width="310" height="110" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="32" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">IPrototype&lt;T&gt;.DeepClone()</text>
+            <text x="535" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Returns: Settings</text>
+            <text x="535" y="78" text-anchor="middle" fill="#22c55e" font-size="11">obj.DeepClone()</text>
+            <text x="535" y="108" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Type-safe + explicit deep contract</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ICloneableBroken.cs</span></div>
             <div class="macos-body">
@@ -2308,6 +2346,32 @@ Settings copy = original.DeepClone(); // no cast needed!</code></pre>
           <p class="body-text"><strong>Mistake:</strong> Deep-cloning the top-level object but assigning collection references directly.</p>
           <p class="body-text"><strong>Why This Happens:</strong> When writing a manual <code>DeepClone()</code> method, developers carefully copy simple properties like <code>Name</code> and <code>Price</code>. When they get to a collection property like <code>Tags</code>, they write <code>Tags = this.Tags</code> without thinking twice — it looks the same as copying a string. But strings are immutable (can't be changed after creation), so sharing a string reference is perfectly safe. A <code>List&lt;string&gt;</code>, however, IS mutable — you can add, remove, and modify items. Sharing a list reference means both objects see each other's changes.</p>
           <p class="body-text">There's also a subtle two-level depth issue: even if you create a new list with <code>new List&lt;T&gt;(this.Items)</code>, if T is a reference type (like a custom <code>OrderLine</code> class), the list is new but the items inside are still shared. You need to clone each item too.</p>
+          <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Tags assigned by reference shares the list versus new List creates independent copy">
+            <rect x="10" y="10" width="310" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="32" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">Tags = this.Tags</text>
+            <rect x="30" y="44" width="90" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="75" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Original</text>
+            <rect x="200" y="44" width="90" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="245" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Clone</text>
+            <rect x="100" y="82" width="120" height="24" rx="4" fill="#ef4444" fill-opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+            <text x="160" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">List&lt;string&gt;</text>
+            <line x1="75" y1="68" x2="135" y2="82" stroke="#ef4444" stroke-width="1.5"/>
+            <line x1="245" y1="68" x2="190" y2="82" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="165" y="130" text-anchor="middle" fill="#ef4444" font-size="11" font-style="italic">clone.Tags.Add() changes original!</text>
+            <rect x="380" y="10" width="310" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="32" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">new List&lt;string&gt;(this.Tags)</text>
+            <rect x="395" y="44" width="90" height="24" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="440" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Original</text>
+            <rect x="575" y="44" width="90" height="24" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="620" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Clone</text>
+            <rect x="395" y="82" width="90" height="24" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="440" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">List A</text>
+            <rect x="575" y="82" width="90" height="24" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="620" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">List B</text>
+            <line x1="440" y1="68" x2="440" y2="82" stroke="#22c55e" stroke-width="1.5"/>
+            <line x1="620" y1="68" x2="620" y2="82" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="535" y="130" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Independent — safe to mutate</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ForgotCollection.cs</span></div>
             <div class="macos-body">
@@ -2344,6 +2408,32 @@ Items = this.Items.Select(i =&gt; i.DeepClone()).ToList()</code></pre>
           <p class="body-text"><strong>Mistake:</strong> Cloning an object that holds <span class="tooltip-trigger">streams<span class="tooltip-content">System.IO.Stream and its subclasses (FileStream, MemoryStream, NetworkStream) represent I/O resources. They maintain internal position counters, buffers, and OS handles. Cloning a stream via MemberwiseClone creates two objects sharing one OS handle — disposing one closes the handle for both.</span></span>, database connections, or HTTP clients.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Some objects hold "resources" — things like file handles, network connections, or database connections that are limited and managed by the operating system. These aren't just data in memory that can be copied. They're like keys to a locked room: copying the key doesn't create a second room. Both keys open the same door. If one person returns the key (disposes the resource), the other person's key is now useless — the room is locked and nobody can get back in.</p>
           <p class="body-text">Developers fall into this trap when a class mixes data and resources. The data parts (file name, settings, configuration) are perfectly safe to clone. But the resource parts (open FileStream, active SqlConnection) cannot be meaningfully duplicated via memory copy.</p>
+          <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Cloning IDisposable shares the stream — disposing one breaks the other">
+            <rect x="10" y="10" width="310" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="32" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">Clone Shares Stream</text>
+            <rect x="30" y="44" width="100" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="80" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Original</text>
+            <rect x="200" y="44" width="100" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="250" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Clone</text>
+            <rect x="100" y="82" width="120" height="24" rx="4" fill="#ef4444" fill-opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+            <text x="160" y="98" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">FileStream</text>
+            <line x1="80" y1="68" x2="140" y2="82" stroke="#ef4444" stroke-width="1.5"/>
+            <line x1="250" y1="68" x2="185" y2="82" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="165" y="130" text-anchor="middle" fill="#ef4444" font-size="10">Dispose original</text>
+            <text x="165" y="144" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Clone explodes: ObjectDisposedException</text>
+            <rect x="380" y="10" width="310" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="32" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Clone Config, Not Resources</text>
+            <rect x="410" y="46" width="100" height="22" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="460" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Config (data)</text>
+            <text x="530" y="61" fill="var(--text-primary, #e2e8f0)" font-size="14">&#x2192;</text>
+            <rect x="555" y="46" width="120" height="22" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="615" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Config (cloned)</text>
+            <rect x="410" y="80" width="100" height="22" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="460" y="95" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Stream A</text>
+            <rect x="555" y="80" width="120" height="22" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="615" y="95" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Stream B (new)</text>
+            <text x="535" y="130" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Each instance owns its own stream</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DisposableTrap.cs</span></div>
             <div class="macos-body">
@@ -2391,6 +2481,22 @@ public class FileProcessor : IDisposable
           <p class="body-text"><strong>Mistake:</strong> Assuming cloning is faster than <code>new</code> without benchmarking.</p>
           <p class="body-text"><strong>Why This Happens:</strong> The Prototype pattern is often taught as a "performance optimization" — skip expensive construction by cloning a pre-built object. This is true when construction involves database queries, file I/O, or network calls (things that take milliseconds). But developers sometimes apply this logic to simple data objects where construction is just setting a few properties (nanoseconds). In that case, <code>new Product { Name = "Widget", Price = 9.99m }</code> is already blazingly fast — there's nothing to optimize.</p>
           <p class="body-text"><code>MemberwiseClone()</code> itself is very fast (~2-5 nanoseconds). But a manual deep clone that creates new lists, dictionaries, and nested objects allocates a lot of memory and can actually be <em>slower</em> than constructing from scratch. Serialization-based cloning (JSON round-trip) is dramatically slower — 100-1000x. Using Prototype for performance without measuring is cargo-cult programming.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Performance comparison — new constructor versus clone versus JSON round-trip">
+            <rect x="10" y="10" width="680" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary)" stroke-width="1.5"/>
+            <text x="350" y="32" text-anchor="middle" fill="var(--accent-primary)" font-size="13" font-weight="bold">Performance Reality Check</text>
+            <text x="30" y="58" fill="#22c55e" font-size="11" font-weight="bold">new Product{...}</text>
+            <rect x="180" y="46" width="80" height="16" rx="3" fill="#22c55e" fill-opacity="0.4"/>
+            <text x="270" y="58" fill="var(--text-primary, #e2e8f0)" font-size="10">~5 ns (fast)</text>
+            <text x="30" y="80" fill="var(--text-primary, #e2e8f0)" font-size="11">MemberwiseClone</text>
+            <rect x="180" y="68" width="60" height="16" rx="3" fill="var(--accent-primary)" fill-opacity="0.4"/>
+            <text x="250" y="80" fill="var(--text-primary, #e2e8f0)" font-size="10">~3 ns (fastest)</text>
+            <text x="30" y="102" fill="var(--text-primary, #e2e8f0)" font-size="11">Manual DeepClone</text>
+            <rect x="180" y="90" width="200" height="16" rx="3" fill="var(--accent-primary)" fill-opacity="0.25"/>
+            <text x="390" y="102" fill="var(--text-primary, #e2e8f0)" font-size="10">~50-500 ns (allocations)</text>
+            <text x="30" y="124" fill="#ef4444" font-size="11" font-weight="bold">JSON round-trip</text>
+            <rect x="180" y="112" width="440" height="16" rx="3" fill="#ef4444" fill-opacity="0.25"/>
+            <text x="630" y="124" fill="#ef4444" font-size="10">~5000 ns</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BenchmarkFirst.cs</span></div>
             <div class="macos-body">
@@ -2419,6 +2525,24 @@ var product = new Product { Name = "Widget", Price = 9.99m };
         <div class="collapsible-body">
           <p class="body-text"><strong>Mistake:</strong> Having <code>Clone()</code> return a base class or interface type instead of the concrete type.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Developers define <code>Clone()</code> on the base class (returning <code>Shape</code>), thinking it's more "polymorphic." But this forces every caller to cast the result: <code>var circle = (Circle)shape.Clone()</code>. Casts are dangerous — if someone passes an <code>Ellipse</code> where a <code>Circle</code> was expected, the cast throws at runtime. The compiler can't help you because the return type is just <code>Shape</code>. C# 9 introduced covariant return types specifically to solve this — an overriding method can return a more specific type than the base method declares.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Clone returning base Shape requires cast versus IPrototype returning Circle directly">
+            <rect x="10" y="10" width="310" height="110" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">Clone() returns Shape</text>
+            <text x="165" y="54" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">circle.Clone()</text>
+            <line x1="165" y1="60" x2="165" y2="72" stroke="var(--text-primary, #e2e8f0)" stroke-width="1" marker-end="url(#pp6-arr)"/>
+            <text x="165" y="84" text-anchor="middle" fill="#ef4444" font-size="11">(Circle)result</text>
+            <text x="165" y="108" text-anchor="middle" fill="#ef4444" font-size="11" font-style="italic">Runtime cast — can throw!</text>
+            <rect x="380" y="10" width="310" height="110" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">DeepClone() returns Circle</text>
+            <text x="535" y="54" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">circle.DeepClone()</text>
+            <line x1="535" y1="60" x2="535" y2="72" stroke="#22c55e" stroke-width="1" marker-end="url(#pp6-arr-g)"/>
+            <text x="535" y="84" text-anchor="middle" fill="#22c55e" font-size="11">Circle (no cast)</text>
+            <text x="535" y="108" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Compile-time safe</text>
+            <defs>
+              <marker id="pp6-arr" markerWidth="8" markerHeight="6" refX="4" refY="3" orient="auto"><path fill="#ef4444" d="M0,0 L8,3 L0,6Z"/></marker>
+              <marker id="pp6-arr-g" markerWidth="8" markerHeight="6" refX="4" refY="3" orient="auto"><path fill="#22c55e" d="M0,0 L8,3 L0,6Z"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WrongReturnType.cs</span></div>
             <div class="macos-body">
@@ -2458,6 +2582,30 @@ Circle copy = original.DeepClone();  // ✅ compiler knows it's a Circle</code><
           <p class="body-text"><strong>Mistake:</strong> Storing mutable prototypes in a registry without protection — someone modifies the template directly instead of cloning first.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A prototype registry stores template objects that serve as the "master copy" for cloning. The natural instinct is to write a <code>GetPrototype()</code> method that returns the template directly. But if the registry hands out the original object (not a clone), any caller can accidentally modify the template. Imagine a library lending out its only copy of a book — if someone scribbles in the margins, every future borrower sees the scribbles. The library should lend out photocopies, never the original.</p>
           <p class="body-text">This bug is particularly insidious because the corruption is delayed. Someone sets <code>goblin.Health = 999</code> during testing, and the next 500 goblins all spawn with 999 health. The person who mutated the prototype is long gone from that code path, making the bug extremely hard to trace back to its source.</p>
+          <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Mutable registry exposes prototype directly versus safe registry only returns clones">
+            <rect x="10" y="10" width="310" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">GetPrototype() — Exposed</text>
+            <rect x="100" y="40" width="130" height="26" rx="5" fill="var(--accent-primary)" fill-opacity="0.2" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="165" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Goblin Template</text>
+            <text x="40" y="88" fill="var(--text-primary, #e2e8f0)" font-size="10">Caller:</text>
+            <text x="90" y="88" fill="#ef4444" font-size="10">goblin.Health = 999</text>
+            <line x1="115" y1="80" x2="140" y2="66" stroke="#ef4444" stroke-width="1.5" marker-end="url(#pp7-arr)"/>
+            <text x="165" y="112" text-anchor="middle" fill="#ef4444" font-size="10">Template corrupted!</text>
+            <text x="165" y="128" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">All future clones get 999 HP</text>
+            <rect x="380" y="10" width="310" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Create() — Returns Clone</text>
+            <rect x="470" y="40" width="130" height="26" rx="5" fill="var(--accent-primary)" fill-opacity="0.2" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="535" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Goblin Template</text>
+            <text x="535" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Goblin Template</text>
+            <line x1="535" y1="66" x2="535" y2="80" stroke="#22c55e" stroke-width="1.5" marker-end="url(#pp7-arr-g)"/>
+            <rect x="470" y="84" width="130" height="22" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="535" y="99" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Clone (independent)</text>
+            <text x="535" y="128" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Template untouched forever</text>
+            <defs>
+              <marker id="pp7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path fill="#ef4444" d="M0,0 L8,3 L0,6Z"/></marker>
+              <marker id="pp7-arr-g" markerWidth="8" markerHeight="6" refX="4" refY="3" orient="auto"><path fill="#22c55e" d="M0,0 L8,3 L0,6Z"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MutableRegistry.cs</span></div>
             <div class="macos-body">
@@ -2495,6 +2643,26 @@ goblin.Stats.Health = 999;  // ✅ Only THIS goblin has 999 health</code></pre>
           <p class="body-text"><strong>Mistake:</strong> Assuming <code>original.Equals(clone)</code> works after cloning.</p>
           <p class="body-text"><strong>Why This Happens:</strong> After cloning an object, you'd expect the original and clone to be "equal" since they have identical data. But in C#, the default <code>Equals()</code> on classes uses <em>reference equality</em> — it checks whether two variables point to the exact same object in memory, not whether they have the same values. Since a clone is a different object (at a different memory address), <code>original.Equals(clone)</code> is always <code>false</code>, even though every single property matches.</p>
           <p class="body-text">This becomes a real problem when you use collections that depend on equality: <code>HashSet&lt;T&gt;.Contains(clone)</code> returns false, <code>list.Distinct()</code> treats clones as different items, and dictionary lookups by object key fail. You think the clone is "the same thing," but C# disagrees.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Reference equality says clones are different versus value equality says clones are equal">
+            <rect x="10" y="10" width="310" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">Reference Equality (class)</text>
+            <rect x="40" y="42" width="100" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="90" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Addr: 0x01</text>
+            <rect x="180" y="42" width="100" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="230" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Addr: 0x02</text>
+            <text x="155" y="58" text-anchor="middle" fill="#ef4444" font-size="14" font-weight="bold">&#x2260;</text>
+            <text x="165" y="90" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Same data, different address</text>
+            <text x="165" y="118" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">Equals() = false</text>
+            <rect x="380" y="10" width="310" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Value Equality (record)</text>
+            <rect x="410" y="42" width="100" height="24" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="460" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Name: Widget</text>
+            <rect x="550" y="42" width="100" height="24" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="600" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Name: Widget</text>
+            <text x="527" y="58" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="bold">=</text>
+            <text x="535" y="90" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Same data = equal</text>
+            <text x="535" y="118" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Equals() = true</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">EqualityTrap.cs</span></div>
             <div class="macos-body">
@@ -2524,6 +2692,32 @@ original.Equals(clone)   // true! Records compare by property values</code></pre
           <p class="body-text"><strong>Mistake:</strong> Using JSON serialization for cloning when some properties are marked <code>[JsonIgnore]</code>.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Serialization-based cloning (serialize to JSON, then deserialize back) is incredibly convenient — it handles nested objects, collections, and complex graphs with zero manual code. Developers reach for it as a "universal deep clone" solution. The trap is that serializers only see properties that are configured for serialization. Properties marked <code>[JsonIgnore]</code> (hidden from API responses for security reasons, like password hashes or internal tokens) are also hidden from the clone. The serializer doesn't know you're cloning — it just does its job of ignoring what you told it to ignore.</p>
           <p class="body-text">Private fields, calculated properties, and properties with custom converters are also at risk. If the serializer can't see it, it can't clone it. The data is silently lost — no error, no warning.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="JSON serialization clone silently drops JsonIgnore properties">
+            <rect x="10" y="10" width="680" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="350" y="32" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">JSON Clone Drops [JsonIgnore] Fields</text>
+            <rect x="30" y="46" width="150" height="70" rx="5" fill="var(--accent-primary)" fill-opacity="0.1" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="105" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" font-weight="bold">Original</text>
+            <text x="105" y="78" text-anchor="middle" fill="#22c55e" font-size="9">Name = "Alice"</text>
+            <text x="105" y="92" text-anchor="middle" fill="#22c55e" font-size="9">PwdHash = "x7f..."</text>
+            <text x="105" y="106" text-anchor="middle" fill="#22c55e" font-size="9">Avatar = [bytes]</text>
+            <line x1="190" y1="80" x2="280" y2="80" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.5" marker-end="url(#pp9-arr)"/>
+            <text x="235" y="74" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Serialize</text>
+            <rect x="290" y="52" width="140" height="56" rx="5" fill="var(--accent-primary)" fill-opacity="0.1" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="360" y="68" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" font-weight="bold">JSON</text>
+            <text x="360" y="84" text-anchor="middle" fill="#22c55e" font-size="9">"Name": "Alice"</text>
+            <text x="360" y="98" text-anchor="middle" fill="#ef4444" font-size="9" font-style="italic">PwdHash: GONE</text>
+            <line x1="440" y1="80" x2="510" y2="80" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.5" marker-end="url(#pp9-arr)"/>
+            <text x="475" y="74" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Deserialize</text>
+            <rect x="520" y="46" width="150" height="70" rx="5" fill="var(--accent-primary)" fill-opacity="0.1" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="595" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" font-weight="bold">Clone</text>
+            <text x="595" y="78" text-anchor="middle" fill="#22c55e" font-size="9">Name = "Alice"</text>
+            <text x="595" y="92" text-anchor="middle" fill="#ef4444" font-size="9">PwdHash = ""</text>
+            <text x="595" y="106" text-anchor="middle" fill="#ef4444" font-size="9">Avatar = empty</text>
+            <text x="350" y="132" text-anchor="middle" fill="#ef4444" font-size="11" font-style="italic">Data silently lost — no error, no warning</text>
+            <defs>
+              <marker id="pp9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path fill="var(--text-primary, #e2e8f0)" d="M0,0 L8,3 L0,6Z"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">JsonIgnoreTrap.cs</span></div>
             <div class="macos-body">
@@ -2567,6 +2761,28 @@ public UserProfile DeepClone() =&gt; new()
           <p class="body-text"><strong>Mistake:</strong> Cloning a service that has DI-injected dependencies (logger, repository, HttpClient).</p>
           <p class="body-text"><strong>Why This Happens:</strong> In ASP.NET Core, the <span class="tooltip-trigger">DI container<span class="tooltip-content">Microsoft.Extensions.DependencyInjection — the built-in dependency injection container in ASP.NET Core. It manages object creation, lifetime tracking (Transient = new per request, Scoped = one per HTTP request, Singleton = one for the app), and disposal. Cloned objects bypass this management entirely.</span></span> manages object lifetimes carefully. A <span class="tooltip-trigger">Scoped<span class="tooltip-content">One instance per HTTP request / scope. Created when the scope starts, disposed when it ends. Ideal for DbContext, per-request state.</span></span> service like <code>DbContext</code> is created at the start of an HTTP request and disposed at the end. A <span class="tooltip-trigger">Transient<span class="tooltip-content">A new instance every time the service is requested from the container. No reuse, no sharing.</span></span> service gets a fresh instance each time. When you clone a service, the DI container has no idea the clone exists. It doesn't track the clone's lifetime, doesn't dispose it, and the clone might hold onto Scoped dependencies that have already been disposed.</p>
           <p class="body-text">Think of it like this: the DI container is a hotel front desk that tracks which rooms are occupied. Cloning a guest (service) without telling the front desk means the hotel doesn't know there's a second person in the building. When checkout time comes, they only evict the registered guest — the clone stays behind, using resources nobody is tracking.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Cloning a DI-managed service bypasses container lifetime tracking">
+            <rect x="10" y="10" width="310" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="2"/>
+            <text x="165" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">Clone a Service</text>
+            <rect x="90" y="40" width="150" height="24" rx="4" fill="var(--accent-primary)" fill-opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="165" y="56" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">DI Container</text>
+            <line x1="165" y1="64" x2="105" y2="78" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <line x1="165" y1="64" x2="225" y2="78" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <rect x="50" y="78" width="110" height="22" rx="4" fill="#22c55e" fill-opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+            <text x="105" y="93" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Service (tracked)</text>
+            <rect x="170" y="78" width="110" height="22" rx="4" fill="#ef4444" fill-opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+            <text x="225" y="93" text-anchor="middle" fill="#ef4444" font-size="9">Clone (ghost!)</text>
+            <text x="165" y="125" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">DI won't dispose the clone</text>
+            <rect x="380" y="10" width="310" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="2"/>
+            <text x="535" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">Clone Data, Not Services</text>
+            <rect x="400" y="45" width="100" height="22" rx="4" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+            <text x="450" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">OrderData</text>
+            <text x="510" y="60" fill="var(--text-primary, #e2e8f0)" font-size="11">clone this</text>
+            <rect x="400" y="78" width="130" height="22" rx="4" fill="var(--accent-primary)" fill-opacity="0.1" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="465" y="93" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">OrderProcessor</text>
+            <text x="545" y="93" fill="var(--text-primary, #e2e8f0)" font-size="11">DI resolves</text>
+            <text x="535" y="125" text-anchor="middle" fill="#22c55e" font-size="11" font-style="italic">Services from DI, data cloned</text>
+          </svg>
           <div class="macos-window mt-sm mb-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DiCloneTrap.cs</span></div>
             <div class="macos-body">

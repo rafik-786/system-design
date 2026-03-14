@@ -16,7 +16,7 @@
 <body data-accent="green" style="opacity:0">
 
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2640,6 +2640,42 @@ public void NotifyAll(decimal price)
           <p class="body-text"><strong>Mistake:</strong> Subscribing to an event with <code>+=</code> but never calling <code>-=</code>. The publisher's delegate list holds a strong reference to the subscriber, preventing garbage collection even after the subscriber is "gone."</p>
           <p class="body-text"><strong>Why This Happens:</strong> It feels natural to subscribe in a constructor &mdash; "I need this data, let me sign up." But developers often forget the second half: cleaning up when done. In most code, you create an object and trust the garbage collector to clean it up. But event subscriptions are different &mdash; they create a hidden reference from the publisher to the subscriber. If the publisher lives longer than the subscriber (which is very common with singletons, static services, or application-level objects), the subscriber can never be garbage-collected. It's like signing up for a mailing list and never unsubscribing &mdash; the mail keeps coming, and your mailbox fills up forever.</p>
           <p class="body-text"><strong>Why Bad:</strong> Long-lived publishers (singletons, static services) keep every short-lived subscriber (ViewModels, dialogs) alive forever. Memory grows until OOM crash. Classic in WPF/MAUI apps.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Memory leak from missing unsubscribe vs proper disposal">
+            <defs>
+              <marker id="op1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker>
+              <marker id="op1-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+            </defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — never unsubscribes</text>
+            <rect x="30" y="42" width="110" height="28" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="85" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">StockService</text>
+            <text x="85" y="37" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8" opacity="0.6">lives forever</text>
+            <line x1="140" y1="50" x2="175" y2="42" stroke="#ef4444" stroke-width="1.2" marker-end="url(#op1-arr-r)"/>
+            <line x1="140" y1="56" x2="175" y2="56" stroke="#ef4444" stroke-width="1.2" marker-end="url(#op1-arr-r)"/>
+            <line x1="140" y1="62" x2="175" y2="70" stroke="#ef4444" stroke-width="1.2" marker-end="url(#op1-arr-r)"/>
+            <rect x="178" y="32" width="75" height="20" rx="3" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+            <text x="215" y="46" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Panel 1 (dead)</text>
+            <rect x="178" y="54" width="75" height="20" rx="3" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+            <text x="215" y="68" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Panel 2 (dead)</text>
+            <rect x="178" y="76" width="75" height="20" rx="3" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+            <text x="215" y="90" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Panel 3 (dead)</text>
+            <text x="265" y="50" text-anchor="start" fill="#ef4444" font-size="16">&#x1F6AB;</text>
+            <text x="267" y="72" text-anchor="start" fill="#ef4444" font-size="8">Can't GC!</text>
+            <text x="170" y="118" text-anchor="middle" fill="#ef4444" font-size="10">Strong refs keep dead objects alive</text>
+            <text x="170" y="132" text-anchor="middle" fill="#ef4444" font-size="10">Memory grows until OOM crash</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — Dispose() unsubscribes</text>
+            <rect x="390" y="45" width="110" height="28" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="445" y="64" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">StockService</text>
+            <line x1="500" y1="59" x2="535" y2="59" stroke="#22c55e" stroke-width="1.2" marker-end="url(#op1-arr)"/>
+            <rect x="538" y="45" width="80" height="28" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="578" y="64" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Panel (alive)</text>
+            <text x="578" y="85" text-anchor="middle" fill="#22c55e" font-size="9">Dispose() calls -=</text>
+            <text x="530" y="110" text-anchor="middle" fill="#22c55e" font-size="10">Every += has a matching -=</text>
+            <text x="530" y="125" text-anchor="middle" fill="#22c55e" font-size="10">Dead panels get GC'd normally</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadUnsubscribe.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2688,6 +2724,31 @@ public void NotifyAll(decimal price)
           <p class="body-text"><strong>Mistake:</strong> An observer's <code>Update()</code> calls <code>Unsubscribe()</code> while the subject is iterating its observer list. The <code>foreach</code> throws <code>InvalidOperationException: Collection was modified</code>.</p>
           <p class="body-text"><strong>Why This Happens:</strong> It seems perfectly logical &mdash; an observer receives a notification and decides "I'm done, I don't need more updates." So it calls <code>Unsubscribe()</code> right there inside the handler. The problem is timing: the subject is currently looping through its observer list to send notifications, and removing an item from the list while the loop is running breaks the iteration. Developers don't think about this because the subscription and notification code are usually in different files, so the conflict isn't visible.</p>
           <p class="body-text"><strong>Why Bad:</strong> Intermittent crash that only happens when an observer decides to self-unsubscribe during a notification. Hard to reproduce in testing.</p>
+          <svg viewBox="0 0 700 155" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Modifying list during iteration vs iterating a snapshot">
+            <defs><marker id="op2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — iterating live list</text>
+            <rect x="30" y="40" width="200" height="30" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="50" y="60" fill="var(--text-primary, #e2e8f0)" font-size="10">[ A, B, C ]</text>
+            <text x="175" y="60" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.6">foreach &#8594;</text>
+            <line x1="80" y1="75" x2="80" y2="90" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="3"/>
+            <text x="82" y="103" fill="#ef4444" font-size="10">B calls Unsubscribe()</text>
+            <text x="82" y="117" fill="#ef4444" font-size="10">removes itself mid-loop</text>
+            <text x="170" y="138" text-anchor="middle" fill="#ef4444" font-size="11">Collection modified! CRASH</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — iterate a snapshot</text>
+            <rect x="390" y="40" width="135" height="26" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="400" y="58" fill="var(--text-primary, #e2e8f0)" font-size="10">_observers (live)</text>
+            <text x="530" y="55" fill="#22c55e" font-size="12">.ToList()</text>
+            <text x="530" y="70" text-anchor="middle" fill="#22c55e" font-size="9">&#8594;</text>
+            <rect x="560" y="40" width="115" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="570" y="58" fill="var(--text-primary, #e2e8f0)" font-size="10">snapshot copy</text>
+            <text x="530" y="95" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">foreach iterates the copy</text>
+            <text x="530" y="112" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">B unsubscribes from original</text>
+            <text x="530" y="130" text-anchor="middle" fill="#22c55e" font-size="11">Copy is unaffected — no crash</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadIteration.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2728,6 +2789,34 @@ foreach (var obs in _observers.ToList())  // .ToList() = independent copy
           <p class="body-text"><strong>Mistake:</strong> Subject fires events from a background thread (timer, SignalR). Observer tries to update a UI element directly.</p>
           <p class="body-text"><strong>Why This Happens:</strong> When you write an observer handler, you're thinking about <em>what</em> to do with the data, not <em>which thread</em> it arrives on. The handler says "update the label text" which seems harmless. But UI frameworks (WPF, MAUI, WinForms) require that all UI updates happen on a specific "main" thread. If your subject fires from a background timer or a SignalR callback, the handler runs on that background thread &mdash; and trying to touch a UI element from the wrong thread causes an immediate crash.</p>
           <p class="body-text"><strong>Why Bad:</strong> WPF/MAUI throw <code>InvalidOperationException: "The calling thread cannot access this object because a different thread owns it."</code> Crashes your app immediately.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Wrong thread accessing UI vs marshalling to UI thread">
+            <defs><marker id="op3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — background thread hits UI</text>
+            <rect x="30" y="42" width="100" height="26" rx="4" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="80" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">BG Thread</text>
+            <line x1="130" y1="55" x2="165" y2="55" stroke="#ef4444" stroke-width="1.5" marker-end="url(#op3-arr)"/>
+            <rect x="168" y="42" width="100" height="26" rx="4" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+            <text x="218" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Label.Text =</text>
+            <text x="285" y="60" fill="#ef4444" font-size="16">&#x26A0;</text>
+            <text x="170" y="90" text-anchor="middle" fill="#ef4444" font-size="10">"Different thread owns this object"</text>
+            <text x="170" y="108" text-anchor="middle" fill="#ef4444" font-size="11">InvalidOperationException!</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — marshal to UI thread</text>
+            <rect x="390" y="45" width="80" height="26" rx="4" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="430" y="63" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">BG Thread</text>
+            <line x1="470" y1="58" x2="500" y2="58" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.2" marker-end="url(#op3-arr)"/>
+            <rect x="503" y="42" width="90" height="32" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="548" y="56" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Dispatcher</text>
+            <text x="548" y="68" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">BeginInvoke</text>
+            <line x1="548" y1="74" x2="548" y2="92" stroke="#22c55e" stroke-width="1.2" marker-end="url(#op3-arr)"/>
+            <rect x="503" y="95" width="90" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="548" y="111" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Label.Text =</text>
+            <text x="600" y="111" fill="#22c55e" font-size="12">&#x2713;</text>
+            <text x="430" y="120" text-anchor="middle" fill="#22c55e" font-size="10">UI thread</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadThread.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2771,6 +2860,48 @@ priceStream
           <p class="body-text"><strong>Mistake:</strong> One observer makes a database call or HTTP request inside <code>OnNext()</code>. The synchronous notification loop blocks every observer after it.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Developers think of observer handlers like any other method &mdash; "I need to save this data, so I'll write to the database right here." What they forget is that the notification loop is <strong>synchronous</strong>. The subject calls observer 1, waits for it to finish, then calls observer 2, and so on. If observer 1 makes a 2-second database call, every other observer sits idle for those 2 seconds. In a UI app, the entire screen freezes. In a server app, the thread is blocked for no good reason.</p>
           <p class="body-text"><strong>Why Bad:</strong> Your 10ms event becomes a 2-second freeze. All downstream observers are delayed. In UI apps, the screen locks up.</p>
+          <svg viewBox="0 0 700 155" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Heavy observer blocking the chain vs offloading to a queue">
+            <defs><marker id="op4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — heavy work inline</text>
+            <rect x="25" y="42" width="50" height="22" rx="4" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="50" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Notify</text>
+            <line x1="75" y1="53" x2="95" y2="53" stroke="var(--text-primary, #e2e8f0)" stroke-width="1" marker-end="url(#op4-arr)"/>
+            <rect x="98" y="40" width="80" height="28" rx="4" fill="#ef4444" opacity="0.2" stroke="#ef4444"/>
+            <text x="138" y="52" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Observer 1</text>
+            <text x="138" y="63" text-anchor="middle" fill="#ef4444" font-size="8">HTTP + DB = 2.5s</text>
+            <line x1="178" y1="53" x2="198" y2="53" stroke="#ef4444" stroke-width="1" stroke-dasharray="3"/>
+            <rect x="200" y="42" width="60" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1" opacity="0.5"/>
+            <text x="230" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.5">Obs 2</text>
+            <rect x="265" y="42" width="55" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1" opacity="0.5"/>
+            <text x="292" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.5">Obs 3</text>
+            <text x="248" y="80" text-anchor="middle" fill="#ef4444" font-size="9">waiting...</text>
+            <rect x="25" y="95" width="295" height="14" rx="3" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1"/>
+            <rect x="25" y="95" width="200" height="14" rx="3" fill="#ef4444" opacity="0.3"/>
+            <text x="125" y="106" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">2.5 seconds blocked</text>
+            <text x="170" y="130" text-anchor="middle" fill="#ef4444" font-size="10">Everyone waits for the slow observer</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — offload to queue</text>
+            <rect x="385" y="42" width="50" height="22" rx="4" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="410" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Notify</text>
+            <line x1="435" y1="53" x2="455" y2="53" stroke="#22c55e" stroke-width="1" marker-end="url(#op4-arr)"/>
+            <rect x="458" y="40" width="75" height="28" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="495" y="52" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Observer 1</text>
+            <text x="495" y="63" text-anchor="middle" fill="#22c55e" font-size="8">queue.Write()</text>
+            <line x1="533" y1="53" x2="553" y2="53" stroke="#22c55e" stroke-width="1" marker-end="url(#op4-arr)"/>
+            <rect x="556" y="42" width="55" height="22" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="583" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Obs 2</text>
+            <line x1="611" y1="53" x2="631" y2="53" stroke="#22c55e" stroke-width="1" marker-end="url(#op4-arr)"/>
+            <rect x="634" y="42" width="45" height="22" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="656" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Obs 3</text>
+            <rect x="385" y="80" width="295" height="14" rx="3" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1"/>
+            <rect x="385" y="80" width="30" height="14" rx="3" fill="#22c55e" opacity="0.3"/>
+            <text x="530" y="91" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">microseconds — all observers done instantly</text>
+            <text x="530" y="115" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Heavy work happens in background worker</text>
+            <text x="530" y="132" text-anchor="middle" fill="#22c55e" font-size="10">No one blocks anyone</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadHeavyWork.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2822,6 +2953,38 @@ private async Task ProcessAsync(CancellationToken ct)
           <p class="body-text"><strong>Mistake:</strong> Observer A modifies Subject B, which notifies Observer C, which modifies Subject A again. Infinite loop or stack overflow.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Each observer handler looks innocent on its own. Observer A says "when X changes, update Y." Observer C says "when Y changes, update X." Neither developer knows about the other's handler because they're in different files, possibly written by different team members. The circular dependency is invisible until runtime, when it manifests as a <code>StackOverflowException</code> or an infinite hang.</p>
           <p class="body-text"><strong>Why Bad:</strong> Nightmarish to debug &mdash; the stack trace shows a loop with no clear entry point. The circular dependency is often spread across multiple files.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Circular notification loop vs re-entrancy guard">
+            <defs>
+              <marker id="op5-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+              <marker id="op5-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+            </defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — infinite ping-pong</text>
+            <rect x="55" y="50" width="90" height="30" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+            <text x="100" y="70" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Celsius</text>
+            <rect x="200" y="50" width="100" height="30" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+            <text x="250" y="70" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Fahrenheit</text>
+            <path d="M145 58 Q172 40 200 58" stroke="#ef4444" stroke-width="1.5" fill="none" marker-end="url(#op5-arr-r)"/>
+            <text x="172" y="44" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">updates</text>
+            <path d="M200 72 Q172 90 145 72" stroke="#ef4444" stroke-width="1.5" fill="none" marker-end="url(#op5-arr-r)"/>
+            <text x="172" y="100" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">updates back</text>
+            <text x="170" y="125" text-anchor="middle" fill="#ef4444" font-size="11">StackOverflowException</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — re-entrancy guard</text>
+            <rect x="405" y="50" width="90" height="30" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="450" y="70" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Celsius</text>
+            <rect x="560" y="50" width="100" height="30" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="610" y="70" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Fahrenheit</text>
+            <path d="M495 58 Q530 40 560 58" stroke="#22c55e" stroke-width="1.5" fill="none" marker-end="url(#op5-arr-g)"/>
+            <text x="527" y="44" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">updates</text>
+            <path d="M560 72 Q530 90 495 72" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.2" fill="none" stroke-dasharray="4" opacity="0.4"/>
+            <text x="527" y="100" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8" opacity="0.5">tries to update</text>
+            <rect x="480" y="88" width="16" height="16" rx="3" fill="#ef4444" opacity="0.8"/>
+            <text x="488" y="100" text-anchor="middle" fill="white" font-size="10" font-weight="bold">&#x2717;</text>
+            <text x="530" y="125" text-anchor="middle" fill="#22c55e" font-size="10">_updating flag = true? Return early!</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadCircular.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2865,6 +3028,33 @@ celsius.Changed += (s, c) =>
           <p class="body-text"><strong>Mistake:</strong> Reaching for events/Observer when there's exactly one listener. Adding subscribe/unsubscribe ceremony for a single consumer.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Developers learn about Observer and events, and then start using them everywhere because it feels "clean" or "decoupled." But Observer is designed for one-to-<em>many</em> broadcasting. When there's exactly one consumer, an event is ceremony without benefit. You're adding subscription management, potential memory leak surface area, and harder-to-trace data flow &mdash; all for a scenario where a simple callback delegate would do the job perfectly.</p>
           <p class="body-text"><strong>Why Bad:</strong> Premature Observer adds complexity: potential memory leaks, harder to trace data flow, subscribe/unsubscribe boilerplate. All for zero benefit when there's only one consumer.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Event for one listener vs simple callback">
+            <defs><marker id="op6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — event for 1 listener</text>
+            <rect x="30" y="42" width="110" height="26" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+            <text x="85" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">FileProcessor</text>
+            <text x="85" y="78" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.7">event ProgressChanged</text>
+            <line x1="140" y1="55" x2="175" y2="55" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="3" marker-end="url(#op6-arr)"/>
+            <text x="157" y="48" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">+=</text>
+            <rect x="178" y="42" width="100" height="26" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="228" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">1 listener</text>
+            <text x="170" y="100" text-anchor="middle" fill="#ef4444" font-size="10">subscribe + track + unsubscribe</text>
+            <text x="170" y="116" text-anchor="middle" fill="#ef4444" font-size="10">...all for ONE consumer</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — simple callback</text>
+            <rect x="390" y="42" width="110" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="445" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">FileProcessor</text>
+            <text x="445" y="78" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.7">Process(onProgress)</text>
+            <line x1="500" y1="55" x2="545" y2="55" stroke="#22c55e" stroke-width="1.5" marker-end="url(#op6-arr)"/>
+            <text x="522" y="48" text-anchor="middle" fill="#22c55e" font-size="9">call</text>
+            <rect x="548" y="42" width="120" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="608" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">pct => bar.Value</text>
+            <text x="530" y="95" text-anchor="middle" fill="#22c55e" font-size="10">No subscribe, no unsubscribe</text>
+            <text x="530" y="112" text-anchor="middle" fill="#22c55e" font-size="10">No leak risk, no ceremony</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadOveruse.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2910,6 +3100,36 @@ celsius.Changed += (s, c) =>
           <p class="body-text"><strong>Mistake:</strong> Checking <code>if (EventHandler != null)</code> then invoking on the next line. Between those two lines, another thread unsubscribes.</p>
           <p class="body-text"><strong>Why This Happens:</strong> It looks safe: "I checked if the event has subscribers, and it does, so I'll invoke it." The problem is that between the null check and the invoke, another thread can unsubscribe &mdash; setting the delegate back to null. By the time <code>.Invoke()</code> runs, the handler is null, and you get a <code>NullReferenceException</code>. This is a race condition, and it's devilishly hard to reproduce because it requires exact timing between two threads.</p>
           <p class="body-text"><strong>Why Bad:</strong> NullReferenceException or missed events. Classic race condition that's impossible to reproduce reliably in tests.</p>
+          <svg viewBox="0 0 700 155" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Race condition between null check and invoke vs atomic null-conditional">
+            <defs><marker id="op7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — gap between check and invoke</text>
+            <!-- Timeline -->
+            <text x="25" y="52" fill="var(--text-primary, #e2e8f0)" font-size="9" font-weight="bold">Thread A:</text>
+            <rect x="100" y="42" width="100" height="18" rx="3" fill="var(--accent-primary)" opacity="0.25"/>
+            <text x="150" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">if (evt != null)</text>
+            <rect x="220" y="42" width="90" height="18" rx="3" fill="#ef4444" opacity="0.25"/>
+            <text x="265" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">.Invoke() BOOM!</text>
+            <text x="25" y="78" fill="var(--text-primary, #e2e8f0)" font-size="9" font-weight="bold">Thread B:</text>
+            <rect x="170" y="68" width="80" height="18" rx="3" fill="#ef4444" opacity="0.3"/>
+            <text x="210" y="81" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">evt -= handler</text>
+            <!-- Arrow showing the gap -->
+            <line x1="200" y1="60" x2="200" y2="68" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="2"/>
+            <text x="215" y="100" fill="#ef4444" font-size="9">Thread B sneaks in between!</text>
+            <text x="170" y="120" text-anchor="middle" fill="#ef4444" font-size="10">evt is null when Invoke runs</text>
+            <text x="170" y="135" text-anchor="middle" fill="#ef4444" font-size="10">NullReferenceException!</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — atomic ?.Invoke()</text>
+            <text x="385" y="55" fill="var(--text-primary, #e2e8f0)" font-size="9" font-weight="bold">Thread A:</text>
+            <rect x="460" y="42" width="160" height="22" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="540" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">evt?.Invoke(this, price)</text>
+            <text x="385" y="82" fill="var(--text-primary, #e2e8f0)" font-size="9" font-weight="bold">Thread B:</text>
+            <text x="460" y="82" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.5">can't interfere — it's one operation</text>
+            <text x="530" y="110" text-anchor="middle" fill="#22c55e" font-size="10">?. reads + null-checks + invokes</text>
+            <text x="530" y="127" text-anchor="middle" fill="#22c55e" font-size="10">atomically — no gap to exploit</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadNullCheck.cs &mdash; &#10060;</span></div>
             <div class="macos-body">
@@ -2950,6 +3170,35 @@ private void OnPriceChanged(decimal price)
           <p class="body-text"><strong>Mistake:</strong> Making the observer list public: <code>public List&lt;IObserver&gt; Observers { get; }</code>. Anyone can bypass your subscribe/unsubscribe logic.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer thinks "I'll expose the observer list so callers can add themselves directly &mdash; it's simpler than writing Subscribe/Unsubscribe methods." The problem is that exposing the raw list lets anyone do anything: clear all subscribers, add duplicates, remove someone else's subscription, or iterate in ways that aren't thread-safe. You lose all control over the subscription lifecycle.</p>
           <p class="body-text"><strong>Why Bad:</strong> Callers can <code>.Clear()</code> the list, add duplicates, or remove others' subscriptions. Bypasses validation, locking, and logging. Subtle bugs that are nearly impossible to trace.</p>
+          <svg viewBox="0 0 700 155" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Exposed observer list vs encapsulated subscribe method">
+            <defs><marker id="op8-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+            <!-- Bad side -->
+            <rect x="10" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — public list exposed</text>
+            <rect x="30" y="40" width="120" height="30" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="90" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Broadcaster</text>
+            <rect x="170" y="38" width="140" height="34" rx="5" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+            <text x="240" y="52" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">public List&lt;IObserver&gt;</text>
+            <text x="240" y="66" text-anchor="middle" fill="#ef4444" font-size="9">wide open!</text>
+            <text x="170" y="90" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.7">Anyone can:</text>
+            <text x="75" y="108" text-anchor="middle" fill="#ef4444" font-size="9">.Clear()</text>
+            <text x="170" y="108" text-anchor="middle" fill="#ef4444" font-size="9">.Add(dup)</text>
+            <text x="265" y="108" text-anchor="middle" fill="#ef4444" font-size="9">.Remove(other)</text>
+            <text x="170" y="130" text-anchor="middle" fill="#ef4444" font-size="10">No control over who does what</text>
+            <!-- Good side -->
+            <rect x="370" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — private list, public API</text>
+            <rect x="400" y="40" width="120" height="30" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+            <text x="460" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Broadcaster</text>
+            <rect x="540" y="38" width="130" height="34" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="605" y="52" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">private List&lt;IObserver&gt;</text>
+            <text x="605" y="66" text-anchor="middle" fill="#22c55e" font-size="9">locked down</text>
+            <rect x="420" y="85" width="100" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="470" y="101" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Subscribe()</text>
+            <rect x="540" y="85" width="100" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+            <text x="590" y="101" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Dispose()</text>
+            <text x="530" y="130" text-anchor="middle" fill="#22c55e" font-size="10">Only 2 operations — full control</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BadExposed.cs &mdash; &#10060;</span></div>
             <div class="macos-body">

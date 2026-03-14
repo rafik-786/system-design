@@ -17,7 +17,7 @@
 
 <!-- ========== TOP TOOLBAR ========== -->
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2178,6 +2178,34 @@ public record UserRecord(int Id, string Email);
           <p class="body-text">The classic example: making a <code>Stack</code> inherit from <code>List&lt;T&gt;</code>. You get <code>Push</code> and <code>Pop</code> for free (sort of), but you also inherit <code>Insert()</code>, <code>RemoveAt()</code>, and <code>Add()</code>. Those operations let someone stick items in the middle of the stack or remove from arbitrary positions. That completely breaks the <span class="tooltip-trigger">LIFO contract<span class="tooltip-content">Last-In-First-Out: a stack only allows Push (add to top) and Pop (remove from top). Inheriting from List exposes Insert-at-index and Remove-at-index, which break the LIFO invariant. Java's Stack class actually makes this mistake — it extends Vector.</span></span>. A user who treats your Stack as a List will use it in ways your Stack never intended.</p>
           <p class="body-text">Java made this exact mistake: <code>java.util.Stack</code> extends <code>Vector</code>. Any code that holds a <code>Vector</code> reference to a <code>Stack</code> can call <code>insertElementAt()</code> and break the LIFO ordering. This has been a well-known design flaw since the 1990s.</p>
 
+          <svg viewBox="0 0 520 200" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Inheritance vs Composition for Stack">
+            <defs>
+              <marker id="lsp-p1-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p1-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad side -->
+            <text x="130" y="18" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Inheritance (leaks methods)</text>
+            <rect x="15" y="28" width="110" height="40" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="70" y="53" text-anchor="middle" fill="#c0392b" font-size="12" font-weight="600">List&lt;T&gt;</text>
+            <text x="70" y="84" text-anchor="middle" fill="#888" font-size="10">Add, Insert, RemoveAt...</text>
+            <line x1="70" y1="68" x2="70" y2="100" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p1-arr-r)"/>
+            <rect x="15" y="102" width="110" height="40" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="70" y="127" text-anchor="middle" fill="#c0392b" font-size="12" font-weight="600">MyStack&lt;T&gt;</text>
+            <rect x="140" y="108" width="100" height="28" rx="4" fill="#fdd" stroke="#e74c3c" stroke-dasharray="4"/>
+            <text x="190" y="126" text-anchor="middle" fill="#c0392b" font-size="10">Insert() exposed!</text>
+            <text x="130" y="175" text-anchor="middle" fill="#e74c3c" font-size="11" font-weight="600">LIFO broken</text>
+            <!-- Good side -->
+            <text x="400" y="18" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Composition (controls API)</text>
+            <rect x="335" y="28" width="130" height="40" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="400" y="53" text-anchor="middle" fill="#1e8449" font-size="12" font-weight="600">MyStack&lt;T&gt;</text>
+            <text x="400" y="84" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Push(), Pop(), Count</text>
+            <line x1="400" y1="68" x2="400" y2="110" stroke="#27ae60" stroke-width="1.5" stroke-dasharray="5" marker-end="url(#lsp-p1-arr-g)"/>
+            <rect x="345" y="112" width="110" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="400" y="128" text-anchor="middle" fill="#888" font-size="10">private List&lt;T&gt;</text>
+            <text x="400" y="140" text-anchor="middle" fill="#888" font-size="9">(hidden inside)</text>
+            <text x="400" y="175" text-anchor="middle" fill="#27ae60" font-size="11" font-weight="600">LIFO enforced</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2238,6 +2266,42 @@ public class MyStack&lt;T&gt;
           <p class="body-text"><strong>Why This Happens:</strong> You're building a class that needs to implement an interface, but one or two methods don't apply to your situation. The deadline is approaching, so you stub them out with <code>throw new NotImplementedException()</code> or <code>throw new NotSupportedException()</code>. Visual Studio even generates this as the default implementation when you auto-implement an interface. It feels safe because the code compiles, the other methods work, and "nobody calls that method anyway."</p>
           <p class="body-text">But here's the trap: the interface is a <em>promise</em>. When code accepts an <code>IFileStorage</code>, it trusts that every method works. If <code>Delete()</code> throws <code>NotImplementedException</code>, any code path that calls <code>Delete()</code> will crash at runtime. The compiler can't catch this because the method signature is satisfied; only the behavior is broken. This is LSP at its core: the subtype doesn't honor the contract the interface promises.</p>
 
+          <svg viewBox="0 0 520 190" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="NotImplementedException breaks the interface promise">
+            <defs>
+              <marker id="lsp-p2-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p2-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad side -->
+            <text x="130" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Fat interface, partial impl</text>
+            <rect x="30" y="26" width="200" height="44" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="130" y="44" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">IFileStorage</text>
+            <text x="130" y="60" text-anchor="middle" fill="#888" font-size="10">Read() | Write() | Delete()</text>
+            <line x1="130" y1="70" x2="130" y2="96" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p2-arr-r)"/>
+            <rect x="30" y="98" width="200" height="44" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="130" y="116" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">ReadOnlyStorage</text>
+            <text x="80" y="132" text-anchor="middle" fill="#27ae60" font-size="10">Read()</text>
+            <text x="145" y="132" text-anchor="middle" fill="#e74c3c" font-size="10">Write()</text>
+            <text x="200" y="132" text-anchor="middle" fill="#e74c3c" font-size="10">Delete()</text>
+            <text x="175" y="160" text-anchor="middle" fill="#e74c3c" font-size="9">throw NotSupported!</text>
+            <!-- Good side -->
+            <text x="400" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Split interfaces</text>
+            <rect x="310" y="26" width="70" height="34" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="345" y="48" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">IFileReader</text>
+            <rect x="390" y="26" width="70" height="34" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="425" y="48" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">IFileWriter</text>
+            <rect x="470" y="26" width="45" height="34" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="492" y="48" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">IDeletor</text>
+            <line x1="345" y1="60" x2="345" y2="96" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p2-arr-g)"/>
+            <rect x="295" y="98" width="100" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="345" y="114" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">ReadOnlyStorage</text>
+            <text x="345" y="126" text-anchor="middle" fill="#27ae60" font-size="9">implements IFileReader only</text>
+            <rect x="410" y="98" width="100" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="460" y="114" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">FullStorage</text>
+            <text x="460" y="126" text-anchor="middle" fill="#27ae60" font-size="9">all three interfaces</text>
+            <line x1="425" y1="60" x2="460" y2="96" stroke="#27ae60" stroke-width="1" stroke-dasharray="4"/>
+            <line x1="492" y1="60" x2="460" y2="96" stroke="#27ae60" stroke-width="1" stroke-dasharray="4"/>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2295,6 +2359,40 @@ public class FullStorage : IFileReader, IFileWriter, IFileDeletor
           <p class="body-text"><strong>Why This Happens:</strong> You receive an interface reference, but one particular implementation needs special handling. Maybe circles need to be drawn differently, or premium customers need an extra step. So you write <code>if (shape is Circle)</code> to check the actual type at runtime. It feels like a quick, practical fix.</p>
           <p class="body-text">But every <code>is</code> or <code>as</code> check is a red flag. It means the interface abstraction has leaked. If the caller needs to know the concrete type, then the types aren't truly interchangeable. Every time a new subtype is added, someone has to update every <code>if-else</code> chain that checks types. This defeats the entire purpose of using interfaces and polymorphism in the first place.</p>
           <p class="body-text">Think of it like a restaurant. The waiter shouldn't need to know which brand of oven the kitchen uses. They just say "make this order" and trust the kitchen to figure it out. If the waiter starts checking "is this a gas oven? Then I need to adjust the temperature myself" that's a sign the kitchen isn't doing its job.</p>
+
+          <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Type-checking vs polymorphism">
+            <defs>
+              <marker id="lsp-p3-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p3-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: caller checks types -->
+            <text x="125" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Caller checks types</text>
+            <rect x="60" y="26" width="130" height="32" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="47" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">Render(IShape)</text>
+            <line x1="80" y1="58" x2="45" y2="88" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p3-arr-r)"/>
+            <line x1="125" y1="58" x2="125" y2="88" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p3-arr-r)"/>
+            <line x1="170" y1="58" x2="205" y2="88" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p3-arr-r)"/>
+            <text x="45" y="105" text-anchor="middle" fill="#c0392b" font-size="10">is Circle?</text>
+            <text x="125" y="105" text-anchor="middle" fill="#c0392b" font-size="10">is Rect?</text>
+            <text x="205" y="105" text-anchor="middle" fill="#c0392b" font-size="10">is ???</text>
+            <polygon points="125,130 145,145 125,160 105,145" fill="#fdd" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="149" text-anchor="middle" fill="#c0392b" font-size="8" font-weight="600">new shape?</text>
+            <text x="125" y="175" text-anchor="middle" fill="#e74c3c" font-size="10">must edit caller every time</text>
+            <!-- Good: polymorphism -->
+            <text x="400" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Each shape renders itself</text>
+            <rect x="340" y="26" width="120" height="32" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="400" y="47" text-anchor="middle" fill="#1e8449" font-size="11" font-weight="600">shape.Render()</text>
+            <line x1="400" y1="58" x2="340" y2="88" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p3-arr-g)"/>
+            <line x1="400" y1="58" x2="400" y2="88" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p3-arr-g)"/>
+            <line x1="400" y1="58" x2="460" y2="88" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p3-arr-g)"/>
+            <rect x="305" y="90" width="70" height="28" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="340" y="108" text-anchor="middle" fill="#1e8449" font-size="10">Circle</text>
+            <rect x="385" y="90" width="30" height="28" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="400" y="108" text-anchor="middle" fill="#1e8449" font-size="10">Rect</text>
+            <rect x="425" y="90" width="70" height="28" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="460" y="108" text-anchor="middle" fill="#1e8449" font-size="10">Triangle</text>
+            <text x="400" y="140" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">add new shape = zero caller changes</text>
+          </svg>
 
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
@@ -2356,6 +2454,38 @@ public void Render(IShape shape) =&gt; shape.Render(_canvas);</code></pre>
         <div class="collapsible-body">
           <p class="body-text"><strong>Why This Happens:</strong> In the real world, a square IS a rectangle (it's a rectangle with equal sides). So it feels natural to make <code>Square</code> extend <code>Rectangle</code> in code. The domain model matches the real world. What could go wrong?</p>
           <p class="body-text">The problem is that real-world categories are about <em>what things are</em>, but programming hierarchies are about <em>how things behave</em>. A <code>Rectangle</code> with mutable dimensions lets you set width and height independently. A <code>Square</code> can't allow that because both dimensions must always be equal. If Square overrides the width setter to also change the height, then code that says <code>rect.Width = 5; rect.Height = 10; assert(rect.Area == 50)</code> fails when <code>rect</code> is actually a Square (area becomes 100 instead of 50).</p>
+
+          <svg viewBox="0 0 520 200" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Square-Rectangle problem: domain is-a vs behavioral is-a">
+            <defs>
+              <marker id="lsp-p4-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p4-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad side -->
+            <text x="125" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Square extends Rectangle</text>
+            <rect x="55" y="26" width="140" height="36" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="42" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">Rectangle</text>
+            <text x="125" y="56" text-anchor="middle" fill="#888" font-size="9">Width, Height (independent)</text>
+            <line x1="125" y1="62" x2="125" y2="88" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p4-arr-r)"/>
+            <rect x="55" y="90" width="140" height="36" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="106" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">Square</text>
+            <text x="125" y="120" text-anchor="middle" fill="#888" font-size="9">Width = Height (coupled!)</text>
+            <rect x="30" y="138" width="190" height="26" rx="4" fill="#fdd" stroke="#e74c3c" stroke-dasharray="4"/>
+            <text x="125" y="155" text-anchor="middle" fill="#c0392b" font-size="10">W=5, H=10 => Area = 100 not 50</text>
+            <text x="125" y="185" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">Caller's assumption broken</text>
+            <!-- Good side -->
+            <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Separate types, shared interface</text>
+            <rect x="345" y="26" width="100" height="32" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="395" y="47" text-anchor="middle" fill="#1e8449" font-size="11" font-weight="600">IShape { Area }</text>
+            <line x1="370" y1="58" x2="340" y2="88" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p4-arr-g)"/>
+            <line x1="420" y1="58" x2="450" y2="88" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p4-arr-g)"/>
+            <rect x="285" y="90" width="110" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="340" y="106" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">Rectangle(W, H)</text>
+            <text x="340" y="120" text-anchor="middle" fill="#888" font-size="9">Area = W x H</text>
+            <rect x="405" y="90" width="100" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="455" y="106" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">Square(Side)</text>
+            <text x="455" y="120" text-anchor="middle" fill="#888" font-size="9">Area = S x S</text>
+            <text x="395" y="155" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">No shared mutable state, no surprises</text>
+          </svg>
 
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
@@ -2428,6 +2558,33 @@ public record Square(int Side) : IShape
           <p class="body-text"><strong>Why This Happens:</strong> An interface says <code>GetByIdAsync</code> returns an <code>Order</code>. The original SQL implementation always returns a valid order (throws if not found). Then someone writes a new implementation where sometimes the method silently returns <code>null</code>. Or a <code>Save()</code> method that does nothing because it's a test stub that accidentally leaked into production.</p>
           <p class="body-text">The developer thinks "I'm handling the edge case gracefully by returning null instead of throwing." But the caller was written to trust the original contract. It doesn't check for null. It chains method calls like <code>order.Items.Count</code> and gets a <code>NullReferenceException</code> three layers up the call stack, far from where the real problem is.</p>
 
+          <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Weakening postconditions: silent null vs explicit nullable">
+            <defs>
+              <marker id="lsp-p5-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p5-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: silent null -->
+            <text x="125" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Promise says non-null</text>
+            <rect x="40" y="26" width="170" height="32" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="47" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">Task&lt;Order&gt; GetByIdAsync()</text>
+            <line x1="125" y1="58" x2="125" y2="85" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p5-arr-r)"/>
+            <rect x="50" y="88" width="150" height="30" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="108" text-anchor="middle" fill="#c0392b" font-size="10" font-weight="600">CachedRepo returns null!</text>
+            <line x1="125" y1="118" x2="125" y2="142" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p5-arr-r)"/>
+            <text x="125" y="158" text-anchor="middle" fill="#c0392b" font-size="10">order.Items.Count</text>
+            <text x="125" y="174" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="700">NullReferenceException!</text>
+            <!-- Good: explicit nullable -->
+            <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Promise says nullable</text>
+            <rect x="300" y="26" width="190" height="32" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="395" y="47" text-anchor="middle" fill="#1e8449" font-size="11" font-weight="600">Task&lt;Order?&gt; GetByIdAsync()</text>
+            <line x1="395" y1="58" x2="395" y2="85" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p5-arr-g)"/>
+            <polygon points="395,88 425,108 395,128 365,108" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="395" y="112" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">null?</text>
+            <text x="340" y="142" text-anchor="middle" fill="#888" font-size="10">yes: handle</text>
+            <text x="450" y="142" text-anchor="middle" fill="#27ae60" font-size="10">no: use safely</text>
+            <text x="395" y="170" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Compiler warns if null not handled</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2484,6 +2641,43 @@ var total = order.Items.Sum(i =&gt; i.Price);  // Compiler warns if null not han
           <p class="body-text"><strong>Why This Happens:</strong> A developer overrides <code>Equals()</code> to compare by business key (email, SKU, etc.) but forgets to override <code>GetHashCode()</code> to match. Or they override both but base them on different fields. It's an easy mistake because the compiler only gives a warning (not an error), and the code seems to work in simple tests.</p>
           <p class="body-text">The <code>Object</code> class in .NET has a fundamental contract: if two objects are <code>Equal</code>, they must produce the same hash code. Hash-based collections (<code>Dictionary</code>, <code>HashSet</code>, LINQ's <code>Distinct()</code>) rely on this rule to work. They use the hash code to pick a bucket, then use <code>Equals</code> to compare within that bucket. If two "equal" objects land in different buckets, the collection will never realize they're the same.</p>
 
+          <svg viewBox="0 0 520 190" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Equals and GetHashCode must use the same fields">
+            <defs>
+              <marker id="lsp-p6-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p6-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: mismatched fields -->
+            <text x="130" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Different fields = broken</text>
+            <rect x="20" y="28" width="100" height="36" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="70" y="44" text-anchor="middle" fill="#c0392b" font-size="10" font-weight="600">Equals()</text>
+            <text x="70" y="58" text-anchor="middle" fill="#888" font-size="9">uses Email</text>
+            <rect x="140" y="28" width="100" height="36" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="190" y="44" text-anchor="middle" fill="#c0392b" font-size="10" font-weight="600">GetHashCode()</text>
+            <text x="190" y="58" text-anchor="middle" fill="#888" font-size="9">uses Id</text>
+            <line x1="70" y1="64" x2="70" y2="90" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p6-arr-r)"/>
+            <line x1="190" y1="64" x2="190" y2="90" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p6-arr-r)"/>
+            <rect x="20" y="92" width="100" height="28" rx="4" fill="#fff" stroke="#ccc"/>
+            <text x="70" y="110" text-anchor="middle" fill="#888" font-size="9">Bucket #3</text>
+            <rect x="140" y="92" width="100" height="28" rx="4" fill="#fff" stroke="#ccc"/>
+            <text x="190" y="110" text-anchor="middle" fill="#888" font-size="9">Bucket #7</text>
+            <text x="130" y="140" text-anchor="middle" fill="#e74c3c" font-size="10">"Equal" users in different buckets</text>
+            <text x="130" y="158" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="700">HashSet thinks they're different!</text>
+            <!-- Good: same fields -->
+            <text x="400" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Same field = correct</text>
+            <rect x="310" y="28" width="100" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="360" y="44" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">Equals()</text>
+            <text x="360" y="58" text-anchor="middle" fill="#888" font-size="9">uses Email</text>
+            <rect x="420" y="28" width="100" height="36" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="470" y="44" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">GetHashCode()</text>
+            <text x="470" y="58" text-anchor="middle" fill="#888" font-size="9">uses Email</text>
+            <line x1="360" y1="64" x2="400" y2="90" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p6-arr-g)"/>
+            <line x1="470" y1="64" x2="430" y2="90" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p6-arr-g)"/>
+            <rect x="370" y="92" width="90" height="28" rx="4" fill="#e8f8e8" stroke="#27ae60"/>
+            <text x="415" y="110" text-anchor="middle" fill="#1e8449" font-size="9">Same Bucket #3</text>
+            <text x="415" y="140" text-anchor="middle" fill="#27ae60" font-size="10">"Equal" users in same bucket</text>
+            <text x="415" y="158" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Collections work correctly</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2529,6 +2723,39 @@ public record User(int Id, string Email);</code></pre>
         <div class="collapsible-body">
           <p class="body-text"><strong>Why This Happens:</strong> A decorator or subtype seems like the perfect place to add caching, retry counts, or other stateful behavior. "I'll just wrap the original and cache the results for performance." But if the base type's contract implies that each method call is independent and stateless, introducing hidden state changes the observable behavior.</p>
           <p class="body-text">For example, a <code>CachingDecorator</code> around a stateless <code>IProductService</code> means the same call now returns different results depending on whether the cache is warm or cold. If another part of the system updates a product in the database, the cache still returns stale data. The original implementation always returned fresh data. That's a behavioral change the caller didn't ask for and doesn't know about.</p>
+
+          <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Hidden mutable state vs explicit cache interface">
+            <defs>
+              <marker id="lsp-p7-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p7-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: hidden cache -->
+            <text x="125" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Hidden cache state</text>
+            <rect x="40" y="26" width="170" height="30" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="125" y="46" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">CachingProductService</text>
+            <rect x="55" y="62" width="65" height="22" rx="4" fill="#fdd" stroke="#e74c3c" stroke-dasharray="3"/>
+            <text x="87" y="77" text-anchor="middle" fill="#c0392b" font-size="9">_cache{}</text>
+            <text x="170" y="77" text-anchor="middle" fill="#888" font-size="9">hidden from caller</text>
+            <text x="55" y="106" text-anchor="middle" fill="#888" font-size="9">Call 1:</text>
+            <text x="120" y="106" text-anchor="middle" fill="#27ae60" font-size="9">fresh</text>
+            <text x="55" y="122" text-anchor="middle" fill="#888" font-size="9">Call 2:</text>
+            <text x="120" y="122" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">stale!</text>
+            <text x="55" y="138" text-anchor="middle" fill="#888" font-size="9">DB update:</text>
+            <text x="135" y="138" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="600">still stale!</text>
+            <text x="125" y="168" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">Caller has no idea</text>
+            <!-- Good: explicit cache -->
+            <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Explicit cache interface</text>
+            <rect x="310" y="26" width="170" height="30" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="395" y="46" text-anchor="middle" fill="#1e8449" font-size="11" font-weight="600">ICachedProductService</text>
+            <rect x="315" y="64" width="75" height="22" rx="4" fill="#e8f8e8" stroke="#27ae60"/>
+            <text x="352" y="79" text-anchor="middle" fill="#1e8449" font-size="9">GetById()</text>
+            <rect x="395" y="64" width="85" height="22" rx="4" fill="#e8f8e8" stroke="#27ae60"/>
+            <text x="437" y="79" text-anchor="middle" fill="#1e8449" font-size="9">InvalidateCache()</text>
+            <rect x="315" y="92" width="75" height="22" rx="4" fill="#e8f8e8" stroke="#27ae60"/>
+            <text x="352" y="107" text-anchor="middle" fill="#1e8449" font-size="9">InvalidateAll()</text>
+            <text x="395" y="138" text-anchor="middle" fill="#27ae60" font-size="10">Caller knows about caching</text>
+            <text x="395" y="168" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">No hidden surprises</text>
+          </svg>
 
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
@@ -2582,6 +2809,39 @@ public interface ICachedProductService : IProductService
           <p class="body-text"><strong>Why This Happens:</strong> You want to change what a method does in a derived class, but the base class didn't mark it as <code>virtual</code>. C# lets you "hide" the base method with the <code>new</code> keyword. It compiles without errors. But it creates a trap: the method called depends on the <em>reference type</em> (how you hold the variable), not the <em>object type</em> (what the object actually is).</p>
           <p class="body-text">This means the exact same object can behave differently depending on whether you hold it as a <code>Base</code> reference or a <code>Derived</code> reference. That directly contradicts substitutability: the whole point of LSP is that the reference type shouldn't matter.</p>
 
+          <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="new keyword hides vs override dispatches correctly">
+            <defs>
+              <marker id="lsp-p8-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p8-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: new keyword -->
+            <text x="130" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">new hides (reference-based)</text>
+            <rect x="30" y="28" width="90" height="30" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="75" y="48" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">Derived d</text>
+            <line x1="75" y1="58" x2="75" y2="78" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p8-arr-r)"/>
+            <text x="75" y="94" text-anchor="middle" fill="#c0392b" font-size="10">d.Name()</text>
+            <text x="165" y="94" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">"Derived"</text>
+            <rect x="30" y="102" width="90" height="30" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="75" y="122" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="600">(Base)d</text>
+            <line x1="75" y1="132" x2="75" y2="148" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p8-arr-r)"/>
+            <text x="75" y="164" text-anchor="middle" fill="#c0392b" font-size="10">d.Name()</text>
+            <text x="165" y="164" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">"Base" !!!</text>
+            <text x="130" y="180" text-anchor="middle" fill="#e74c3c" font-size="9">Same object, two answers</text>
+            <!-- Good: override -->
+            <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">override (object-based)</text>
+            <rect x="335" y="28" width="90" height="30" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="380" y="48" text-anchor="middle" fill="#1e8449" font-size="11" font-weight="600">Derived d</text>
+            <line x1="380" y1="58" x2="380" y2="78" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p8-arr-g)"/>
+            <text x="380" y="94" text-anchor="middle" fill="#1e8449" font-size="10">d.Name()</text>
+            <text x="470" y="94" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">"Derived"</text>
+            <rect x="335" y="102" width="90" height="30" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="380" y="122" text-anchor="middle" fill="#1e8449" font-size="11" font-weight="600">(Base)d</text>
+            <line x1="380" y1="132" x2="380" y2="148" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p8-arr-g)"/>
+            <text x="380" y="164" text-anchor="middle" fill="#1e8449" font-size="10">d.Name()</text>
+            <text x="470" y="164" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">"Derived"</text>
+            <text x="395" y="180" text-anchor="middle" fill="#27ae60" font-size="9">Same object, consistent answer</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2631,6 +2891,39 @@ Console.WriteLine(((Base)d).Name());   // "Derived" — SAME behavior!
         <div class="collapsible-body">
           <p class="body-text"><strong>Why This Happens:</strong> A base method accepts any input (e.g., <code>Process(Order order)</code> works for any order). A developer creates a subtype that adds a business rule: "we only handle orders above $50." The subtype throws an exception or silently skips small orders. The caller had no idea about this restriction because the base type didn't have it.</p>
           <p class="body-text">This is called "strengthening the precondition." The base says "give me anything," but the subtype says "give me only this specific subset." That breaks substitutability: code that worked with the base type (passing any order) breaks with the subtype (which rejects small orders). LSP's rule is clear: subtypes can accept MORE inputs than the base (weaker preconditions), but never FEWER (stronger preconditions).</p>
+
+          <svg viewBox="0 0 520 180" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="Strengthened precondition rejects inputs the base accepted">
+            <defs>
+              <marker id="lsp-p9-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p9-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: subtype rejects -->
+            <text x="130" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">Subtype rejects valid input</text>
+            <rect x="30" y="26" width="200" height="32" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="130" y="47" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">Base: Process(any order)</text>
+            <line x1="130" y1="58" x2="130" y2="78" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p9-arr-r)"/>
+            <rect x="30" y="80" width="200" height="32" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="130" y="101" text-anchor="middle" fill="#c0392b" font-size="10" font-weight="600">Premium: only total >= $50</text>
+            <line x1="80" y1="112" x2="80" y2="138" stroke="#e74c3c" stroke-width="1" marker-end="url(#lsp-p9-arr-r)"/>
+            <text x="80" y="152" text-anchor="middle" fill="#c0392b" font-size="9">$30 order</text>
+            <text x="80" y="166" text-anchor="middle" fill="#e74c3c" font-size="9" font-weight="700">REJECTED!</text>
+            <line x1="180" y1="112" x2="180" y2="138" stroke="#27ae60" stroke-width="1" marker-end="url(#lsp-p9-arr-g)"/>
+            <text x="180" y="152" text-anchor="middle" fill="#888" font-size="9">$60 order</text>
+            <text x="180" y="166" text-anchor="middle" fill="#27ae60" font-size="9">OK</text>
+            <!-- Good: CanProcess -->
+            <text x="400" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Capability check first</text>
+            <rect x="310" y="26" width="180" height="32" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="400" y="47" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">IOrderProcessor</text>
+            <rect x="315" y="66" width="80" height="24" rx="4" fill="#e8f8e8" stroke="#27ae60"/>
+            <text x="355" y="82" text-anchor="middle" fill="#1e8449" font-size="9">CanProcess()</text>
+            <rect x="400" y="66" width="80" height="24" rx="4" fill="#e8f8e8" stroke="#27ae60"/>
+            <text x="440" y="82" text-anchor="middle" fill="#1e8449" font-size="9">Process()</text>
+            <polygon points="400,105 420,120 400,135 380,120" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="400" y="124" text-anchor="middle" fill="#1e8449" font-size="8" font-weight="600">can?</text>
+            <text x="355" y="155" text-anchor="middle" fill="#888" font-size="9">no: skip gracefully</text>
+            <text x="450" y="155" text-anchor="middle" fill="#27ae60" font-size="9">yes: process</text>
+            <text x="400" y="175" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">No surprise rejections</text>
+          </svg>
 
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
@@ -2688,6 +2981,35 @@ public class PremiumProcessor : IOrderProcessor
           <p class="body-text"><strong>Why This Happens:</strong> LSP is often taught using class inheritance examples (Rectangle/Square, Bird/Penguin), so many developers think it only matters when you write <code>class Dog : Animal</code>. But in modern C#, you rarely use class inheritance for polymorphism. You use <em>interfaces</em>. And LSP applies just as strongly to interface implementations.</p>
           <p class="body-text">Every time you register <code>services.AddScoped&lt;IRepository, SqlRepository&gt;()</code> in your DI container, you're creating a subtype relationship. <code>SqlRepository</code> is being substituted for <code>IRepository</code>. If <code>SqlRepository</code> behaves differently than what <code>IRepository</code> consumers expect (slower, throws different exceptions, returns null when others don't), that's an LSP violation. The same applies to decorators, adapters, mocks, and any wrapper that claims to implement an interface.</p>
 
+          <svg viewBox="0 0 520 170" style="width:100%;max-width:520px;margin:1rem auto;display:block" aria-label="LSP applies to DI registrations and interface implementations, not just class inheritance">
+            <defs>
+              <marker id="lsp-p10-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#e74c3c"/></marker>
+              <marker id="lsp-p10-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#27ae60"/></marker>
+            </defs>
+            <!-- Bad: fake sender via DI -->
+            <text x="130" y="16" text-anchor="middle" fill="#e74c3c" font-weight="700" font-size="13">DI swaps in a no-op</text>
+            <rect x="40" y="26" width="180" height="30" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="130" y="46" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">IEmailSender</text>
+            <line x1="130" y1="56" x2="130" y2="78" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#lsp-p10-arr-r)"/>
+            <rect x="35" y="80" width="190" height="36" rx="6" fill="#ffeaea" stroke="#e74c3c" stroke-width="1.5"/>
+            <text x="130" y="96" text-anchor="middle" fill="#c0392b" font-size="10" font-weight="600">FakeEmailSender</text>
+            <text x="130" y="110" text-anchor="middle" fill="#c0392b" font-size="9">silently drops all emails</text>
+            <text x="130" y="136" text-anchor="middle" fill="#e74c3c" font-size="10">Interface says "sends email"</text>
+            <text x="130" y="152" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="700">Implementation doesn't!</text>
+            <!-- Good: real implementations -->
+            <text x="395" y="16" text-anchor="middle" fill="#27ae60" font-weight="700" font-size="13">Every impl honors contract</text>
+            <rect x="310" y="26" width="170" height="30" rx="6" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="395" y="46" text-anchor="middle" fill="#1e8449" font-size="10" font-weight="600">IEmailSender</text>
+            <line x1="360" y1="56" x2="340" y2="78" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p10-arr-g)"/>
+            <line x1="430" y1="56" x2="450" y2="78" stroke="#27ae60" stroke-width="1.5" marker-end="url(#lsp-p10-arr-g)"/>
+            <rect x="295" y="80" width="90" height="30" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="340" y="100" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">SmtpSender</text>
+            <rect x="405" y="80" width="90" height="30" rx="5" fill="#e8f8e8" stroke="#27ae60" stroke-width="1.5"/>
+            <text x="450" y="100" text-anchor="middle" fill="#1e8449" font-size="9" font-weight="600">SendGridSender</text>
+            <text x="395" y="130" text-anchor="middle" fill="#27ae60" font-size="10">Both actually send emails</text>
+            <text x="395" y="150" text-anchor="middle" fill="#27ae60" font-size="10" font-weight="600">Postcondition honored</text>
+          </svg>
+
           <div class="macos-window mt-sm">
             <div class="macos-titlebar">
               <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -2724,6 +3046,22 @@ services.AddScoped&lt;IEmailSender, SendGridSender&gt;();     // Alternative
           </div>
 
           <p class="body-text mt-sm">The takeaway: any time you swap one implementation for another (through DI, decorators, adapters, or test doubles), ask yourself: "Will every consumer still work correctly with this new implementation?" That question IS the Liskov Substitution Principle.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="LSP applies to DI registrations and decorators, not just class inheritance">
+            <rect x="0" y="0" width="700" height="130" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="350" y="22" text-anchor="middle" fill="var(--accent-primary)" font-size="13" font-weight="bold">LSP Applies Everywhere, Not Just Inheritance</text>
+            <rect x="20" y="38" width="130" height="30" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1"/>
+            <text x="85" y="58" text-anchor="middle" fill="#ef4444" font-size="9">DI Registration</text>
+            <rect x="165" y="38" width="100" height="30" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1"/>
+            <text x="215" y="58" text-anchor="middle" fill="#ef4444" font-size="9">Decorators</text>
+            <rect x="280" y="38" width="100" height="30" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1"/>
+            <text x="330" y="58" text-anchor="middle" fill="#ef4444" font-size="9">Adapters</text>
+            <rect x="395" y="38" width="100" height="30" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1"/>
+            <text x="445" y="58" text-anchor="middle" fill="#ef4444" font-size="9">Test Doubles</text>
+            <rect x="510" y="38" width="100" height="30" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1"/>
+            <text x="560" y="58" text-anchor="middle" fill="#ef4444" font-size="9">Mocks</text>
+            <text x="350" y="90" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">Every swap is a substitution.</text>
+            <text x="350" y="108" text-anchor="middle" fill="var(--accent-primary)" font-size="11">Will every consumer still work correctly?</text>
+          </svg>
         </div>
       </div>
     </div>

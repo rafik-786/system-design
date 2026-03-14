@@ -17,7 +17,7 @@
 
 <!-- ========== TOP TOOLBAR ========== -->
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2454,6 +2454,32 @@ public sealed class CachedUIFactory : IUIFactory
           <p class="body-text"><strong>Mistake:</strong> Cramming all product families into a single class with switch statements.</p>
           <p class="body-text"><strong>Why This Happens:</strong> It starts innocently. You have two families — Windows and macOS. You write one factory class with a switch on the platform name. It works, it is simple, and it fits in one file. Then Linux support arrives. Then a "high contrast" accessibility family. Each new family adds another case to every switch statement in the class. Suddenly your "simple" factory is 500 lines long with 4 switch blocks, and every single change risks breaking all other families.</p>
           <p class="body-text">The deeper reason developers do this is that creating a separate class for each family feels like "too many files." But the trade-off is wrong: a few extra files is far cheaper than one monster file that every developer on the team needs to edit simultaneously.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="One god factory with switch statements for every family vs separate factory class per family">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ God Factory</text>
+            <rect x="75" y="30" width="200" height="34" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="175" y="52" text-anchor="middle" fill="#ef4444" font-size="11">UIFactory (500 lines)</text>
+            <line x1="115" y1="64" x2="65" y2="86" stroke="#ef4444" stroke-width="1"/>
+            <line x1="175" y1="64" x2="175" y2="86" stroke="#ef4444" stroke-width="1"/>
+            <line x1="235" y1="64" x2="285" y2="86" stroke="#ef4444" stroke-width="1"/>
+            <rect x="20" y="86" width="90" height="24" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/>
+            <text x="65" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">switch(win)</text>
+            <rect x="130" y="86" width="90" height="24" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/>
+            <text x="175" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">switch(mac)</text>
+            <rect x="240" y="86" width="90" height="24" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/>
+            <text x="285" y="103" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">switch(linux)</text>
+            <text x="175" y="132" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Every new family = edit this class</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ One Class Per Family</text>
+            <rect x="395" y="35" width="85" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="437" y="54" text-anchor="middle" fill="#22c55e" font-size="9">WinFactory</text>
+            <rect x="490" y="35" width="85" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="532" y="54" text-anchor="middle" fill="#22c55e" font-size="9">MacFactory</text>
+            <rect x="585" y="35" width="95" height="28" rx="5" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="632" y="54" text-anchor="middle" fill="var(--accent-primary)" font-size="9">LinuxFactory</text>
+            <text x="632" y="78" text-anchor="middle" fill="var(--accent-primary)" font-size="9">NEW class</text>
+            <text x="540" y="132" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">New family = new class, no edits</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">GodFactory.cs</span></div>
             <div class="macos-body">
@@ -2514,6 +2540,36 @@ public sealed class LinuxFactory : IUIFactory { ... }</code></pre>
           <p class="body-text"><strong>Mistake:</strong> Creating too many families with too many products each — 5 families x 8 products = 40 <span class="tooltip-trigger">concrete<span class="tooltip-content">Implementation classes as opposed to abstract types — the actual classes that get instantiated (e.g., WinButton vs IButton).</span></span> product classes + 5 factory classes.</p>
           <p class="body-text"><strong>Why This Happens:</strong> The pattern works so well for 2 families and 3 products that developers apply it to everything. "We have 5 platforms and 8 UI controls — let's make all 40 combinations!" But often only 2-3 of those products actually differ between families. A scrollbar might look identical on Windows and macOS. A text label might render the same everywhere. Creating family-specific versions of products that do not actually vary is pure waste — 40 classes where 20 would suffice.</p>
           <p class="body-text">The fix is to ask a simple question for each product: <strong>Does this product actually behave differently across families?</strong> If not, share a single implementation. Only the products that truly vary need family-specific classes. This can dramatically shrink your class count.</p>
+          <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Explosion of 40 classes when every product is duplicated per family vs sharing products that are identical across families">
+            <rect x="0" y="0" width="700" height="160" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ 5 x 8 = 40 Classes</text>
+            <!-- Grid of red boxes -->
+            <rect x="20" y="32" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="46" y="46" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">WinBtn</text>
+            <rect x="78" y="32" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="104" y="46" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">WinChk</text>
+            <rect x="136" y="32" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="162" y="46" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">WinLbl</text>
+            <rect x="194" y="32" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="220" y="46" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">WinScrl</text>
+            <text x="270" y="46" fill="#ef4444" font-size="9">+4 more</text>
+            <rect x="20" y="58" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="46" y="72" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">MacBtn</text>
+            <rect x="78" y="58" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="104" y="72" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">MacChk</text>
+            <rect x="136" y="58" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="162" y="72" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">MacLbl</text>
+            <rect x="194" y="58" width="52" height="20" rx="3" fill="#1a1a2e" stroke="#ef4444" stroke-width="1"/><text x="220" y="72" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="7">MacScrl</text>
+            <text x="270" y="72" fill="#ef4444" font-size="9">+4 more</text>
+            <text x="175" y="104" text-anchor="middle" fill="#ef4444" font-size="9">x5 families = 40 classes</text>
+            <text x="175" y="122" text-anchor="middle" fill="#ef4444" font-size="9" font-style="italic">Label &amp; Scrollbar are identical everywhere!</text>
+            <text x="175" y="148" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">20 classes are pure waste</text>
+            <line x1="365" y1="10" x2="365" y2="150" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Share What Doesn't Vary</text>
+            <rect x="390" y="35" width="56" height="20" rx="3" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/><text x="418" y="49" text-anchor="middle" fill="#22c55e" font-size="7">WinBtn</text>
+            <rect x="452" y="35" width="56" height="20" rx="3" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/><text x="480" y="49" text-anchor="middle" fill="#22c55e" font-size="7">WinChk</text>
+            <rect x="390" y="60" width="56" height="20" rx="3" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/><text x="418" y="74" text-anchor="middle" fill="#22c55e" font-size="7">MacBtn</text>
+            <rect x="452" y="60" width="56" height="20" rx="3" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/><text x="480" y="74" text-anchor="middle" fill="#22c55e" font-size="7">MacChk</text>
+            <text x="450" y="100" text-anchor="middle" fill="#22c55e" font-size="9">Only what differs per family</text>
+            <rect x="560" y="35" width="110" height="46" rx="5" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1.5"/>
+            <text x="615" y="53" text-anchor="middle" fill="var(--accent-primary)" font-size="8">StandardLabel</text>
+            <text x="615" y="70" text-anchor="middle" fill="var(--accent-primary)" font-size="8">StandardScrollbar</text>
+            <text x="615" y="100" text-anchor="middle" fill="var(--accent-primary)" font-size="9">Shared across all</text>
+            <text x="540" y="148" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Half the classes, same result</text>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SharedProducts.cs</span></div>
             <div class="macos-body">
@@ -2541,6 +2597,31 @@ public sealed class WinFactory : IUIFactory
           <p class="body-text"><strong>Mistake:</strong> Factory method returns <code>WinButton</code> instead of <code>IButton</code>, or client casts the result to a concrete type.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Developers know the concrete type and reach for it out of habit. "I know it is a <code>WinButton</code>, so why not use the concrete type? I get IntelliSense for the Windows-specific properties." The problem is that once client code depends on <code>WinButton</code>, you cannot swap in <code>MacButton</code> without changing that code. You have just hard-wired the family into the consumer — the entire point of Abstract Factory was to avoid that.</p>
           <p class="body-text">Sometimes the leak is not the return type itself, but a <code>(WinButton)</code> cast buried deep in application code. That cast is a time bomb: it works today because you only have Windows, but it explodes the moment you add a second family.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Casting IButton to WinButton couples client to one family vs working through IButton stays family-agnostic">
+            <rect x="0" y="0" width="700" height="130" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Downcast = Coupled</text>
+            <rect x="20" y="34" width="80" height="28" rx="5" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1.2"/>
+            <text x="60" y="53" text-anchor="middle" fill="var(--accent-primary)" font-size="10">IButton</text>
+            <path d="M100,48 L140,48" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#afp3-arr)"/>
+            <text x="120" y="40" fill="#ef4444" font-size="8">(cast)</text>
+            <rect x="140" y="34" width="90" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="185" y="53" text-anchor="middle" fill="#ef4444" font-size="10">WinButton</text>
+            <line x1="230" y1="48" x2="260" y2="48" stroke="#ef4444" stroke-width="1.2" marker-end="url(#afp3-arr)"/>
+            <text x="290" y="53" fill="#ef4444" font-size="9">.ShowWinTaskbar()</text>
+            <text x="175" y="86" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Breaks when Mac family is added</text>
+            <line x1="365" y1="10" x2="365" y2="120" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Interface Only</text>
+            <rect x="410" y="34" width="80" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="450" y="53" text-anchor="middle" fill="#22c55e" font-size="10">IButton</text>
+            <line x1="490" y1="48" x2="530" y2="48" stroke="#22c55e" stroke-width="1.5" marker-end="url(#afp3-arr2)"/>
+            <text x="575" y="48" fill="#22c55e" font-size="10">.Paint()</text>
+            <text x="575" y="63" fill="#22c55e" font-size="10">.OnClick()</text>
+            <text x="540" y="100" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Works for any family</text>
+            <defs>
+              <marker id="afp3-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="afp3-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LeakedTypes.cs</span></div>
             <div class="macos-body">
@@ -2574,6 +2655,36 @@ btn.OnClick(); // ✅ Defined on IButton — family-agnostic</code></pre>
           <p class="body-text"><strong>Mistake:</strong> Writing <code>new WinFactory()</code> in application code instead of resolving from the DI container.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Developers sometimes skip DI because "it is just one factory, I will hard-code it for now." Or they are not familiar with how to register multiple implementations. The result is tight coupling: the code that creates <code>new WinFactory()</code> is permanently married to the Windows family. You cannot swap families via configuration, environment variables, or test doubles.</p>
           <p class="body-text">This also defeats testability. In unit tests, you want to inject a <code>TestFactory</code> that returns lightweight stub products. If the code hard-codes <code>new WinFactory()</code>, the only way to substitute it is to change the source code itself.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Hard-coded new WinFactory cannot be swapped vs DI-injected IUIFactory can be any family">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Hard-coded new</text>
+            <rect x="30" y="34" width="100" height="30" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="80" y="54" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Dashboard</text>
+            <line x1="130" y1="49" x2="155" y2="49" stroke="#ef4444" stroke-width="2" marker-end="url(#afp4-arr)"/>
+            <text x="145" y="40" fill="#ef4444" font-size="8">new</text>
+            <rect x="155" y="34" width="105" height="30" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="207" y="54" text-anchor="middle" fill="#ef4444" font-size="10">WinFactory</text>
+            <rect x="60" y="82" width="130" height="26" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="125" y="100" text-anchor="middle" fill="#ef4444" font-size="10">Test? Can't swap!</text>
+            <text x="220" y="100" fill="#ef4444" font-size="14">✕</text>
+            <text x="175" y="130" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Permanently married to Windows</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ DI Injection</text>
+            <rect x="400" y="34" width="100" height="30" rx="5" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="450" y="54" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Dashboard</text>
+            <line x1="500" y1="49" x2="530" y2="49" stroke="#22c55e" stroke-width="1.5" marker-end="url(#afp4-arr2)"/>
+            <rect x="530" y="34" width="100" height="30" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="580" y="54" text-anchor="middle" fill="#22c55e" font-size="10">IUIFactory</text>
+            <rect x="430" y="82" width="90" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="475" y="99" text-anchor="middle" fill="#22c55e" font-size="9">WinFactory</text>
+            <rect x="530" y="82" width="90" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="575" y="99" text-anchor="middle" fill="#22c55e" font-size="9">TestFactory</text>
+            <text x="540" y="130" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Swap family with one line change</text>
+            <defs>
+              <marker id="afp4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="afp4-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ManualNew.cs</span></div>
             <div class="macos-body">
@@ -2612,6 +2723,30 @@ builder.Services.AddSingleton&lt;IUIFactory, MacFactory&gt;();</code></pre>
           <p class="body-text"><strong>Mistake:</strong> Creating an Abstract Factory with only one <code>Create</code> method.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Someone reads about Abstract Factory and gets excited. They create <code>INotificationFactory</code> with a single <code>CreateNotification()</code> method. But there is no "family" here — just one product with multiple variants. That is literally what Factory Method does. Abstract Factory exists specifically for the case where you have <strong>multiple products that must stay in sync across families</strong>. With just one product, the "family consistency" guarantee is meaningless.</p>
           <p class="body-text">Using Abstract Factory for a single product adds an unnecessary layer of indirection: an extra interface, an extra class, and extra complexity — all for zero benefit over Factory Method.</p>
+          <svg viewBox="0 0 700 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Abstract Factory with only one Create method is overkill vs Factory Method or plain DI for single products">
+            <rect x="0" y="0" width="700" height="130" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Overkill for 1 Product</text>
+            <rect x="30" y="34" width="140" height="30" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="100" y="54" text-anchor="middle" fill="#ef4444" font-size="9">INotificationFactory</text>
+            <line x1="170" y1="49" x2="200" y2="49" stroke="#ef4444" stroke-width="1.2" marker-end="url(#afp5-arr)"/>
+            <rect x="200" y="34" width="130" height="30" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.2"/>
+            <text x="265" y="54" text-anchor="middle" fill="#ef4444" font-size="9">CreateNotification()</text>
+            <text x="265" y="74" text-anchor="middle" fill="#ef4444" font-size="9" font-style="italic">only 1 method = no family!</text>
+            <text x="175" y="108" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Extra interface + class for nothing</text>
+            <line x1="365" y1="10" x2="365" y2="120" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Just Use Factory Method / DI</text>
+            <rect x="410" y="34" width="110" height="30" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="465" y="54" text-anchor="middle" fill="#22c55e" font-size="10">INotification</text>
+            <line x1="520" y1="49" x2="550" y2="49" stroke="#22c55e" stroke-width="1.2" marker-end="url(#afp5-arr2)"/>
+            <rect x="550" y="34" width="120" height="30" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="610" y="54" text-anchor="middle" fill="#22c55e" font-size="9">EmailNotification</text>
+            <text x="540" y="86" text-anchor="middle" fill="#22c55e" font-size="10">Register directly in DI</text>
+            <text x="540" y="108" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Simpler, cleaner, no factory needed</text>
+            <defs>
+              <marker id="afp5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="afp5-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SingleProduct.cs</span></div>
             <div class="macos-body">
@@ -2643,6 +2778,33 @@ builder.Services.AddSingleton&lt;INotification, EmailNotification&gt;();</code><
           <p class="body-text"><strong>Mistake:</strong> Using raw strings for keyed service resolution without constants or enums.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Keyed services in .NET 8 are so easy to set up that developers jump straight to raw strings: <code>"postgres"</code>, <code>"sqlserver"</code>, <code>"redis"</code>. It works fine initially. But as the codebase grows and multiple developers register and resolve services in different files, typos creep in. One file says <code>"postgres"</code>, another says <code>"postgresql"</code>, a third says <code>"pg"</code>. All are reasonable names — and all must match exactly.</p>
           <p class="body-text">Without compile-time validation, these mismatches only surface at runtime. And if the mismatched code is behind a rarely-used feature flag, it might sit in production for weeks before a user triggers it.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Raw string keys lead to typo mismatches vs const or enum keys catch errors at compile time">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Raw Strings</text>
+            <rect x="20" y="34" width="100" height="26" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="70" y="52" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">"postgres"</text>
+            <rect x="20" y="68" width="100" height="26" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="70" y="86" text-anchor="middle" fill="#ef4444" font-size="9">"postgresql"</text>
+            <rect x="20" y="102" width="100" height="26" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="70" y="120" text-anchor="middle" fill="#ef4444" font-size="9">"pg"</text>
+            <text x="150" y="52" fill="var(--text-primary, #e2e8f0)" font-size="9">Registration</text>
+            <text x="150" y="86" fill="#ef4444" font-size="9">File A (typo!)</text>
+            <text x="150" y="120" fill="#ef4444" font-size="9">File B (typo!)</text>
+            <text x="260" y="86" fill="#ef4444" font-size="11">= runtime crash</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Const / Enum Keys</text>
+            <rect x="400" y="40" width="120" height="50" rx="5" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1.5"/>
+            <text x="460" y="58" text-anchor="middle" fill="var(--accent-primary)" font-size="9">static class DbKeys</text>
+            <text x="460" y="74" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Postgres = "postgres"</text>
+            <line x1="520" y1="65" x2="550" y2="50" stroke="#22c55e" stroke-width="1" marker-end="url(#afp6-arr2)"/>
+            <line x1="520" y1="65" x2="550" y2="80" stroke="#22c55e" stroke-width="1" marker-end="url(#afp6-arr2)"/>
+            <text x="610" y="54" fill="#22c55e" font-size="9">DbKeys.Postgres</text>
+            <text x="610" y="84" fill="#22c55e" font-size="9">DbKeys.Postgres</text>
+            <text x="540" y="118" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">One source of truth, compiler-safe</text>
+            <defs>
+              <marker id="afp6-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RawStrings.cs</span></div>
             <div class="macos-body">
@@ -2686,6 +2848,33 @@ public class ReportService(
           <p class="body-text"><strong>Mistake:</strong> Leaving concrete factories inheritable, leading to unintended inheritance hierarchies.</p>
           <p class="body-text"><strong>Why This Happens:</strong> A developer needs a "slightly different" Windows factory — maybe one that caches products. Instead of creating a new factory class, they inherit from <code>WinFactory</code> and override just <code>CreateButton()</code>. Seems harmless, right? But now the child class returns a cached <code>WinButton</code> from <code>CreateButton()</code> and a fresh <code>WinCheckbox</code> from the parent's <code>CreateCheckbox()</code>. If the cached button holds stale state, the family's products are no longer consistent.</p>
           <p class="body-text">Inheritance also makes the factory hierarchy brittle. Every change to <code>WinFactory</code> might break its children. The Abstract Factory pattern is designed for extension through <strong>new classes</strong>, not through inheritance of existing ones.</p>
+          <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Inheriting from an unsealed factory causes partial overrides and stale state vs sealed factories implement the interface independently">
+            <rect x="0" y="0" width="700" height="140" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Unsealed + Inheritance</text>
+            <rect x="80" y="30" width="105" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="132" y="49" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">WinFactory</text>
+            <line x1="132" y1="58" x2="132" y2="78" stroke="#ef4444" stroke-width="1.2" marker-end="url(#afp7-arr)"/>
+            <rect x="55" y="78" width="155" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="132" y="97" text-anchor="middle" fill="#ef4444" font-size="9">CachedWinFactory</text>
+            <text x="310" y="87" fill="#ef4444" font-size="9">overrides CreateButton()</text>
+            <text x="310" y="101" fill="#ef4444" font-size="9">inherits CreateCheckbox()</text>
+            <text x="175" y="128" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">Cached button + fresh checkbox = mismatch</text>
+            <line x1="365" y1="10" x2="365" y2="130" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Sealed + Independent</text>
+            <rect x="395" y="34" width="90" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="440" y="52" text-anchor="middle" fill="#22c55e" font-size="9">IUIFactory</text>
+            <line x1="440" y1="60" x2="440" y2="78" stroke="#22c55e" stroke-width="1" marker-end="url(#afp7-arr2)"/>
+            <line x1="440" y1="60" x2="570" y2="78" stroke="#22c55e" stroke-width="1" marker-end="url(#afp7-arr2)"/>
+            <rect x="388" y="78" width="108" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="442" y="96" text-anchor="middle" fill="#22c55e" font-size="9">sealed WinFactory</text>
+            <rect x="518" y="78" width="125" height="26" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="580" y="96" text-anchor="middle" fill="#22c55e" font-size="9">sealed CachedFactory</text>
+            <text x="540" y="128" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Each owns all its Create methods</text>
+            <defs>
+              <marker id="afp7-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="afp7-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">UnsealedFactory.cs</span></div>
             <div class="macos-body">
@@ -2722,6 +2911,36 @@ public sealed class CachedWinFactory : IUIFactory { ... } // Own class, full con
           <p class="body-text"><strong>Mistake:</strong> A method accepts <code>IUIFactory</code> but also takes individual <code>IButton</code> and <code>ICheckbox</code> parameters from elsewhere.</p>
           <p class="body-text"><strong>Why This Happens:</strong> Performance optimization or convenience. A developer thinks "I already have this button from earlier — why create a new one from the factory?" So they pass the pre-created button alongside the factory. But the pre-created button might be from a different family than the factory. Now you have a Windows button sitting next to a macOS checkbox again — the same "mixed families" problem from Bug 1, just hidden behind a method signature.</p>
           <p class="body-text">The root issue is that the method signature promises family consistency (by accepting <code>IUIFactory</code>) but then breaks that promise by also accepting individual products from unknown sources.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Mixing factory-created and externally-passed products breaks family consistency vs letting factory create everything keeps families in sync">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Mixed Sources</text>
+            <rect x="40" y="32" width="100" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="90" y="51" text-anchor="middle" fill="#22c55e" font-size="9">MacFactory</text>
+            <line x1="90" y1="60" x2="90" y2="82" stroke="#22c55e" stroke-width="1" marker-end="url(#afp8-arr2)"/>
+            <rect x="50" y="82" width="80" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="90" y="99" text-anchor="middle" fill="#22c55e" font-size="9">MacCheckbox</text>
+            <rect x="185" y="32" width="100" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="235" y="51" text-anchor="middle" fill="#ef4444" font-size="9">externalButton</text>
+            <line x1="235" y1="60" x2="235" y2="82" stroke="#ef4444" stroke-width="1" marker-end="url(#afp8-arr)"/>
+            <rect x="190" y="82" width="85" height="24" rx="4" fill="#1a1a2e" stroke="#ef4444" stroke-width="2"/>
+            <text x="232" y="99" text-anchor="middle" fill="#ef4444" font-size="9">WinButton!</text>
+            <text x="175" y="128" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">MacCheckbox + WinButton = broken</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Factory Creates All</text>
+            <rect x="480" y="32" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="540" y="51" text-anchor="middle" fill="#22c55e" font-size="10">MacFactory</text>
+            <line x1="510" y1="60" x2="475" y2="82" stroke="#22c55e" stroke-width="1" marker-end="url(#afp8-arr2)"/>
+            <line x1="570" y1="60" x2="605" y2="82" stroke="#22c55e" stroke-width="1" marker-end="url(#afp8-arr2)"/>
+            <rect x="420" y="82" width="95" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="467" y="99" text-anchor="middle" fill="#22c55e" font-size="9">MacButton</text>
+            <rect x="560" y="82" width="95" height="24" rx="4" fill="#1a1a2e" stroke="#22c55e" stroke-width="1"/>
+            <text x="607" y="99" text-anchor="middle" fill="#22c55e" font-size="9">MacCheckbox</text>
+            <text x="540" y="128" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Same family guaranteed</text>
+            <defs>
+              <marker id="afp8-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+              <marker id="afp8-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MixedBoundary.cs</span></div>
             <div class="macos-body">
@@ -2761,6 +2980,36 @@ public void RenderForm(IUIFactory factory)
           <p class="body-text"><strong>Mistake:</strong> A factory interface with <code>CreateButton()</code>, <code>CreateCheckbox()</code>, <code>CreateDropdown()</code>, <code>CreateSlider()</code>, <code>CreateRadio()</code>, ... 10+ methods.</p>
           <p class="body-text"><strong>Why This Happens:</strong> The team keeps adding products to the same factory interface as the UI grows. "We need a datepicker? Add <code>CreateDatePicker()</code> to <code>IUIFactory</code>." After a year, the interface has 12 methods. Every concrete factory must implement all 12, even if most clients only use 2-3. This violates the <span class="tooltip-trigger">Interface Segregation Principle<span class="tooltip-content">Clients should not be forced to depend on interfaces they don't use. If your interface has 12 methods and most consumers use 3, the interface is too broad.</span></span> — clients are forced to depend on factory methods they never call.</p>
           <p class="body-text">Adding a new product also forces every concrete factory to change (add the new method), which means editing files across multiple assemblies and risking merge conflicts.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="A fat factory interface with 10+ methods forces all clients to depend on everything vs split interfaces let each client depend only on what it needs">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ 10+ Methods</text>
+            <rect x="50" y="30" width="250" height="56" rx="6" fill="#1a1a2e" stroke="#ef4444" stroke-width="1.5"/>
+            <text x="175" y="48" text-anchor="middle" fill="#ef4444" font-size="10">IUIFactory</text>
+            <text x="175" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">CreateButton | CreateCheckbox | CreateDropdown</text>
+            <text x="175" y="76" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">CreateSlider | CreateRadio | CreateModal | ...</text>
+            <rect x="30" y="100" width="100" height="24" rx="4" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="80" y="117" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">FormRenderer</text>
+            <text x="155" y="117" fill="#ef4444" font-size="9">uses 2, depends on 10+</text>
+            <text x="175" y="140" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">ISP violation</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Split by Cohesion</text>
+            <rect x="390" y="34" width="120" height="32" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="450" y="48" text-anchor="middle" fill="#22c55e" font-size="9">IInputFactory</text>
+            <text x="450" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Button, Checkbox</text>
+            <rect x="540" y="34" width="130" height="32" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="605" y="48" text-anchor="middle" fill="#22c55e" font-size="9">ILayoutFactory</text>
+            <text x="605" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Modal, Toast</text>
+            <line x1="450" y1="66" x2="450" y2="90" stroke="#22c55e" stroke-width="1" marker-end="url(#afp9-arr2)"/>
+            <rect x="395" y="90" width="110" height="24" rx="4" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="450" y="107" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">FormRenderer</text>
+            <line x1="605" y1="66" x2="605" y2="90" stroke="#22c55e" stroke-width="1" marker-end="url(#afp9-arr2)"/>
+            <rect x="545" y="90" width="120" height="24" rx="4" fill="#1a1a2e" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+            <text x="605" y="107" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">NotificationSvc</text>
+            <text x="540" y="140" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Each client depends only on what it uses</text>
+            <defs>
+              <marker id="afp9-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#22c55e"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">FatInterface.cs</span></div>
             <div class="macos-body">
@@ -2805,6 +3054,30 @@ public class NotificationService(ILayoutFactory layout) { ... } // Needs only la
           <p class="body-text"><strong>Mistake:</strong> Registering the factory in DI but not its product dependencies. Factory creates products that need services not in the container.</p>
           <p class="body-text"><strong>Why This Happens:</strong> The factory itself is registered fine. But the products it creates have their own dependencies — maybe <code>WinButton</code> needs an <code>IThemeService</code>, or <code>MacCheckbox</code> requires an <code>IAccessibilityProvider</code>. If those dependencies are not also registered in the DI container, the factory's <code>Create</code> method fails with a resolution exception buried deep in the call stack. The error message says "Cannot resolve IThemeService" but gives no hint that the problem started because you forgot to register it alongside the factory.</p>
           <p class="body-text">This is especially sneaky when different families have different product dependencies. The Windows factory might work perfectly (all its product deps are registered) while the macOS factory crashes because <code>IAccessibilityProvider</code> was never added.</p>
+          <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Registering factory but not its product dependencies causes runtime crashes vs bundling everything in one extension method ensures completeness">
+            <rect x="0" y="0" width="700" height="150" rx="8" fill="var(--bg-secondary, #1e293b)"/>
+            <text x="175" y="20" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="bold">❌ Partial Registration</text>
+            <rect x="55" y="32" width="100" height="28" rx="5" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.2"/>
+            <text x="105" y="51" text-anchor="middle" fill="#22c55e" font-size="9">WinFactory</text>
+            <text x="195" y="51" fill="#22c55e" font-size="10">registered</text>
+            <rect x="55" y="68" width="100" height="28" rx="5" fill="#1a1a2e" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3"/>
+            <text x="105" y="87" text-anchor="middle" fill="#ef4444" font-size="9">IThemeService</text>
+            <text x="195" y="87" fill="#ef4444" font-size="10">MISSING!</text>
+            <line x1="175" y1="96" x2="175" y2="116" stroke="#ef4444" stroke-width="1" marker-end="url(#afp10-arr)"/>
+            <text x="175" y="132" text-anchor="middle" fill="#ef4444" font-size="10" font-style="italic">WinButton needs it → runtime crash</text>
+            <line x1="365" y1="10" x2="365" y2="140" stroke="var(--text-primary, #e2e8f0)" stroke-width="0.5" opacity="0.3"/>
+            <text x="540" y="20" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="bold">✅ Bundled Extension</text>
+            <rect x="420" y="34" width="240" height="60" rx="6" fill="#1a1a2e" stroke="#22c55e" stroke-width="1.5"/>
+            <text x="540" y="52" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="bold">AddWinUI()</text>
+            <text x="540" y="68" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">WinFactory + IThemeService + IIconProvider</text>
+            <text x="540" y="82" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">All dependencies in one call</text>
+            <rect x="455" y="106" width="170" height="24" rx="4" fill="#1a1a2e" stroke="var(--accent-primary)" stroke-width="1"/>
+            <text x="540" y="123" text-anchor="middle" fill="var(--accent-primary)" font-size="9">ValidateOnStart = true</text>
+            <text x="540" y="145" text-anchor="middle" fill="#22c55e" font-size="10" font-style="italic">Missing deps caught at boot, not in prod</text>
+            <defs>
+              <marker id="afp10-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10z" fill="#ef4444"/></marker>
+            </defs>
+          </svg>
           <div class="macos-window mt-sm">
             <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">IncompleteRegistration.cs</span></div>
             <div class="macos-body">

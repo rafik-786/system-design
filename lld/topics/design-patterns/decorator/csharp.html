@@ -16,7 +16,7 @@
 <body data-accent="purple" style="opacity:0">
 
 <header class="top-toolbar" role="banner">
-  <a href="../../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
   <a href="../../../index.html" class="fab-btn fab-back" aria-label="Back to LLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
   <span class="toolbar-sep"></span>
   <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
@@ -2938,6 +2938,35 @@ hashSet.Add(decorated);   // NOT added — Equals returns true</code></pre>
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Writing a decorator that extends <code>OrderService</code> (concrete class) instead of implementing <code>IOrderService</code> (interface).</p>
         <p class="body-text"><strong>Why This Happens:</strong> You might think "I already have <code>OrderService</code>, I&apos;ll just extend it and add logging in the override." It feels natural &mdash; inheritance is the first tool most developers reach for. But this couples your decorator directly to the concrete class. If <code>OrderService</code> changes its constructor, adds a new field, or restructures its internals, your decorator breaks. Worse: you can&apos;t stack multiple decorators easily, because each one extends a different concrete class.</p>
+        <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Decorating concrete class vs interface comparison">
+          <defs><marker id="dp1-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="32" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — extends concrete class</text>
+          <rect x="30" y="45" width="120" height="34" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+          <text x="90" y="67" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">OrderService</text>
+          <line x1="150" y1="62" x2="185" y2="62" stroke="#ef4444" stroke-width="1.5" marker-end="url(#dp1-arr)"/>
+          <text x="167" y="55" text-anchor="middle" fill="#ef4444" font-size="9">extends</text>
+          <rect x="188" y="45" width="130" height="34" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+          <text x="253" y="67" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">LoggingDecorator</text>
+          <text x="170" y="105" text-anchor="middle" fill="#ef4444" font-size="10">Tightly coupled — can't stack</text>
+          <text x="170" y="120" text-anchor="middle" fill="#ef4444" font-size="10">Constructor changes break decorator</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="32" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — implements interface</text>
+          <rect x="440" y="42" width="120" height="28" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+          <text x="500" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">IOrderService</text>
+          <line x1="460" y1="70" x2="420" y2="90" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp1-arr)"/>
+          <line x1="500" y1="70" x2="500" y2="90" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp1-arr)"/>
+          <line x1="540" y1="70" x2="580" y2="90" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp1-arr)"/>
+          <rect x="385" y="93" width="70" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="420" y="109" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Logging</text>
+          <rect x="465" y="93" width="70" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="500" y="109" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Caching</text>
+          <rect x="545" y="93" width="70" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="580" y="109" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Retry</text>
+          <text x="530" y="133" text-anchor="middle" fill="#22c55e" font-size="10">Loosely coupled — stackable!</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — decorating concrete class</span></div>
           <div class="macos-body">
@@ -2996,6 +3025,32 @@ public class LoggingOrderDecorator : IOrderService
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Building a single <code>SuperDecorator</code> that adds logging AND caching AND retry AND validation AND metrics all in one class.</p>
         <p class="body-text"><strong>Why This Happens:</strong> You start with just logging. Then someone asks for caching, so you add it to the same class. Then retry logic. Then metrics. Before you know it, you have a 500-line "decorator" with 8 constructor parameters that does everything. It feels efficient &mdash; one class, one place &mdash; but you&apos;ve just recreated the monolith problem that Decorator was supposed to solve.</p>
+        <svg viewBox="0 0 700 155" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="God Decorator vs single-responsibility decorators">
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — God Decorator</text>
+          <rect x="40" y="40" width="260" height="85" rx="6" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="170" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11" font-weight="bold">SuperDecorator</text>
+          <text x="170" y="75" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Logging + Caching + Retry</text>
+          <text x="170" y="90" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">+ Metrics + Validation</text>
+          <text x="170" y="110" text-anchor="middle" fill="#ef4444" font-size="10">500 lines, 8 params</text>
+          <text x="170" y="135" text-anchor="middle" fill="#ef4444" font-size="10">All or nothing — can't opt out</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="135" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — One concern each</text>
+          <rect x="390" y="42" width="90" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="435" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Logging</text>
+          <rect x="490" y="42" width="90" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="535" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Caching</text>
+          <rect x="590" y="42" width="90" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="635" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Retry</text>
+          <rect x="440" y="78" width="90" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="485" y="96" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Metrics</text>
+          <rect x="540" y="78" width="90" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="585" y="96" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Validation</text>
+          <text x="530" y="125" text-anchor="middle" fill="#22c55e" font-size="10">~50 lines each, independently testable</text>
+          <text x="530" y="140" text-anchor="middle" fill="#22c55e" font-size="10">Add/remove one line in DI</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — God Decorator</span></div>
           <div class="macos-body">
@@ -3051,6 +3106,35 @@ services.Decorate&lt;IOrderService, LoggingDecorator&gt;();   // opt-in
         <p class="body-text"><strong>Mistake:</strong> Every decorator manually implements all 8 interface methods, copy-pasting the same <code>_inner.MethodX()</code> forwarding in each one. You now have 5 decorators with 40 identical forwarding methods.</p>
         <p class="body-text"><strong>Why Bad:</strong> When the interface gains a new method, you must update every single decorator. Miss one? Silent bug (see Bug Study #1). It&apos;s also a massive code review burden &mdash; reviewers have to verify every forwarding call is correct.</p>
         <p class="body-text"><strong>Fix:</strong> Create an abstract <code>OrderServiceDecoratorBase</code> that implements the interface and forwards everything to <code>_inner</code> by default. Each concrete decorator extends this base and overrides only the methods it cares about. New interface methods? Add them to the base once.</p>
+        <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Without vs with base decorator class">
+          <defs><marker id="dp3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — no base class</text>
+          <rect x="30" y="40" width="130" height="40" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="95" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">LoggingDecorator</text>
+          <text x="95" y="70" text-anchor="middle" fill="#ef4444" font-size="8">8 forwarding methods</text>
+          <rect x="175" y="40" width="130" height="40" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="240" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">CachingDecorator</text>
+          <text x="240" y="70" text-anchor="middle" fill="#ef4444" font-size="8">8 forwarding methods</text>
+          <rect x="30" y="90" width="130" height="40" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="95" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">RetryDecorator</text>
+          <text x="95" y="120" text-anchor="middle" fill="#ef4444" font-size="8">8 forwarding methods</text>
+          <text x="240" y="115" text-anchor="middle" fill="#ef4444" font-size="10">= 24 copy-paste methods!</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="140" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — base forwards all</text>
+          <rect x="440" y="38" width="180" height="30" rx="5" fill="var(--accent-primary)" opacity="0.2" stroke="var(--accent-primary)"/>
+          <text x="530" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">DecoratorBase (8 methods)</text>
+          <line x1="490" y1="68" x2="440" y2="85" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp3-arr)"/>
+          <line x1="530" y1="68" x2="530" y2="85" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp3-arr)"/>
+          <line x1="570" y1="68" x2="620" y2="85" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp3-arr)"/>
+          <rect x="390" y="88" width="100" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="440" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Logging (1 override)</text>
+          <rect x="495" y="88" width="100" height="26" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="545" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Caching (1 override)</text>
+          <text x="530" y="137" text-anchor="middle" fill="#22c55e" font-size="10">New method? Update base once</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">BaseDecorator.cs</span></div>
           <div class="macos-body">
@@ -3098,6 +3182,38 @@ public class LoggingOrderDecorator : OrderServiceDecoratorBase
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Manually constructing decorator chains with <code>new</code> instead of letting the DI container handle it.</p>
         <p class="body-text"><strong>Why This Happens:</strong> You might think "I&apos;ll just manually wire the decorators in <code>Program.cs</code> to keep things simple." So you write something like <code>new LoggingDecorator(new CachingDecorator(new OrderService(db)), logger)</code>. This works for 2-3 dependencies. But as the chain grows, you have to manually pass every dependency to every constructor &mdash; miss one and you get a <code>NullReferenceException</code> at runtime. It&apos;s also fragile: if any constructor signature changes, you must update the manual wiring.</p>
+        <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Manual wiring vs DI container wiring">
+          <defs><marker id="dp4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker></defs>
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — manual new()</text>
+          <rect x="30" y="42" width="80" height="24" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="70" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Service</text>
+          <line x1="110" y1="54" x2="135" y2="54" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4" marker-end="url(#dp4-arr)"/>
+          <rect x="138" y="42" width="80" height="24" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="178" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Cache</text>
+          <line x1="218" y1="54" x2="243" y2="54" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4" marker-end="url(#dp4-arr)"/>
+          <rect x="246" y="42" width="70" height="24" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="281" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Log</text>
+          <text x="170" y="85" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9" opacity="0.7">new Log(new Cache(new Svc(db)), logger)</text>
+          <text x="170" y="100" text-anchor="middle" fill="#ef4444" font-size="10">You wire every dependency by hand</text>
+          <text x="170" y="115" text-anchor="middle" fill="#ef4444" font-size="10">Miss one = NullReferenceException</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — DI container</text>
+          <rect x="470" y="40" width="120" height="30" rx="6" fill="var(--accent-primary)" opacity="0.25" stroke="var(--accent-primary)"/>
+          <text x="530" y="60" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">DI Container</text>
+          <line x1="490" y1="70" x2="420" y2="90" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp4-arr)"/>
+          <line x1="530" y1="70" x2="530" y2="90" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp4-arr)"/>
+          <line x1="570" y1="70" x2="640" y2="90" stroke="#22c55e" stroke-width="1.2" marker-end="url(#dp4-arr)"/>
+          <rect x="390" y="93" width="60" height="22" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="420" y="108" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Svc</text>
+          <rect x="500" y="93" width="60" height="22" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="530" y="108" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Cache</text>
+          <rect x="610" y="93" width="60" height="22" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="640" y="108" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Log</text>
+          <text x="530" y="135" text-anchor="middle" fill="#22c55e" font-size="10">Auto-resolves all dependencies</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — manual wiring</span></div>
           <div class="macos-body">
@@ -3134,6 +3250,28 @@ services.Decorate&lt;IOrderService, LoggingDecorator&gt;();
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Using the Decorator pattern when a simple method call or inheritance would do the job perfectly.</p>
         <p class="body-text"><strong>Why This Happens:</strong> After learning Decorator, you might start seeing every problem as a nail. "I need to add logging? Decorator! Validation? Decorator! Error handling? Decorator!" But if you only have one implementation and the behavior is always needed (not optional, not combinable), creating a full decorator chain is like building a highway to cross the street.</p>
+        <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Over-engineered decorator vs simple direct code">
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — over-engineered</text>
+          <rect x="30" y="42" width="75" height="24" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="67" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Interface</text>
+          <rect x="115" y="42" width="75" height="24" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="152" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">Concrete</text>
+          <rect x="200" y="42" width="110" height="24" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="255" y="58" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="9">LoggingDecorator</text>
+          <text x="170" y="85" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">3 classes + DI wiring</text>
+          <text x="170" y="102" text-anchor="middle" fill="#ef4444" font-size="10">...for behavior that's ALWAYS on</text>
+          <text x="170" y="118" text-anchor="middle" fill="#ef4444" font-size="10">and never removed</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="120" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — just put it in the class</text>
+          <rect x="430" y="42" width="200" height="60" rx="6" fill="#22c55e" opacity="0.12" stroke="#22c55e"/>
+          <text x="530" y="62" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="11">UserRepository</text>
+          <text x="530" y="80" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">_logger.Log(...)</text>
+          <text x="530" y="94" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">_db.Users.FindAsync(...)</text>
+          <text x="530" y="120" text-anchor="middle" fill="#22c55e" font-size="10">1 class, simple, done</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Over-engineered — decorator for permanent behavior</span></div>
           <div class="macos-body">
@@ -3177,6 +3315,36 @@ public class UserRepository : IUserRepository
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Misconfigured DI where decorators accidentally create a circular dependency.</p>
         <p class="body-text"><strong>Why This Happens:</strong> You might have a <code>LoggingDecorator</code> that wraps <code>IOrderService</code>, but internally it also depends on <code>INotificationService</code>. Meanwhile, the <code>INotificationService</code> implementation depends on <code>IOrderService</code>. The DI container tries to resolve A → B → A → B... and throws a <code>StackOverflowException</code> or a circular dependency error. The stack trace is just pages of the same two constructors calling each other &mdash; very confusing to debug.</p>
+        <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Circular dependency in decorator chain vs linear chain">
+          <defs>
+            <marker id="dp6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444"/></marker>
+            <marker id="dp6-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+          </defs>
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — circular dependency</text>
+          <rect x="40" y="45" width="120" height="28" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+          <text x="100" y="64" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">LoggingDecorator</text>
+          <rect x="190" y="45" width="120" height="28" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+          <text x="250" y="64" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">NotificationSvc</text>
+          <path d="M160 55 Q175 38 190 55" stroke="#ef4444" stroke-width="1.5" fill="none" marker-end="url(#dp6-arr)"/>
+          <path d="M190 69 Q175 86 160 69" stroke="#ef4444" stroke-width="1.5" fill="none" marker-end="url(#dp6-arr)"/>
+          <text x="175" y="102" text-anchor="middle" fill="#ef4444" font-size="18">&#8734;</text>
+          <text x="170" y="125" text-anchor="middle" fill="#ef4444" font-size="10">A needs B needs A = StackOverflow</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — linear chain</text>
+          <rect x="390" y="55" width="70" height="28" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="425" y="74" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Real</text>
+          <line x1="460" y1="69" x2="488" y2="69" stroke="#22c55e" stroke-width="1.5" marker-end="url(#dp6-arr-g)"/>
+          <rect x="491" y="55" width="80" height="28" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="531" y="74" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Cache</text>
+          <line x1="571" y1="69" x2="599" y2="69" stroke="#22c55e" stroke-width="1.5" marker-end="url(#dp6-arr-g)"/>
+          <rect x="602" y="55" width="70" height="28" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="637" y="74" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Log</text>
+          <text x="530" y="110" text-anchor="middle" fill="#22c55e" font-size="10">One direction only — no cycles</text>
+          <text x="530" y="127" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Only cross-cutting deps (ILogger, IMetrics)</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — circular dependency</span></div>
           <div class="macos-body">
@@ -3211,6 +3379,33 @@ public class NotificationService : INotificationService
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> A decorator changes the behavioral contract that callers expect from the interface.</p>
         <p class="body-text"><strong>Why This Happens:</strong> You add a <code>CachingDecorator</code> that returns data from 30 minutes ago, but the interface contract implies "current data." Or a <code>RetryDecorator</code> catches exceptions and returns a fallback value, but the caller expects to handle those exceptions. The decorator looks like it implements the same interface, but it <em>behaves</em> differently in ways callers don&apos;t expect. Bugs show up far from the decorator code, because the caller&apos;s assumptions are silently violated.</p>
+        <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Decorator breaking vs honoring the interface contract">
+          <defs>
+            <marker id="dp7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-primary, #e2e8f0)"/></marker>
+          </defs>
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — contract broken</text>
+          <rect x="30" y="42" width="80" height="28" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+          <text x="70" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Caller</text>
+          <line x1="110" y1="56" x2="140" y2="56" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.2" marker-end="url(#dp7-arr)"/>
+          <rect x="143" y="42" width="110" height="28" rx="4" fill="#ef4444" opacity="0.15" stroke="#ef4444"/>
+          <text x="198" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">RetryDecorator</text>
+          <text x="198" y="85" text-anchor="middle" fill="#ef4444" font-size="10">Error? Returns null!</text>
+          <text x="170" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Caller expects: Order or Exception</text>
+          <text x="170" y="120" text-anchor="middle" fill="#ef4444" font-size="10">Gets: null (surprise!)</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — contract honored</text>
+          <rect x="390" y="42" width="80" height="28" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+          <text x="430" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Caller</text>
+          <line x1="470" y1="56" x2="500" y2="56" stroke="var(--text-primary, #e2e8f0)" stroke-width="1.2" marker-end="url(#dp7-arr)"/>
+          <rect x="503" y="42" width="110" height="28" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="558" y="61" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">RetryDecorator</text>
+          <text x="558" y="85" text-anchor="middle" fill="#22c55e" font-size="10">Error? Re-throws it!</text>
+          <text x="530" y="105" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Caller expects: Order or Exception</text>
+          <text x="530" y="120" text-anchor="middle" fill="#22c55e" font-size="10">Gets: Order or Exception (correct!)</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">❌ Bad — decorator silently swallows errors</span></div>
           <div class="macos-body">
@@ -3258,6 +3453,34 @@ public async Task&lt;Order&gt; CreateAsync(CreateOrderRequest req)
       <div class="collapsible-body">
         <p class="body-text"><strong>Mistake:</strong> Only testing the full decorator chain end-to-end, never testing decorators individually.</p>
         <p class="body-text"><strong>Why This Happens:</strong> You might think "The chain works as a whole in production, so I should test the whole chain." But when a test fails, you have no idea <em>which</em> decorator is broken. Is it the CachingDecorator? The LoggingDecorator? The real service? You spend hours adding breakpoints and peeling layers to isolate the problem.</p>
+        <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Testing full chain vs testing each decorator in isolation">
+          <!-- Bad side -->
+          <rect x="10" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="170" y="30" text-anchor="middle" fill="#ef4444" font-size="12" font-weight="bold">BAD — test full chain only</text>
+          <rect x="30" y="42" width="55" height="22" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="57" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Log</text>
+          <rect x="90" y="42" width="65" height="22" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="122" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Cache</text>
+          <rect x="160" y="42" width="60" height="22" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="190" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Retry</text>
+          <rect x="225" y="42" width="80" height="22" rx="4" fill="#ef4444" opacity="0.12" stroke="#ef4444"/>
+          <text x="265" y="57" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="8">Real Svc</text>
+          <text x="170" y="82" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">Test fails...</text>
+          <text x="170" y="98" text-anchor="middle" fill="#ef4444" font-size="11">Which layer broke? No idea!</text>
+          <text x="170" y="115" text-anchor="middle" fill="#ef4444" font-size="10">Hours of debugging to isolate</text>
+          <!-- Good side -->
+          <rect x="370" y="10" width="320" height="130" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="530" y="30" text-anchor="middle" fill="#22c55e" font-size="12" font-weight="bold">GOOD — test each in isolation</text>
+          <rect x="420" y="42" width="90" height="30" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="465" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">CacheDecorator</text>
+          <text x="465" y="66" text-anchor="middle" fill="#22c55e" font-size="8">+ Mock inner</text>
+          <rect x="530" y="42" width="90" height="30" rx="5" fill="#22c55e" opacity="0.15" stroke="#22c55e"/>
+          <text x="575" y="55" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10">LogDecorator</text>
+          <text x="575" y="66" text-anchor="middle" fill="#22c55e" font-size="8">+ Mock inner</text>
+          <text x="530" y="95" text-anchor="middle" fill="#22c55e" font-size="10">Test fails? You know exactly where</text>
+          <text x="530" y="112" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Mock inner = predictable inputs</text>
+          <text x="530" y="127" text-anchor="middle" fill="var(--text-primary, #e2e8f0)" font-size="10" opacity="0.7">Test verifies only that decorator's logic</text>
+        </svg>
         <div class="macos-window mt-sm">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">✅ Good — test each decorator in isolation</span></div>
           <div class="macos-body">
