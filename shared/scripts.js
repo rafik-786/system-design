@@ -566,6 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#backToTop')) window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
+
   /* ----------------------------------------------------------
    *  16. Cmd+K / Ctrl+K Search — build overlay once, reuse
    * -------------------------------------------------------- */
