@@ -6050,10 +6050,12 @@ public class DbSink : ILogSink
       </div>
     </div>
 
-    <p class="body-text">A candidate submitted this logging framework as a pull request. It compiles. It runs. It handles basic console and file logging. But there are exactly <strong>5 bugs</strong> hiding in it &mdash; issues that would cause real problems in production. Can you find them all before scrolling down?</p>
+    <p class="body-text">A candidate submitted this logging framework as a pull request. It compiles. It runs. It handles basic console and file logging. But there are exactly <strong>5 bugs</strong> hiding in it &mdash; issues that would cause real problems in production. Some are obvious if you know what to look for. Others are the kind of subtle mistakes that slip past junior reviewers and only surface at 3 AM when the on-call engineer is debugging a production outage.</p>
+
+    <p class="body-text">This is how real code reviews work: the code <em>looks</em> fine at first glance. The bugs aren't syntax errors &mdash; they're design mistakes that only matter under load, across timezones, or during shutdown. Can you find them all before scrolling down?</p>
 
     <!-- SVG: Code Review Flow -->
-    <svg viewBox="0 0 760 100" style="width:100%; max-width:760px; display:block; margin:1rem auto;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Code review flow from PR submitted through review to approval">
+    <svg id="lf-s15-flow" viewBox="0 0 760 100" style="width:100%; max-width:760px; display:block; margin:1rem auto;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Code review flow from PR submitted through review to approval">
       <defs>
         <marker id="lf-s15-bugs-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent-primary, #8b5cf6)"/></marker>
       </defs>
@@ -6086,6 +6088,7 @@ public class DbSink : ILogSink
 
     <p class="body-text" style="font-weight:600; margin-top:0.5rem;">Read the code below carefully. Try to find all 5 issues before revealing the answers.</p>
 
+    <!-- Candidate Code in macos-window -->
     <div class="macos-window">
       <div class="macos-titlebar">
         <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
@@ -6144,7 +6147,12 @@ public static class LogManager                                   // Line 39
     </div>
 
     <!-- SVG: Bug Severity Chart -->
-    <svg viewBox="0 0 760 100" style="width:100%; max-width:760px; display:block; margin:1.25rem auto;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bug severity chart showing 5 bugs ranked by severity">
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-chart-bar icon-gap text-red"></i> Bug Severity Overview
+    </p>
+    <p class="body-text">Not all bugs are created equal. The chart below ranks the 5 issues by severity and category. Thread safety and resource leaks are the hardest to catch because they don't show up in simple testing &mdash; they only surface under load or during shutdown. That's why they're the highest-severity bugs in the list.</p>
+
+    <svg id="lf-s15-severity" viewBox="0 0 760 100" style="width:100%; max-width:760px; display:block; margin:1rem auto;" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bug severity chart showing 5 bugs ranked by severity">
       <rect width="760" height="100" rx="12" fill="var(--surface-2, #1e1e2e)" opacity="0.5"/>
       <text x="380" y="18" text-anchor="middle" fill="var(--text-muted, #888)" font-family="'Inter',sans-serif" font-size="10" font-weight="700">BUG SEVERITY</text>
 
@@ -6181,9 +6189,18 @@ public static class LogManager                                   // Line 39
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>The problem:</strong> Multiple threads call <code>Log()</code> simultaneously. The <code>foreach</code> loop iterates <code>_sinks</code> without any synchronization. If <code>FileSink.Write()</code> calls <code>StreamWriter.WriteLine()</code> from two threads at the same time, the output gets <span class="tooltip-trigger">interleaved<span class="tooltip-content">Thread interleaving means two threads writing "Hello" and "World" to the same file might produce "HeWollorld" instead of two clean lines. StreamWriter is not thread-safe by default. Without a lock, concurrent writes corrupt the output.</span></span> &mdash; half of one log line gets mixed with half of another.</p>
-          <p class="body-text"><strong>The fix:</strong> Add <code>lock (_lock)</code> around the foreach loop, OR use a <code>Channel&lt;LogEntry&gt;</code> to serialize writes on a background thread (the <code>AsyncDecorator</code> approach).</p>
-          <p class="body-text"><strong>SOLID principle:</strong> This is a robustness issue. The <span class="tooltip-trigger">Single Responsibility Principle<span class="tooltip-content">Each class should have one reason to change. Thread safety is the Logger's responsibility &mdash; individual sinks shouldn't need to worry about whether they're being called from multiple threads. The Logger should guarantee that sinks are called one-at-a-time.</span></span> says the Logger should guarantee safe invocation of its sinks.</p>
+          <p class="body-text"><strong>What's wrong:</strong> Multiple threads call <code>Log()</code> simultaneously. The <code>foreach</code> loop iterates <code>_sinks</code> without any synchronization. If <code>FileSink.Write()</code> calls <code>StreamWriter.WriteLine()</code> from two threads at the same time, the output gets <span class="tooltip">interleaved<span class="tooltip-text">Thread interleaving means two threads writing "Hello" and "World" to the same file might produce "HeWollorld" instead of two clean lines. StreamWriter is not thread-safe by default. Without a lock, concurrent writes corrupt the output.</span></span> &mdash; half of one log line gets mixed with half of another.</p>
+
+          <p class="body-text"><strong>Why it's dangerous:</strong> This bug is invisible in development (single thread, low volume). It only manifests in production under concurrent load. The corrupted output looks like gibberish, and you can't even use the logs to debug the problem &mdash; because the logs themselves are corrupted.</p>
+
+          <p class="body-text"><strong>The fix:</strong> Add <code>lock (_lock)</code> around the foreach loop, OR use a <code>Channel&lt;LogEntry&gt;</code> to serialize writes on a background thread (the async buffered approach from Level 7). The Channel approach is better for high throughput because callers never block.</p>
+
+          <p class="body-text"><strong>Principle violated:</strong> <span class="tooltip">Single Responsibility Principle<span class="tooltip-text">Each class should have one reason to change. Thread safety is the Logger's responsibility &mdash; individual sinks shouldn't need to worry about whether they're being called from multiple threads. The Logger should guarantee that sinks are called one-at-a-time.</span></span> &mdash; the Logger is responsible for safe invocation of its sinks. Sinks shouldn't need their own locking.</p>
+
+          <div class="callout callout-warning" style="margin-top:0.75rem;">
+            <i class="fa-solid fa-graduation-cap icon-gap"></i>
+            <strong>Taught in Level 5</strong> &mdash; The thread-safety level where we added <code>lock</code> and then upgraded to <code>Channel&lt;T&gt;</code> for async writes. If you missed this bug, revisit Level 5.
+          </div>
         </div>
       </div>
     </div>
@@ -6196,9 +6213,16 @@ public static class LogManager                                   // Line 39
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>The problem:</strong> <code>DateTime.Now</code> returns <em>local time</em>, which depends on the server's timezone setting. If your application runs in Azure across multiple regions (US East, EU West, Asia), each server stamps logs with a different timezone. Sorting logs by time becomes impossible &mdash; an event at 3:00 PM US might appear <em>after</em> an event at 9:00 PM EU even though it happened first.</p>
-          <p class="body-text"><strong>The fix:</strong> Always use <code>DateTimeOffset.UtcNow</code>. It captures both the time and the UTC offset, so logs from any server anywhere in the world sort correctly.</p>
-          <p class="body-text"><strong>Rule of thumb:</strong> <code>DateTime.Now</code> is for displaying to humans. <code>DateTimeOffset.UtcNow</code> is for storing and comparing.</p>
+          <p class="body-text"><strong>What's wrong:</strong> <code>DateTime.Now</code> returns <em>local time</em>, which depends on the server's timezone setting. If your application runs in Azure across multiple regions (US East, EU West, Asia), each server stamps logs with a different timezone. An event at 3:00 PM US might appear <em>after</em> an event at 9:00 PM EU even though it happened first in absolute time.</p>
+
+          <p class="body-text"><strong>Why it's dangerous:</strong> When debugging a production incident, you rely on log timestamps to reconstruct what happened in what order. If servers in different timezones produce unsortable timestamps, your incident investigation is blind. You'll waste hours on wrong causality chains.</p>
+
+          <p class="body-text"><strong>The fix:</strong> Always use <code>DateTimeOffset.UtcNow</code>. It captures both the time and the UTC offset, so logs from any server anywhere in the world sort correctly. The rule of thumb: <span class="tooltip"><code>DateTime.Now</code><span class="tooltip-text">Returns the local date and time. The exact value depends on the server's timezone setting. Two servers in different timezones produce different values at the same instant. Never use this for log timestamps.</span></span> is for displaying to humans. <code>DateTimeOffset.UtcNow</code> is for storing and comparing.</p>
+
+          <div class="callout callout-warning" style="margin-top:0.75rem;">
+            <i class="fa-solid fa-graduation-cap icon-gap"></i>
+            <strong>Taught in Level 4</strong> &mdash; The enrichment level where the <code>TimestampEnricher</code> was introduced. We used <code>DateTimeOffset.UtcNow</code> from the start. This bug appears when someone skips that enricher and hardcodes the timestamp in Logger.
+          </div>
         </div>
       </div>
     </div>
@@ -6211,8 +6235,16 @@ public static class LogManager                                   // Line 39
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>The problem:</strong> <code>"[" + entry.Level + "] " + entry.Timestamp + " " + entry.Message</code> creates 4 intermediate string objects on every single log call. In a system logging 10,000 entries per second, that's 40,000 garbage strings per second hitting the <span class="tooltip-trigger">garbage collector<span class="tooltip-content">The .NET garbage collector automatically frees unused memory. But it has to pause your application to do so. More garbage means more frequent pauses. In a high-throughput logging system, string concatenation is one of the biggest sources of GC pressure.</span></span>.</p>
-          <p class="body-text"><strong>The fix:</strong> Use <code>string interpolation</code> (<code>$"[{entry.Level}] {entry.Timestamp} {entry.Message}"</code>) which the compiler optimizes, or use <code>StringBuilder</code> / <code>string.Create()</code> for truly hot paths.</p>
+          <p class="body-text"><strong>What's wrong:</strong> <code>"[" + entry.Level + "] " + entry.Timestamp + " " + entry.Message</code> creates 4 intermediate string objects on every single log call. Each <code>+</code> allocates a new string because strings in C# are <span class="tooltip">immutable<span class="tooltip-text">Once a string is created in .NET, it can never be changed. Every string operation (concatenation, substring, trim) creates a brand-new string object. In a hot path like logging, this creates massive garbage collection pressure.</span></span> &mdash; the runtime creates a new object, copies the old characters plus the new ones, and throws away the old object.</p>
+
+          <p class="body-text"><strong>Why it's dangerous:</strong> In a system logging 10,000 entries per second, that's 40,000 garbage strings per second hitting the <span class="tooltip">garbage collector<span class="tooltip-text">The .NET garbage collector automatically frees unused memory. But it has to pause your application to do so. More garbage means more frequent pauses. In a high-throughput logging system, string concatenation is one of the biggest sources of GC pressure.</span></span>. Each GC pause freezes all threads briefly. At scale, this adds up to noticeable latency spikes &mdash; exactly what you don't want from a logging system that's supposed to be invisible.</p>
+
+          <p class="body-text"><strong>The fix:</strong> Use <span class="tooltip">string interpolation<span class="tooltip-text">C#'s $"..." syntax. The compiler converts it to string.Format or string.Concat depending on context, and modern .NET further optimizes it with DefaultInterpolatedStringHandler to minimize allocations.</span></span> (<code>$"[{entry.Level}] {entry.Timestamp} {entry.Message}"</code>) which the compiler optimizes, or use <code>StringBuilder</code> / <code>string.Create()</code> for truly hot paths. For structured logging, you'd typically serialize the <code>LogEntry</code> properties directly instead of formatting a string at all.</p>
+
+          <div class="callout callout-warning" style="margin-top:0.75rem;">
+            <i class="fa-solid fa-graduation-cap icon-gap"></i>
+            <strong>Taught in Level 3</strong> &mdash; The formatting level where we introduced structured output. The structured approach avoids this problem entirely because it serializes key-value pairs rather than concatenating strings.
+          </div>
         </div>
       </div>
     </div>
@@ -6225,8 +6257,16 @@ public static class LogManager                                   // Line 39
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>The problem:</strong> <code>FileSink</code> creates a <code>StreamWriter</code> in its constructor but never disposes it. When the application shuts down, the StreamWriter's internal buffer might still have unwritten data. Those log entries &mdash; including the ones describing <em>why</em> the app is shutting down &mdash; are lost. In a long-running app, you also leak file handles until the OS refuses to open more.</p>
-          <p class="body-text"><strong>The fix:</strong> Make <code>FileSink</code> implement <code>IDisposable</code> and call <code>_writer.Dispose()</code>. Make <code>Logger</code> implement <code>IDisposable</code> too, and have it dispose all its sinks. Register the Logger in DI so the host disposes it on shutdown.</p>
+          <p class="body-text"><strong>What's wrong:</strong> <code>FileSink</code> creates a <code>StreamWriter</code> in its constructor but never disposes it. When the application shuts down, the StreamWriter's internal buffer might still have unwritten data. Those log entries &mdash; often the ones describing <em>why</em> the app is shutting down &mdash; are lost forever.</p>
+
+          <p class="body-text"><strong>Why it's dangerous:</strong> This is a double hit. First, you lose the most important log entries (the ones from the final seconds before a crash). Second, in a long-running app, you leak <span class="tooltip">file handles<span class="tooltip-text">Operating system resources that represent open files. Every OS has a limit on how many file handles a process can have open. StreamWriter holds one until disposed. Leak enough and the OS refuses to open any more files &mdash; including new log files.</span></span> until the OS refuses to open more. Eventually, the logger itself can't create new log files, and you lose logging entirely &mdash; silently.</p>
+
+          <p class="body-text"><strong>The fix:</strong> Make <code>FileSink</code> implement <code>IDisposable</code> and call <code>_writer.Dispose()</code> (which also flushes). Make <code>Logger</code> implement <code>IDisposable</code> too, and have it dispose all its sinks. Register the Logger in DI so the host calls <code>Dispose()</code> automatically on <span class="tooltip">graceful shutdown<span class="tooltip-text">When an application exits cleanly (Ctrl+C, SIGTERM, AppDomain unload), the DI container disposes all registered singletons. If your Logger is registered as a DI singleton and implements IDisposable, the framework flushes all buffers and closes all file handles for you.</span></span>.</p>
+
+          <div class="callout callout-warning" style="margin-top:0.75rem;">
+            <i class="fa-solid fa-graduation-cap icon-gap"></i>
+            <strong>Taught in Level 6</strong> &mdash; The resource management level where we added <code>IDisposable</code> to both Logger and all sinks with unmanaged resources. If you missed this bug, revisit Level 6 &mdash; especially the "graceful shutdown" section.
+          </div>
         </div>
       </div>
     </div>
@@ -6239,25 +6279,44 @@ public static class LogManager                                   // Line 39
       </div>
       <div class="collapsible-content">
         <div class="collapsible-body">
-          <p class="body-text"><strong>The problem:</strong> <code>LogManager.Instance</code> is global, mutable state. Any code that calls <code>LogManager.Instance.Log(...)</code> is tightly coupled to a concrete Logger that can't be swapped in tests. Worse, <code>Initialize()</code> can be called multiple times &mdash; replacing the instance mid-flight. And since it's static, parallel test runs share the same instance, causing log entries from Test A to appear in Test B's assertions.</p>
-          <p class="body-text"><strong>The fix:</strong> Remove the static <code>LogManager</code> entirely. Register <code>Logger</code> as a DI singleton using <code>builder.Services.AddSingleton(...)</code>. In tests, create a fresh <code>Logger</code> per test with a <code>TestSink</code>. No global state, no leakage, full isolation.</p>
+          <p class="body-text"><strong>What's wrong:</strong> <code>LogManager.Instance</code> is global, mutable state. Any code that calls <code>LogManager.Instance.Log(...)</code> is tightly coupled to a concrete Logger that can't be swapped in tests. Three specific problems arise from this design:</p>
+          <ul style="margin:0.5rem 0 0.75rem 1.2rem; line-height:1.8;">
+            <li><strong>No mocking:</strong> You can't inject a <code>MockLogSink</code> into code that hard-references the static instance.</li>
+            <li><strong>Test leakage:</strong> Since the instance is static, <span class="tooltip">parallel test runs<span class="tooltip-text">Modern test runners like xUnit run tests in parallel by default for speed. If tests share a static Logger instance, log entries from Test A appear in Test B's assertions, causing random test failures.</span></span> share the same instance. Log entries from Test A leak into Test B's assertions.</li>
+            <li><strong>Unprotected initialization:</strong> <code>Initialize()</code> can be called multiple times, replacing the instance mid-flight. Any thread holding a reference to the old instance now writes to a disconnected logger.</li>
+          </ul>
+
+          <p class="body-text"><strong>The fix:</strong> Remove the static <code>LogManager</code> entirely. Register <code>Logger</code> as a DI singleton using <code>builder.Services.AddSingleton&lt;ILogger, Logger&gt;()</code>. In tests, create a fresh <code>Logger</code> per test with a <code>TestSink</code>. No global state, no leakage, full isolation. The <span class="tooltip">DI container<span class="tooltip-text">The Dependency Injection container manages object lifetimes. AddSingleton means one instance for the app. AddScoped means one per request. AddTransient means a new one every time. Using DI instead of static gives you all the benefits of Singleton without the testability cost.</span></span> handles the "one instance" guarantee without any static fields.</p>
+
+          <div class="callout callout-warning" style="margin-top:0.75rem;">
+            <i class="fa-solid fa-graduation-cap icon-gap"></i>
+            <strong>Taught in Level 1</strong> &mdash; The very first level established the Singleton via DI, not via a static class. This is the foundational design decision that all other levels build on. If you used <code>static</code> instead, every subsequent level's testability is compromised.
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Scoring -->
-    <div class="callout callout-info" style="margin-top:1.5rem;">
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-trophy icon-gap text-yellow"></i> Score Yourself
+    </p>
+
+    <div class="callout callout-info" style="margin-top:0.5rem;">
       <i class="fa-solid fa-trophy icon-gap"></i>
-      <strong>Score yourself:</strong>
+      <strong>How did you do?</strong>
       <ul style="margin:0.5rem 0 0 1.2rem; line-height:1.8;">
-        <li><strong>All 5:</strong> Senior-level code review instincts. You'd catch these in a real PR.</li>
-        <li><strong>3&ndash;4:</strong> Solid mid-level. You see the structural issues but might miss the subtle ones (DateTime, string concat).</li>
-        <li><strong>1&ndash;2:</strong> Review Levels 4&ndash;6 in the Constraint Game. Thread safety and disposal are the most commonly missed issues in logging code.</li>
+        <li><strong>All 5:</strong> Senior-level code review instincts. You'd catch these in a real PR and explain <em>why</em> each one matters. You understand that the most dangerous bugs are the ones that only appear under load or during shutdown.</li>
+        <li><strong>3&ndash;4:</strong> Solid mid-level. You see the structural issues (thread safety, static state) but might miss the subtle ones (DateTime timezone, string concat GC pressure). These are the "it works on my machine" bugs that only production reveals.</li>
+        <li><strong>1&ndash;2:</strong> Review Levels 4&ndash;6 in the Constraint Game. Thread safety and disposal are the most commonly missed issues in logging code &mdash; and the most commonly asked about in interviews.</li>
+        <li><strong>0:</strong> Don't worry &mdash; that's exactly why this section exists. Go through each bug explanation above, then re-read the candidate code. You'll be surprised how obvious the bugs become once you know what to look for.</li>
       </ul>
     </div>
-  </div>
 
-  <!-- ========== 16. INTERVIEW WALKTHROUGH ========== -->
+    <div class="callout callout-purple" style="margin-top:1rem;">
+      <i class="fa-solid fa-lightbulb icon-gap"></i>
+      <strong>Pro Tip for real code reviews:</strong> Build a mental checklist. For any class that touches I/O, ask three questions: (1) Is it thread-safe? (2) Does it implement <code>IDisposable</code>? (3) Can it be tested without hitting the real file system? These three questions alone would have caught bugs #1, #4, and #5. Add "is it using UTC?" and "is it allocating in a hot path?" to catch the other two.
+    </div>
+  </div>
   <div class="section" id="walkthrough">
     <div class="section-header">
       <div class="section-icon yellow"><i class="fa-solid fa-person-chalkboard"></i></div>
@@ -6267,9 +6326,16 @@ public static class LogManager                                   // Line 39
       </div>
     </div>
 
-    <p class="body-text">A logging framework sounds boring until the interviewer asks "how do you add a new sink without touching existing code?" or "how does correlation work across async calls?" Suddenly it's a <span class="tooltip">design patterns showcase<span class="tooltip-text">Logging naturally uses Strategy (sinks), Decorator (enrichment), and Singleton (shared logger instance) &mdash; three patterns in one system.</span></span>. Below you'll see two runs: the polished one and the realistic one with stumbles. Both get hired. The difference is recovery speed.</p>
+    <p class="body-text">A logging framework sounds boring until the interviewer asks "how do you add a new sink without touching existing code?" or "how does correlation work across async calls?" Suddenly it's a <span class="tooltip">design patterns showcase<span class="tooltip-text">Logging naturally uses Strategy (sinks), Decorator (enrichment), and Singleton (shared logger instance) &mdash; three patterns in one system. That's why interviewers love this question.</span></span>. Below you'll see two complete runs of the same 30-minute interview: the polished one where everything flows smoothly, and the realistic one with stumbles, pauses, and recovery. Both get hired. The difference is recovery speed, not perfection.</p>
+
+    <p class="body-text">Pay attention to the "Interviewer Thinks" column &mdash; it reveals the <strong>hidden scoring</strong> that candidates never see. Every green comment is a mental checkbox. Every yellow comment is a "let's see if they recover" moment. Understanding what interviewers are silently tracking is the single biggest advantage you can have.</p>
 
     <!-- SVG: Interview Rubric -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-clipboard-list icon-gap text-yellow"></i> What Interviewers Actually Score
+    </p>
+    <p class="body-text">Most candidates think interviewers score on "did you use the right pattern?" Wrong. They score on <strong>five dimensions</strong>, and only one of them is about patterns. The others are about extensibility, thread safety, modern practices, and real-world awareness. Miss any two and you're below "Hire" even if your code compiles perfectly.</p>
+
     <svg id="lf-s16-rubric" viewBox="0 0 760 250" role="img" aria-label="Interview evaluation rubric for logging framework design" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
       <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
       <text x="380" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text-primary)">What Interviewers Score on a Logging Framework Design</text>
@@ -6306,6 +6372,7 @@ public static class LogManager                                   // Line 39
       <text x="380" y="238" text-anchor="middle" font-size="9" fill="var(--text-muted)">Logging seems trivial. That's why it exposes shallow thinkers fast.</text>
     </svg>
 
+    <!-- Tabs: Clean Run / Realistic Run -->
     <div class="tab-container">
       <div class="tab-header" role="tablist">
         <button class="tab-btn active" data-tab="lf-interview-clean" role="tab" aria-selected="true">
@@ -6318,49 +6385,50 @@ public static class LogManager                                   // Line 39
 
       <!-- Clean Run -->
       <div class="tab-panel active" id="lf-interview-clean" role="tabpanel">
+        <p class="body-text" style="margin-bottom:1rem;">This is what the interview looks like when you've practiced the articulation cards from Section 17. Every phase flows into the next. The candidate never says a pattern name without first explaining the problem it solves. Notice how the "Interviewer Thinks" column goes green on every row &mdash; that's what "Strong Hire" looks like from the other side.</p>
         <div class="table-wrapper">
           <table>
             <thead><tr><th style="width:75px;">Time</th><th>Candidate Says</th><th>Interviewer Thinks</th></tr></thead>
             <tbody>
               <tr>
                 <td style="white-space:nowrap;"><code>0:00</code></td>
-                <td>"Before I code, let me clarify. Are we building a library like Serilog, or an internal logging service? Do we need multiple output targets &mdash; console, file, database? Should it support structured logging with key-value properties?"</td>
-                <td><span class="text-green">Scoping a "boring" problem. Shows this person treats every design seriously.</span></td>
+                <td>"Before I code, let me clarify. Are we building a library like Serilog, or an internal logging service? Do we need multiple output targets &mdash; console, file, database? Should it support structured logging with key-value properties? What about async and thread safety?"</td>
+                <td><span class="text-green">Scoping a "boring" problem. Shows this person treats every design seriously. Four scoping questions in 30 seconds.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>2:00</code></td>
                 <td>"Functional: log at multiple <span class="tooltip">severity levels<span class="tooltip-text">Categories like Debug, Info, Warning, Error, Fatal that indicate how serious a log entry is. Used for filtering &mdash; production might only capture Warning and above.</span></span>, write to pluggable sinks, enrich entries with context. Non-functional: thread-safe, zero changes to add a new sink, minimal allocation on <span class="tooltip">hot paths<span class="tooltip-text">Code that runs very frequently (e.g., every API request). Even small inefficiencies multiply into big performance costs on hot paths.</span></span>."</td>
-                <td><span class="text-green">F/NF split on logging? Senior-level framing. The perf mention is a bonus.</span></td>
+                <td><span class="text-green">F/NF split on logging? Senior-level framing. The perf mention is a bonus &mdash; shows they've dealt with high-throughput systems.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>4:00</code></td>
                 <td>"Core entities: <code>LogEntry</code> record holds level, message, timestamp, properties dictionary. <code>ILogSink</code> interface &mdash; each output target implements it. <code>ILogEnricher</code> adds context. <code>Logger</code> orchestrates: enrichers decorate, then sinks consume."</td>
-                <td><span class="text-green">Clean entity extraction. Record for immutable data, interfaces for extension points. Textbook.</span></td>
+                <td><span class="text-green">Clean entity extraction. Record for immutable data, interfaces for extension points. Type choices are deliberate.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>6:00</code></td>
                 <td>"Sinks vary independently &mdash; console, file, HTTP &mdash; same interface, different implementations. That's <span class="tooltip">Strategy<span class="tooltip-text">The Strategy pattern lets you swap algorithms (here: where logs go) at runtime without modifying the code that uses them.</span></span>. Enrichers wrap each other to layer on context &mdash; timestamp, then correlation ID, then machine name. That's <span class="tooltip">Decorator<span class="tooltip-text">The Decorator pattern wraps an object with additional behavior. Each enricher wraps the previous one, adding its own context before passing the log entry along.</span></span>."</td>
-                <td><span class="text-green">Two patterns, each motivated by a concrete problem. Not name-dropping.</span></td>
+                <td><span class="text-green">Two patterns, each motivated by a concrete problem. Not name-dropping &mdash; the problem came first, then the pattern name.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>10:00</code></td>
                 <td><em>Starts coding: LogLevel enum, LogEntry record, ILogSink, ConsoleSink, FileSink, ILogEnricher, TimestampEnricher, Logger class with List&lt;ILogSink&gt;...</em></td>
-                <td>Watching for: sealed classes, readonly fields, ConcurrentQueue or lock usage</td>
+                <td>Watching for: sealed classes, readonly fields, <span class="tooltip">ConcurrentQueue<span class="tooltip-text">A thread-safe queue in .NET that allows multiple threads to add and remove items without locks. Often used as the foundation for producer-consumer patterns.</span></span> or lock usage, IDisposable on FileSink</td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>20:00</code></td>
                 <td>"For thread safety, the Logger is a <span class="tooltip">Singleton<span class="tooltip-text">A single shared instance across the app. Registered as a singleton in DI so all classes share one logger with the same sinks and enrichers configured.</span></span> registered in DI. Writes use a lock around the sink loop, or better &mdash; a <span class="tooltip"><code>Channel&lt;LogEntry&gt;</code><span class="tooltip-text">A .NET async producer-consumer queue. Writers add items without blocking; a background reader processes them. Perfect for decoupling hot paths from slow I/O.</span></span> as an async buffer so callers never block."</td>
-                <td><span class="text-green">Async buffering for logging. That's production-grade thinking, not textbook.</span></td>
+                <td><span class="text-green">Async buffering for logging. That's production-grade thinking, not textbook. DI singleton, not static &mdash; shows testability awareness.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>24:00</code></td>
                 <td>"Edge cases: sink throws &mdash; catch per sink, don't let one broken sink kill all logging. Log entry too large &mdash; truncation policy. <span class="tooltip">Circular dependency<span class="tooltip-text">When the logger tries to log its own errors through itself, creating an infinite loop. The fix: internal errors go to a separate channel (stderr) that bypasses the pipeline.</span></span> &mdash; the logger itself should never log its own failures to the same pipeline."</td>
-                <td><span class="text-green">Proactive failure thinking. Most candidates forget that sinks can fail.</span></td>
+                <td><span class="text-green">Proactive failure thinking. Most candidates forget that sinks can fail. The circular dependency catch is senior-level awareness.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>27:00</code></td>
-                <td>"At scale: centralized log aggregation with ELK or Seq. Correlation IDs via <span class="tooltip"><code>AsyncLocal&lt;T&gt;</code><span class="tooltip-text">A .NET type that stores a value scoped to the current async flow. It survives async/await boundaries automatically, unlike ThreadLocal which is bound to a single thread.</span></span> so a single request's logs can be traced across services. <span class="tooltip">Sampling<span class="tooltip-text">Only logging a percentage of entries (e.g., 10% of Debug) on high-volume paths to reduce load on sinks without losing visibility on errors.</span></span> for high-throughput paths to avoid drowning the sink."</td>
-                <td><span class="text-green">LLD to HLD bridge. Correlation IDs show distributed systems awareness. Strong Hire.</span></td>
+                <td>"At scale: centralized log aggregation with ELK or <span class="tooltip">Seq<span class="tooltip-text">A structured log server built for .NET. It indexes structured log data and provides powerful query and dashboard capabilities. Often used with Serilog in .NET ecosystems.</span></span>. Correlation IDs via <span class="tooltip"><code>AsyncLocal&lt;T&gt;</code><span class="tooltip-text">A .NET type that stores a value scoped to the current async flow. It survives async/await boundaries automatically, unlike ThreadLocal which is bound to a single thread.</span></span> so a single request's logs can be traced across services. <span class="tooltip">Sampling<span class="tooltip-text">Only logging a percentage of entries (e.g., 10% of Debug) on high-volume paths to reduce load on sinks without losing visibility on errors.</span></span> for high-throughput paths to avoid drowning the sink."</td>
+                <td><span class="text-green">LLD to HLD bridge. Correlation IDs show distributed systems awareness. Strong Hire &mdash; all 5 rubric dimensions covered.</span></td>
               </tr>
             </tbody>
           </table>
@@ -6369,6 +6437,7 @@ public static class LogManager                                   // Line 39
 
       <!-- Realistic Run -->
       <div class="tab-panel" id="lf-interview-real" role="tabpanel">
+        <p class="body-text" style="margin-bottom:1rem;">This is what the interview looks like when you're nervous, didn't sleep well, or the question caught you off guard. The candidate stumbles twice, pauses once, and needs a nudge from the interviewer. They still get "Strong Hire" &mdash; because every stumble is followed by a <strong>recovery that shows real understanding</strong>. Pay attention to the yellow moments and how they turn green.</p>
         <div class="table-wrapper">
           <table>
             <thead><tr><th style="width:75px;">Time</th><th>Candidate Says</th><th>Interviewer Thinks</th></tr></thead>
@@ -6376,42 +6445,62 @@ public static class LogManager                                   // Line 39
               <tr>
                 <td style="white-space:nowrap;"><code>0:00</code></td>
                 <td>"Logging... OK, so we need a Logger class that writes to the console. Let me start with a static method..."</td>
-                <td><span style="color:#fde047;">Jumped straight to static Console.WriteLine wrapper. No scoping.</span></td>
+                <td><span style="color:#fde047;">Jumped straight to static Console.WriteLine wrapper. No scoping. Let's see if they recover.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>1:30</code></td>
                 <td>"Actually, wait &mdash; should this support multiple outputs? Like file and database too? And is this a library or an internal tool?"</td>
-                <td><span class="text-green">Self-corrected to scope. Good recovery &mdash; better late than never.</span></td>
+                <td><span class="text-green">Self-corrected to scope. Good recovery &mdash; better late than never. The fact that they stopped themselves is a positive signal.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>4:00</code></td>
-                <td>"I'll make a Logger with a switch on output type... hmm, but that means every new output type changes the Logger class. That's OCP violation. Let me use an interface instead &mdash; <code>ILogSink</code>."</td>
-                <td><span class="text-green">Self-corrected from switch to interface. Showing real-time design evolution &mdash; this is BETTER than getting it right instantly.</span></td>
+                <td>"I'll make a Logger with a switch on output type... hmm, but that means every new output type changes the Logger class. That's an <span class="tooltip">OCP<span class="tooltip-text">Open-Closed Principle: open for extension (new sinks), closed for modification (Logger doesn't change). One of the five SOLID principles &mdash; and the one most directly tested by logging framework interviews.</span></span> violation. Let me use an interface instead &mdash; <code>ILogSink</code>."</td>
+                <td><span class="text-green">Self-corrected from switch to interface. Showing real-time design evolution &mdash; this is BETTER than getting it right instantly because it proves the reasoning process.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>8:00</code></td>
                 <td>"For adding context &mdash; timestamp, machine name &mdash; I could put it all in the Logger... but that makes Logger responsible for everything. Each piece of context should be its own thing that wraps..."</td>
-                <td><span class="text-green">Discovering Decorator through SRP reasoning. Organic, not memorized.</span></td>
+                <td><span class="text-green">Discovering Decorator through SRP reasoning. This is organic, not memorized. Even better than the clean run &mdash; the interviewer can see the thought process.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>12:00</code></td>
-                <td><em>Coding... pauses...</em> "How should the enrichers chain together? Let me think..."</td>
-                <td><span style="color:#fde047;">Pausing is fine. Thinking silence beats rushing into wrong code.</span></td>
+                <td><em>Coding... pauses...</em> "How should the enrichers chain together? Let me think for a moment..."</td>
+                <td><span style="color:#fde047;">Pausing is fine. Thinking silence beats rushing into wrong code. Most interviewers will wait 30-60 seconds comfortably.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>13:00</code></td>
                 <td>"Each enricher takes a LogEntry, adds its property, and returns the enriched entry. The Logger loops through enrichers before passing to sinks. Or &mdash; enrichers could wrap each other like middleware. I'll go with the loop for simplicity, but mention the Decorator alternative."</td>
-                <td><span class="text-green">Considered two approaches, picked one with reasoning. Trade-off articulation.</span></td>
+                <td><span class="text-green">Considered two approaches, picked one with reasoning. Trade-off articulation is exactly what I'm scoring on. The "but here's the alternative" shows depth.</span></td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;"><code>18:00</code></td>
+                <td><em>Finishes coding the basic Logger + sinks.</em> "I think that covers the main flow."</td>
+                <td><span style="color:#fde047;">Good code but didn't mention thread safety or edge cases. Let me probe.</span></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>20:00</code></td>
                 <td><strong>Interviewer:</strong> "What happens if the file sink throws an IOException mid-write?"</td>
-                <td><em>Testing if candidate handles sink failures gracefully.</em></td>
+                <td><em>Testing if candidate handles sink failures gracefully. This is the "production thinking" dimension.</em></td>
               </tr>
               <tr>
                 <td style="white-space:nowrap;"><code>20:30</code></td>
                 <td>"Oh &mdash; I should catch per-sink. If the file sink dies, console should still work. Let me wrap each sink call in try-catch and maybe add a fallback sink or just swallow and continue. I'd also log sink failures to <span class="tooltip">stderr<span class="tooltip-text">Standard error stream &mdash; a separate output channel from stdout. Writing to stderr bypasses the normal logging pipeline, making it a safe last-resort for logging system failures.</span></span> as a last-resort channel."</td>
-                <td><span class="text-green">Needed a nudge but responded with a solid, layered approach. Strong Hire.</span></td>
+                <td><span class="text-green">Needed a nudge but responded with a solid, layered approach. Per-sink isolation + stderr fallback = production thinking.</span></td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;"><code>23:00</code></td>
+                <td><strong>Interviewer:</strong> "What about thread safety? Multiple requests hitting this at once?"</td>
+                <td><em>Second probe. If they handle this well, it's still a Strong Hire despite the slow start.</em></td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;"><code>23:30</code></td>
+                <td>"Right, the Logger is shared across the app. I need a lock around the sink loop at minimum. For better performance, I'd use a Channel &mdash; callers enqueue and a background consumer writes to sinks. That way the calling thread never waits for disk I/O."</td>
+                <td><span class="text-green">Strong recovery. Went from "no mention" to "Channel-based async buffering" in 30 seconds. The performance reasoning (callers never wait for disk) seals it.</span></td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;"><code>27:00</code></td>
+                <td>"For scaling &mdash; at the distributed level, I'd add a sink that ships to ELK or a message bus. Correlation IDs via AsyncLocal to trace requests across services. The LLD stays the same &mdash; just a new sink."</td>
+                <td><span class="text-green">LLD to HLD bridge achieved. Strong Hire &mdash; the stumbles early on actually made the recovery more impressive.</span></td>
               </tr>
             </tbody>
           </table>
@@ -6420,7 +6509,12 @@ public static class LogManager                                   // Line 39
     </div>
 
     <!-- SVG: Interview Timeline -->
-    <svg id="lf-s16-timeline" viewBox="0 0 760 120" role="img" aria-label="30-minute interview timeline showing CREATES structure for logging framework" style="width:100%; max-width:760px; margin:1.25rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-timeline icon-gap text-yellow"></i> The CREATES Timeline &mdash; 30 Minutes, 7 Phases
+    </p>
+    <p class="body-text">Every logging framework interview follows the same arc, whether you're doing the clean run or the realistic one. The CREATES <span class="tooltip">framework<span class="tooltip-text">CREATES stands for Clarify, Requirements, Entities, API/Architecture, Trade-offs, Edge cases, Scale. It's a systematic way to structure your answer so you never forget a phase.</span></span> gives you a roadmap so you never blank on "what should I talk about next?" Spend roughly 60% of your time on entities and code (the middle phases), and 40% on everything else.</p>
+
+    <svg id="lf-s16-timeline" viewBox="0 0 760 120" role="img" aria-label="30-minute interview timeline showing CREATES structure for logging framework" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
       <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
       <text x="380" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text-primary)">The CREATES Timeline &mdash; 30 Minutes, 7 Phases</text>
       <!-- Track -->
@@ -6440,38 +6534,122 @@ public static class LogManager                                   // Line 39
       <text x="380" y="112" text-anchor="middle" font-size="8" fill="var(--text-muted)">Spend ~60% of your time on entities + code. The other 40% on scope, edge cases, and scaling.</text>
     </svg>
 
+    <!-- Scoring Rubric Table -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-table icon-gap text-yellow"></i> Scoring Rubric &mdash; How Interviewers Grade Each Phase
+    </p>
+    <p class="body-text">This is the rubric interviewers use (often on a shared doc). Each phase has a clear "Strong Hire" signal and a "No Hire" signal. The gap between them is usually one thing: <strong>reasoning</strong>. The candidate who explains <em>why</em> they chose an interface over a switch will always outscore the one who just writes an interface without explanation.</p>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Phase</th><th style="color:#22c55e;">Strong Hire Signal</th><th style="color:#ef4444;">No Hire Signal</th><th>Weight</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Clarify</strong></td>
+            <td>Asks about scope, output targets, structured vs unstructured, async needs</td>
+            <td>Jumps straight to <code>Console.WriteLine</code> without asking anything</td>
+            <td>10%</td>
+          </tr>
+          <tr>
+            <td><strong>Requirements</strong></td>
+            <td>Splits <span class="tooltip">functional/non-functional<span class="tooltip-text">Functional: what the system does (log at levels, write to sinks). Non-functional: how it does it (thread-safe, extensible, low-allocation). Splitting these shows senior-level thinking about system qualities.</span></span>, mentions perf</td>
+            <td>Only lists features, no quality attributes</td>
+            <td>10%</td>
+          </tr>
+          <tr>
+            <td><strong>Entities</strong></td>
+            <td>Record for LogEntry, interfaces for extension points, deliberate type choices</td>
+            <td>One God class with string properties</td>
+            <td>15%</td>
+          </tr>
+          <tr>
+            <td><strong>Architecture</strong></td>
+            <td>Strategy (sinks) + Decorator (enrichers) both motivated by concrete problems</td>
+            <td>Names patterns without explaining why they fit the logging domain</td>
+            <td>25%</td>
+          </tr>
+          <tr>
+            <td><strong>Code</strong></td>
+            <td>Clean separation, sealed classes, readonly fields, IDisposable where needed</td>
+            <td>Monolithic Logger with switch statements and no interfaces</td>
+            <td>20%</td>
+          </tr>
+          <tr>
+            <td><strong>Edge Cases</strong></td>
+            <td>Sink failure isolation, circular logging, message truncation, <span class="tooltip">graceful shutdown<span class="tooltip-text">Flushing the async buffer before the app exits so the last few log entries aren't lost. Without graceful shutdown, logs describing why the app crashed are themselves lost.</span></span></td>
+            <td>Assumes nothing ever fails</td>
+            <td>10%</td>
+          </tr>
+          <tr>
+            <td><strong>Scale</strong></td>
+            <td>ELK/centralized aggregation, correlation IDs, sampling, "add a new sink" bridge</td>
+            <td>"I'd use Serilog" (names library, shows no understanding)</td>
+            <td>10%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- Scoring Summary -->
-    <div style="margin-top:2rem;">
-      <p style="font-weight:600; font-size:0.95rem; margin-bottom:1rem;">
-        <i class="fa-solid fa-scale-balanced icon-gap text-blue"></i> Scoring Summary
-      </p>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-        <div class="concept-card" style="border-color:rgba(34,197,94,0.35);">
-          <div class="concept-card-title" style="color:#86efac;">
-            <i class="fa-solid fa-check-circle"></i> The Clean Run
-          </div>
-          <p class="concept-card-desc" style="font-size:1rem; font-weight:700; color:#86efac; margin-bottom:0.5rem;">Strong Hire</p>
-          <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem; color:var(--text-secondary); line-height:1.8;">
-            <li>Scoped library vs service before line 1</li>
-            <li>F/NF split with perf awareness</li>
-            <li>Strategy for sinks, Decorator for enrichers &mdash; both motivated</li>
-            <li>Async buffer + per-sink error isolation</li>
-            <li>Correlation IDs + ELK scaling bridge</li>
-          </ul>
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-scale-balanced icon-gap text-blue"></i> Scoring Summary &mdash; Both Runs
+    </p>
+    <p class="body-text">Both candidates scored "Strong Hire" despite very different paths. The Clean Run hit every phase on time. The Realistic Run stumbled twice, got nudged once, but recovered every time. The key insight: <strong>interviewers don't grade on polish &mdash; they grade on thinking</strong>. A stumble you recover from is often <em>more impressive</em> than a flawless run, because it proves you can handle ambiguity on a real team.</p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="concept-card" style="border-color:rgba(34,197,94,0.35);">
+        <div class="concept-card-title" style="color:#86efac;">
+          <i class="fa-solid fa-check-circle"></i> The Clean Run
         </div>
-        <div class="concept-card" style="border-color:rgba(34,197,94,0.35);">
-          <div class="concept-card-title" style="color:#86efac;">
-            <i class="fa-solid fa-rotate"></i> The Realistic Run
-          </div>
-          <p class="concept-card-desc" style="font-size:1rem; font-weight:700; color:#86efac; margin-bottom:0.5rem;">Strong Hire</p>
-          <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem; color:var(--text-secondary); line-height:1.8;">
-            <li>Slow start &mdash; recovered with scope questions</li>
-            <li>Self-corrected switch &rarr; ILogSink interface</li>
-            <li>Discovered Decorator through SRP reasoning</li>
-            <li>Needed nudge on sink failure &mdash; responded with layered approach</li>
-            <li>Honest, structured recovery throughout</li>
-          </ul>
+        <p class="concept-card-desc" style="font-size:1rem; font-weight:700; color:#86efac; margin-bottom:0.5rem;">Strong Hire</p>
+        <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem; color:var(--text-secondary); line-height:1.8;">
+          <li>Scoped library vs service before line 1</li>
+          <li>F/NF split with perf awareness</li>
+          <li>Strategy for sinks, Decorator for enrichers &mdash; both motivated</li>
+          <li>Async buffer + per-sink error isolation</li>
+          <li>Correlation IDs + ELK scaling bridge</li>
+        </ul>
+      </div>
+      <div class="concept-card" style="border-color:rgba(34,197,94,0.35);">
+        <div class="concept-card-title" style="color:#86efac;">
+          <i class="fa-solid fa-rotate"></i> The Realistic Run
         </div>
+        <p class="concept-card-desc" style="font-size:1rem; font-weight:700; color:#86efac; margin-bottom:0.5rem;">Strong Hire</p>
+        <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem; color:var(--text-secondary); line-height:1.8;">
+          <li>Slow start &mdash; recovered with scope questions at 1:30</li>
+          <li>Self-corrected switch &rarr; ILogSink interface (live reasoning)</li>
+          <li>Discovered Decorator through SRP reasoning (not memorized)</li>
+          <li>Needed nudge on sink failure &mdash; responded with layered approach</li>
+          <li>Needed nudge on thread safety &mdash; responded with Channel + async</li>
+          <li>Honest, structured recovery throughout</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Follow-up Questions -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-arrows-spin icon-gap text-yellow"></i> Common Follow-Up Questions
+    </p>
+    <p class="body-text">After the main 30-minute walkthrough, interviewers often have 5-10 minutes left for follow-ups. These questions test depth &mdash; they're not asking you to redesign, they're asking you to extend your existing design under new constraints. If your architecture is truly extensible, every answer should start with "add a new class" rather than "change existing code."</p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.75rem;">
+      <div class="concept-card">
+        <div class="concept-card-title"><i class="fa-solid fa-question-circle" style="color:#f59e0b;"></i> "How would you add rate limiting?"</div>
+        <p class="concept-card-desc"><strong>Expected answer:</strong> "A <code>RateLimitDecorator</code> that wraps the sink. It counts entries per second and drops or buffers excess. The Decorator pattern means zero changes to Logger or existing sinks."</p>
+      </div>
+      <div class="concept-card">
+        <div class="concept-card-title"><i class="fa-solid fa-question-circle" style="color:#f59e0b;"></i> "How do you test this without files?"</div>
+        <p class="concept-card-desc"><strong>Expected answer:</strong> "Inject a <code>MockLogSink</code> that captures entries in a <code>List&lt;LogEntry&gt;</code>. Assert count, levels, and messages. No file system, no console, no flakiness. Runs in <span class="tooltip">milliseconds<span class="tooltip-text">Fast tests mean you run them on every build. Slow tests mean you skip them. A mock sink completes in microseconds compared to milliseconds for file I/O.</span></span>."</p>
+      </div>
+      <div class="concept-card">
+        <div class="concept-card-title"><i class="fa-solid fa-question-circle" style="color:#f59e0b;"></i> "What if logs need to be encrypted?"</div>
+        <p class="concept-card-desc"><strong>Expected answer:</strong> "An <code>EncryptionDecorator</code> that wraps the sink and encrypts the message before writing. Or an <code>EncryptionEnricher</code> that encrypts the message property in the LogEntry before sinks see it."</p>
+      </div>
+      <div class="concept-card">
+        <div class="concept-card-title"><i class="fa-solid fa-question-circle" style="color:#f59e0b;"></i> "How do you handle log rotation?"</div>
+        <p class="concept-card-desc"><strong>Expected answer:</strong> "The <code>FileSink</code> checks file size before each write. When it exceeds the limit, it closes the current file, renames it with a timestamp, and opens a new one. This is internal to FileSink &mdash; the Logger doesn't know or care."</p>
       </div>
     </div>
 
@@ -6480,12 +6658,10 @@ public static class LogManager                                   // Line 39
       <span>
         <strong>Key Takeaway:</strong> Two very different styles. Same outcome.
         Interviewers don't grade on polish &mdash; they grade on <strong>THINKING</strong>.
-        A stumble you recover from is often <em>more impressive</em> than a flawless run &mdash; because it proves you can handle ambiguity on a real team.
+        A stumble you recover from is often <em>more impressive</em> than a flawless run &mdash; because it proves you can handle ambiguity on a real team. The clean run shows preparation. The realistic run shows resilience. Both are "Strong Hire" qualities.
       </span>
     </div>
   </div>
-
-  <!-- ========== 17. ARTICULATION GUIDE ========== -->
   <div class="section" id="articulation">
     <div class="section-header">
       <div class="section-icon cyan"><i class="fa-solid fa-microphone"></i></div>
@@ -6495,7 +6671,9 @@ public static class LogManager                                   // Line 39
       </div>
     </div>
 
-    <p class="body-text">Design skill and communication skill are separate muscles. You can have a brilliant logging framework in your head and still tank the interview because you can't narrate it under pressure. The 8 cards below cover the exact moments where phrasing decides whether the interviewer hears "this person gets it" or "this person memorized a pattern catalog."</p>
+    <p class="body-text">Design skill and communication skill are separate muscles. You can have a brilliant logging framework in your head and still tank the interview because you can't narrate it under pressure. The 8 cards below cover the exact moments where phrasing decides whether the interviewer hears "this person gets it" or "this person memorized a pattern catalog." Each card gives you four things: the <strong>Situation</strong> (when you'd use this phrase), the <strong>Say</strong> (what to actually say), the <strong>Don't Say</strong> (the common mistake), and the <strong>Why</strong> (the psychology behind why one works and the other doesn't).</p>
+
+    <p class="body-text">The golden rule is simple: <strong>problem first, pattern name second</strong>. Interviewers can tell in one sentence whether you understand a pattern or merely memorized its name. When you say "sinks vary independently &mdash; that's Strategy," the interviewer hears reasoning. When you say "I'll use Strategy because it's standard," they hear a textbook.</p>
 
     <!-- SVG: Articulation Flow -->
     <svg id="lf-s17-flow" viewBox="0 0 760 140" role="img" aria-label="Flow showing articulation order: problem first, then pattern, then trade-off, then code" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
@@ -6529,112 +6707,225 @@ public static class LogManager                                   // Line 39
     </svg>
 
     <!-- Say vs Don't Say SVG -->
-    <svg viewBox="0 0 760 200" role="img" aria-label="Say versus don't say comparison for logging framework interviews" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-scale-balanced icon-gap text-purple"></i> Say vs Don't Say &mdash; Side by Side
+    </p>
+    <p class="body-text">Here's the cheat sheet. The left column sounds like someone who has <em>built</em> logging systems. The right column sounds like someone who has <em>read about</em> logging systems. The difference is always the same: the good version names a concrete problem before naming a pattern.</p>
+
+    <svg id="lf-s17-vs" viewBox="0 0 760 230" role="img" aria-label="Say versus don't say comparison for logging framework interviews" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
       <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
       <text x="380" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)">Say vs Don't Say &mdash; The Phrases That Matter</text>
       <!-- Good side -->
-      <rect x="20" y="32" width="350" height="155" rx="10" fill="rgba(34,197,94,0.05)" stroke="#22c55e" stroke-width="1.5"/>
+      <rect x="20" y="32" width="350" height="190" rx="10" fill="rgba(34,197,94,0.05)" stroke="#22c55e" stroke-width="1.5"/>
       <text x="195" y="52" text-anchor="middle" font-size="10" font-weight="700" fill="#22c55e">SAY THIS (problem-driven)</text>
       <text x="36" y="74" font-size="9" fill="var(--text-secondary)">"Sinks vary independently &mdash; that's Strategy."</text>
       <text x="36" y="96" font-size="9" fill="var(--text-secondary)">"Enrichers layer context &mdash; that's Decorator."</text>
       <text x="36" y="118" font-size="9" fill="var(--text-secondary)">"One logger shared app-wide via DI &mdash; Singleton."</text>
       <text x="36" y="140" font-size="9" fill="var(--text-secondary)">"If a sink throws, isolate it &mdash; don't kill logging."</text>
       <text x="36" y="162" font-size="9" fill="var(--text-secondary)">"Structured logging &mdash; key-value, not string.Format."</text>
-      <text x="36" y="180" font-size="9" fill="var(--text-secondary)">"AsyncLocal for correlation across await boundaries."</text>
+      <text x="36" y="184" font-size="9" fill="var(--text-secondary)">"AsyncLocal for correlation across await boundaries."</text>
+      <text x="36" y="206" font-size="9" fill="var(--text-secondary)">"Channel&lt;T&gt; decouples producers from slow I/O."</text>
       <!-- Bad side -->
-      <rect x="390" y="32" width="350" height="155" rx="10" fill="rgba(239,68,68,0.05)" stroke="#ef4444" stroke-width="1.5"/>
+      <rect x="390" y="32" width="350" height="190" rx="10" fill="rgba(239,68,68,0.05)" stroke="#ef4444" stroke-width="1.5"/>
       <text x="565" y="52" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">DON'T SAY THIS (memorized)</text>
       <text x="406" y="74" font-size="9" fill="var(--text-secondary)">"I'll use Strategy because it's standard."</text>
       <text x="406" y="96" font-size="9" fill="var(--text-secondary)">"Decorator is a structural pattern."</text>
       <text x="406" y="118" font-size="9" fill="var(--text-secondary)">"Logger should be static."</text>
       <text x="406" y="140" font-size="9" fill="var(--text-secondary)">"Exceptions handle errors."</text>
       <text x="406" y="162" font-size="9" fill="var(--text-secondary)">"I'll use Console.WriteLine."</text>
-      <text x="406" y="180" font-size="9" fill="var(--text-secondary)">"Correlation... I haven't heard of that."</text>
+      <text x="406" y="184" font-size="9" fill="var(--text-secondary)">"Correlation... I haven't heard of that."</text>
+      <text x="406" y="206" font-size="9" fill="var(--text-secondary)">"I'll just make the writes synchronous."</text>
     </svg>
+
+    <!-- 8 Articulation Cards -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-comments icon-gap text-purple"></i> 8 Moments That Decide the Interview
+    </p>
+    <p class="body-text">Each card below targets a specific interview moment. The "Say" phrasing has been tested across dozens of mock interviews &mdash; it consistently triggers positive reactions from interviewers because it <strong>leads with the problem</strong>, <strong>names the pattern only after motivation</strong>, and <strong>acknowledges trade-offs</strong>.</p>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:1rem 0;">
 
       <!-- Card 1: Opening -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-play"></i> 1. Opening the Problem</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> The interviewer says "Design a logging framework."</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "Before I start, let me scope this. Is it a library like Serilog or an internal service? Multiple output targets? Structured logging with properties? What about async and thread safety requirements?"</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "OK, so I'll make a Logger class with a Write method..." (jumping to implementation)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Scoping a "simple" problem is more impressive than scoping a complex one &mdash; it shows the habit is automatic.</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> The interviewer says "Design a logging framework." You have 5 seconds to decide how to start.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "Before I start, let me scope this. Is it a library like <span class="tooltip">Serilog<span class="tooltip-text">Serilog is a popular .NET structured logging library. Mentioning it shows you know the industry landscape &mdash; but designing one from scratch shows deeper understanding.</span></span> or an internal service? Multiple output targets? Structured logging with properties? What about async and thread safety requirements?"</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "OK, so I'll make a Logger class with a Write method..." (jumping to implementation without understanding the problem space)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Scoping a "simple" problem is more impressive than scoping a complex one &mdash; it shows the habit is automatic. Interviewers mark "clarifying questions" as the first rubric item. Skip it and you start with negative points.</p>
       </div>
 
       <!-- Card 2: Entity Decisions -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-cube"></i> 2. Entity Decisions</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> You're explaining how you modeled the core types.</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "<code>LogEntry</code> is a record &mdash; immutable data bag with level, message, timestamp, and a properties dictionary. <code>LogLevel</code> is an enum because levels are categories with no behavior. <code>ILogSink</code> is an interface because each sink has genuinely different write logic."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I'll use a string for the log level." (no type modeling, no reasoning)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Record vs class vs enum shows you choose types deliberately based on behavior and mutability.</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> You're explaining how you modeled the core types. The interviewer is watching to see if you pick types deliberately or by habit.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "<code>LogEntry</code> is a <span class="tooltip">record<span class="tooltip-text">In C#, a record is an immutable reference type with built-in value equality and easy cloning via 'with' expressions. Perfect for data bags like log entries that shouldn't change after creation.</span></span> &mdash; immutable data bag with level, message, timestamp, and a properties dictionary. <code>LogLevel</code> is an enum because levels are categories with no behavior. <code>ILogSink</code> is an interface because each sink has genuinely different write logic."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I'll use a string for the log level." (no type modeling, no reasoning about why one C# type fits better than another)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Record vs class vs enum shows you choose types deliberately based on behavior and <span class="tooltip">mutability<span class="tooltip-text">Whether an object can change after creation. Log entries should be immutable &mdash; once created, they pass through enrichers and sinks without being modified. This prevents race conditions in multi-threaded logging.</span></span>. Interviewers love hearing "it's a record because it's an immutable data bag."</p>
       </div>
 
       <!-- Card 3: Strategy for Sinks -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-diagram-project"></i> 3. Strategy for Sinks</div>
         <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> You're introducing the Strategy pattern. Interviewer asks "why not just a switch?"</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "Each sink &mdash; console, file, HTTP, database &mdash; has genuinely different write logic. A switch means every new sink changes the Logger class. With <code>ILogSink</code>, I add a new class and register it. Zero edits to Logger. That's <span class="tooltip">OCP<span class="tooltip-text">Open-Closed Principle: open for extension (add new sinks), closed for modification (Logger doesn't change).</span></span> in action."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "Strategy is the standard pattern for varying algorithms." (textbook, no connection to logging)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> You connected Strategy to a concrete need &mdash; genuinely different write logic across sinks.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "Each sink &mdash; console, file, HTTP, database &mdash; has genuinely different write logic. A switch means every new sink changes the Logger class. With <code>ILogSink</code>, I add a new class and register it. Zero edits to Logger. That's <span class="tooltip">OCP<span class="tooltip-text">Open-Closed Principle: open for extension (add new sinks), closed for modification (Logger doesn't change). One of the five SOLID principles.</span></span> in action."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "Strategy is the standard pattern for varying algorithms." (textbook definition, no connection to logging &mdash; the interviewer can't tell if you understand it or just memorized it)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> You connected Strategy to a concrete need &mdash; genuinely different write logic across sinks. The phrase "zero edits to Logger" is the magic sentence. It proves you understand what OCP actually means in practice.</p>
       </div>
 
       <!-- Card 4: Decorator for Enrichment -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-layer-group"></i> 4. Decorator for Enrichment</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Explaining how context gets added to log entries.</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "Each enricher adds one piece of context &mdash; timestamp, correlation ID, machine name. They chain together: the timestamp enricher wraps the base, then correlation wraps timestamp. Each one adds its property and passes the entry along. That's Decorator &mdash; layering behavior without modifying the original."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I'll add all context in the Logger constructor." (couples context logic to Logger)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> The "layering" metaphor makes Decorator concrete. Each enricher has one job &mdash; SRP at the enrichment level.</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Explaining how context gets added to log entries. The interviewer wants to see if you can justify Decorator vs just adding all context in one place.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "Each enricher adds one piece of context &mdash; timestamp, correlation ID, machine name. They chain together: the timestamp enricher wraps the base, then correlation wraps timestamp. Each one adds its property and passes the entry along. That's <span class="tooltip">Decorator<span class="tooltip-text">The Decorator pattern wraps an object to add behavior without modifying the original. Each wrapper implements the same interface, so they can be stacked in any order and combination.</span></span> &mdash; layering behavior without modifying the original."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I'll add all context in the Logger constructor." (couples context logic to Logger &mdash; every new enrichment type forces Logger to change)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> The "layering" metaphor makes Decorator concrete. Each enricher has one job &mdash; <span class="tooltip">SRP<span class="tooltip-text">Single Responsibility Principle: each class should have one reason to change. A TimestampEnricher only changes if timestamp format changes. A CorrelationEnricher only changes if correlation logic changes.</span></span> at the enrichment level. The phrase "adds its property and passes along" is how you make Decorator click for interviewers who think visually.</p>
       </div>
 
       <!-- Card 5: Thread Safety -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-lock"></i> 5. Concurrency</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Multiple threads logging simultaneously.</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "The Logger is shared across the app &mdash; DI <span class="tooltip">Singleton<span class="tooltip-text">One instance for the app's lifetime. DI Singleton is testable (inject a mock). Static singleton is not.</span></span>. Multiple threads will call <code>Log()</code> concurrently. The simplest safe approach: a lock around the sink loop. For high throughput, a <code>Channel&lt;LogEntry&gt;</code> decouples producers from consumers &mdash; callers enqueue and return instantly."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "It's thread-safe because I used <code>static</code>." (static doesn't mean thread-safe)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Shows you know the difference between shared instance and thread-safe instance. The Channel mention signals real async experience.</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Multiple threads logging simultaneously. This is where most candidates either panic or say "I'll use static."</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "The Logger is shared across the app &mdash; DI <span class="tooltip">Singleton<span class="tooltip-text">One instance for the app's lifetime. DI Singleton is testable (inject a mock). Static singleton is not. In logging, a single instance prevents multiple file handles competing for the same log file.</span></span>. Multiple threads will call <code>Log()</code> concurrently. The simplest safe approach: a lock around the sink loop. For high throughput, a <span class="tooltip"><code>Channel&lt;LogEntry&gt;</code><span class="tooltip-text">A .NET async producer-consumer queue. Writers add items without blocking; a background reader processes them. Perfect for decoupling hot paths from slow I/O like file or network writes.</span></span> decouples producers from consumers &mdash; callers enqueue and return instantly."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "It's thread-safe because I used <code>static</code>." (static means globally accessible, not thread-safe &mdash; a common and dangerous misconception)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Shows you know the difference between shared instance and thread-safe instance. The Channel mention signals real async experience and tells the interviewer you've dealt with high-throughput systems.</p>
       </div>
 
       <!-- Card 6: Edge Cases -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-shield-halved"></i> 6. Edge Cases</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> You've finished the happy path. Most candidates stop here.</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "What if a sink throws? Catch per-sink &mdash; one broken target shouldn't kill all logging. What if the log message is 10MB? Truncation policy. What about the logger itself failing? Stderr as a last-resort channel. And circular logging &mdash; the logger must never log its own internal errors to the same pipeline."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> <em>(nothing &mdash; most candidates never mention sink failure)</em></p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Proactive failure thinking is the strongest "Strong Hire" signal for infrastructure code.</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> You've finished the happy path. Most candidates stop here. The interviewer is watching to see if you proactively think about failure.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "What if a sink throws? Catch per-sink &mdash; one broken target shouldn't kill all logging. What if the log message is 10MB? <span class="tooltip">Truncation policy<span class="tooltip-text">A rule that limits log entry size. Without it, a single huge message can exhaust memory, fill disk space, or crash the sink. Typical limit: 32KB per entry with the excess replaced by '[truncated]'.</span></span>. What about the logger itself failing? Stderr as a last-resort channel. And circular logging &mdash; the logger must never log its own internal errors to the same pipeline."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> <em>(nothing &mdash; most candidates never mention sink failure, and the interviewer notices the silence)</em></p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Proactive failure thinking is the strongest "Strong Hire" signal for infrastructure code. Logging is the tool you use to debug everything else &mdash; if the logger itself can fail silently, you're flying blind in production.</p>
       </div>
 
       <!-- Card 7: Scaling -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-arrow-up-right-dots"></i> 7. Scaling Bridge</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Interviewer asks "What about 50 microservices all logging?"</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "Locally, each service uses our Logger with sinks. At scale, add an <code>ElasticsearchSink</code> that ships logs to a centralized ELK stack. Correlation IDs via <code>AsyncLocal&lt;T&gt;</code> let you trace a single request across services. Sampling reduces volume on hot paths. The LLD doesn't change &mdash; we just register a new sink."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I'd use Serilog." (names a library, shows no understanding of the architecture)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Bridges LLD to HLD. Shows the logging design is ready for distributed systems without modification.</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Interviewer asks "What about 50 microservices all logging?" This is the LLD-to-HLD bridge question.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "Locally, each service uses our Logger with sinks. At scale, add an <code>ElasticsearchSink</code> that ships logs to a centralized <span class="tooltip">ELK stack<span class="tooltip-text">Elasticsearch + Logstash + Kibana. Elasticsearch stores and indexes logs, Logstash transforms and routes them, and Kibana provides dashboards for searching and visualizing. The industry standard for centralized log management.</span></span>. Correlation IDs via <code>AsyncLocal&lt;T&gt;</code> let you trace a single request across services. Sampling reduces volume on hot paths. The LLD doesn't change &mdash; we just register a new sink."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I'd use Serilog." (names a library but shows no understanding of the architecture behind it &mdash; the interviewer wants to hear how <em>you</em> would build it)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Bridges LLD to HLD. Shows the logging design is ready for distributed systems without modification. The key insight: "the LLD doesn't change &mdash; we just register a new sink." That sentence proves your architecture is extensible.</p>
       </div>
 
       <!-- Card 8: I Don't Know -->
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-circle-question"></i> 8. "I Don't Know"</div>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Interviewer asks about log aggregation at Netflix scale and you've never operated ELK at that volume.</p>
-        <p class="concept-card-desc"><strong>Say:</strong> "I haven't operated ELK at that scale, but the approach is clear: our <code>ILogSink</code> interface means we'd write a <span class="tooltip"><code>KafkaSink</code><span class="tooltip-text">A sink that publishes log entries to Apache Kafka, a distributed message bus. Decouples log production from consumption and handles traffic spikes.</span></span> that publishes to a message bus. A separate consumer indexes into Elasticsearch. The logging framework doesn't change &mdash; the sink handles the transport. I'd research partitioning and retention policies."</p>
-        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I don't know distributed logging." (full stop, no reasoning)</p>
-        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Honesty + clear reasoning about the approach = respect. The sink abstraction protects you &mdash; you can always say "new sink, same interface."</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;"><strong>Situation:</strong> Interviewer asks about log aggregation at Netflix scale and you've never operated ELK at that volume. This moment defines your maturity as an engineer.</p>
+        <p class="concept-card-desc"><strong>Say:</strong> "I haven't operated ELK at that scale, but the approach is clear: our <code>ILogSink</code> interface means we'd write a <span class="tooltip"><code>KafkaSink</code><span class="tooltip-text">A sink that publishes log entries to Apache Kafka, a distributed message bus. Decouples log production from consumption and handles traffic spikes via partitioned topics.</span></span> that publishes to a message bus. A separate consumer indexes into Elasticsearch. The logging framework doesn't change &mdash; the sink handles the transport. I'd research partitioning and retention policies."</p>
+        <p class="concept-card-desc" style="color:#fca5a5;"><strong>Don't say:</strong> "I don't know distributed logging." (full stop, no reasoning &mdash; the interviewer has no signal to work with)</p>
+        <p class="concept-card-desc" style="font-size:0.8rem; color:var(--text-muted);"><em>Why it works:</em> Honesty + clear reasoning about the approach = respect. The sink abstraction protects you &mdash; you can always say "new sink, same interface." Interviewers don't expect you to know everything. They expect you to <em>reason</em> about what you don't know using the abstractions you do know.</p>
       </div>
 
     </div>
 
+    <!-- Common Phrasing Mistakes Table -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-triangle-exclamation icon-gap text-red"></i> The 5 Most Common Phrasing Mistakes
+    </p>
+    <p class="body-text">These aren't hypothetical &mdash; they're the exact phrases that cost real candidates points in real interviews. Each one sounds fine in your head but triggers a negative reaction from the interviewer. The fix is always the same: <strong>say the problem before the pattern</strong>.</p>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th style="width:35%;">What Candidates Say</th><th style="width:35%;">What to Say Instead</th><th>Why It Matters</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:#fca5a5;">"I'll use the Strategy pattern here."</td>
+            <td style="color:#86efac;">"Sinks have different write logic, so I'll put each behind an <code>ILogSink</code> interface."</td>
+            <td>Problem-first shows understanding; pattern-first shows memorization.</td>
+          </tr>
+          <tr>
+            <td style="color:#fca5a5;">"The logger is a Singleton."</td>
+            <td style="color:#86efac;">"All classes share one logger via DI &mdash; avoids duplicate file handles."</td>
+            <td>Explains the <em>reason</em> for one instance, not just the pattern name.</td>
+          </tr>
+          <tr>
+            <td style="color:#fca5a5;">"Decorator is a <span class="tooltip">structural pattern<span class="tooltip-text">The Gang of Four categorized patterns into Creational, Structural, and Behavioral. Knowing the category is fine, but leading with it sounds like you memorized a textbook classification rather than understanding what Decorator actually does.</span></span>."</td>
+            <td style="color:#86efac;">"Each enricher wraps the previous one and adds one property &mdash; that's Decorator."</td>
+            <td>Category labels add zero value. Concrete behavior adds everything.</td>
+          </tr>
+          <tr>
+            <td style="color:#fca5a5;">"I'll make it thread-safe."</td>
+            <td style="color:#86efac;">"Multiple threads call <code>Log()</code> &mdash; I'll lock the sink loop, or use a Channel for async."</td>
+            <td>Names the specific threat and the specific mitigation. "Make it thread-safe" is vague.</td>
+          </tr>
+          <tr>
+            <td style="color:#fca5a5;">"I'll handle errors."</td>
+            <td style="color:#86efac;">"If a sink throws, catch per-sink so one broken target doesn't kill all logging."</td>
+            <td>Specifies <em>what</em> can fail and <em>how</em> you isolate it. Generic "handle errors" says nothing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Quick Reference Cards -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-bolt icon-gap text-purple"></i> Quick Reference &mdash; The 3 Sentences to Memorize
+    </p>
+    <p class="body-text">If you're short on prep time, memorize these three sentences. They cover the three most-asked design points in a logging framework interview. Each one follows the articulation order: problem &rarr; pattern &rarr; trade-off.</p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin:1rem 0;">
+      <div class="callout callout-blue" style="margin:0;">
+        <strong style="color:var(--accent-primary);">Sinks</strong>
+        <p style="margin:0.4rem 0 0; font-size:0.85rem;">"Each sink has different write logic &mdash; that's <span class="tooltip">Strategy<span class="tooltip-text">Encapsulate each algorithm (sink) behind a common interface. New sink = new class, zero edits to Logger.</span></span>. New sink = one class, zero edits."</p>
+      </div>
+      <div class="callout callout-purple" style="margin:0;">
+        <strong style="color:#c586c0;">Enrichers</strong>
+        <p style="margin:0.4rem 0 0; font-size:0.85rem;">"Enrichers wrap each other and add one property &mdash; that's Decorator. Stack them in any order."</p>
+      </div>
+      <div class="callout callout-success" style="margin:0;">
+        <strong style="color:#22c55e;">Thread Safety</strong>
+        <p style="margin:0.4rem 0 0; font-size:0.85rem;">"Shared logger + concurrent threads = lock the sink loop or use a <code>Channel&lt;T&gt;</code> for async writes."</p>
+      </div>
+    </div>
+
+    <!-- Articulation Confidence SVG -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-chart-line icon-gap text-purple"></i> Confidence Curve &mdash; Why Practice Matters
+    </p>
+    <p class="body-text">Most candidates know these concepts in their heads but stumble when they have to say them out loud under time pressure. The chart below shows the typical confidence curve: reading builds recognition, but only speaking builds production fluency. The gap between "I know this" and "I can say this clearly in 10 seconds" is bigger than you think.</p>
+
+    <svg id="lf-s17-confidence" viewBox="0 0 760 200" role="img" aria-label="Confidence curve showing the gap between reading knowledge and speaking fluency" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+      <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+      <text x="380" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)">The Fluency Gap &mdash; Reading vs Speaking</text>
+      <!-- Axes -->
+      <line x1="80" y1="170" x2="720" y2="170" stroke="var(--text-muted)" stroke-width="1.5"/>
+      <line x1="80" y1="170" x2="80" y2="40" stroke="var(--text-muted)" stroke-width="1.5"/>
+      <text x="400" y="194" text-anchor="middle" font-size="9" fill="var(--text-muted)">Practice Sessions</text>
+      <text x="50" y="105" text-anchor="middle" font-size="9" fill="var(--text-muted)" transform="rotate(-90, 50, 105)">Confidence</text>
+      <!-- X labels -->
+      <text x="140" y="186" text-anchor="middle" font-size="8" fill="var(--text-muted)">1x Read</text>
+      <text x="280" y="186" text-anchor="middle" font-size="8" fill="var(--text-muted)">3x Read</text>
+      <text x="420" y="186" text-anchor="middle" font-size="8" fill="var(--text-muted)">1x Speak</text>
+      <text x="560" y="186" text-anchor="middle" font-size="8" fill="var(--text-muted)">3x Speak</text>
+      <text x="680" y="186" text-anchor="middle" font-size="8" fill="var(--text-muted)">Mock Interview</text>
+      <!-- Reading curve (slower, flatter) -->
+      <polyline points="80,160 140,130 280,100 420,90 560,85 680,82" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3"/>
+      <text x="700" y="82" font-size="8" fill="#f59e0b">Reading</text>
+      <!-- Speaking curve (starts lower, ends higher) -->
+      <polyline points="80,160 140,155 280,145 420,110 560,65 680,50" fill="none" stroke="#22c55e" stroke-width="2.5"/>
+      <text x="700" y="50" font-size="8" fill="#22c55e">Speaking</text>
+      <!-- Gap annotation -->
+      <line x1="420" y1="90" x2="420" y2="110" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3"/>
+      <text x="450" y="103" font-size="8" font-weight="600" fill="#ef4444">The Gap</text>
+      <!-- Inflection -->
+      <circle cx="420" cy="110" r="4" fill="#22c55e"/>
+      <text x="420" y="130" text-anchor="middle" font-size="7" fill="var(--text-secondary)">First time saying it aloud</text>
+    </svg>
+
     <div class="callout callout-success" style="margin-top:1.25rem;">
-      <strong>Pro Tip &mdash; Practice OUT LOUD, not just in your head</strong>
-      <p style="margin:0.5rem 0 0;">Reading these cards silently builds <em>recognition</em>. Saying them aloud builds <em>production</em>. Target three phrases for fluency: the Strategy justification ("sinks vary independently &mdash; different write logic"), the Decorator insight ("enrichers layer context without modifying the entry"), and the Singleton trade-off ("DI singleton, not static &mdash; testable"). These are the spots where candidates go vague under pressure.</p>
+      <strong><i class="fa-solid fa-bullhorn icon-gap"></i> Pro Tip &mdash; Practice OUT LOUD, Not Just in Your Head</strong>
+      <p style="margin:0.5rem 0 0;">Reading these cards silently builds <em>recognition</em>. Saying them aloud builds <em>production</em>. There's a reason actors rehearse lines and musicians rehearse songs &mdash; your brain stores "things I can say fluently" differently from "things I've read." Target three phrases for fluency:</p>
+      <ul style="margin:0.5rem 0 0 1.2rem; line-height:1.8;">
+        <li><strong>Strategy justification:</strong> "sinks vary independently &mdash; different write logic"</li>
+        <li><strong>Decorator insight:</strong> "enrichers layer context without modifying the entry"</li>
+        <li><strong>Singleton trade-off:</strong> "DI singleton, not static &mdash; testable"</li>
+      </ul>
+      <p style="margin:0.5rem 0 0;">These are the exact spots where candidates go vague under pressure. If you can say each one clearly in under 10 seconds, you're in the top 20% of candidates. Time yourself.</p>
     </div>
   </div>
-
-  <!-- ========== 18. INTERVIEW Q&A ========== -->
   <div class="section" id="qa">
     <div class="section-header">
       <div class="section-icon blue"><i class="fa-solid fa-comments"></i></div>
@@ -7706,9 +7997,16 @@ public static class LogManager                                   // Line 39
       </div>
     </div>
 
-    <p class="body-text">You didn't just learn how to build a logger. You learned three <strong>structural thinking moves</strong> &mdash; "ensure one shared resource" (Singleton), "layer optional behavior" (Decorator), and "swap algorithms at runtime" (Strategy). Those three ideas appear in virtually every system that processes data. Below is the proof: the exact same three techniques, applied to four completely different domains.</p>
+    <p class="body-text">You didn't just learn how to build a logger. You learned <strong>seven structural thinking moves</strong> that appear in virtually every system that processes data. The three core patterns &mdash; "ensure one shared resource" (Singleton), "layer optional behavior" (Decorator), and "swap algorithms at runtime" (Strategy) &mdash; are joined by four supporting techniques: thread safety, structured data modeling, pipeline architecture, and error isolation. Below is the proof: the exact same techniques, applied to four completely different domains.</p>
 
-    <!-- Transfer Matrix Table -->
+    <p class="body-text">The point of this section is to convince you that learning one system well is worth more than skimming ten systems. If you can explain <em>why</em> Singleton works for a logger, you can explain why it works for a metrics collector, an audit service, or a cache manager. The structural problem is the same &mdash; only the domain vocabulary changes.</p>
+
+    <!-- Transfer Matrix Table: 7 techniques x 4 systems -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-table-cells icon-gap text-yellow"></i> Transfer Matrix &mdash; 7 Techniques Across 4 Systems
+    </p>
+    <p class="body-text">Each row is a technique you learned in the logging framework. Each column is a different system. Read across a row to see how the <em>same structural move</em> applies to monitoring, auditing, and error tracking. Read down a column to see how one system uses <em>multiple techniques</em> together.</p>
+
     <div class="table-wrapper">
       <table>
         <thead>
@@ -7717,14 +8015,14 @@ public static class LogManager                                   // Line 39
         <tbody>
           <tr>
             <td><strong>Singleton</strong></td>
-            <td>One <span class="tooltip-trigger">LogManager<span class="tooltip-content">The single entry point for all logging in the app. Every class gets the same logger instance &mdash; no duplicated file handles, no race conditions.</span></span> per app</td>
+            <td>One <span class="tooltip">LogManager<span class="tooltip-text">The single entry point for all logging in the app. Every class gets the same logger instance &mdash; no duplicated file handles, no race conditions.</span></span> per app</td>
             <td>One <code>MetricsCollector</code> aggregating all health checks</td>
             <td>One <code>AuditService</code> ensuring every action is recorded</td>
             <td>One <code>ErrorReporter</code> sending all crashes to one dashboard</td>
           </tr>
           <tr>
             <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
-              Wherever multiple parts of a system need to write to the same shared resource &mdash; one instance, shared globally. That's Singleton.
+              <strong>The structural problem:</strong> Multiple parts of a system need to write to the same shared resource. One instance, shared globally via DI. That's Singleton.
             </td>
           </tr>
           <tr>
@@ -7736,19 +8034,67 @@ public static class LogManager                                   // Line 39
           </tr>
           <tr>
             <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
-              Wherever you need to add optional features without changing the core &mdash; wrap it in a Decorator. Each layer adds one capability. Stack as many as you need.
+              <strong>The structural problem:</strong> You need to add optional features without changing the core. Wrap it in a Decorator. Each layer adds one capability. Stack as many as you need.
             </td>
           </tr>
           <tr>
             <td><strong>Strategy</strong></td>
             <td>Console vs File vs Cloud output sink</td>
-            <td>Prometheus vs Datadog vs CloudWatch exporter</td>
+            <td><span class="tooltip">Prometheus<span class="tooltip-text">An open-source monitoring system that pulls metrics from your app. It stores time-series data and supports powerful queries. The Strategy pattern lets you swap between Prometheus, Datadog, or CloudWatch exporters.</span></span> vs Datadog vs CloudWatch exporter</td>
             <td>Database vs EventStore vs Blockchain storage</td>
             <td>Sentry vs Bugsnag vs Custom webhook reporter</td>
           </tr>
           <tr>
             <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
-              Wherever there's more than one way to do the same job and the choice varies by environment &mdash; extract it behind an interface. New implementation = new class, zero changes.
+              <strong>The structural problem:</strong> More than one way to do the same job, and the choice varies by environment. Extract it behind an interface. New implementation = new class, zero changes.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Thread Safety</strong></td>
+            <td><code>lock</code> around sink writes, <code>Channel&lt;T&gt;</code> for async</td>
+            <td><code>ConcurrentDictionary</code> for metric counters</td>
+            <td><code>lock</code> around event sequence numbers</td>
+            <td><span class="tooltip"><code>SemaphoreSlim</code><span class="tooltip-text">A lightweight synchronization primitive that limits how many threads can access a resource concurrently. Unlike lock (which is binary), SemaphoreSlim can allow N concurrent accessors.</span></span> for rate-limited error reporting</td>
+          </tr>
+          <tr>
+            <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
+              <strong>The structural problem:</strong> Multiple threads hitting shared mutable state simultaneously. Identify the state, pick the minimal synchronization tool.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Structured Data</strong></td>
+            <td><code>LogEntry</code> record with key-value properties</td>
+            <td><code>MetricSample</code> with name, value, tags, timestamp</td>
+            <td><code>AuditEvent</code> with actor, action, resource, outcome</td>
+            <td><code>ErrorReport</code> with exception, context, breadcrumbs</td>
+          </tr>
+          <tr>
+            <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
+              <strong>The structural problem:</strong> Data that flows through a pipeline must be structured, not stringly-typed. Immutable records with typed properties beat concatenated strings every time.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Pipeline</strong></td>
+            <td>Entry &rarr; Enrichers &rarr; Sinks</td>
+            <td>Sample &rarr; Aggregators &rarr; Exporters</td>
+            <td>Event &rarr; Validators &rarr; <span class="tooltip">Stores<span class="tooltip-text">The final destination for audit events. Could be a database, event store, or even blockchain. The pipeline pattern means the store is swappable &mdash; same as logging sinks.</span></span></td>
+            <td>Error &rarr; Enrichers &rarr; Reporters</td>
+          </tr>
+          <tr>
+            <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
+              <strong>The structural problem:</strong> Data flows through a sequence of processing stages. Each stage transforms or routes. The pipeline pattern makes each stage independently testable and replaceable.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Error Isolation</strong></td>
+            <td>Per-sink try-catch, stderr fallback</td>
+            <td>Per-exporter circuit breaker</td>
+            <td>Per-store retry with dead-letter queue</td>
+            <td>Per-reporter timeout with fallback to local file</td>
+          </tr>
+          <tr>
+            <td colspan="5" style="background:var(--bg-secondary,#1e1e2e); color:var(--text-muted,#888); font-size:0.82rem; padding:0.45rem 1rem; font-style:italic;">
+              <strong>The structural problem:</strong> One failing component must not take down the entire system. Isolate failures, provide fallbacks, and never let infrastructure code crash the app it serves.
             </td>
           </tr>
         </tbody>
@@ -7759,7 +8105,7 @@ public static class LogManager                                   // Line 39
     <p style="font-weight:600; font-size:0.95rem; margin:1.8rem 0 0.75rem;">
       <i class="fa-solid fa-diagram-project icon-gap text-yellow"></i> Transfer Web &mdash; One Framework, Many Domains
     </p>
-    <p class="body-text">Think of the Logging Framework as the center of a web. Every pattern you learned radiates outward into entirely different systems. The domain changes, but the structural move stays the same.</p>
+    <p class="body-text">Think of the Logging Framework as the center of a web. Every pattern you learned radiates outward into entirely different systems. The domain changes, but the structural move stays the same. The lines are dashed because the connection isn't copy-paste &mdash; it's <em>structural analogy</em>. You don't take Logger code and paste it into a monitoring system. You take the <em>thinking</em> (Singleton for shared resource, Decorator for layering, Strategy for swapping) and apply it fresh.</p>
 
     <div class="macos-window">
       <div class="macos-titlebar">
@@ -7821,18 +8167,18 @@ public static class LogManager                                   // Line 39
 
     <!-- Heat Map SVG -->
     <p style="font-weight:600; font-size:0.95rem; margin:1.8rem 0 0.75rem;">
-      <i class="fa-solid fa-fire icon-gap text-yellow"></i> Pattern Heat Map &mdash; Which Pattern Appears Where?
+      <i class="fa-solid fa-fire icon-gap text-yellow"></i> Technique Heat Map &mdash; Which Technique Appears Where?
     </p>
-    <p class="body-text">The darker the cell, the more critical that pattern is to that domain. Notice how Decorator and Singleton show up everywhere &mdash; they're the two most reusable patterns in infrastructure code.</p>
+    <p class="body-text">The darker the cell, the more critical that technique is to that domain. Notice how Decorator shows up as CRITICAL in almost every row &mdash; that's because layering optional behavior is the single most reusable pattern in infrastructure code. Also notice that thread safety is HIGH or CRITICAL everywhere &mdash; because infrastructure systems are almost always <span class="tooltip">multi-tenant<span class="tooltip-text">Serving multiple users, threads, or requests concurrently. Any shared resource (logger, cache, config) must handle concurrent access safely. This is why thread safety shows up as critical in virtually every infrastructure domain.</span></span>.</p>
 
     <div class="macos-window">
       <div class="macos-titlebar">
         <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-        <span class="macos-filename">Pattern Heat Map &mdash; Reusability Across Domains</span>
+        <span class="macos-filename">Technique Heat Map &mdash; Reusability Across Domains</span>
       </div>
       <div class="macos-body" style="padding:1.5rem; background:var(--bg-secondary);">
         <svg id="lf-s21-heat" viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:700px; display:block; margin:0 auto;" role="img" aria-labelledby="lf-s21-heat-title">
-          <title id="lf-s21-heat-title">Heat map showing pattern reusability across seven domains</title>
+          <title id="lf-s21-heat-title">Heat map showing technique reusability across seven domains</title>
 
           <!-- Column headers (Patterns) -->
           <text x="280" y="30" text-anchor="middle" fill="#eab308" font-family="'Inter', sans-serif" font-size="12" font-weight="700">Singleton</text>
@@ -7908,13 +8254,17 @@ public static class LogManager                                   // Line 39
       </div>
     </div>
 
+    <!-- "How to apply this" prose section -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.8rem 0 0.75rem;">
+      <i class="fa-solid fa-graduation-cap icon-gap text-yellow"></i> How to Apply This in Your Next Design
+    </p>
+    <p class="body-text">When you sit down with a new system design problem &mdash; whether it's a caching layer, a notification service, or a payment gateway &mdash; run through the transfer matrix mentally. Ask yourself: "Does this system have a shared resource?" (Singleton). "Does it layer optional behavior?" (Decorator). "Does it have swappable implementations?" (Strategy). "Is it multi-threaded?" (Thread Safety). "Does data flow through stages?" (Pipeline). You'll find that most infrastructure systems match 4-5 of these seven rows. The domain vocabulary changes, but the structural problems are the same ones you just solved in logging.</p>
+
     <div class="callout callout-purple" style="margin-top:1rem;">
       <i class="fa-solid fa-lightbulb icon-gap"></i>
-      <strong>The insight:</strong> Patterns aren't domain-specific. They target <em>structural problems</em> that recur everywhere: "one shared resource" (Singleton), "optional behavior layers" (Decorator), "swappable algorithms" (Strategy). Learn the structure once, apply it to logging, monitoring, auditing, caching, notifications &mdash; anything.
+      <strong>The insight:</strong> Patterns aren't domain-specific. They target <em>structural problems</em> that recur everywhere: "one shared resource" (Singleton), "optional behavior layers" (Decorator), "swappable algorithms" (Strategy), "concurrent access" (Thread Safety), "typed data flow" (Structured Data), "sequential processing" (Pipeline), "fault isolation" (Error Isolation). Learn the structure once, apply it to logging, monitoring, auditing, caching, notifications &mdash; anything. The person who learns <em>one system deeply</em> beats the person who skims ten systems superficially, because they can transfer the structural insight to any new domain in minutes.
     </div>
   </div>
-
-  <!-- ========== 22. TOOLKIT ========== -->
   <div class="section" id="toolkit">
     <div class="section-header">
       <div class="section-icon green"><i class="fa-solid fa-toolbox"></i></div>
@@ -7924,104 +8274,275 @@ public static class LogManager                                   // Line 39
       </div>
     </div>
 
-    <p class="body-text">Six thinking tools you picked up in this case study. Each one is a <strong>portable mental move</strong> &mdash; not a logging trick, but something you can use in any LLD interview or real-world design. Here's what each tool is, when to reach for it, and where you used it in this case study.</p>
+    <p class="body-text">Six thinking tools you picked up in this case study. Each one is a <strong>portable mental move</strong> &mdash; not a logging trick, but something you can use in any LLD interview or real-world design. Think of them as questions you ask yourself whenever you sit down to design a system. If you remember nothing else from this page, remember these six questions &mdash; they work for payment systems, caching layers, notification services, and anything else that processes data through a pipeline.</p>
 
-    <!-- Toolkit SVG -->
+    <p class="body-text">The trick isn't knowing the pattern name. It's knowing <em>when to reach for it</em>. Each card below gives you the <strong>trigger question</strong> (the moment you'd think of this tool), a plain English explanation of <strong>how to use it</strong> in any context, and the specific <strong>logging example</strong> where you saw it in action on this page.</p>
+
+    <!-- Toolkit Overview SVG -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-toolbox icon-gap text-green"></i> Your 6-Tool Mental Toolkit
+    </p>
+
     <div class="macos-window">
       <div class="macos-titlebar">
         <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
         <span class="macos-filename">Your Toolkit &mdash; 6 Portable Thinking Tools</span>
       </div>
       <div class="macos-body" style="padding:1.5rem; background:var(--bg-secondary);">
-        <svg id="lf-s22-tools" viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:720px; display:block; margin:0 auto;" role="img" aria-labelledby="lf-s22-tools-title">
+        <svg id="lf-s22-tools" viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="width:100%; max-width:720px; display:block; margin:0 auto;" role="img" aria-labelledby="lf-s22-tools-title">
           <title id="lf-s22-tools-title">Toolbox with six labeled design thinking tools</title>
 
           <!-- Toolbox body -->
-          <rect x="15" y="60" width="690" height="120" rx="12" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="2"/>
+          <rect x="15" y="60" width="690" height="140" rx="12" fill="rgba(34,197,94,0.06)" stroke="#22c55e" stroke-width="2"/>
           <!-- Toolbox handle -->
           <rect x="300" y="30" width="120" height="35" rx="8" fill="none" stroke="#22c55e" stroke-width="2"/>
           <text x="360" y="53" text-anchor="middle" fill="#22c55e" font-family="'Inter', sans-serif" font-size="12" font-weight="700">TOOLKIT</text>
 
           <!-- Tool 1 -->
-          <rect x="30" y="76" width="100" height="88" rx="6" fill="rgba(234,179,8,0.1)" stroke="#eab308" stroke-width="1"/>
-          <text x="80" y="98" text-anchor="middle" fill="#eab308" font-family="'Inter', sans-serif" font-size="10" font-weight="600">One Instance?</text>
-          <text x="80" y="116" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Singleton</text>
-          <text x="80" y="150" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">LogManager</text>
+          <rect x="30" y="76" width="100" height="106" rx="6" fill="rgba(234,179,8,0.1)" stroke="#eab308" stroke-width="1"/>
+          <text x="80" y="96" text-anchor="middle" fill="#eab308" font-family="'Inter', sans-serif" font-size="10" font-weight="600">One Instance?</text>
+          <text x="80" y="114" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Singleton</text>
+          <line x1="40" y1="126" x2="120" y2="126" stroke="rgba(234,179,8,0.3)" stroke-width="0.5"/>
+          <text x="80" y="142" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">How: DI registration</text>
+          <text x="80" y="158" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Logging: LogManager</text>
+          <text x="80" y="174" text-anchor="middle" fill="#eab308" font-family="'Inter', sans-serif" font-size="7" font-weight="600">Level 1</text>
 
           <!-- Tool 2 -->
-          <rect x="143" y="76" width="100" height="88" rx="6" fill="rgba(197,134,192,0.1)" stroke="#c586c0" stroke-width="1"/>
-          <text x="193" y="98" text-anchor="middle" fill="#c586c0" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Layer It?</text>
-          <text x="193" y="116" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Decorator</text>
-          <text x="193" y="150" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">+JSON +Timestamp</text>
+          <rect x="143" y="76" width="100" height="106" rx="6" fill="rgba(197,134,192,0.1)" stroke="#c586c0" stroke-width="1"/>
+          <text x="193" y="96" text-anchor="middle" fill="#c586c0" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Layer It?</text>
+          <text x="193" y="114" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Decorator</text>
+          <line x1="153" y1="126" x2="233" y2="126" stroke="rgba(197,134,192,0.3)" stroke-width="0.5"/>
+          <text x="193" y="142" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">How: Wrap + delegate</text>
+          <text x="193" y="158" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Logging: Enrichers</text>
+          <text x="193" y="174" text-anchor="middle" fill="#c586c0" font-family="'Inter', sans-serif" font-size="7" font-weight="600">Level 4</text>
 
           <!-- Tool 3 -->
-          <rect x="256" y="76" width="100" height="88" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
-          <text x="306" y="98" text-anchor="middle" fill="#ef4444" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Swap It?</text>
-          <text x="306" y="116" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Strategy</text>
-          <text x="306" y="150" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Console / File / Cloud</text>
+          <rect x="256" y="76" width="100" height="106" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="306" y="96" text-anchor="middle" fill="#ef4444" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Swap It?</text>
+          <text x="306" y="114" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Strategy</text>
+          <line x1="266" y1="126" x2="346" y2="126" stroke="rgba(239,68,68,0.3)" stroke-width="0.5"/>
+          <text x="306" y="142" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">How: Interface + inject</text>
+          <text x="306" y="158" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Logging: ILogSink</text>
+          <text x="306" y="174" text-anchor="middle" fill="#ef4444" font-family="'Inter', sans-serif" font-size="7" font-weight="600">Level 2</text>
 
           <!-- Tool 4 -->
-          <rect x="369" y="76" width="100" height="88" rx="6" fill="rgba(59,130,246,0.1)" stroke="#3b82f6" stroke-width="1"/>
-          <text x="419" y="98" text-anchor="middle" fill="#3b82f6" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Thread Safe?</text>
-          <text x="419" y="116" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Lock / Lazy&lt;T&gt;</text>
-          <text x="419" y="150" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Concurrent writes</text>
+          <rect x="369" y="76" width="100" height="106" rx="6" fill="rgba(59,130,246,0.1)" stroke="#3b82f6" stroke-width="1"/>
+          <text x="419" y="96" text-anchor="middle" fill="#3b82f6" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Thread Safe?</text>
+          <text x="419" y="114" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; Lock / Lazy&lt;T&gt;</text>
+          <line x1="379" y1="126" x2="459" y2="126" stroke="rgba(59,130,246,0.3)" stroke-width="0.5"/>
+          <text x="419" y="142" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">How: Identify shared state</text>
+          <text x="419" y="158" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Logging: Sink writes</text>
+          <text x="419" y="174" text-anchor="middle" fill="#3b82f6" font-family="'Inter', sans-serif" font-size="7" font-weight="600">Level 5</text>
 
           <!-- Tool 5 -->
-          <rect x="482" y="76" width="100" height="88" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
-          <text x="532" y="98" text-anchor="middle" fill="#22c55e" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Extend It?</text>
-          <text x="532" y="116" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; OCP</text>
-          <text x="532" y="150" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">New sink = new class</text>
+          <rect x="482" y="76" width="100" height="106" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1"/>
+          <text x="532" y="96" text-anchor="middle" fill="#22c55e" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Extend It?</text>
+          <text x="532" y="114" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; OCP</text>
+          <line x1="492" y1="126" x2="572" y2="126" stroke="rgba(34,197,94,0.3)" stroke-width="0.5"/>
+          <text x="532" y="142" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">How: New class, not edit</text>
+          <text x="532" y="158" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Logging: New sinks</text>
+          <text x="532" y="174" text-anchor="middle" fill="#22c55e" font-family="'Inter', sans-serif" font-size="7" font-weight="600">Level 3</text>
 
           <!-- Tool 6 -->
-          <rect x="595" y="76" width="100" height="88" rx="6" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1"/>
-          <text x="645" y="98" text-anchor="middle" fill="#a855f7" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Test It?</text>
-          <text x="645" y="116" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; DI + Interfaces</text>
-          <text x="645" y="150" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Mock ILogSink</text>
+          <rect x="595" y="76" width="100" height="106" rx="6" fill="rgba(168,85,247,0.1)" stroke="#a855f7" stroke-width="1"/>
+          <text x="645" y="96" text-anchor="middle" fill="#a855f7" font-family="'Inter', sans-serif" font-size="10" font-weight="600">Test It?</text>
+          <text x="645" y="114" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="9">&rarr; DI + Interfaces</text>
+          <line x1="605" y1="126" x2="685" y2="126" stroke="rgba(168,85,247,0.3)" stroke-width="0.5"/>
+          <text x="645" y="142" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">How: Mock interfaces</text>
+          <text x="645" y="158" text-anchor="middle" fill="var(--text-muted, #64748b)" font-family="'Inter', sans-serif" font-size="8">Logging: Mock ILogSink</text>
+          <text x="645" y="174" text-anchor="middle" fill="#a855f7" font-family="'Inter', sans-serif" font-size="7" font-weight="600">Level 6</text>
         </svg>
       </div>
     </div>
 
     <!-- Tool Cards in 3-col grid -->
-    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin:1.5rem 0;">
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-wrench icon-gap text-green"></i> Deep Dive &mdash; Each Tool Explained
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin:1rem 0;">
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-fingerprint"></i> One Instance?</div>
-        <p class="concept-card-desc">Ask: "Should every class create its own copy, or should everyone share one?" If sharing matters &mdash; because of file locks, resource limits, or consistency &mdash; use a <span class="tooltip-trigger">Singleton<span class="tooltip-content">Ensures a class has exactly one instance and provides a global point of access. In logging, this prevents multiple file handles competing for the same log file.</span></span>.</p>
-        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>LogManager.Instance</code> &mdash; one logger, one file handle, thread-safe writes.</p>
+        <p class="concept-card-desc">Ask yourself: "Should every class create its own copy, or should everyone share one?" If sharing matters &mdash; because of file locks, resource limits, or consistency &mdash; you need a <span class="tooltip">Singleton<span class="tooltip-text">Ensures a class has exactly one instance and provides a global point of access. In logging, this prevents multiple file handles competing for the same log file.</span></span>.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:#22c55e;">How to use:</strong> Register the type as a <span class="tooltip">DI Singleton<span class="tooltip-text">Dependency Injection Singleton means the DI container creates exactly one instance and gives the same instance to every class that requests it. Unlike a static singleton, it's testable &mdash; you can swap it for a mock.</span></span>. Avoid the static singleton anti-pattern &mdash; it kills testability.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>LogManager.Instance</code> &mdash; one logger, one file handle, thread-safe writes. Every class in the app shares the same logger without creating duplicate resources.</p>
       </div>
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-layer-group"></i> Layer It?</div>
-        <p class="concept-card-desc">Ask: "Can I add this feature by wrapping the existing object instead of changing it?" If yes, use a <span class="tooltip-trigger">Decorator<span class="tooltip-content">Wraps an object to add behavior without modifying the original class. Each decorator implements the same interface, so you can stack them in any combination.</span></span>. Each layer adds one thing and delegates the rest to the inner object.</p>
-        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>TimestampDecorator</code>, <code>JsonDecorator</code>, <code>EncryptionDecorator</code> &mdash; stack in any order.</p>
+        <p class="concept-card-desc">Ask yourself: "Can I add this feature by wrapping the existing object instead of changing it?" If yes, use a <span class="tooltip">Decorator<span class="tooltip-text">Wraps an object to add behavior without modifying the original class. Each decorator implements the same interface, so you can stack them in any combination.</span></span>. Each layer adds one thing and delegates the rest to the inner object.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:#22c55e;">How to use:</strong> Create a wrapper class that implements the same interface as the thing it wraps. The wrapper adds its behavior, then calls the inner object. Stack as many wrappers as you need &mdash; order is configurable.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>TimestampDecorator</code>, <code>JsonDecorator</code>, <code>EncryptionDecorator</code> &mdash; each adds one enrichment and passes the entry along.</p>
       </div>
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-shuffle"></i> Swap It?</div>
-        <p class="concept-card-desc">Ask: "Is there more than one way to do this, and the choice might change?" If yes, extract the algorithm behind an interface &mdash; that's the <span class="tooltip-trigger">Strategy<span class="tooltip-content">Defines a family of algorithms, encapsulates each one, and makes them interchangeable. The client code doesn't know which algorithm is running &mdash; it just calls the interface method.</span></span> pattern. New algorithm = new class, zero changes elsewhere.</p>
-        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>ILogSink</code> &rarr; <code>ConsoleLogSink</code>, <code>FileLogSink</code>, <code>CloudLogSink</code> &mdash; swap per environment.</p>
+        <p class="concept-card-desc">Ask yourself: "Is there more than one way to do this, and the choice might change?" If yes, extract the algorithm behind an interface &mdash; that's the <span class="tooltip">Strategy<span class="tooltip-text">Defines a family of algorithms, encapsulates each one, and makes them interchangeable. The client code doesn't know which algorithm is running.</span></span> pattern. New algorithm = new class, zero changes elsewhere.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:#22c55e;">How to use:</strong> Define an interface for the varying behavior. Each implementation is a separate class. Inject the correct one via <span class="tooltip">DI<span class="tooltip-text">Dependency Injection: instead of creating dependencies yourself, you declare what you need and let a container provide it. Makes swapping implementations trivial &mdash; just change the registration.</span></span> based on configuration or environment.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>ILogSink</code> &rarr; <code>ConsoleLogSink</code>, <code>FileLogSink</code>, <code>CloudLogSink</code> &mdash; swap per environment without touching Logger.</p>
       </div>
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-lock"></i> Thread Safe?</div>
-        <p class="concept-card-desc">Ask: "Can multiple threads hit this at the same time?" If yes, you need synchronization. In C#, <code>Lazy&lt;T&gt;</code> handles lazy Singleton creation safely, and <code>lock</code> or <code>ConcurrentQueue</code> protects shared write buffers.</p>
-        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>Lazy&lt;LogManager&gt;</code> for instance creation, <code>lock</code> around file writes to prevent interleaved output.</p>
+        <p class="concept-card-desc">Ask yourself: "Can multiple threads hit this at the same time?" If yes, you need synchronization. The first step is always the same: identify the <span class="tooltip">shared mutable state<span class="tooltip-text">Data that multiple threads can read and write simultaneously. In logging, the StreamWriter's internal buffer is shared mutable state &mdash; without protection, concurrent writes corrupt the output.</span></span>. Then pick the right tool: <code>lock</code> for simple cases, <code>Channel&lt;T&gt;</code> for high-throughput producer-consumer scenarios.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:#22c55e;">How to use:</strong> Identify what's shared (file handle, list, counter). Add the minimal synchronization needed. <code>Lazy&lt;T&gt;</code> for creation, <code>lock</code> for access, <code>ConcurrentQueue</code> for collections.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> <code>Lazy&lt;LogManager&gt;</code> for instance creation, <code>lock</code> around file writes to prevent interleaved output from concurrent threads.</p>
       </div>
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-puzzle-piece"></i> Extend It?</div>
-        <p class="concept-card-desc">Ask: "Can I add a new feature without modifying existing code?" That's the <span class="tooltip-trigger">Open/Closed Principle<span class="tooltip-content">Software should be open for extension but closed for modification. You can add new behavior (new decorator, new strategy) without changing any existing class.</span></span>. Decorator and Strategy both achieve this &mdash; new wrappers and new sinks are pure additions.</p>
-        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> Adding <code>SlackLogSink</code> = one new class. No changes to <code>LogManager</code>, decorators, or existing sinks.</p>
+        <p class="concept-card-desc">Ask yourself: "Can I add a new feature without modifying existing code?" That's the <span class="tooltip">Open/Closed Principle<span class="tooltip-text">Software should be open for extension but closed for modification. You can add new behavior (new decorator, new strategy) without changing any existing class. This is what makes architectures resilient to change.</span></span>. Decorator and Strategy both achieve this &mdash; new wrappers and new sinks are pure additions to the codebase.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:#22c55e;">How to use:</strong> If you find yourself editing existing classes to add a feature, stop. Ask whether a new class that implements an existing interface would work instead. If it would, you've found an extension point.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> Adding <code>SlackLogSink</code> = one new class. No changes to <code>LogManager</code>, decorators, or existing sinks. The architecture absorbs new features without surgery.</p>
       </div>
       <div class="concept-card">
         <div class="concept-card-title"><i class="fa-solid fa-flask"></i> Test It?</div>
-        <p class="concept-card-desc">Ask: "Can I write a unit test for this without spinning up the real file system or cloud service?" If not, inject interfaces instead of concrete classes. Mock the <code>ILogSink</code> in tests, assert the right messages were written.</p>
-        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> Inject a <code>MockLogSink</code> in tests. Verify that the <code>TimestampDecorator</code> prepends the correct format without touching the real file system.</p>
+        <p class="concept-card-desc">Ask yourself: "Can I write a <span class="tooltip">unit test<span class="tooltip-text">A test that checks a single piece of behavior in isolation. Unit tests should run in milliseconds, with no file system, no network, and no database. Mocking makes this possible by replacing real dependencies with fakes.</span></span> for this without spinning up the real file system or cloud service?" If not, inject interfaces instead of concrete classes. Mock the interface in tests, assert the right behavior was triggered.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:#22c55e;">How to use:</strong> Every dependency that touches I/O (files, network, database) should be behind an interface. In tests, swap the real implementation for a mock that records what was called.</p>
+        <p class="concept-card-desc" style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color,#333);"><strong style="color:var(--accent-teal,#4ec9b0);">Logging use:</strong> Inject a <code>MockLogSink</code> in tests. Verify that the <code>TimestampDecorator</code> prepends the correct format without touching the real file system. Fast, isolated, repeatable.</p>
       </div>
     </div>
 
-    <div class="callout callout-success">
+    <!-- Self-Check Checklist -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-clipboard-check icon-gap text-green"></i> Self-Check &mdash; Can You Use Each Tool?
+    </p>
+    <p class="body-text">Before you leave this page, run through this checklist. Each item maps to one tool above. If you can answer "yes" to all six, you've internalized the thinking moves &mdash; not just the pattern names.</p>
+
+    <div class="callout callout-info" style="margin-top:0.75rem;">
+      <ul style="margin:0; padding-left:1.2rem; line-height:2;">
+        <li><strong>Singleton:</strong> Can you explain <em>why</em> a logging framework needs exactly one instance &mdash; without saying "because it's a Singleton"? (Hint: file locks, consistent config, thread-safe writes)</li>
+        <li><strong>Decorator:</strong> Can you draw the enricher chain on a whiteboard &mdash; showing how <code>TimestampEnricher</code> wraps the base, and <code>CorrelationEnricher</code> wraps that? Can you explain why order matters?</li>
+        <li><strong>Strategy:</strong> Can you add a new <code>SlackLogSink</code> to the logging framework without editing any existing file? If you'd need to touch <code>Logger.cs</code>, your design has a <span class="tooltip">coupling problem<span class="tooltip-text">When adding a new feature forces changes to existing code, the code is tightly coupled. Good architecture (OCP) means new features are pure additions &mdash; new files, not edits to old files.</span></span>.</li>
+        <li><strong>Thread Safety:</strong> Can you explain what goes wrong when two threads call <code>FileSink.Write()</code> at the same time? Can you name two ways to fix it? (lock vs Channel)</li>
+        <li><strong>OCP:</strong> Can you point to three places in the logging framework where you can extend behavior without modifying existing code? (new sink, new enricher, new formatter)</li>
+        <li><strong>Testability:</strong> Can you write a test that verifies "the logger called all registered sinks" without actually writing to a file or console? What do you inject instead?</li>
+      </ul>
+    </div>
+
+    <!-- Tool Decision Flowchart SVG -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-sitemap icon-gap text-green"></i> Decision Flowchart &mdash; Which Tool Do I Reach For?
+    </p>
+    <p class="body-text">When you're in the middle of a design and a new requirement appears, use this flowchart to pick the right tool. Start at the top with the requirement, follow the questions, and land on the tool. Most requirements map to exactly one tool. Some (like "add a new enricher") combine two (Decorator + OCP).</p>
+
+    <svg id="lf-s22-decision" viewBox="0 0 760 280" role="img" aria-label="Decision flowchart for choosing the right design tool" style="width:100%; max-width:760px; margin:1rem auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="lf-s22-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+      </defs>
+      <style>text { font-family: system-ui, -apple-system, sans-serif; }</style>
+      <text x="380" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text-primary)">New Requirement? Ask These Questions</text>
+
+      <!-- Start -->
+      <rect x="310" y="30" width="140" height="32" rx="6" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="380" y="50" text-anchor="middle" font-size="9" font-weight="700" fill="#22c55e">New Requirement</text>
+
+      <!-- Q1: Shared resource? -->
+      <line x1="380" y1="62" x2="380" y2="82" stroke="#22c55e" stroke-width="1.2" marker-end="url(#lf-s22-arr)"/>
+      <rect x="280" y="84" width="200" height="28" rx="14" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="1.2"/>
+      <text x="380" y="102" text-anchor="middle" font-size="9" fill="#eab308">Need exactly one instance?</text>
+
+      <!-- Yes -> Singleton -->
+      <line x1="280" y1="98" x2="195" y2="98" stroke="#eab308" stroke-width="1" marker-end="url(#lf-s22-arr)"/>
+      <text x="238" y="92" text-anchor="middle" font-size="7" fill="#22c55e">Yes</text>
+      <rect x="120" y="84" width="75" height="28" rx="6" fill="rgba(234,179,8,0.15)" stroke="#eab308" stroke-width="1.2"/>
+      <text x="157" y="102" text-anchor="middle" font-size="9" font-weight="600" fill="#eab308">Singleton</text>
+
+      <!-- No -> Q2: Add optional behavior? -->
+      <line x1="380" y1="112" x2="380" y2="132" stroke="#22c55e" stroke-width="1.2" marker-end="url(#lf-s22-arr)"/>
+      <text x="392" y="124" font-size="7" fill="var(--text-muted)">No</text>
+      <rect x="280" y="134" width="200" height="28" rx="14" fill="rgba(197,134,192,0.08)" stroke="#c586c0" stroke-width="1.2"/>
+      <text x="380" y="152" text-anchor="middle" font-size="9" fill="#c586c0">Add optional behavior layer?</text>
+
+      <!-- Yes -> Decorator -->
+      <line x1="280" y1="148" x2="195" y2="148" stroke="#c586c0" stroke-width="1" marker-end="url(#lf-s22-arr)"/>
+      <text x="238" y="142" text-anchor="middle" font-size="7" fill="#22c55e">Yes</text>
+      <rect x="120" y="134" width="75" height="28" rx="6" fill="rgba(197,134,192,0.15)" stroke="#c586c0" stroke-width="1.2"/>
+      <text x="157" y="152" text-anchor="middle" font-size="9" font-weight="600" fill="#c586c0">Decorator</text>
+
+      <!-- No -> Q3: Swap implementation? -->
+      <line x1="380" y1="162" x2="380" y2="182" stroke="#22c55e" stroke-width="1.2" marker-end="url(#lf-s22-arr)"/>
+      <text x="392" y="174" font-size="7" fill="var(--text-muted)">No</text>
+      <rect x="280" y="184" width="200" height="28" rx="14" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.2"/>
+      <text x="380" y="202" text-anchor="middle" font-size="9" fill="#ef4444">Swap between implementations?</text>
+
+      <!-- Yes -> Strategy -->
+      <line x1="280" y1="198" x2="195" y2="198" stroke="#ef4444" stroke-width="1" marker-end="url(#lf-s22-arr)"/>
+      <text x="238" y="192" text-anchor="middle" font-size="7" fill="#22c55e">Yes</text>
+      <rect x="120" y="184" width="75" height="28" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.2"/>
+      <text x="157" y="202" text-anchor="middle" font-size="9" font-weight="600" fill="#ef4444">Strategy</text>
+
+      <!-- No -> Q4: Concurrent access? -->
+      <line x1="380" y1="212" x2="380" y2="232" stroke="#22c55e" stroke-width="1.2" marker-end="url(#lf-s22-arr)"/>
+      <text x="392" y="224" font-size="7" fill="var(--text-muted)">No</text>
+      <rect x="280" y="234" width="200" height="28" rx="14" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.2"/>
+      <text x="380" y="252" text-anchor="middle" font-size="9" fill="#3b82f6">Multiple threads hitting it?</text>
+
+      <!-- Yes -> Thread Safety -->
+      <line x1="280" y1="248" x2="195" y2="248" stroke="#3b82f6" stroke-width="1" marker-end="url(#lf-s22-arr)"/>
+      <text x="238" y="242" text-anchor="middle" font-size="7" fill="#22c55e">Yes</text>
+      <rect x="105" y="234" width="90" height="28" rx="6" fill="rgba(59,130,246,0.15)" stroke="#3b82f6" stroke-width="1.2"/>
+      <text x="150" y="252" text-anchor="middle" font-size="9" font-weight="600" fill="#3b82f6">Thread Safety</text>
+
+      <!-- Right side: OCP + Test -->
+      <line x1="480" y1="148" x2="545" y2="148" stroke="#22c55e" stroke-width="1" stroke-dasharray="4"/>
+      <rect x="548" y="134" width="90" height="28" rx="6" fill="rgba(34,197,94,0.15)" stroke="#22c55e" stroke-width="1.2"/>
+      <text x="593" y="152" text-anchor="middle" font-size="9" font-weight="600" fill="#22c55e">OCP</text>
+      <text x="593" y="170" text-anchor="middle" font-size="7" fill="var(--text-muted)">New class, not edit</text>
+
+      <line x1="480" y1="198" x2="545" y2="198" stroke="#a855f7" stroke-width="1" stroke-dasharray="4"/>
+      <rect x="548" y="184" width="90" height="28" rx="6" fill="rgba(168,85,247,0.15)" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="593" y="202" text-anchor="middle" font-size="9" font-weight="600" fill="#a855f7">Test It</text>
+      <text x="593" y="220" text-anchor="middle" font-size="7" fill="var(--text-muted)">Mock the interface</text>
+    </svg>
+
+    <!-- When NOT to use -->
+    <p style="font-weight:600; font-size:0.95rem; margin:1.5rem 0 0.75rem;">
+      <i class="fa-solid fa-ban icon-gap text-red"></i> When NOT to Use Each Tool
+    </p>
+    <p class="body-text">Knowing when to use a tool is important. Knowing when <em>not</em> to use it is just as important. Over-applying patterns is the second most common mistake in LLD interviews (after under-applying them). Each tool has a specific trigger &mdash; use it only when that trigger fires.</p>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>Tool</th><th style="color:#22c55e;">Use When</th><th style="color:#ef4444;">Don't Use When</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Singleton</strong></td>
+            <td>Shared resource with contention (file handles, connection pools)</td>
+            <td>Every class &mdash; most objects don't need global access. Default to <span class="tooltip">transient<span class="tooltip-text">A new instance every time it's requested from the DI container. This is the safest default because there's no shared state and no concurrency issues.</span></span>.</td>
+          </tr>
+          <tr>
+            <td><strong>Decorator</strong></td>
+            <td>Optional, composable behavior (enrichment, formatting, caching)</td>
+            <td>When the "layers" never change or there's only one possible combination. A simple method call is cheaper than a Decorator chain.</td>
+          </tr>
+          <tr>
+            <td><strong>Strategy</strong></td>
+            <td>Multiple implementations that can be swapped by config or environment</td>
+            <td>When there's genuinely only one way to do something. Don't create an interface for a class that will never have a second implementation.</td>
+          </tr>
+          <tr>
+            <td><strong>Thread Safety</strong></td>
+            <td>Shared mutable state accessed from multiple threads</td>
+            <td>Immutable objects (like <code>LogEntry</code> records) &mdash; immutable data is inherently <span class="tooltip">thread-safe<span class="tooltip-text">If an object can't change after creation, multiple threads can read it simultaneously without any risk of corruption. That's why LogEntry is a record &mdash; no locking needed.</span></span>.</td>
+          </tr>
+          <tr>
+            <td><strong>OCP</strong></td>
+            <td>Extension points where new behavior is likely (sinks, enrichers, formatters)</td>
+            <td>Internal implementation details that are unlikely to change. Over-abstracting stable code adds complexity without benefit.</td>
+          </tr>
+          <tr>
+            <td><strong>Test via DI</strong></td>
+            <td>Any dependency that touches I/O (files, network, database, clock)</td>
+            <td>Pure logic with no side effects &mdash; just test the output directly. Mocking <code>Math.Max()</code> would be absurd.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-success" style="margin-top:1rem;">
       <i class="fa-solid fa-star icon-gap"></i>
-      <strong>These 6 tools are your permanent inventory.</strong> They work for every framework, every service, every system that processes data. Domains change. The structural questions don't. If you remember nothing else from this page, remember THESE.
+      <strong>These 6 tools are your permanent inventory.</strong> They work for every framework, every service, every system that processes data through a pipeline. Domains change &mdash; logging today, caching tomorrow, notifications next week. The structural questions don't change. "One instance? Layer it? Swap it? Thread safe? Extend it? Test it?" If you can answer those six questions for any system, you can design it well.
     </div>
   </div>
-
-  <!-- ========== 23. PRACTICE EXERCISES ========== -->
   <div class="section" id="exercises">
     <div class="section-header">
       <div class="section-icon yellow"><i class="fa-solid fa-dumbbell"></i></div>
