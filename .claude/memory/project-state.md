@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 topics across 4 page types (23 Design Patterns, 5 SOLID, 72 Case Studies, 10 Advanced). Currently 17 complete pages (Singleton, Factory Method, Abstract Factory, Builder, Prototype, SRP, OCP, LSP, ISP, DIP, Strategy, Observer, Decorator, Template Method, Parking Lot, Tic-Tac-Toe), 93 coming soon.
+**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 1 complete page (How to Approach System Design), 203 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -100,7 +100,10 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │   ├── index.html                          — HLD Hub (1313 lines, 88 foundations + 108 case studies + 8 deep dives)
 │   ├── learning-path.md                    — Build order (204 pages, 14 foundation phases + 9 case study tiers + deep dives)
 │   ├── topic-list-v2.md                    — All 204 topics categorized
-│   └── transcript-reference.md             — Analysis of 48 Arpit Bhayani transcripts
+│   ├── transcript-reference.md             — Analysis of 48 Arpit Bhayani transcripts
+│   └── foundations/
+│       └── how-to-approach/
+│           └── index.html                  — COMPLETE (2498 lines, 16 sections, 25 SVGs, 21 tooltips, favicon: 🧭)
 ├── hld-spec.md                             — HLD page build spec (philosophy, section menu, writing rules)
 ```
 
