@@ -4,7 +4,7 @@
 
 ## 1. PROJECT OVERVIEW
 
-**What:** A comprehensive LLD (Low-Level Design) guide as a static HTML website. Dark themed with teal/cyan accent, premium visual design (Linear/Vercel-tier). C# / .NET Core focused.
+**What:** A comprehensive LLD + HLD System Design guide as a static HTML website. Dark themed with teal/cyan accent, premium visual design (Linear/Vercel-tier). LLD is C# / .NET Core focused. HLD is language-agnostic.
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
@@ -96,7 +96,12 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 │           └── decorator/
 │               ├── csharp.html             — COMPLETE (5775 lines, 24 sections, 50 tooltips, favicon: 🎁)
 │               └── java.html               — COMING SOON placeholder
-└── hld/                                    — Coming soon
+├── hld/
+│   ├── index.html                          — HLD Hub (1313 lines, 88 foundations + 108 case studies + 8 deep dives)
+│   ├── learning-path.md                    — Build order (204 pages, 14 foundation phases + 9 case study tiers + deep dives)
+│   ├── topic-list-v2.md                    — All 204 topics categorized
+│   └── transcript-reference.md             — Analysis of 48 Arpit Bhayani transcripts
+├── hld-spec.md                             — HLD page build spec (philosophy, section menu, writing rules)
 ```
 
 ### Multi-Language Architecture (NEW)

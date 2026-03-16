@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>High-Level Design — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗️</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+<style>
+/* ── Smooth scroll + offset for sticky nav ── */
+html { scroll-behavior: smooth; }
+.section[id] { scroll-margin-top: 100px; }
+
+/* ── Compact coming-soon pill list ── */
+.soon-list { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.5rem 0; }
+.soon-pill {
+  font-size: 0.72rem; font-weight: 500; padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full); background: var(--bg-secondary);
+  border: 1px solid var(--border-color); color: var(--text-muted);
+}
+
+/* ── Inline "+N upcoming" toggle in category header ── */
+.lld-category { display: flex; align-items: center; justify-content: space-between; }
+.inline-toggle {
+  font-size: 0.65rem; font-weight: 500; color: var(--text-muted); cursor: pointer;
+  background: none; border: 1px solid var(--border-color); border-radius: var(--radius-full);
+  padding: 0.2rem 0.6rem; transition: all 0.2s; white-space: nowrap;
+}
+.inline-toggle:hover { border-color: var(--accent-primary); color: var(--text-secondary); }
+.inline-toggle.active { color: var(--accent-primary); border-color: var(--accent-primary); }
+
+/* ── Case study category headers ── */
+.cs-category {
+  font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);
+  margin-top: 1.25rem; margin-bottom: 0.4rem; padding-left: 0.15rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.cs-category:first-of-type { margin-top: 0.75rem; }
+.cs-cat-count {
+  font-size: 0.6rem; font-weight: 500; color: var(--text-muted);
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-full); padding: 0.1rem 0.45rem;
+}
+
+/* ── Floating Study Next Widget ── */
+.study-float {
+  position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 999;
+  width: 280px; border-radius: var(--radius-md); overflow: hidden;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3); transition: all 0.25s;
+}
+.study-float.minimized { width: auto; }
+.study-float.minimized .sf-body { display: none; }
+.sf-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.6rem 0.75rem; background: rgba(var(--accent-primary-rgb), 0.08);
+  border-bottom: 1px solid var(--glass-border); cursor: pointer; user-select: none;
+}
+.sf-header-left { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
+.sf-step { font-size: 0.6rem; color: var(--text-muted); font-weight: 500; }
+.sf-minimize { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 0.15rem; }
+.sf-body { padding: 0.75rem; }
+.sf-phase { font-size: 0.6rem; color: var(--accent-primary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.3rem; }
+.sf-topic { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.4rem; }
+.sf-actions { display: flex; gap: 0.4rem; }
+.sf-btn {
+  flex: 1; padding: 0.4rem 0; border-radius: var(--radius-full); font-size: 0.7rem;
+  font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; border: none;
+}
+.sf-btn--go {
+  background: var(--accent-primary); color: #fff; text-decoration: none; display: block;
+}
+.sf-btn--go:hover { filter: brightness(1.15); }
+.sf-btn--go.disabled { opacity: 0.4; pointer-events: none; }
+.sf-btn--done {
+  background: rgba(var(--accent-primary-rgb), 0.1); color: var(--accent-primary);
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.2);
+}
+.sf-btn--done:hover { background: rgba(var(--accent-primary-rgb), 0.2); }
+.sf-done-msg { font-size: 0.8rem; color: var(--accent-primary); font-weight: 600; text-align: center; padding: 0.5rem 0; }
+.sf-list-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 0.15rem 0.3rem; margin-right: 0.1rem; }
+.sf-list-btn:hover { color: var(--accent-primary); }
+.sf-list-wrap { max-height: 340px; overflow-y: auto; padding: 0.5rem 0.6rem; scrollbar-width: thin; }
+.sf-list-wrap::-webkit-scrollbar { width: 4px; }
+.sf-list-wrap::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+.sf-list-phase { font-size: 0.58rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase;
+  letter-spacing: 0.04em; margin: 0.5rem 0 0.2rem; }
+.sf-list-phase:first-child { margin-top: 0; }
+.sf-list-item { font-size: 0.68rem; padding: 0.2rem 0.4rem; border-radius: 4px; color: var(--text-muted);
+  display: flex; align-items: center; gap: 0.35rem; line-height: 1.3; }
+.sf-list-item.done { text-decoration: line-through; opacity: 0.45; }
+.sf-list-item.current { color: var(--accent-primary); font-weight: 700; background: rgba(var(--accent-primary-rgb), 0.08);
+  border-radius: var(--radius-sm); }
+.sf-list-item .sf-li-icon { font-size: 0.55rem; width: 0.7rem; text-align: center; flex-shrink: 0; }
+.sf-reset-btn {
+  display: block; width: 100%; margin-top: 0.75rem; padding: 0.4rem; border: 1px solid rgba(220,38,38,0.25);
+  border-radius: var(--radius-full); background: rgba(220,38,38,0.06); color: #ef4444;
+  font-size: 0.65rem; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.sf-reset-btn:hover { background: rgba(220,38,38,0.15); border-color: rgba(220,38,38,0.4); }
+.study-float.list-open { width: 300px; }
+.study-float.list-open .sf-body { display: none; }
+@media (max-width: 480px) { .study-float { width: calc(100vw - 2rem); right: 1rem; bottom: 1rem; }
+  .study-float.list-open { width: calc(100vw - 2rem); } }
+
+/* ── HLD Roadmap ── */
+.hld-roadmap {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 0;
+}
+.hld-phase-pill {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  min-width: 90px; padding: 0.6rem 0.5rem; border-radius: var(--radius-md);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px); text-align: center;
+  transition: border-color 0.2s;
+}
+.hld-phase-pill:hover { border-color: var(--accent-primary); }
+.hld-phase-num {
+  font-size: 0.6rem; font-weight: 700; color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.1); width: 1.4rem; height: 1.4rem;
+  border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center;
+}
+.hld-phase-label { font-size: 0.62rem; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
+.hld-phase-count { font-size: 0.55rem; color: var(--text-muted); }
+.hld-phase-pill--cs { border-color: rgba(168, 85, 247, 0.3); }
+.hld-phase-pill--cs .hld-phase-num { color: #a855f7; background: rgba(168,85,247,0.1); }
+
+/* ── Hub nav as buttons (override default button styles) ── */
+.hub-nav button.hub-nav-pill {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-muted); font-family: inherit;
+}
+.hub-nav button.hub-nav-pill--active {
+  background: rgba(var(--accent-primary-rgb), 0.12);
+  color: var(--accent-primary);
+}
+
+/* ── Topic description line ── */
+.lld-topic-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem; line-height: 1.35; }
+</style>
+</head>
+<body style="opacity:0">
+
+<!-- ========== TOP TOOLBAR ========== -->
+<header class="top-toolbar no-progress" role="banner">
+  <a href="../index.html" class="fab-btn fab-back" aria-label="Back to Home"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-brand">HLD Hub</span>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ========== HERO ========== -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-server" aria-hidden="true"></i> High-Level Design</div>
+    <h1>HLD Topics</h1>
+    <p class="hero-subtitle">System architecture, distributed systems, databases, caching &amp; real-world system designs</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-layer-group" aria-hidden="true"></i> 88 Foundation Topics</span>
+      <span><i class="fa-solid fa-flask" aria-hidden="true"></i> 108 Case Studies</span>
+      <span><i class="fa-solid fa-scroll" aria-hidden="true"></i> 8 Deep Dives</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== STICKY NAV ========== -->
+<nav class="hub-nav">
+  <button class="hub-nav-pill hub-nav-pill--active" data-show="foundations" onclick="hldTab(this)"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Foundations</button>
+  <button class="hub-nav-pill" data-show="case-studies" onclick="hldTab(this)"><i class="fa-solid fa-flask" aria-hidden="true"></i> Case Studies</button>
+  <button class="hub-nav-pill" data-show="deep-dives" onclick="hldTab(this)"><i class="fa-solid fa-scroll" aria-hidden="true"></i> Deep Dives</button>
+</nav>
+
+<main class="wiki-container">
+
+  <!-- ═══════════════════════════════════════════
+       FOUNDATIONS — 88 Topics, 14 Categories
+       ═══════════════════════════════════════════ -->
+  <div class="section" id="foundations">
+    <div class="section-header">
+      <div class="section-icon green"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></div>
+      <div>
+        <div class="section-num">88 Topics — 14 Categories</div>
+        <h2 class="section-title">Foundations</h2>
+      </div>
+    </div>
+
+    <!-- ── Category 1: Core Principles (8 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-compass icon-gap" aria-hidden="true"></i>Core Principles</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">How to Approach SD</span>
+          <div class="lld-topic-desc">Structured thinking, top-down vs bottom-up methodology</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-arrows-up-down" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Scalability</span>
+          <div class="lld-topic-desc">Horizontal vs vertical scaling, unit economics</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-shield" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Reliability</span>
+          <div class="lld-topic-desc">Failure modes, redundancy, graceful degradation</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Availability</span>
+          <div class="lld-topic-desc">Nines (99.9→99.999%), SLA/SLO/SLI, failover</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Performance</span>
+          <div class="lld-topic-desc">Latency vs throughput, P50/P95/P99 percentiles</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">CAP Theorem</span>
+          <div class="lld-topic-desc">Why "pick 2 of 3" is misleading, PACELC</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">ACID vs BASE</span>
+          <div class="lld-topic-desc">Strong vs eventual consistency trade-offs</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-calculator" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Estimation</span>
+          <div class="lld-topic-desc">Traffic, storage, bandwidth, QPS calculations</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Category 2: Networking (8 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-network-wired icon-gap" aria-hidden="true"></i>Networking</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'net-upcoming')">+4 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-globe" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Internet Basics</span>
+          <div class="lld-topic-desc">TCP/IP stack, what happens when you type a URL</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-signs-post" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">DNS</span>
+          <div class="lld-topic-desc">Hierarchical resolution, GeoDNS, record types</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-handshake" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">TCP &amp; UDP</span>
+          <div class="lld-topic-desc">Handshakes, congestion control, when to use each</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-code" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">HTTP Evolution</span>
+          <div class="lld-topic-desc">HTTP/1.1 → 2 → 3, QUIC, multiplexing</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="net-upcoming" style="display:none;">
+      <span class="soon-pill">REST API</span>
+      <span class="soon-pill">Webhooks</span>
+      <span class="soon-pill">Real-time Communication</span>
+      <span class="soon-pill">Proxies</span>
+    </div>
+
+    <!-- ── Category 3: Databases (8 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-database icon-gap" aria-hidden="true"></i>Databases</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'db-upcoming')">+4 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-table" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Relational DBs</span>
+          <div class="lld-topic-desc">ACID, indexing (B+ tree), normalization</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-lock" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Isolation &amp; Locking</span>
+          <div class="lld-topic-desc">4 levels, SKIP LOCKED, MVCC, deadlocks</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Schema Design</span>
+          <div class="lld-topic-desc">ER diagrams, soft deletes, migrations</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">SQL Tuning</span>
+          <div class="lld-topic-desc">EXPLAIN plans, N+1, connection pooling</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="db-upcoming" style="display:none;">
+      <span class="soon-pill">Scaling DBs</span>
+      <span class="soon-pill">Sharding</span>
+      <span class="soon-pill">DB Internals</span>
+      <span class="soon-pill">WAL</span>
+    </div>
+
+    <!-- ── Category 4: NoSQL & DB Selection (9 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-cubes-stacked icon-gap" aria-hidden="true"></i>NoSQL &amp; DB Selection</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'nosql-upcoming')">+5 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-leaf" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">MongoDB</span>
+          <div class="lld-topic-desc">BSON, flexible schema, aggregation pipeline</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-memory" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Redis Deep Dive</span>
+          <div class="lld-topic-desc">Data structures, persistence, clustering, Lua</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-database" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Cassandra</span>
+          <div class="lld-topic-desc">Partition keys, gossip protocol, tunable consistency</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-circle-nodes" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Neo4j</span>
+          <div class="lld-topic-desc">Cypher, graph traversals, when to use graphs</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="nosql-upcoming" style="display:none;">
+      <span class="soon-pill">Elasticsearch</span>
+      <span class="soon-pill">Time-Series DBs</span>
+      <span class="soon-pill">NewSQL</span>
+      <span class="soon-pill">Picking DBs</span>
+      <span class="soon-pill">Polyglot Persistence</span>
+    </div>
+
+    <!-- ── Category 5: Caching (5 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-bolt icon-gap" aria-hidden="true"></i>Caching</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Strategies</span>
+          <div class="lld-topic-desc">Cache-aside, write-through, write-behind, refresh-ahead</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-memory" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Eviction Internals</span>
+          <div class="lld-topic-desc">LRU, LFU, Redis TTL sampling, jemalloc</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-rotate" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Invalidation</span>
+          <div class="lld-topic-desc">TTL, event-based, cache stampede, thundering herd</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">CDN</span>
+          <div class="lld-topic-desc">PoPs, push vs pull, edge computing, origin shielding</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Caching Levels</span>
+          <div class="lld-topic-desc">Browser → API → Redis → DB, materialized views</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Category 6: Messaging (6 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-envelope-open-text icon-gap" aria-hidden="true"></i>Messaging</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'msg-upcoming')">+2 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-inbox" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Message Queues</span>
+          <div class="lld-topic-desc">SQS, RabbitMQ, DLQ, exactly-once delivery</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-stream" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Kafka Deep Dive</span>
+          <div class="lld-topic-desc">Partitions, ISR, consumer groups, compaction</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Pub/Sub</span>
+          <div class="lld-topic-desc">Redis Pub/Sub, fan-out, config push patterns</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Async Patterns</span>
+          <div class="lld-topic-desc">Task queues, backpressure, flow control</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="msg-upcoming" style="display:none;">
+      <span class="soon-pill">Stream Processing</span>
+      <span class="soon-pill">Real-Time Analytics</span>
+    </div>
+
+    <!-- ── Category 7: Distributed Systems (10 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-circle-nodes icon-gap" aria-hidden="true"></i>Distributed Systems</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'dist-upcoming')">+6 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-equals" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Consistency Models</span>
+          <div class="lld-topic-desc">Strong, eventual, causal, linearizability</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-handshake-angle" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Consensus</span>
+          <div class="lld-topic-desc">Raft, Paxos, how nodes agree despite failures</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Clocks &amp; Ordering</span>
+          <div class="lld-topic-desc">Lamport, vector clocks, TrueTime</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-ring" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Consistent Hashing</span>
+          <div class="lld-topic-desc">Ring, vnodes, data migration, jump hashing</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="dist-upcoming" style="display:none;">
+      <span class="soon-pill">Bloom Filters</span>
+      <span class="soon-pill">ID Generation</span>
+      <span class="soon-pill">Distributed Locking</span>
+      <span class="soon-pill">Leader Election</span>
+      <span class="soon-pill">Failure Detection</span>
+      <span class="soon-pill">Distributed Transactions</span>
+    </div>
+
+    <!-- ── Category 8: Load Balancing & Resilience (5 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-shield-halved icon-gap" aria-hidden="true"></i>Load Balancing &amp; Resilience</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-server" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Load Balancers</span>
+          <div class="lld-topic-desc">L4 vs L7, algorithms, health checks, DNS-based</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-door-open" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">API Gateway</span>
+          <div class="lld-topic-desc">Auth, rate limiting, routing, aggregation</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Rate Limiting</span>
+          <div class="lld-topic-desc">Token bucket, sliding window, library vs service</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Circuit Breaker</span>
+          <div class="lld-topic-desc">3-state model, bulkhead, exponential backoff</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-fingerprint" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Idempotency</span>
+          <div class="lld-topic-desc">Keys, exactly-once patterns, Stripe's approach</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Category 9: Storage & Data (6 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-hard-drive icon-gap" aria-hidden="true"></i>Storage &amp; Data</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'stor-upcoming')">+2 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-box-archive" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">S3 / Blob Storage</span>
+          <div class="lld-topic-desc">Signed URLs, multipart, erasure coding, 11 nines</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-folder-tree" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Distributed FS</span>
+          <div class="lld-topic-desc">GFS, HDFS, chunk storage, fault tolerance</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Tiered Storage</span>
+          <div class="lld-topic-desc">Hot/warm/cold/glacier, cost optimization</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-gears" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Batch Processing</span>
+          <div class="lld-topic-desc">MapReduce, Spark, data locality, lineage</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="stor-upcoming" style="display:none;">
+      <span class="soon-pill">ETL &amp; CDC</span>
+      <span class="soon-pill">Data Warehousing</span>
+    </div>
+
+    <!-- ── Category 10: Serialization (2 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-file-export icon-gap" aria-hidden="true"></i>Serialization</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-file-export" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Serialization Formats</span>
+          <div class="lld-topic-desc">Protobuf, Avro, Thrift, schema evolution</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-compress" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Compression</span>
+          <div class="lld-topic-desc">gzip, zstd, Snappy, columnar compression</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Category 11: Architecture Patterns (8 topics) ── -->
+    <h3 class="lld-category">
+      <span><i class="fa-solid fa-building icon-gap" aria-hidden="true"></i>Architecture Patterns</span>
+      <button class="inline-toggle" onclick="inlineToggle(this,'arch-upcoming')">+4 upcoming</button>
+    </h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-cubes" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Monolith vs Micro</span>
+          <div class="lld-topic-desc">Trade-offs, decomposition, database per service</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Event-Driven</span>
+          <div class="lld-topic-desc">Event sourcing, CQRS, saga, outbox pattern</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Service Mesh</span>
+          <div class="lld-topic-desc">Istio, sidecar proxies, Consul, etcd</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-arrows-split-up-and-left" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Communication</span>
+          <div class="lld-topic-desc">sync (REST, gRPC) vs async (events), BFF</div>
+        </div>
+      </div>
+    </div>
+    <div class="soon-list" id="arch-upcoming" style="display:none;">
+      <span class="soon-pill">Migration Patterns</span>
+      <span class="soon-pill">Multi-Region</span>
+      <span class="soon-pill">Multi-Tenancy</span>
+      <span class="soon-pill">Anti-Patterns</span>
+    </div>
+
+    <!-- ── Category 12: Security (4 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-user-shield icon-gap" aria-hidden="true"></i>Security</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-key" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Auth</span>
+          <div class="lld-topic-desc">OAuth 2.0, JWT, SSO, RBAC/ABAC, session management</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-lock" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">TLS / Encryption</span>
+          <div class="lld-topic-desc">Handshake, certificates, mTLS, KMS</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-shield" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">API Security</span>
+          <div class="lld-topic-desc">CORS, CSRF, DDoS, OWASP top 10</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Zero Trust</span>
+          <div class="lld-topic-desc">Service-to-service auth, VPC, segmentation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Category 13: Observability (4 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-eye icon-gap" aria-hidden="true"></i>Observability</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Logging</span>
+          <div class="lld-topic-desc">Structured logging, ELK, correlation IDs</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Metrics</span>
+          <div class="lld-topic-desc">Prometheus, Grafana, RED/USE methods</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Tracing</span>
+          <div class="lld-topic-desc">Jaeger, OpenTelemetry, trace/span propagation</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-bell" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Alerting</span>
+          <div class="lld-topic-desc">On-call, runbooks, alert fatigue, postmortems</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Category 14: Infrastructure (5 topics) ── -->
+    <h3 class="lld-category"><i class="fa-solid fa-cloud icon-gap" aria-hidden="true"></i>Infrastructure</h3>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Containers &amp; K8s</span>
+          <div class="lld-topic-desc">Docker, pods, services, ingress, scaling</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-code-branch" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">CI/CD</span>
+          <div class="lld-topic-desc">Build, test, deploy, artifacts, GitOps</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-rocket" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Deployment</span>
+          <div class="lld-topic-desc">Blue-green, canary, rolling, feature flags</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-cloud" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">Serverless</span>
+          <div class="lld-topic-desc">Lambda, cold starts, concurrency, event-driven</div>
+        </div>
+      </div>
+      <div class="lld-topic-card lld-topic-card--soon">
+        <span class="lld-topic-icon"><i class="fa-solid fa-file-code" aria-hidden="true"></i></span>
+        <div>
+          <span class="lld-topic-name">IaC</span>
+          <div class="lld-topic-desc">Terraform, CloudFormation, immutable infrastructure</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /foundations -->
+
+  <!-- CASE STUDIES SECTION -->
+  <div class="section" id="case-studies" style="display:none">
+    <div class="section-header">
+      <div class="section-icon purple"><i class="fa-solid fa-flask" aria-hidden="true"></i></div>
+      <div>
+        <div class="section-num">108 Systems — 0 Complete</div>
+        <h2 class="section-title">System Design Case Studies</h2>
+      </div>
+    </div>
+
+    <!-- Tier 1: Simple Systems -->
+    <div class="cs-category"><i class="fa-solid fa-seedling" aria-hidden="true"></i>Tier 1 — Simple Systems <span class="cs-cat-count">15</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-circle" aria-hidden="true"></i></span><div><span class="lld-topic-name">Online/Offline Indicator <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Redis</span><span class="lld-pattern-tag">Heartbeat</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><div><span class="lld-topic-name">Recent Searches <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Redis</span><span class="lld-pattern-tag">Kafka</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-trophy" aria-hidden="true"></i></span><div><span class="lld-topic-name">Leaderboard <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Redis</span><span class="lld-pattern-tag">Sorted Sets</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-paste" aria-hidden="true"></i></span><div><span class="lld-topic-name">PasteBin <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">S3</span><span class="lld-pattern-tag">Database</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-link" aria-hidden="true"></i></span><div><span class="lld-topic-name">URL Shortener <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">ID Generation</span><span class="lld-pattern-tag">Encoding</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i></span><div><span class="lld-topic-name">Rate Limiter <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Algorithms</span><span class="lld-pattern-tag">Redis</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-ban" aria-hidden="true"></i></span><div><span class="lld-topic-name">Abuse Masker <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Trie</span><span class="lld-pattern-tag">Pub/Sub</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-square-poll-vertical" aria-hidden="true"></i></span><div><span class="lld-topic-name">Polling / Voting <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Concurrency</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-comments" aria-hidden="true"></i></span><div><span class="lld-topic-name">Comment System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Threading</span><span class="lld-pattern-tag">Moderation</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bell" aria-hidden="true"></i></span><div><span class="lld-topic-name">Unread Count <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Redis</span><span class="lld-pattern-tag">Auxiliary DB</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-store" aria-hidden="true"></i></span><div><span class="lld-topic-name">E-commerce Listing <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Replicas</span><span class="lld-pattern-tag">Caching</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-baseball" aria-hidden="true"></i></span><div><span class="lld-topic-name">CricBuzz Commentary <span class="lld-difficulty lld-difficulty--easy">Easy</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Redis</span><span class="lld-pattern-tag">Caching</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-image" aria-hidden="true"></i></span><div><span class="lld-topic-name">Image Hosting <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">CDN</span><span class="lld-pattern-tag">S3</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-flag" aria-hidden="true"></i></span><div><span class="lld-topic-name">Feature Flags <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Targeting</span><span class="lld-pattern-tag">A/B Testing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-sliders" aria-hidden="true"></i></span><div><span class="lld-topic-name">Config Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Zookeeper</span><span class="lld-pattern-tag">etcd</span></div></div></div>
+    </div>
+
+    <!-- Tier 2: Medium Systems -->
+    <div class="cs-category"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Tier 2 — Medium Systems <span class="cs-cat-count">25</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span><div><span class="lld-topic-name">Flash Sale <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Locking</span><span class="lld-pattern-tag">SKIP LOCKED</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i></span><div><span class="lld-topic-name">Notification System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Queues</span><span class="lld-pattern-tag">Bloom Filter</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-fire" aria-hidden="true"></i></span><div><span class="lld-topic-name">Tinder <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Geospatial</span><span class="lld-pattern-tag">Bloom Filter</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i></span><div><span class="lld-topic-name">Load Balancer <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">L4/L7</span><span class="lld-pattern-tag">Health Checks</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-spider" aria-hidden="true"></i></span><div><span class="lld-topic-name">Web Crawler <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Bloom Filter</span><span class="lld-pattern-tag">Consistent Hash</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-database" aria-hidden="true"></i></span><div><span class="lld-topic-name">Distributed Cache <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Consistent Hash</span><span class="lld-pattern-tag">Eviction</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-server" aria-hidden="true"></i></span><div><span class="lld-topic-name">Key-Value Store <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Quorum</span><span class="lld-pattern-tag">Vector Clocks</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-clock" aria-hidden="true"></i></span><div><span class="lld-topic-name">Task Scheduler <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Locking</span><span class="lld-pattern-tag">Leader Election</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-box-archive" aria-hidden="true"></i></span><div><span class="lld-topic-name">S3 Object Storage <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Partitions</span><span class="lld-pattern-tag">Erasure Coding</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span><div><span class="lld-topic-name">Recommendation <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Graph DB</span><span class="lld-pattern-tag">ML</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-user-secret" aria-hidden="true"></i></span><div><span class="lld-topic-name">Fraud Detection <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">ML Pipeline</span><span class="lld-pattern-tag">Spark</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-keyboard" aria-hidden="true"></i></span><div><span class="lld-topic-name">Typeahead <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Trie</span><span class="lld-pattern-tag">Ranking</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-location-dot" aria-hidden="true"></i></span><div><span class="lld-topic-name">Proximity Service <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Geohash</span><span class="lld-pattern-tag">Quadtree</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span><div><span class="lld-topic-name">Digital Wallet <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Double-Entry</span><span class="lld-pattern-tag">Transactions</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-credit-card" aria-hidden="true"></i></span><div><span class="lld-topic-name">Payment System <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Saga</span><span class="lld-pattern-tag">Idempotency</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-flask-vial" aria-hidden="true"></i></span><div><span class="lld-topic-name">A/B Testing <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Hashing</span><span class="lld-pattern-tag">Metrics</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Logging System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Ingestion</span><span class="lld-pattern-tag">Indexing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span><div><span class="lld-topic-name">Monitoring System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Time-Series</span><span class="lld-pattern-tag">Alerting</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-code-branch" aria-hidden="true"></i></span><div><span class="lld-topic-name">CI/CD Pipeline <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Build</span><span class="lld-pattern-tag">Deploy</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-stream" aria-hidden="true"></i></span><div><span class="lld-topic-name">Message Queue (Kafka) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Partitions</span><span class="lld-pattern-tag">ISR</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i></span><div><span class="lld-topic-name">CDN Design <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Edge</span><span class="lld-pattern-tag">Invalidation</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-lock" aria-hidden="true"></i></span><div><span class="lld-topic-name">Locking Service <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Consensus</span><span class="lld-pattern-tag">Fencing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span><div><span class="lld-topic-name">Data Pipeline <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">DAG</span><span class="lld-pattern-tag">Scheduling</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-mouse-pointer" aria-hidden="true"></i></span><div><span class="lld-topic-name">Ad Click Aggregation <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Stream Processing</span><span class="lld-pattern-tag">Dedup</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-bullseye" aria-hidden="true"></i></span><div><span class="lld-topic-name">Ad Serving <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">RTB</span><span class="lld-pattern-tag">Click Tracking</span></div></div></div>
+    </div>
+
+    <!-- Tier 3: Social & Messaging -->
+    <div class="cs-category"><i class="fa-solid fa-comments" aria-hidden="true"></i>Tier 3 — Social &amp; Messaging <span class="cs-cat-count">13</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-twitter" aria-hidden="true"></i></span><div><span class="lld-topic-name">Twitter / X <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Feed</span><span class="lld-pattern-tag">Kafka</span><span class="lld-pattern-tag">Search</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i></span><div><span class="lld-topic-name">Twitter Trends <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">NER</span><span class="lld-pattern-tag">Elasticsearch</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-instagram" aria-hidden="true"></i></span><div><span class="lld-topic-name">Instagram <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">CDN</span><span class="lld-pattern-tag">Feed</span><span class="lld-pattern-tag">Stories</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-facebook" aria-hidden="true"></i></span><div><span class="lld-topic-name">Facebook Feed <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Ranking</span><span class="lld-pattern-tag">Graph</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-tiktok" aria-hidden="true"></i></span><div><span class="lld-topic-name">TikTok <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">ML</span><span class="lld-pattern-tag">CDN</span><span class="lld-pattern-tag">Video</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-reddit" aria-hidden="true"></i></span><div><span class="lld-topic-name">Reddit <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Voting</span><span class="lld-pattern-tag">Threading</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-linkedin" aria-hidden="true"></i></span><div><span class="lld-topic-name">LinkedIn <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Graph</span><span class="lld-pattern-tag">Job Match</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></span><div><span class="lld-topic-name">WhatsApp <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">WebSocket</span><span class="lld-pattern-tag">E2E</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-slack" aria-hidden="true"></i></span><div><span class="lld-topic-name">Slack <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Channels</span><span class="lld-pattern-tag">WebSocket</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-discord" aria-hidden="true"></i></span><div><span class="lld-topic-name">Discord <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Voice</span><span class="lld-pattern-tag">Scale</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-video" aria-hidden="true"></i></span><div><span class="lld-topic-name">Zoom <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">WebRTC</span><span class="lld-pattern-tag">SFU/MCU</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-envelope" aria-hidden="true"></i></span><div><span class="lld-topic-name">Gmail <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">SMTP</span><span class="lld-pattern-tag">Spam</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-headset" aria-hidden="true"></i></span><div><span class="lld-topic-name">In-App Chat <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Bot</span><span class="lld-pattern-tag">Agent Routing</span></div></div></div>
+    </div>
+
+    <!-- Tier 4: Media & Streaming -->
+    <div class="cs-category"><i class="fa-solid fa-play" aria-hidden="true"></i>Tier 4 — Media &amp; Streaming <span class="cs-cat-count">8</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-youtube" aria-hidden="true"></i></span><div><span class="lld-topic-name">YouTube <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Transcoding</span><span class="lld-pattern-tag">CDN</span><span class="lld-pattern-tag">Recommendations</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-film" aria-hidden="true"></i></span><div><span class="lld-topic-name">Netflix <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Adaptive Bitrate</span><span class="lld-pattern-tag">CDN</span><span class="lld-pattern-tag">Personalization</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-spotify" aria-hidden="true"></i></span><div><span class="lld-topic-name">Spotify <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Streaming</span><span class="lld-pattern-tag">Playlists</span><span class="lld-pattern-tag">Discovery</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-twitch" aria-hidden="true"></i></span><div><span class="lld-topic-name">Twitch <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Low Latency</span><span class="lld-pattern-tag">Chat</span><span class="lld-pattern-tag">VOD</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><div><span class="lld-topic-name">Video Pipeline <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Transcoding</span><span class="lld-pattern-tag">Thumbnails</span><span class="lld-pattern-tag">Captions</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-podcast" aria-hidden="true"></i></span><div><span class="lld-topic-name">Podcast Platform <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">RSS</span><span class="lld-pattern-tag">Audio Processing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-music" aria-hidden="true"></i></span><div><span class="lld-topic-name">Shazam <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Audio Fingerprinting</span><span class="lld-pattern-tag">Matching</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-microphone" aria-hidden="true"></i></span><div><span class="lld-topic-name">Clubhouse <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Live Audio</span><span class="lld-pattern-tag">Moderation</span></div></div></div>
+    </div>
+
+    <!-- Tier 5: E-Commerce & Search -->
+    <div class="cs-category"><i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>Tier 5 — E-Commerce &amp; Search <span class="cs-cat-count">12</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-amazon" aria-hidden="true"></i></span><div><span class="lld-topic-name">Amazon <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Catalog</span><span class="lld-pattern-tag">Cart</span><span class="lld-pattern-tag">Checkout</span><span class="lld-pattern-tag">Inventory</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i></span><div><span class="lld-topic-name">Shopping Cart <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Session</span><span class="lld-pattern-tag">Pricing</span><span class="lld-pattern-tag">Reservation</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span><div><span class="lld-topic-name">Product Search <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Elasticsearch</span><span class="lld-pattern-tag">Faceted Search</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span><div><span class="lld-topic-name">Order Management <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State Machine</span><span class="lld-pattern-tag">Fulfillment</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-warehouse" aria-hidden="true"></i></span><div><span class="lld-topic-name">Inventory <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Stock Tracking</span><span class="lld-pattern-tag">Reconciliation</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-ticket" aria-hidden="true"></i></span><div><span class="lld-topic-name">Coupons / Promos <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Validation</span><span class="lld-pattern-tag">Fraud</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gavel" aria-hidden="true"></i></span><div><span class="lld-topic-name">Auction (eBay) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Bidding Engine</span><span class="lld-pattern-tag">Sniping</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-house" aria-hidden="true"></i></span><div><span class="lld-topic-name">Marketplace (Airbnb) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Two-Sided</span><span class="lld-pattern-tag">Trust</span><span class="lld-pattern-tag">Pricing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-google" aria-hidden="true"></i></span><div><span class="lld-topic-name">Google Search <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Crawling</span><span class="lld-pattern-tag">PageRank</span><span class="lld-pattern-tag">Indexing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-rss" aria-hidden="true"></i></span><div><span class="lld-topic-name">News Feed <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Fanout</span><span class="lld-pattern-tag">Ranking</span><span class="lld-pattern-tag">Engagement</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-hashtag" aria-hidden="true"></i></span><div><span class="lld-topic-name">Trending / Hashtags <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">NER</span><span class="lld-pattern-tag">Time-Decay</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-newspaper" aria-hidden="true"></i></span><div><span class="lld-topic-name">News Aggregator <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Crawling</span><span class="lld-pattern-tag">Dedup</span><span class="lld-pattern-tag">Clustering</span></div></div></div>
+    </div>
+
+    <!-- Tier 6: Transportation & Location -->
+    <div class="cs-category"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>Tier 6 — Transportation &amp; Location <span class="cs-cat-count">7</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-car" aria-hidden="true"></i></span><div><span class="lld-topic-name">Uber / Lyft <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Matching</span><span class="lld-pattern-tag">ETA</span><span class="lld-pattern-tag">Surge Pricing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-utensils" aria-hidden="true"></i></span><div><span class="lld-topic-name">DoorDash / Zomato <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Order Routing</span><span class="lld-pattern-tag">Driver Matching</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-map" aria-hidden="true"></i></span><div><span class="lld-topic-name">Google Maps <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Routing</span><span class="lld-pattern-tag">Traffic</span><span class="lld-pattern-tag">Map Tiles</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-draw-polygon" aria-hidden="true"></i></span><div><span class="lld-topic-name">Geofencing <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Region Monitoring</span><span class="lld-pattern-tag">Triggers</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-box" aria-hidden="true"></i></span><div><span class="lld-topic-name">Package Tracking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Status Updates</span><span class="lld-pattern-tag">Integration</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-charging-station" aria-hidden="true"></i></span><div><span class="lld-topic-name">EV Charging <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Availability</span><span class="lld-pattern-tag">Reservation</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-square-parking" aria-hidden="true"></i></span><div><span class="lld-topic-name">Parking Finder <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Real-time</span><span class="lld-pattern-tag">Geospatial</span></div></div></div>
+    </div>
+
+    <!-- Tier 7: Collaboration & Files -->
+    <div class="cs-category"><i class="fa-solid fa-users" aria-hidden="true"></i>Tier 7 — Collaboration &amp; Files <span class="cs-cat-count">5</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-dropbox" aria-hidden="true"></i></span><div><span class="lld-topic-name">Dropbox <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">File Sync</span><span class="lld-pattern-tag">Chunking</span><span class="lld-pattern-tag">Dedup</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-pen" aria-hidden="true"></i></span><div><span class="lld-topic-name">Google Docs <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">OT vs CRDT</span><span class="lld-pattern-tag">Cursor Sync</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-table-cells" aria-hidden="true"></i></span><div><span class="lld-topic-name">Notion <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Blocks</span><span class="lld-pattern-tag">Workspaces</span><span class="lld-pattern-tag">Collab</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-figma" aria-hidden="true"></i></span><div><span class="lld-topic-name">Figma <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Multiplayer</span><span class="lld-pattern-tag">Components</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-github" aria-hidden="true"></i></span><div><span class="lld-topic-name">GitHub <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Repos</span><span class="lld-pattern-tag">PRs</span><span class="lld-pattern-tag">CI/CD</span></div></div></div>
+    </div>
+
+    <!-- Tier 8: Finance & Booking -->
+    <div class="cs-category"><i class="fa-solid fa-building-columns" aria-hidden="true"></i>Tier 8 — Finance &amp; Booking <span class="cs-cat-count">11</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i></span><div><span class="lld-topic-name">Stock Trading <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Event Sourcing</span><span class="lld-pattern-tag">Matching Engine</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span><div><span class="lld-topic-name">Banking <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Transfers</span><span class="lld-pattern-tag">KYC/AML</span><span class="lld-pattern-tag">Audit</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-bitcoin" aria-hidden="true"></i></span><div><span class="lld-topic-name">Crypto Exchange <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Order Matching</span><span class="lld-pattern-tag">Wallets</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i></span><div><span class="lld-topic-name">UPI Payments <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Inter-Bank</span><span class="lld-pattern-tag">Settlement</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i></span><div><span class="lld-topic-name">Billing System <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Recurring</span><span class="lld-pattern-tag">Proration</span><span class="lld-pattern-tag">Dunning</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-hotel" aria-hidden="true"></i></span><div><span class="lld-topic-name">Hotel Booking <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Search</span><span class="lld-pattern-tag">Calendar</span><span class="lld-pattern-tag">Dynamic Pricing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-ticket" aria-hidden="true"></i></span><div><span class="lld-topic-name">Movie Tickets <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Seat Map</span><span class="lld-pattern-tag">Hold-then-Pay</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-plane" aria-hidden="true"></i></span><div><span class="lld-topic-name">Flight Booking <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Fare Rules</span><span class="lld-pattern-tag">PNR</span><span class="lld-pattern-tag">Overbooking</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-calendar" aria-hidden="true"></i></span><div><span class="lld-topic-name">Calendar <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Recurring</span><span class="lld-pattern-tag">Timezone</span><span class="lld-pattern-tag">RFC 5545</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span><div><span class="lld-topic-name">Appointments <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Availability</span><span class="lld-pattern-tag">Multi-timezone</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-ticket-simple" aria-hidden="true"></i></span><div><span class="lld-topic-name">Ticketmaster <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Virtual Queue</span><span class="lld-pattern-tag">Scalping Prevention</span></div></div></div>
+    </div>
+
+    <!-- Tier 9: Specialized -->
+    <div class="cs-category"><i class="fa-solid fa-flask-vial" aria-hidden="true"></i>Tier 9 — Specialized <span class="cs-cat-count">12</span></div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-stack-overflow" aria-hidden="true"></i></span><div><span class="lld-topic-name">Stack Overflow <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Q&A</span><span class="lld-pattern-tag">Reputation</span><span class="lld-pattern-tag">SEO</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-medium" aria-hidden="true"></i></span><div><span class="lld-topic-name">Medium <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Publishing</span><span class="lld-pattern-tag">Recommendations</span><span class="lld-pattern-tag">Paywall</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-brands fa-pinterest" aria-hidden="true"></i></span><div><span class="lld-topic-name">Pinterest <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Visual Discovery</span><span class="lld-pattern-tag">Image Similarity</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-chart-area" aria-hidden="true"></i></span><div><span class="lld-topic-name">Analytics Platform <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Event Tracking</span><span class="lld-pattern-tag">Funnels</span><span class="lld-pattern-tag">Cohorts</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-terminal" aria-hidden="true"></i></span><div><span class="lld-topic-name">Code Execution (LeetCode) <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Sandbox</span><span class="lld-pattern-tag">Multi-Language</span><span class="lld-pattern-tag">Queuing</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-eye" aria-hidden="true"></i></span><div><span class="lld-topic-name">Content Moderation <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">ML + Human</span><span class="lld-pattern-tag">Appeals</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-brain" aria-hidden="true"></i></span><div><span class="lld-topic-name">ML Serving <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Model Registry</span><span class="lld-pattern-tag">Feature Store</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-robot" aria-hidden="true"></i></span><div><span class="lld-topic-name">AI Chatbot <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">LLM</span><span class="lld-pattern-tag">RAG</span><span class="lld-pattern-tag">Rate Limiting</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-microchip" aria-hidden="true"></i></span><div><span class="lld-topic-name">IoT Platform <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Telemetry</span><span class="lld-pattern-tag">Fleet Management</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-share-nodes" aria-hidden="true"></i></span><div><span class="lld-topic-name">BitTorrent / P2P <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">DHT</span><span class="lld-pattern-tag">Chunk Distribution</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-key" aria-hidden="true"></i></span><div><span class="lld-topic-name">Password Manager <span class="lld-difficulty lld-difficulty--medium">Medium</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">Client Encryption</span><span class="lld-pattern-tag">Zero Knowledge</span></div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--purple"><i class="fa-solid fa-gamepad" aria-hidden="true"></i></span><div><span class="lld-topic-name">Multiplayer Game <span class="lld-difficulty lld-difficulty--hard">Hard</span></span><div class="lld-pattern-tags"><span class="lld-pattern-tag">State Sync</span><span class="lld-pattern-tag">Matchmaking</span><span class="lld-pattern-tag">Anti-Cheat</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- DEEP DIVES SECTION -->
+  <div class="section" id="deep-dives" style="display:none">
+    <div class="section-header">
+      <div class="section-icon cyan"><i class="fa-solid fa-scroll" aria-hidden="true"></i></div>
+      <div>
+        <div class="section-num">8 Papers — Coming Soon</div>
+        <h2 class="section-title">Real-World Deep Dives</h2>
+      </div>
+    </div>
+    <div class="lld-grid">
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Amazon Dynamo</span><div class="lld-topic-desc">Consistent hashing, vector clocks, sloppy quorum</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Google BigTable</span><div class="lld-topic-desc">Tablets, SSTables, bloom filters, compaction</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Google GFS</span><div class="lld-topic-desc">Chunk servers, 64MB chunks, append-only</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Google Spanner</span><div class="lld-topic-desc">TrueTime, distributed ACID, Paxos groups</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Meta TAO</span><div class="lld-topic-desc">Social graph cache, read-after-write consistency</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Discord Architecture</span><div class="lld-topic-desc">Elixir to Rust migration, data services</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Hotstar 50M Concurrent</span><div class="lld-topic-desc">Auto-scaling, cricket match spikes</div></div></div>
+      <div class="lld-topic-card lld-topic-card--soon"><span class="lld-topic-icon lld-topic-icon--cyan"><i class="fa-solid fa-file-lines" aria-hidden="true"></i></span><div><span class="lld-topic-name">Stripe Idempotency</span><div class="lld-topic-desc">Preventing duplicate charges, distributed safety</div></div></div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open" aria-hidden="true"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../index.html"><i class="fa-solid fa-house" aria-hidden="true"></i>Home</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github" aria-hidden="true"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope" aria-hidden="true"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5" aria-hidden="true"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt" aria-hidden="true"></i> CSS</span>
+      <span><i class="fa-brands fa-js" aria-hidden="true"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather" aria-hidden="true"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2025 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+
+<button class="back-to-top" id="backToTop" aria-label="Back to top"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+<script src="../shared/scripts.js"></script>
+<script>
+function inlineToggle(btn, targetId) {
+  var el = document.getElementById(targetId);
+  var isVisible = el.style.display !== 'none';
+  el.style.display = isVisible ? 'none' : '';
+  btn.classList.toggle('active', !isVisible);
+}
+
+/* Hub tab switching */
+function hldTab(btn) {
+  var target = btn.getAttribute('data-show');
+  /* hide all tab sections */
+  ['foundations', 'case-studies', 'deep-dives'].forEach(function(id) {
+    document.getElementById(id).style.display = 'none';
+  });
+  /* deactivate all pills */
+  document.querySelectorAll('.hub-nav-pill').forEach(function(p) {
+    p.classList.remove('hub-nav-pill--active');
+  });
+  /* show target + activate pill */
+  document.getElementById(target).style.display = '';
+  btn.classList.add('hub-nav-pill--active');
+  /* scroll to top of content */
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+<script>
+/* Study Next Widget */
+(function() {
+  var PATH = [
+    /* Phase 1: Core Principles */
+    { phase: 'Core Principles', name: 'How to Approach System Design', url: null },
+    { phase: 'Core Principles', name: 'Scalability', url: null },
+    { phase: 'Core Principles', name: 'Reliability & Fault Tolerance', url: null },
+    { phase: 'Core Principles', name: 'Availability', url: null },
+    { phase: 'Core Principles', name: 'Performance', url: null },
+    { phase: 'Core Principles', name: 'CAP Theorem & PACELC', url: null },
+    { phase: 'Core Principles', name: 'ACID vs BASE', url: null },
+    { phase: 'Core Principles', name: 'Back-of-Envelope Estimation', url: null },
+    /* Phase 2: Networking */
+    { phase: 'Networking', name: 'How the Internet Works', url: null },
+    { phase: 'Networking', name: 'DNS', url: null },
+    { phase: 'Networking', name: 'TCP & UDP', url: null },
+    { phase: 'Networking', name: 'HTTP/1.1, 2, 3 & QUIC', url: null },
+    { phase: 'Networking', name: 'REST API Design', url: null },
+    { phase: 'Networking', name: 'Webhooks', url: null },
+    { phase: 'Networking', name: 'Real-time Communication', url: null },
+    { phase: 'Networking', name: 'Proxies', url: null },
+    /* Phase 3: Databases */
+    { phase: 'Databases', name: 'Relational Databases', url: null },
+    { phase: 'Databases', name: 'Isolation Levels & Locking', url: null },
+    { phase: 'Databases', name: 'Schema Design', url: null },
+    { phase: 'Databases', name: 'SQL Tuning', url: null },
+    { phase: 'Databases', name: 'Scaling Databases', url: null },
+    { phase: 'Databases', name: 'Sharding & Partitioning', url: null },
+    { phase: 'Databases', name: 'Database Internals', url: null },
+    { phase: 'Databases', name: 'Write-Ahead Logging', url: null },
+    /* Phase 4: NoSQL & Selection */
+    { phase: 'NoSQL & Selection', name: 'MongoDB', url: null },
+    { phase: 'NoSQL & Selection', name: 'Redis Deep Dive', url: null },
+    { phase: 'NoSQL & Selection', name: 'Cassandra', url: null },
+    { phase: 'NoSQL & Selection', name: 'Neo4j', url: null },
+    { phase: 'NoSQL & Selection', name: 'Elasticsearch', url: null },
+    { phase: 'NoSQL & Selection', name: 'Time-Series DBs', url: null },
+    { phase: 'NoSQL & Selection', name: 'NewSQL (Spanner)', url: null },
+    { phase: 'NoSQL & Selection', name: 'Picking the Right DB', url: null },
+    { phase: 'NoSQL & Selection', name: 'Polyglot Persistence', url: null },
+    /* Phase 5: Caching */
+    { phase: 'Caching', name: 'Caching Strategies', url: null },
+    { phase: 'Caching', name: 'Cache Internals & Eviction', url: null },
+    { phase: 'Caching', name: 'Invalidation & Distributed Cache', url: null },
+    { phase: 'Caching', name: 'CDN', url: null },
+    { phase: 'Caching', name: 'Caching at Different Levels', url: null },
+    /* Phase 6: Messaging */
+    { phase: 'Messaging', name: 'Message Queues', url: null },
+    { phase: 'Messaging', name: 'Kafka Deep Dive', url: null },
+    { phase: 'Messaging', name: 'Pub/Sub Systems', url: null },
+    { phase: 'Messaging', name: 'Async Patterns', url: null },
+    { phase: 'Messaging', name: 'Stream Processing', url: null },
+    { phase: 'Messaging', name: 'Real-Time Analytics', url: null },
+    /* Phase 7: Distributed Systems */
+    { phase: 'Distributed Systems', name: 'Consistency Models', url: null },
+    { phase: 'Distributed Systems', name: 'Consensus (Raft, Paxos)', url: null },
+    { phase: 'Distributed Systems', name: 'Clocks & Ordering', url: null },
+    { phase: 'Distributed Systems', name: 'Consistent Hashing', url: null },
+    { phase: 'Distributed Systems', name: 'Bloom Filters', url: null },
+    { phase: 'Distributed Systems', name: 'Distributed ID Generation', url: null },
+    { phase: 'Distributed Systems', name: 'Distributed Locking', url: null },
+    { phase: 'Distributed Systems', name: 'Leader Election', url: null },
+    { phase: 'Distributed Systems', name: 'Failure Detection', url: null },
+    { phase: 'Distributed Systems', name: 'Distributed Transactions', url: null },
+    /* Phase 8: Load Balancing */
+    { phase: 'Load Balancing', name: 'Load Balancers', url: null },
+    { phase: 'Load Balancing', name: 'API Gateway', url: null },
+    { phase: 'Load Balancing', name: 'Rate Limiting', url: null },
+    { phase: 'Load Balancing', name: 'Circuit Breaker', url: null },
+    { phase: 'Load Balancing', name: 'Idempotency', url: null },
+    /* Phase 9: Storage & Data */
+    { phase: 'Storage & Data', name: 'S3 / Blob Storage', url: null },
+    { phase: 'Storage & Data', name: 'Distributed File Systems', url: null },
+    { phase: 'Storage & Data', name: 'Tiered Storage', url: null },
+    { phase: 'Storage & Data', name: 'Batch Processing', url: null },
+    { phase: 'Storage & Data', name: 'ETL & CDC', url: null },
+    { phase: 'Storage & Data', name: 'Data Warehousing', url: null },
+    /* Phase 10: Serialization */
+    { phase: 'Serialization', name: 'Serialization Formats', url: null },
+    { phase: 'Serialization', name: 'Compression', url: null },
+    /* Phase 11: Architecture */
+    { phase: 'Architecture', name: 'Monolith vs Microservices', url: null },
+    { phase: 'Architecture', name: 'Event-Driven Architecture', url: null },
+    { phase: 'Architecture', name: 'Service Mesh & Discovery', url: null },
+    { phase: 'Architecture', name: 'Microservice Communication', url: null },
+    { phase: 'Architecture', name: 'Migration Patterns', url: null },
+    { phase: 'Architecture', name: 'Multi-Region', url: null },
+    { phase: 'Architecture', name: 'Multi-Tenancy', url: null },
+    { phase: 'Architecture', name: 'Performance Anti-Patterns', url: null },
+    /* Phase 12: Security */
+    { phase: 'Security', name: 'Auth (OAuth, JWT)', url: null },
+    { phase: 'Security', name: 'TLS/SSL & Encryption', url: null },
+    { phase: 'Security', name: 'API Security', url: null },
+    { phase: 'Security', name: 'Zero Trust', url: null },
+    /* Phase 13: Observability */
+    { phase: 'Observability', name: 'Logging', url: null },
+    { phase: 'Observability', name: 'Metrics & Monitoring', url: null },
+    { phase: 'Observability', name: 'Distributed Tracing', url: null },
+    { phase: 'Observability', name: 'Alerting & Incident Response', url: null },
+    /* Phase 14: Infrastructure */
+    { phase: 'Infrastructure', name: 'Containers & K8s', url: null },
+    { phase: 'Infrastructure', name: 'CI/CD Pipelines', url: null },
+    { phase: 'Infrastructure', name: 'Deployment Strategies', url: null },
+    { phase: 'Infrastructure', name: 'Serverless', url: null },
+    { phase: 'Infrastructure', name: 'Infrastructure as Code', url: null },
+    /* Tier 1: Simple Systems */
+    { phase: 'Simple Systems', name: 'Online/Offline Indicator', url: null },
+    { phase: 'Simple Systems', name: 'Recent Searches', url: null },
+    { phase: 'Simple Systems', name: 'Leaderboard', url: null },
+    { phase: 'Simple Systems', name: 'PasteBin', url: null },
+    { phase: 'Simple Systems', name: 'URL Shortener', url: null },
+    { phase: 'Simple Systems', name: 'Rate Limiter', url: null },
+    { phase: 'Simple Systems', name: 'Abuse Masker', url: null },
+    { phase: 'Simple Systems', name: 'Polling / Voting', url: null },
+    { phase: 'Simple Systems', name: 'Comment System', url: null },
+    { phase: 'Simple Systems', name: 'Unread Count', url: null },
+    { phase: 'Simple Systems', name: 'E-commerce Listing', url: null },
+    { phase: 'Simple Systems', name: 'CricBuzz Commentary', url: null },
+    { phase: 'Simple Systems', name: 'Image Hosting', url: null },
+    { phase: 'Simple Systems', name: 'Feature Flags', url: null },
+    { phase: 'Simple Systems', name: 'Config Management', url: null },
+    /* Tier 2: Medium Systems */
+    { phase: 'Medium Systems', name: 'Flash Sale', url: null },
+    { phase: 'Medium Systems', name: 'Notification System', url: null },
+    { phase: 'Medium Systems', name: 'Tinder', url: null },
+    { phase: 'Medium Systems', name: 'Load Balancer Design', url: null },
+    { phase: 'Medium Systems', name: 'Web Crawler', url: null },
+    { phase: 'Medium Systems', name: 'Distributed Cache', url: null },
+    { phase: 'Medium Systems', name: 'Key-Value Store', url: null },
+    { phase: 'Medium Systems', name: 'Task Scheduler', url: null },
+    { phase: 'Medium Systems', name: 'S3 Object Storage', url: null },
+    { phase: 'Medium Systems', name: 'Recommendation Engine', url: null },
+    { phase: 'Medium Systems', name: 'Fraud Detection', url: null },
+    { phase: 'Medium Systems', name: 'Typeahead', url: null },
+    { phase: 'Medium Systems', name: 'Proximity Service', url: null },
+    { phase: 'Medium Systems', name: 'Digital Wallet', url: null },
+    { phase: 'Medium Systems', name: 'Payment System', url: null },
+    { phase: 'Medium Systems', name: 'A/B Testing', url: null },
+    { phase: 'Medium Systems', name: 'Logging System', url: null },
+    { phase: 'Medium Systems', name: 'Monitoring System', url: null },
+    { phase: 'Medium Systems', name: 'CI/CD Pipeline', url: null },
+    { phase: 'Medium Systems', name: 'Message Queue (Kafka)', url: null },
+    { phase: 'Medium Systems', name: 'CDN Design', url: null },
+    { phase: 'Medium Systems', name: 'Locking Service', url: null },
+    { phase: 'Medium Systems', name: 'Data Pipeline', url: null },
+    { phase: 'Medium Systems', name: 'Ad Click Aggregation', url: null },
+    { phase: 'Medium Systems', name: 'Ad Serving', url: null },
+    /* Tier 3: Social & Messaging */
+    { phase: 'Social & Messaging', name: 'Twitter / X', url: null },
+    { phase: 'Social & Messaging', name: 'Twitter Trends', url: null },
+    { phase: 'Social & Messaging', name: 'Instagram', url: null },
+    { phase: 'Social & Messaging', name: 'Facebook Feed', url: null },
+    { phase: 'Social & Messaging', name: 'TikTok', url: null },
+    { phase: 'Social & Messaging', name: 'Reddit', url: null },
+    { phase: 'Social & Messaging', name: 'LinkedIn', url: null },
+    { phase: 'Social & Messaging', name: 'WhatsApp', url: null },
+    { phase: 'Social & Messaging', name: 'Slack', url: null },
+    { phase: 'Social & Messaging', name: 'Discord', url: null },
+    { phase: 'Social & Messaging', name: 'Zoom', url: null },
+    { phase: 'Social & Messaging', name: 'Gmail', url: null },
+    { phase: 'Social & Messaging', name: 'In-App Chat', url: null },
+    /* Tier 4: Media & Streaming */
+    { phase: 'Media & Streaming', name: 'YouTube', url: null },
+    { phase: 'Media & Streaming', name: 'Netflix', url: null },
+    { phase: 'Media & Streaming', name: 'Spotify', url: null },
+    { phase: 'Media & Streaming', name: 'Twitch', url: null },
+    { phase: 'Media & Streaming', name: 'Video Pipeline', url: null },
+    { phase: 'Media & Streaming', name: 'Podcast Platform', url: null },
+    { phase: 'Media & Streaming', name: 'Shazam', url: null },
+    { phase: 'Media & Streaming', name: 'Clubhouse', url: null },
+    /* Tier 5: E-Commerce & Search */
+    { phase: 'E-Commerce & Search', name: 'Amazon', url: null },
+    { phase: 'E-Commerce & Search', name: 'Shopping Cart', url: null },
+    { phase: 'E-Commerce & Search', name: 'Product Search', url: null },
+    { phase: 'E-Commerce & Search', name: 'Order Management', url: null },
+    { phase: 'E-Commerce & Search', name: 'Inventory', url: null },
+    { phase: 'E-Commerce & Search', name: 'Coupons / Promos', url: null },
+    { phase: 'E-Commerce & Search', name: 'Auction (eBay)', url: null },
+    { phase: 'E-Commerce & Search', name: 'Marketplace (Airbnb)', url: null },
+    { phase: 'E-Commerce & Search', name: 'Google Search', url: null },
+    { phase: 'E-Commerce & Search', name: 'News Feed', url: null },
+    { phase: 'E-Commerce & Search', name: 'Trending / Hashtags', url: null },
+    { phase: 'E-Commerce & Search', name: 'News Aggregator', url: null },
+    /* Tier 6: Transportation & Location */
+    { phase: 'Transportation & Location', name: 'Uber / Lyft', url: null },
+    { phase: 'Transportation & Location', name: 'DoorDash / Zomato', url: null },
+    { phase: 'Transportation & Location', name: 'Google Maps', url: null },
+    { phase: 'Transportation & Location', name: 'Geofencing', url: null },
+    { phase: 'Transportation & Location', name: 'Package Tracking', url: null },
+    { phase: 'Transportation & Location', name: 'EV Charging', url: null },
+    { phase: 'Transportation & Location', name: 'Parking Finder', url: null },
+    /* Tier 7: Collaboration & Files */
+    { phase: 'Collaboration & Files', name: 'Dropbox', url: null },
+    { phase: 'Collaboration & Files', name: 'Google Docs', url: null },
+    { phase: 'Collaboration & Files', name: 'Notion', url: null },
+    { phase: 'Collaboration & Files', name: 'Figma', url: null },
+    { phase: 'Collaboration & Files', name: 'GitHub', url: null },
+    /* Tier 8: Finance & Booking */
+    { phase: 'Finance & Booking', name: 'Stock Trading', url: null },
+    { phase: 'Finance & Booking', name: 'Banking', url: null },
+    { phase: 'Finance & Booking', name: 'Crypto Exchange', url: null },
+    { phase: 'Finance & Booking', name: 'UPI Payments', url: null },
+    { phase: 'Finance & Booking', name: 'Billing System', url: null },
+    { phase: 'Finance & Booking', name: 'Hotel Booking', url: null },
+    { phase: 'Finance & Booking', name: 'Movie Tickets', url: null },
+    { phase: 'Finance & Booking', name: 'Flight Booking', url: null },
+    { phase: 'Finance & Booking', name: 'Calendar', url: null },
+    { phase: 'Finance & Booking', name: 'Appointments', url: null },
+    { phase: 'Finance & Booking', name: 'Ticketmaster', url: null },
+    /* Tier 9: Specialized */
+    { phase: 'Specialized', name: 'Stack Overflow', url: null },
+    { phase: 'Specialized', name: 'Medium (Blog)', url: null },
+    { phase: 'Specialized', name: 'Pinterest', url: null },
+    { phase: 'Specialized', name: 'Analytics Platform', url: null },
+    { phase: 'Specialized', name: 'Code Execution (LeetCode)', url: null },
+    { phase: 'Specialized', name: 'Content Moderation', url: null },
+    { phase: 'Specialized', name: 'ML Serving', url: null },
+    { phase: 'Specialized', name: 'AI Chatbot', url: null },
+    { phase: 'Specialized', name: 'IoT Platform', url: null },
+    { phase: 'Specialized', name: 'BitTorrent / P2P', url: null },
+    { phase: 'Specialized', name: 'Password Manager', url: null },
+    { phase: 'Specialized', name: 'Multiplayer Game', url: null },
+    /* Deep Dives */
+    { phase: 'Deep Dives', name: 'Amazon Dynamo Paper', url: null },
+    { phase: 'Deep Dives', name: 'Google BigTable Paper', url: null },
+    { phase: 'Deep Dives', name: 'Google GFS Paper', url: null },
+    { phase: 'Deep Dives', name: 'Google Spanner Paper', url: null },
+    { phase: 'Deep Dives', name: 'Meta TAO Paper', url: null },
+    { phase: 'Deep Dives', name: 'Discord Architecture', url: null },
+    { phase: 'Deep Dives', name: 'Hotstar 50M Concurrent', url: null },
+    { phase: 'Deep Dives', name: 'Stripe Idempotency', url: null }
+  ];
+
+  var KEY = 'hld-study-step';
+  var MIN_KEY = 'hld-study-min';
+  var step = parseInt(localStorage.getItem(KEY) || '0', 10);
+  var minimized = localStorage.getItem(MIN_KEY) === '1';
+  var listOpen = false;
+
+  document.querySelectorAll('.study-float').forEach(function(x) { x.remove(); });
+
+  var el = document.createElement('div');
+  el.className = 'study-float' + (minimized ? ' minimized' : '');
+  document.body.appendChild(el);
+
+  function buildList() {
+    var html = '<div class="sf-list-wrap">';
+    var lastPhase = '';
+    for (var i = 0; i < PATH.length; i++) {
+      if (PATH[i].phase !== lastPhase) {
+        lastPhase = PATH[i].phase;
+        html += '<div class="sf-list-phase">' + lastPhase + '</div>';
+      }
+      var cls = i < step ? 'sf-list-item done' : i === step ? 'sf-list-item current' : 'sf-list-item';
+      var icon = i < step ? '<i class="fa-solid fa-check sf-li-icon"></i>'
+               : i === step ? '<i class="fa-solid fa-arrow-right sf-li-icon"></i>'
+               : '<span class="sf-li-icon">\u00b7</span>';
+      html += '<div class="' + cls + '">' + icon + PATH[i].name + '</div>';
+    }
+    html += '<button class="sf-reset-btn" onclick="event.stopPropagation();window._sfReset()"><i class="fa-solid fa-rotate-left"></i> Reset Progress</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function render() {
+    var done = step >= PATH.length;
+    var t = done ? null : PATH[step];
+    var listIcon = listOpen ? 'fa-xmark' : 'fa-list-ol';
+    el.innerHTML =
+      '<div class="sf-header">' +
+        '<span class="sf-header-left" onclick="window._sfToggleMin()" style="cursor:pointer;flex:1"><i class="fa-solid fa-compass" aria-hidden="true"></i> Study Next' +
+          (done ? '' : ' <span class="sf-step">' + (step + 1) + '/' + PATH.length + '</span>') +
+        '</span>' +
+        '<button class="sf-list-btn" onclick="event.stopPropagation();window._sfToggleList()" title="' + (listOpen ? 'Close list' : 'View all topics') + '"><i class="fa-solid ' + listIcon + '"></i></button>' +
+        '<button class="sf-minimize" onclick="event.stopPropagation();window._sfToggleMin()"><i class="fa-solid fa-minus"></i></button>' +
+      '</div>' +
+      (listOpen ? buildList() : '') +
+      '<div class="sf-body">' +
+        (done
+          ? '<div class="sf-done-msg">All topics completed!</div>'
+          : '<div class="sf-phase">' + t.phase + '</div>' +
+            '<div class="sf-topic">' + t.name + '</div>' +
+            '<div class="sf-actions">' +
+              (t.url
+                ? '<a href="' + t.url + '" class="sf-btn sf-btn--go">Study</a>'
+                : '<span class="sf-btn sf-btn--go disabled">Coming Soon</span>') +
+              '<button class="sf-btn sf-btn--done" onclick="event.stopPropagation();window._sfNext()">Done <i class="fa-solid fa-check"></i></button>' +
+            '</div>'
+        ) +
+      '</div>';
+    el.classList.toggle('list-open', listOpen);
+  }
+
+  window._sfNext = function() {
+    step = Math.min(step + 1, PATH.length);
+    localStorage.setItem(KEY, step);
+    render();
+  };
+  window._sfToggleMin = function() {
+    minimized = !minimized;
+    el.classList.toggle('minimized', minimized);
+    localStorage.setItem(MIN_KEY, minimized ? '1' : '0');
+  };
+  window._sfReset = function() {
+    if (confirm('Reset all study progress? This cannot be undone.')) {
+      step = 0; localStorage.setItem(KEY, '0'); render();
+    }
+  };
+  window._sfToggleList = function() {
+    listOpen = !listOpen;
+    if (listOpen) { minimized = false; el.classList.remove('minimized'); localStorage.setItem(MIN_KEY, '0'); }
+    render();
+    if (listOpen) {
+      var cur = el.querySelector('.sf-list-item.current');
+      if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  };
+  render();
+})();
+</script>
+</body>
+</html>
