@@ -1,0 +1,2561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Back-of-Envelope Estimation — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧮</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="green" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-calculator"></i> Core Principles</div>
+    <h1>Back-of-Envelope Estimation</h1>
+    <p class="hero-subtitle">The 30-second math skill that separates "I think this works" from "I know this works" — and the single most impressive thing you can do in a system design interview.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 7 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 25 SVG Diagrams</span>
+      <span><i class="fa-solid fa-flask-vial"></i> 4 Worked Examples</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-circle-info"></i> 20 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> Estimation is a bullshit detector. In 30 seconds of multiplication, you can tell whether an idea is brilliant or broken — before writing a single line of code.
+  </div>
+
+  <p>The entire skill boils down to one sentence: figure out <strong>how many users</strong> you have, <strong>what each one does</strong>, and <strong>how big each action is</strong>. Multiply those three numbers together. That's it. That answer tells you how many servers you need, how much storage to buy, and whether your architecture will survive its first real traffic spike.</p>
+
+  <!-- TL;DR core formula SVG -->
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Core estimation formula: Users times Activity times Size equals Answer">
+    <defs>
+      <marker id="est-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <!-- Box 1: Users -->
+    <rect x="20" y="40" width="140" height="80" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="90" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">USERS</text>
+    <text x="90" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">How many people</text>
+    <text x="90" y="104" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">use this every day?</text>
+
+    <!-- Multiply sign -->
+    <text x="185" y="87" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="22">×</text>
+
+    <!-- Box 2: Activity -->
+    <rect x="210" y="40" width="140" height="80" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="280" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">ACTIVITY</text>
+    <text x="280" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">What does each</text>
+    <text x="280" y="104" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">person do per day?</text>
+
+    <!-- Multiply sign -->
+    <text x="375" y="87" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="22">×</text>
+
+    <!-- Box 3: Size -->
+    <rect x="400" y="40" width="140" height="80" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="470" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">SIZE</text>
+    <text x="470" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">How big is</text>
+    <text x="470" y="104" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">each action?</text>
+
+    <!-- Equals sign -->
+    <text x="565" y="87" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="22">=</text>
+
+    <!-- Box 4: Answer -->
+    <rect x="590" y="40" width="150" height="80" rx="12" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2.5"/>
+    <text x="665" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">ANSWER</text>
+    <text x="665" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Storage, bandwidth,</text>
+    <text x="665" y="104" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">QPS, servers...</text>
+
+    <!-- Bottom labels -->
+    <text x="90" y="150" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">e.g. 100M DAU</text>
+    <text x="280" y="150" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">e.g. 50 messages/day</text>
+    <text x="470" y="150" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">e.g. 100 bytes each</text>
+    <text x="665" y="150" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">= 500 GB/day</text>
+
+    <!-- Bottom insight -->
+    <rect x="140" y="175" width="480" height="45" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="197" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="12" font-weight="600">That's it. Elementary school math. Multiplication and division.</text>
+    <text x="380" y="212" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">The hard part isn't the math — it's knowing which numbers to pick.</text>
+  </svg>
+
+  <p>You don't need to be exact. Nobody expects you to nail the number down to the byte. What matters is getting within the right <strong><span class="tooltip-trigger">order of magnitude<span class="tooltip-content">A factor of 10. Being 'off by an order of magnitude' means your guess was 10× too high or too low.</span></span></strong> — knowing whether you need gigabytes or petabytes, 100 servers or 10,000. Being off by 2x is fine. Being off by 1000x is a career-ending architecture mistake.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> Estimation isn't about precision — it's about preventing disasters. Thirty seconds of multiplication can save you from building a system that crashes on day one.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">Why You Need This</h2>
+    </div>
+  </div>
+
+  <p>Picture this. You're in a system design interview. The interviewer says: "Design a chat app like WhatsApp." You start drawing boxes — a client, a server, a database. You're feeling good. Then the interviewer leans forward and asks:</p>
+
+  <div class="callout callout-danger">
+    <strong>"How much storage do you need per day?"</strong>
+  </div>
+
+  <p>Silence. You have no idea. You stammer, "Uh... probably a lot?" The interviewer nods politely, but you can see them writing something on their notepad. It's not a good something.</p>
+
+  <p>Here's the thing: that question wasn't a trick. The interviewer doesn't have an exact number in mind either. They wanted to see you <strong>think with numbers</strong>. They wanted you to say something like: "WhatsApp has about 2 billion users. Let's say 1 billion are active daily. If each sends 40 messages a day, and each message is about 100 bytes of text... that's 4 trillion bytes. About 4 terabytes per day, just for message content." That takes 20 seconds, and it completely changes the conversation.</p>
+
+  <!-- SVG: Interview freeze moment -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Developer freezing when asked for numbers in an interview">
+    <defs>
+      <marker id="est-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+      </marker>
+    </defs>
+
+    <!-- Interviewer -->
+    <circle cx="620" cy="70" r="22" fill="none" stroke="#f1f5f9" stroke-width="2"/>
+    <circle cx="613" cy="66" r="2" fill="#f1f5f9"/>
+    <circle cx="627" cy="66" r="2" fill="#f1f5f9"/>
+    <path d="M610,78 Q620,84 630,78" fill="none" stroke="#f1f5f9" stroke-width="1.5"/>
+    <line x1="620" y1="92" x2="620" y2="160" stroke="#f1f5f9" stroke-width="2"/>
+    <line x1="620" y1="120" x2="590" y2="145" stroke="#f1f5f9" stroke-width="2"/>
+    <line x1="620" y1="120" x2="650" y2="145" stroke="#f1f5f9" stroke-width="2"/>
+    <text x="620" y="185" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Interviewer</text>
+
+    <!-- Speech bubble from interviewer -->
+    <rect x="420" y="20" width="170" height="45" rx="10" fill="#334155"/>
+    <polygon points="590,50 600,65 585,50" fill="#334155"/>
+    <text x="505" y="40" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="600">"How much storage</text>
+    <text x="505" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="600">do you need per day?"</text>
+
+    <!-- Candidate (frozen) -->
+    <circle cx="150" cy="70" r="22" fill="none" stroke="#f1f5f9" stroke-width="2"/>
+    <circle cx="143" cy="66" r="2" fill="#f1f5f9"/>
+    <circle cx="157" cy="66" r="2" fill="#f1f5f9"/>
+    <path d="M140,80 Q150,76 160,80" fill="none" stroke="#f1f5f9" stroke-width="1.5"/>
+    <line x1="150" y1="92" x2="150" y2="160" stroke="#f1f5f9" stroke-width="2"/>
+    <line x1="150" y1="120" x2="120" y2="100" stroke="#f1f5f9" stroke-width="2"/>
+    <line x1="150" y1="120" x2="180" y2="100" stroke="#f1f5f9" stroke-width="2"/>
+    <text x="150" y="185" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Candidate</text>
+
+    <!-- Thought bubble -->
+    <circle cx="200" cy="55" r="4" fill="#334155"/>
+    <circle cx="215" cy="40" r="7" fill="#334155"/>
+    <rect x="225" y="10" width="100" height="40" rx="10" fill="#334155"/>
+    <text x="275" y="30" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">uhh...</text>
+    <text x="275" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">"...a lot?"</text>
+
+    <!-- Whiteboard in middle -->
+    <rect x="290" y="95" width="180" height="120" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="380" y="115" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">WhatsApp Design</text>
+    <rect x="310" y="125" width="50" height="25" rx="4" fill="#334155"/>
+    <text x="335" y="142" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Client</text>
+    <rect x="380" y="125" width="50" height="25" rx="4" fill="#334155"/>
+    <text x="405" y="142" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Server</text>
+    <rect x="345" y="165" width="50" height="25" rx="4" fill="#334155"/>
+    <text x="370" y="182" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">DB</text>
+    <text x="380" y="207" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-style="italic">no numbers anywhere!</text>
+
+    <!-- Bottom lesson -->
+    <rect x="100" y="225" width="560" height="40" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+    <text x="380" y="250" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="600">Without numbers, every architecture decision is a coin flip.</text>
+  </svg>
+
+  <p>Without estimation, you can't answer the most basic architecture questions. <strong>Every single one of these decisions depends on numbers:</strong></p>
+
+  <div class="grid-2" style="gap:0.75rem; margin:1rem 0;">
+    <div class="callout callout-info"><strong>How many servers?</strong><br>Depends on requests per second</div>
+    <div class="callout callout-info"><strong>SQL or NoSQL?</strong><br>Depends on read/write ratio &amp; data size</div>
+    <div class="callout callout-info"><strong>Need a cache?</strong><br>Depends on whether your DB handles the read load</div>
+    <div class="callout callout-info"><strong><span class="tooltip-trigger">Shard<span class="tooltip-content">Splitting a large database across multiple machines, each holding a portion of the data. Necessary when data outgrows a single server.</span></span> the database?</strong><br>Depends on whether one machine stores all data</div>
+    <div class="callout callout-info"><strong>Monthly cloud bill?</strong><br>Depends on all of the above</div>
+    <div class="callout callout-info"><strong>Which CDN / region?</strong><br>Depends on egress bandwidth &amp; user locations</div>
+  </div>
+
+  <p>Estimation gives you the numbers to answer every one of these. And the beautiful part? The math is embarrassingly simple. Multiplication and division. That's the whole skill.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>WhatsApp has 2 billion users. About 100 billion messages are sent per day. Each text message averages around 100 bytes. <strong>How much storage does WhatsApp need per day, just for message content?</strong></p>
+    <span class="think-hint">It's one multiplication. Try it before scrolling down. (Answer: 100 billion × 100 bytes = 10 trillion bytes = 10 TB/day)</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT (GUESSING)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-dice"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — Guessing</h2>
+    </div>
+  </div>
+
+  <p>Here's what most people do when asked "how much storage?" or "how many requests per second?" — they guess. "Probably a terabyte?" "Maybe a thousand requests per second?" It sounds reasonable in the moment. The problem is, guesses are almost always wildly wrong — and not just a little wrong, but orders-of-magnitude wrong.</p>
+
+  <p>An <strong>order of magnitude</strong> just means "a factor of 10." If the real answer is 10 TB and you guess 10 GB, you're off by three orders of magnitude — you're off by 1000x. That's the difference between needing one server and needing a thousand servers. That's the difference between a $500/month cloud bill and a $500,000/month cloud bill.</p>
+
+  <!-- SVG: Scale of wrongness -->
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scale showing the difference between 1 GB, 1 TB, and 1 PB and what each means">
+    <defs>
+      <marker id="est-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Scale of Being Wrong</text>
+
+    <!-- 1 GB -->
+    <rect x="30" y="50" width="200" height="90" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="130" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="16">1 GB</text>
+    <text x="130" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">One laptop's RAM</text>
+    <text x="130" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">One small server handles this</text>
+    <text x="130" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">~$0.02/month on S3</text>
+
+    <!-- Arrow + multiplier -->
+    <line x1="230" y1="95" x2="270" y2="95" stroke="#10b981" stroke-width="2" marker-end="url(#est-s3-arr)"/>
+    <text x="250" y="85" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">×1000</text>
+
+    <!-- 1 TB -->
+    <rect x="280" y="50" width="200" height="90" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="380" y="75" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="16">1 TB</text>
+    <text x="380" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">A big hard drive</text>
+    <text x="380" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Need dedicated storage infra</text>
+    <text x="380" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">~$23/month on S3</text>
+
+    <!-- Arrow + multiplier -->
+    <line x1="480" y1="95" x2="520" y2="95" stroke="#f59e0b" stroke-width="2" marker-end="url(#est-s3-arr)"/>
+    <text x="500" y="85" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">×1000</text>
+
+    <!-- 1 PB -->
+    <rect x="530" y="50" width="200" height="90" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="630" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="16">1 PB</text>
+    <text x="630" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Netflix-scale storage</text>
+    <text x="630" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Distributed systems mandatory</text>
+    <text x="630" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">~$23,000/month on S3</text>
+
+    <!-- What each means for architecture -->
+    <text x="380" y="175" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="12">What this means for your architecture:</text>
+
+    <rect x="30" y="190" width="200" height="55" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="130" y="210" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">1 server, 1 database</text>
+    <text x="130" y="228" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Keep it simple</text>
+
+    <rect x="280" y="190" width="200" height="55" rx="8" fill="rgba(245,158,11,0.06)" stroke="#f59e0b" stroke-width="1"/>
+    <text x="380" y="210" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="600">Replicas, caching, CDN</text>
+    <text x="380" y="228" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Moderate complexity</text>
+
+    <rect x="530" y="190" width="200" height="55" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+    <text x="630" y="210" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Sharding, distributed DB, S3</text>
+    <text x="630" y="228" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Serious infrastructure</text>
+
+    <!-- Bottom punchline -->
+    <rect x="120" y="270" width="520" height="35" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="380" y="293" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="600">Guess wrong, and you build the wrong system entirely.</text>
+  </svg>
+
+  <p>The interviewer doesn't expect an exact number. Nobody can tell you the precise storage requirement down to the byte. What they DO expect is that you can <strong>reason your way to the right ballpark</strong>. "About 10 TB per day" is a perfect answer. "Probably a lot" is not.</p>
+
+  <p>Here's why guessing is dangerous beyond interviews: in real engineering, a wrong estimate doesn't just lose you interview points — it loses money. A team that guesses "probably 1,000 requests per second" and builds for that, when the actual traffic is 50,000 requests per second, will watch their system crash on launch day. Every recovery is expensive, rushed, and stressful.</p>
+
+  <div class="callout callout-success">
+    <strong>The good news:</strong> You don't need to memorize a million numbers. You just need a simple method — a recipe — that turns any "how much?" question into a chain of multiplications you can do on the back of an envelope. That's exactly what the next sections teach you.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-explosion"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">What Happens Without Math</h2>
+    </div>
+  </div>
+
+  <p>Let's look at what actually happens when teams skip estimation and just... build things based on vibes.</p>
+
+  <h3>The Launch Day Disaster</h3>
+
+  <p>A team builds a new social feature. They assume maybe 1,000 users will use it at launch. They don't do any math. They provision two small servers and a single database instance.</p>
+
+  <div class="callout callout-danger">
+    <strong>Launch day arrives.</strong> The feature goes viral. 50,000 users hit it in the first hour. The database connection pool fills up in 30 seconds. Response times spike from 200ms to 15 seconds. Users see error pages. The team scrambles to add servers — but scaling up takes time, and by then the damage is done. Users leave. The press writes "Company X's new feature crashes on launch." All because nobody spent 30 seconds multiplying.
+  </div>
+
+  <!-- SVG: Two paths — with vs without estimation -->
+  <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two paths: with estimation leading to smooth scaling, without estimation leading to a crash">
+    <defs>
+      <marker id="est-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+      </marker>
+      <marker id="est-s4-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="est-s4-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Two Teams, Same Feature, Different Preparation</text>
+
+    <!-- Starting point -->
+    <rect x="295" y="40" width="170" height="40" rx="8" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <text x="380" y="65" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11" font-weight="600">New Feature Launch</text>
+
+    <!-- Fork arrows -->
+    <line x1="330" y1="80" x2="180" y2="115" stroke="#10b981" stroke-width="2" marker-end="url(#est-s4-arr-g)"/>
+    <line x1="430" y1="80" x2="580" y2="115" stroke="#ef4444" stroke-width="2" marker-end="url(#est-s4-arr-r)"/>
+
+    <!-- LEFT PATH: With Estimation -->
+    <text x="160" y="110" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">WITH ESTIMATION</text>
+
+    <rect x="50" y="120" width="220" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="160" y="145" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">"50K users likely → ~500 req/sec"</text>
+
+    <line x1="160" y1="160" x2="160" y2="180" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-s4-arr-g)"/>
+
+    <rect x="50" y="180" width="220" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="160" y="205" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Provision 4 servers + load balancer</text>
+
+    <line x1="160" y1="220" x2="160" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-s4-arr-g)"/>
+
+    <rect x="50" y="240" width="220" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="160" y="265" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Launch day: traffic matches estimate</text>
+
+    <line x1="160" y1="280" x2="160" y2="300" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-s4-arr-g)"/>
+
+    <rect x="50" y="300" width="220" height="40" rx="8" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="2"/>
+    <text x="160" y="325" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11" font-weight="700">Smooth sailing</text>
+
+    <!-- RIGHT PATH: Without Estimation -->
+    <text x="600" y="110" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">WITHOUT ESTIMATION</text>
+
+    <rect x="490" y="120" width="220" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="600" y="145" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">"Should be fine, probably not many"</text>
+
+    <line x1="600" y1="160" x2="600" y2="180" stroke="#ef4444" stroke-width="1.5" marker-end="url(#est-s4-arr-r)"/>
+
+    <rect x="490" y="180" width="220" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="600" y="205" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Provision 2 small servers, 1 DB</text>
+
+    <line x1="600" y1="220" x2="600" y2="240" stroke="#ef4444" stroke-width="1.5" marker-end="url(#est-s4-arr-r)"/>
+
+    <rect x="490" y="240" width="220" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="600" y="260" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Launch: 50K users, 500 req/sec</text>
+
+    <line x1="600" y1="280" x2="600" y2="300" stroke="#ef4444" stroke-width="1.5" marker-end="url(#est-s4-arr-r)"/>
+
+    <rect x="490" y="300" width="220" height="40" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="2"/>
+    <text x="600" y="320" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="700">Servers crash. Users leave.</text>
+    <text x="600" y="335" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Panicked 3am recovery.</text>
+  </svg>
+
+  <h3>The Real Cost of Guessing</h3>
+
+  <p>Guessing wrong doesn't just cause crashes. It causes <em>bad architecture decisions</em> that are expensive to undo:</p>
+
+  <div class="callout callout-danger">
+    <strong>Guess too low:</strong> You build for 1,000 users/sec, actual is 50,000. System crashes on launch day. Emergency rewrite under pressure. Weeks of rework. Lost users. Lost revenue.
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>Guess too high:</strong> You build a massively distributed system for 10 million users/sec when you only get 100. You've spent 6 months building infrastructure you didn't need. Your startup runs out of money before finding product-market fit.
+  </div>
+
+  <p>Both directions are painful. Estimation keeps you in the sweet spot — building <em>just enough</em> infrastructure for your actual needs, with some headroom for growth.</p>
+
+  <div class="callout callout-warning">
+    <strong>Think about it:</strong> Every architecture decision without numbers is a coin flip. How many servers? Coin flip. Which database? Coin flip. Cache or no cache? Coin flip. Would you bet your company on a coin flip? Because that's what building without estimation is.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-breakthrough">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — It's Just 4th-Grade Math</h2>
+    </div>
+  </div>
+
+  <p>Here's the revelation that changes everything: back-of-envelope estimation is <strong>multiplication and division</strong>. That's it. No calculus. No statistics. No algorithms. Just the same math you learned when you were ten years old.</p>
+
+  <p>The name says it all — <strong><span class="tooltip-trigger">back-of-envelope estimation<span class="tooltip-content">A rough calculation done quickly, named because you could literally do it on the back of an envelope with a pen.</span></span></strong> — because you can literally do it on the back of an envelope at a coffee shop. No laptop required. No spreadsheet. Just a pen and some napkin math.</p>
+
+  <p>You only need three pieces of information to estimate almost anything:</p>
+
+  <ol>
+    <li><strong>How many users?</strong> — Not total registered users. How many actually show up each day.</li>
+    <li><strong>What does each user do?</strong> — How many messages, clicks, uploads, searches per day.</li>
+    <li><strong>How big is each action?</strong> — Each message is 100 bytes. Each photo is 2 MB. Each video is 50 MB.</li>
+  </ol>
+
+  <p>Multiply those three things together and you have your answer. Want storage? Users × actions × size per action. Want requests per second? Users × actions per day ÷ seconds in a day. Want bandwidth? Same thing, but measured in bits per second instead of bytes stored.</p>
+
+  <!-- SVG: The estimation pipeline -->
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The estimation pipeline from total users down to storage, QPS, and bandwidth">
+    <defs>
+      <marker id="est-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="est-s5-arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <!-- Row 1: User funnel -->
+    <rect x="30" y="20" width="130" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="95" y="42" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">TOTAL USERS</text>
+    <text x="95" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">2 billion</text>
+
+    <line x1="160" y1="47" x2="195" y2="47" stroke="#10b981" stroke-width="2" marker-end="url(#est-s5-arr)"/>
+    <text x="178" y="42" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">50%</text>
+
+    <rect x="200" y="20" width="130" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="265" y="42" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">MONTHLY ACTIVE</text>
+    <text x="265" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">1 billion</text>
+
+    <line x1="330" y1="47" x2="365" y2="47" stroke="#10b981" stroke-width="2" marker-end="url(#est-s5-arr)"/>
+    <text x="348" y="42" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">50%</text>
+
+    <rect x="370" y="20" width="130" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="435" y="42" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">DAILY ACTIVE</text>
+    <text x="435" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">500 million</text>
+
+    <line x1="500" y1="47" x2="535" y2="47" stroke="#10b981" stroke-width="2" marker-end="url(#est-s5-arr)"/>
+    <text x="518" y="42" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">×40</text>
+
+    <rect x="540" y="20" width="190" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="635" y="42" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">DAILY ACTIONS</text>
+    <text x="635" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">20 billion messages/day</text>
+
+    <!-- Arrow down to outputs -->
+    <line x1="635" y1="75" x2="635" y2="105" stroke="#10b981" stroke-width="2" marker-end="url(#est-s5-arr)"/>
+    <text x="665" y="95" fill="#64748b" font-family="Inter, sans-serif" font-size="9">×100 bytes</text>
+
+    <!-- Row 2: Three outputs -->
+    <rect x="30" y="120" width="210" height="70" rx="10" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="2"/>
+    <text x="135" y="145" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">STORAGE</text>
+    <text x="135" y="163" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">actions/day × size per action</text>
+    <text x="135" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">= 20B × 100B = 2 TB/day</text>
+
+    <rect x="275" y="120" width="210" height="70" rx="10" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="2"/>
+    <text x="380" y="145" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">QPS</text>
+    <text x="380" y="163" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">actions/day ÷ 86,400 seconds</text>
+    <text x="380" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">= 20B ÷ 86K ≈ 230K writes/sec</text>
+
+    <rect x="520" y="120" width="210" height="70" rx="10" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="2"/>
+    <text x="625" y="145" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">BANDWIDTH</text>
+    <text x="625" y="163" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">QPS × size per action × 8 bits</text>
+    <text x="625" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">= 230K × 100B × 8 ≈ 180 Mbps</text>
+
+    <!-- Connecting lines from daily actions down to outputs -->
+    <line x1="635" y1="105" x2="135" y2="120" stroke="#3b82f6" stroke-width="1" stroke-dasharray="5,4"/>
+    <line x1="635" y1="105" x2="380" y2="120" stroke="#3b82f6" stroke-width="1" stroke-dasharray="5,4"/>
+    <line x1="635" y1="105" x2="625" y2="120" stroke="#3b82f6" stroke-width="1" stroke-dasharray="5,4"/>
+
+    <!-- Bottom summary -->
+    <rect x="100" y="220" width="560" height="60" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="245" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">From one question ("how many users?") you can derive EVERYTHING</text>
+    <text x="380" y="265" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Storage, throughput, bandwidth, server count, cost — it all flows from the same 3 numbers.</text>
+  </svg>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>YouTube has about 2 billion monthly users, and around 800 million daily active users. Each user watches an average of 40 minutes per day. The average video streams at about 5 Mbps (megabits per second). <strong>How much total bandwidth does YouTube need per second?</strong></p>
+    <span class="think-hint">Start with: 800M users × 40 min. But not all users watch at the same instant — spread over 24 hours. Think about how to convert daily watching time to concurrent viewers.</span>
+  </div>
+
+  <p>Let's work through that Think First. 800 million users each watch 40 minutes per day. That's 32 billion minutes of video per day. Spread across 24 hours (1,440 minutes), that means on average about 22 million people are watching at any given moment. At 5 Mbps per stream, that's 22 million × 5 Mbps = 110 million Mbps = <strong>110 Tbps</strong> (terabits per second). That's why YouTube spends billions of dollars on infrastructure and CDN. And you just figured that out with a napkin and a pen.</p>
+
+  <div class="callout callout-info">
+    <strong>Key insight:</strong> The name <strong>"back-of-envelope estimation"</strong> exists because the whole skill literally fits on the back of an envelope. You just need to know which numbers to start with — and that's what the next section teaches you step by step.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (THE 5-STEP METHOD)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-list-ol"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The 5-Step Method</h2>
+    </div>
+  </div>
+
+  <p>Here's the complete method, step by step. Once you learn this, you can estimate the storage, <span class="tooltip-trigger">throughput<span class="tooltip-content">The total number of operations a system can handle per unit of time. Higher throughput = more work done.</span></span>, bandwidth, and server count for <em>any</em> system in under a minute. Let's walk through each step, then do two full worked examples end to end.</p>
+
+  <!-- SVG: 5-step overview -->
+  <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="5-step estimation method overview">
+    <defs>
+      <marker id="est-s6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <rect x="10" y="30" width="125" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="72" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">STEP 1</text>
+    <text x="72" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Start with</text>
+    <text x="72" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Users</text>
+
+    <line x1="135" y1="60" x2="158" y2="60" stroke="#10b981" stroke-width="2" marker-end="url(#est-s6-arr)"/>
+
+    <rect x="162" y="30" width="125" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="224" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">STEP 2</text>
+    <text x="224" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Estimate</text>
+    <text x="224" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Actions/User</text>
+
+    <line x1="287" y1="60" x2="310" y2="60" stroke="#10b981" stroke-width="2" marker-end="url(#est-s6-arr)"/>
+
+    <rect x="314" y="30" width="125" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="376" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">STEP 3</text>
+    <text x="376" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Calculate</text>
+    <text x="376" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">QPS</text>
+
+    <line x1="439" y1="60" x2="462" y2="60" stroke="#10b981" stroke-width="2" marker-end="url(#est-s6-arr)"/>
+
+    <rect x="466" y="30" width="125" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="528" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">STEP 4</text>
+    <text x="528" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Calculate</text>
+    <text x="528" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Storage</text>
+
+    <line x1="591" y1="60" x2="614" y2="60" stroke="#10b981" stroke-width="2" marker-end="url(#est-s6-arr)"/>
+
+    <rect x="618" y="30" width="125" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="680" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">STEP 5</text>
+    <text x="680" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Calculate</text>
+    <text x="680" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Bandwidth</text>
+
+    <!-- Bottom note -->
+    <text x="380" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11" font-style="italic">Each step feeds into the next. Start at users, end with everything you need.</text>
+  </svg>
+
+
+  <!-- ─── STEP 1 ─── -->
+  <div class="card open">
+  <h3 class="card-title"><span><i class="fa-solid fa-users icon-gap"></i> Step 1: Start with Users</span></h3>
+  <div class="card-body">
+
+  <p>Every estimation begins with the same question: <strong>how many people actually use this thing every day?</strong></p>
+
+  <p>There are three numbers that matter, and they form a funnel. At the top you have the total number of people who have ever signed up — <strong>total users</strong>. A lot of those people signed up and forgot about it, so the next number is <strong><span class="tooltip-trigger">monthly active users (MAU)<span class="tooltip-content">Monthly Active Users — unique people who use a service at least once in a month. DAU is usually 20-50% of MAU.</span></span></strong> — people who use the app at least once a month. And finally, <strong><span class="tooltip-trigger">daily active users (DAU)<span class="tooltip-content">Daily Active Users — the number of unique people who use a service on a given day. This is the starting point for most estimations.</span></span></strong> — people who use it every single day. This is the number that matters most for estimation, because your servers don't care about people who signed up three years ago and never came back.</p>
+
+  <!-- SVG: User funnel -->
+  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="User funnel from total users to monthly active to daily active">
+    <!-- Funnel shape -->
+    <polygon points="180,20 580,20 520,85 240,85" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="45" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">Total Users: 2 Billion</text>
+    <text x="380" y="62" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Everyone who ever signed up</text>
+
+    <polygon points="240,90 520,90 480,155 280,155" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="380" y="115" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">MAU: 1 Billion</text>
+    <text x="380" y="132" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Used it at least once this month</text>
+
+    <polygon points="280,160 480,160 440,200 320,200" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="380" y="180" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="13">DAU: 500 Million</text>
+    <text x="380" y="195" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Uses it every day ← THIS is what matters</text>
+
+    <!-- Right side labels -->
+    <text x="600" y="55" fill="#64748b" font-family="Inter, sans-serif" font-size="10">~50% become MAU</text>
+    <text x="600" y="125" fill="#64748b" font-family="Inter, sans-serif" font-size="10">~50% become DAU</text>
+    <text x="600" y="185" fill="#64748b" font-family="Inter, sans-serif" font-size="10">DAU/MAU ratio varies</text>
+  </svg>
+
+  <p>A handy rule of thumb: for social apps, <strong>DAU is usually 20-50% of MAU</strong>. WhatsApp is on the high end (~70% — people check messages daily). A shopping app might be on the low end (~10% — people don't shop every day). In an interview, if you're not given specific numbers, pick a reasonable ratio and state your assumption clearly.</p>
+
+  </div></div>
+
+  <!-- ─── STEP 2 ─── -->
+  <div class="card">
+  <h3 class="card-title"><span><i class="fa-solid fa-hand-pointer icon-gap"></i> Step 2: Estimate Actions per User</span></h3>
+  <div class="card-body">
+
+  <p>Now that you know how many people show up each day, the next question is: <strong>what does each person actually DO?</strong> How many messages do they send? How many tweets do they read? How many photos do they upload?</p>
+
+  <p>This is where you need to think about the <strong><span class="tooltip-trigger">read/write ratio<span class="tooltip-content">The proportion of read operations to write operations. Most systems are heavily read-biased (10:1 to 1000:1).</span></span></strong>. Most systems are heavily read-biased — users read much more content than they create. This ratio matters enormously because reads and writes stress your system in completely different ways.</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>System</th><th>Reads/user/day</th><th>Writes/user/day</th><th>Read:Write Ratio</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Twitter/X</td><td>200 tweets viewed</td><td>2 tweets posted</td><td>100:1</td></tr>
+        <tr><td>WhatsApp</td><td>40 messages read</td><td>40 messages sent</td><td>1:1</td></tr>
+        <tr><td>Instagram</td><td>100 posts viewed</td><td>1 post uploaded</td><td>100:1</td></tr>
+        <tr><td>Google Search</td><td>5 searches done</td><td>0 (no user writes)</td><td>Read-only</td></tr>
+        <tr><td>URL Shortener</td><td>50 redirects</td><td>1 URL created</td><td>50:1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Notice the pattern: most systems are <em>massively</em> read-heavy. Twitter users read 100 tweets for every 1 they write. Instagram users scroll past 100 photos for every 1 they upload. This is why caching exists — if 99% of your traffic is reads, putting a cache in front of your database eliminates most of the load.</p>
+
+  </div></div>
+
+  <!-- ─── STEP 3 ─── -->
+  <div class="card">
+  <h3 class="card-title"><span><i class="fa-solid fa-gauge-high icon-gap"></i> Step 3: Calculate Per-Second Rates (QPS)</span></h3>
+  <div class="card-body">
+
+  <p>Now you know the total number of actions per day. But servers don't think in "per day" — they think in "per second." So you need to convert. The magic number is <strong>86,400</strong> — that's how many seconds are in a day (24 × 60 × 60). To make life easy, just round it to <strong>100,000</strong> (10<sup>5</sup>). That makes the division trivial and only off by ~15%, which is perfectly acceptable for estimation.</p>
+
+  <div class="math-block">
+    <span class="math-label">QPS Formula</span>
+    Average QPS = daily actions ÷ 86,400
+
+    Quick version: daily actions ÷ 100,000
+    (rounds down ~15%, but close enough)
+    <span class="math-result">→ Example: 500M tweets read/day ÷ 100K ≈ 5,000 reads/sec</span>
+  </div>
+
+  <p>But that's the <strong>average</strong>. Traffic doesn't arrive evenly throughout the day. There are peaks — the morning commute, lunch breaks, evenings. At <span class="tooltip-trigger">peak traffic<span class="tooltip-content">The busiest moment of the day, typically 2-5× the average load. Your system must handle this without crashing.</span></span> times, traffic is typically 2-5× the average for social media apps, and can spike to 10-100× for flash sales or live events.</p>
+
+  <!-- SVG: Average vs Peak traffic -->
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Traffic wave showing average vs peak requests per second">
+    <defs>
+      <marker id="est-s6c-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+      </marker>
+    </defs>
+
+    <!-- Axes -->
+    <line x1="60" y1="190" x2="720" y2="190" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="60" y1="190" x2="60" y2="20" stroke="#64748b" stroke-width="1.5"/>
+    <text x="390" y="220" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Time of Day</text>
+    <text x="25" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" transform="rotate(-90,25,105)">Requests/sec</text>
+
+    <!-- Time labels -->
+    <text x="100" y="207" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">12am</text>
+    <text x="230" y="207" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">6am</text>
+    <text x="380" y="207" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">12pm</text>
+    <text x="530" y="207" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">6pm</text>
+    <text x="680" y="207" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">12am</text>
+
+    <!-- Traffic curve -->
+    <path d="M80,170 Q130,165 180,155 Q230,130 280,100 Q330,75 380,60 Q430,50 480,55 Q530,65 580,45 Q620,60 660,100 Q690,140 710,170"
+          fill="none" stroke="#10b981" stroke-width="2.5"/>
+
+    <!-- Average line -->
+    <line x1="60" y1="120" x2="720" y2="120" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="8,4"/>
+    <text x="730" y="124" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="600">Avg</text>
+
+    <!-- Peak annotation -->
+    <line x1="580" y1="45" x2="580" y2="10" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3"/>
+    <rect x="510" y="0" width="140" height="22" rx="5" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+    <text x="580" y="15" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Peak = 2-5× average</text>
+
+    <!-- Low point annotation -->
+    <line x1="100" y1="170" x2="100" y2="145" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="100" y="142" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">Low: ~0.3× avg</text>
+
+    <!-- Fill under curve for visual effect -->
+    <path d="M80,170 Q130,165 180,155 Q230,130 280,100 Q330,75 380,60 Q430,50 480,55 Q530,65 580,45 Q620,60 660,100 Q690,140 710,170 L710,190 L80,190 Z"
+          fill="rgba(16,185,129,0.06)"/>
+  </svg>
+
+  <div class="math-block">
+    <span class="math-label">Twitter Write QPS</span>
+    500 million DAU × 2 tweets/day = 1 billion tweets/day
+
+    Average write QPS = 1B ÷ 86,400 ≈ 12,000 writes/sec
+    Peak write QPS   = 12,000 × 3 ≈ 36,000 writes/sec
+    <span class="math-result">→ You need infrastructure that can handle 36K writes/sec at peak.</span>
+  </div>
+
+  <p>The term <strong><span class="tooltip-trigger">QPS<span class="tooltip-content">Queries Per Second — the number of requests a server handles every second. The key metric for sizing infrastructure.</span></span></strong> stands for "queries per second" — it's just a count of how many requests hit your server every second. In an interview, always calculate both average AND peak QPS. The average tells you what your system needs to handle most of the time. The peak tells you what it needs to survive without crashing.</p>
+
+  </div></div>
+
+  <!-- ─── STEP 4 ─── -->
+  <div class="card">
+  <h3 class="card-title"><span><i class="fa-solid fa-hard-drive icon-gap"></i> Step 4: Calculate Storage</span></h3>
+  <div class="card-body">
+
+  <p>Storage estimation is the easiest of all — it's literally just how much data you create per day, times how long you keep it.</p>
+
+  <div class="math-block">
+    <span class="math-label">Storage Formula</span>
+    Daily storage = actions/day × data size per action
+    Total storage = daily storage × <span class="tooltip-trigger">retention period<span class="tooltip-content">How long you keep data before deleting or archiving it. Affects total storage needs dramatically.</span></span> (days)
+
+    Don't forget:
+    + Metadata (20-30% overhead typically)
+    + Indexes (depends on DB, but ~10-20%)
+    + Replicas (usually 3× for reliability)
+    <span class="math-result">→ Multiply your raw data by ~5× for a realistic total.</span>
+  </div>
+
+  <div class="math-block">
+    <span class="math-label">WhatsApp Storage Example</span>
+    100 billion messages/day × 100 bytes/message = 10 TB/day
+
+    Per year: 10 TB × 365 = 3.65 PB/year (just messages)
+    With 3× replication: ~11 PB/year
+    With metadata + indexes: ~15 PB/year
+    <span class="math-result">→ WhatsApp needs to add ~15 petabytes of storage every year for messages alone. That's serious infrastructure.</span>
+  </div>
+
+  <p>A common trap: forgetting about <strong><span class="tooltip-trigger">replication<span class="tooltip-content">Storing multiple copies of data across different servers. Typically 3 copies (one primary, two backups) for reliability.</span></span></strong>. Almost every production database keeps 3 copies of every piece of data (one primary, two replicas). This triples your storage requirement instantly. And if you have indexes on multiple columns, add another 10-20% on top of that. When you give your final number in an interview, mentioning replicas and indexes shows the interviewer you understand real-world systems, not just textbook math.</p>
+
+  </div></div>
+
+  <!-- ─── STEP 5 ─── -->
+  <div class="card">
+  <h3 class="card-title"><span><i class="fa-solid fa-wifi icon-gap"></i> Step 5: Calculate Bandwidth</span></h3>
+  <div class="card-body">
+
+  <p>Bandwidth is how much data flows through your network per second. There are two directions: data coming IN (<strong><span class="tooltip-trigger">ingress<span class="tooltip-content">Incoming data — traffic flowing INTO your system. Users uploading, posting, or sending data.</span></span></strong>) and data going OUT (<strong><span class="tooltip-trigger">egress<span class="tooltip-content">Outgoing data — traffic flowing OUT of your system. Users downloading, streaming, or receiving responses.</span></span></strong>). For most systems, egress is much larger than ingress because many users are reading/downloading, while only a few are writing/uploading.</p>
+
+  <div class="math-block">
+    <span class="math-label">Bandwidth Formula</span>
+    Ingress = write QPS × data size per write
+    Egress  = read QPS × data size per read
+
+    Convert bytes to bits: multiply by 8
+    (Network speeds are measured in bits/sec, not bytes/sec)
+    <span class="math-result">→ Egress is usually 10-100× larger than ingress. That's why CDNs exist.</span>
+  </div>
+
+  <div class="math-block">
+    <span class="math-label">YouTube Egress Example</span>
+    800M DAU × 40 min/day = 32B minutes of video/day
+    Spread over 1,440 min/day ≈ 22M concurrent viewers
+    At 5 Mbps per stream: 22M × 5 Mbps = 110 Tbps
+
+    That's 110 terabits per second.
+    <span class="math-result">→ No single data center can handle this. This is why YouTube uses CDN servers in thousands of locations worldwide.</span>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Quick tip:</strong> When bandwidth numbers get absurdly large (like YouTube's), that's your signal that the system MUST use a <span class="tooltip-trigger">CDN<span class="tooltip-content">Content Delivery Network — a network of servers spread around the world that cache content close to users, so they don't all have to fetch data from one central location</span></span> (Content Delivery Network). It's not a nice-to-have — it's physically impossible to serve that much bandwidth from one location.
+  </div>
+
+  </div></div>
+
+  <!-- ─── WORKED EXAMPLE 1: URL SHORTENER ─── -->
+  <h3>Full Worked Example: URL Shortener</h3>
+
+  <p>Let's put the whole method together and estimate everything for a URL shortener (like bit.ly). We'll walk through all 5 steps end to end.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="est-url-s1" role="tab" aria-selected="true">Step 1: Users</button>
+      <button class="tab-btn" data-tab="est-url-s2" role="tab" aria-selected="false">Step 2: Actions</button>
+      <button class="tab-btn" data-tab="est-url-s3" role="tab" aria-selected="false">Step 3: QPS</button>
+      <button class="tab-btn" data-tab="est-url-s4" role="tab" aria-selected="false">Step 4: Storage</button>
+      <button class="tab-btn" data-tab="est-url-s5" role="tab" aria-selected="false">Step 5: Bandwidth</button>
+    </div>
+
+    <div class="tab-panel active" id="est-url-s1" role="tabpanel">
+      <p><strong>How many users?</strong></p>
+      <p>Let's assume our URL shortener has 100 million monthly active users. Not everyone creates short URLs — most people just click on them. Maybe 10% of MAU create URLs (10M creators), and 90% just click (90M clickers). For DAU, let's say 20% of MAU = 20 million daily active users.</p>
+      <div class="math-block">
+        <span class="math-label">Step 1: Users</span>
+        MAU = 100 million
+        DAU = 20 million (20% of MAU)
+        Creators: 10% of DAU = 2 million/day create URLs
+        Clickers: 90% of DAU = 18 million/day click URLs
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-url-s2" role="tabpanel">
+      <p><strong>What does each user do?</strong></p>
+      <p>A URL creator shortens maybe 1 URL per day on average. Each short URL gets clicked about 50 times over its lifetime. Since we have 2 million new URLs per day, and each gets 50 clicks spread over time, let's estimate about 100 million clicks per day total (combining new and historical URLs).</p>
+      <div class="math-block">
+        <span class="math-label">Step 2: Actions</span>
+        Writes: 2M new URLs created per day
+        Reads: ~100M redirects per day (clicks on short URLs)
+        Read:Write ratio = 100M : 2M = 50:1
+        <span class="math-result">→ This is a heavily read-dominant system.</span>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-url-s3" role="tabpanel">
+      <p><strong>How many requests per second?</strong></p>
+      <div class="math-block">
+        <span class="math-label">Step 3: QPS</span>
+        Write QPS = 2M / 86,400 ≈ 23 writes/sec
+        Read QPS  = 100M / 86,400 ≈ 1,160 reads/sec
+
+        Peak (3× average):
+        Peak write QPS ≈ 70/sec
+        Peak read QPS  ≈ 3,500/sec
+        <span class="math-result">→ Very manageable. A single modern server can handle this read load with caching.</span>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-url-s4" role="tabpanel">
+      <p><strong>How much storage?</strong></p>
+      <p>Each URL record stores: the short code (~7 bytes), the original URL (~200 bytes average), creation timestamp (8 bytes), and user ID (8 bytes). Let's round to ~500 bytes per record.</p>
+      <div class="math-block">
+        <span class="math-label">Step 4: Storage</span>
+        Daily: 2M URLs × 500 bytes = 1 GB/day
+        Yearly: 1 GB × 365 = 365 GB/year
+        5 years: ~1.8 TB
+
+        With 3× replication: ~5.5 TB
+        With indexes: ~7 TB total after 5 years
+        <span class="math-result">→ This easily fits on a single modern server. No sharding needed for storage — the bottleneck is reads, not space.</span>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-url-s5" role="tabpanel">
+      <p><strong>How much bandwidth?</strong></p>
+      <div class="math-block">
+        <span class="math-label">Step 5: Bandwidth</span>
+        Ingress: 23 writes/sec × 500 bytes = 11.5 KB/sec ≈ 92 Kbps
+        Egress: 1,160 reads/sec × 500 bytes = 580 KB/sec ≈ 4.6 Mbps
+
+        Peak egress: ~14 Mbps
+        <span class="math-result">→ Tiny bandwidth. A basic internet connection could handle this. Bandwidth is NOT the bottleneck here — latency is (you want redirects under 50ms).</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Summary:</strong> A URL shortener is a surprisingly small system. 7 TB of storage over 5 years, ~3,500 reads/sec at peak. The real challenge isn't scale — it's generating unique short codes fast enough and making redirects lightning-quick. The estimation tells you where to focus your design effort.
+  </div>
+
+
+  <!-- ─── WORKED EXAMPLE 2: INSTAGRAM ─── -->
+  <h3>Full Worked Example: Instagram</h3>
+
+  <p>Now let's try something bigger. Instagram is a photo and video sharing platform with massive read traffic, heavy storage requirements, and a global user base. The numbers get much scarier.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="est-ig-s1" role="tab" aria-selected="true">Step 1: Users</button>
+      <button class="tab-btn" data-tab="est-ig-s2" role="tab" aria-selected="false">Step 2: Actions</button>
+      <button class="tab-btn" data-tab="est-ig-s3" role="tab" aria-selected="false">Step 3: QPS</button>
+      <button class="tab-btn" data-tab="est-ig-s4" role="tab" aria-selected="false">Step 4: Storage</button>
+      <button class="tab-btn" data-tab="est-ig-s5" role="tab" aria-selected="false">Step 5: Bandwidth</button>
+    </div>
+
+    <div class="tab-panel active" id="est-ig-s1" role="tabpanel">
+      <p><strong>How many users?</strong></p>
+      <p>Instagram has about 2 billion MAU. It's a highly engaging app — people scroll through it daily — so let's say DAU is about 50% of MAU.</p>
+      <div class="math-block">
+        <span class="math-label">Step 1: Users</span>
+        MAU = 2 billion
+        DAU = 1 billion (50% of MAU)
+        Posters: ~10% of DAU = 100M upload daily
+        Scrollers: ~90% of DAU = 900M just browse
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-ig-s2" role="tabpanel">
+      <p><strong>What does each user do?</strong></p>
+      <p>The average user scrolls through about 100 posts per day (a mix of photos and Reels). Posters upload about 1 photo per day on average. Let's focus on photo uploads for storage (Reels/video would be a separate, much larger calculation).</p>
+      <div class="math-block">
+        <span class="math-label">Step 2: Actions</span>
+        Reads: 1B DAU × 100 posts viewed = 100B post views/day
+        Writes: 100M uploaders × 1 photo = 100M uploads/day
+
+        Read:Write ratio = 100B : 100M = 1000:1
+        <span class="math-result">→ Extremely read-heavy. Caching and CDN are absolutely essential.</span>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-ig-s3" role="tabpanel">
+      <p><strong>How many requests per second?</strong></p>
+      <div class="math-block">
+        <span class="math-label">Step 3: QPS</span>
+        Write QPS = 100M / 86,400 ≈ 1,160 uploads/sec
+        Read QPS  = 100B / 86,400 ≈ 1,160,000 reads/sec
+
+        Peak (3×):
+        Peak writes ≈ 3,500 uploads/sec
+        Peak reads  ≈ 3.5 MILLION reads/sec
+        <span class="math-result">→ 3.5 million reads per second at peak. No single server handles this — you need thousands of cache servers and CDN nodes.</span>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-ig-s4" role="tabpanel">
+      <p><strong>How much storage?</strong></p>
+      <p>An Instagram photo is typically stored in multiple sizes (thumbnail, medium, original). Let's say the average total per photo is about 2 MB across all sizes.</p>
+      <div class="math-block">
+        <span class="math-label">Step 4: Storage</span>
+        Daily: 100M photos × 2 MB = 200 TB/day
+        Yearly: 200 TB × 365 = 73 PB/year
+
+        With 3× replication: ~220 PB/year
+        <span class="math-result">→ 220 petabytes per year just for photos. This is why Instagram uses massive object storage systems (like S3) — no traditional database can hold this.</span>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="est-ig-s5" role="tabpanel">
+      <p><strong>How much bandwidth?</strong></p>
+      <div class="math-block">
+        <span class="math-label">Step 5: Bandwidth</span>
+        Ingress: 1,160 uploads/sec × 2 MB = 2.3 GB/sec ≈ 18.5 Gbps
+        Egress: Each post view serves a ~200KB image (cached CDN size)
+        → 1.16M reads/sec × 200 KB = 232 GB/sec ≈ 1.85 Tbps
+
+        Peak egress: ~5.5 Tbps
+        <span class="math-result">→ Nearly 6 terabits per second at peak. This MUST be served from CDN edge nodes worldwide — no central data center can push this much data.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Summary:</strong> Instagram is a storage monster (73+ PB/year) and a bandwidth beast (Tbps-level egress). The estimation makes it obvious that you need object storage (not a database) for photos, a global CDN for serving, and heavy caching at every layer. Without these numbers, you might naively propose "store photos in the database" — and the interviewer would know you haven't thought about scale.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Try estimating a system yourself: <strong>Slack</strong>. Assume 20 million DAU, each sends 50 messages per day, each message is about 200 bytes of text. Some messages include file attachments averaging 500 KB, but only 5% of messages have files. <strong>What's the daily storage? What's the write QPS?</strong></p>
+    <span class="think-hint">Text storage: 20M × 50 × 200B. File storage: 20M × 50 × 5% × 500KB. Add them up. For QPS: total messages per day ÷ 86,400.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER (REFERENCE NUMBERS)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="reference-numbers">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-table-cells"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — The Numbers You Need to Memorize</h2>
+    </div>
+  </div>
+
+  <p>So far you've learned the method. Now you need ammunition — the reference numbers that make the method work. There are three sets of numbers worth committing to memory: <strong>powers of 2</strong> (data sizes), <strong>latency numbers</strong> (how fast things are), and <strong>quick conversion tricks</strong> (shortcuts that speed up your math).</p>
+
+
+  <!-- ─── Powers of 2 ─── -->
+  <h3>Powers of 2: The Data Size Ladder</h3>
+
+  <p>Computers think in powers of 2. Every time you go up by 10 powers, the data size jumps by about 1,000×. Here's the ladder that maps those powers to units you actually use:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Power</th><th>Exact Value</th><th>Approx.</th><th>Unit</th><th>Real-World Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2<sup>10</sup></td><td>1,024</td><td>~1 Thousand</td><td><strong>1 KB</strong></td><td>A short paragraph of text</td></tr>
+        <tr><td>2<sup>20</sup></td><td>1,048,576</td><td>~1 Million</td><td><strong>1 MB</strong></td><td>A high-quality photo</td></tr>
+        <tr><td>2<sup>30</sup></td><td>1,073,741,824</td><td>~1 Billion</td><td><strong>1 GB</strong></td><td>A movie in HD</td></tr>
+        <tr><td>2<sup>40</sup></td><td>~1.1 Trillion</td><td>~1 Trillion</td><td><strong>1 TB</strong></td><td>500 hours of video</td></tr>
+        <tr><td>2<sup>50</sup></td><td>~1.1 Quadrillion</td><td>~1 Quadrillion</td><td><strong>1 PB</strong></td><td>All of Netflix's video library</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SVG: Visual scale of data sizes -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Visual scale from 1 KB to 1 PB with real-world comparisons">
+    <defs>
+      <marker id="est-s7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Each step = 1,000× bigger</text>
+
+    <!-- Scale bar -->
+    <line x1="60" y1="70" x2="700" y2="70" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- KB -->
+    <circle cx="100" cy="70" r="8" fill="#10b981"/>
+    <text x="100" y="50" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">KB</text>
+    <text x="100" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">A tweet</text>
+    <text x="100" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">(~280 chars)</text>
+
+    <!-- ×1000 -->
+    <text x="200" y="63" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="700">×1000</text>
+
+    <!-- MB -->
+    <circle cx="260" cy="70" r="10" fill="#3b82f6"/>
+    <text x="260" y="50" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">MB</text>
+    <text x="260" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">A photo</text>
+    <text x="260" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">(2-5 MB)</text>
+
+    <!-- ×1000 -->
+    <text x="360" y="63" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="700">×1000</text>
+
+    <!-- GB -->
+    <circle cx="420" cy="70" r="12" fill="#8b5cf6"/>
+    <text x="420" y="48" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-weight="700" font-size="13">GB</text>
+    <text x="420" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">An HD movie</text>
+    <text x="420" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">(1-4 GB)</text>
+
+    <!-- ×1000 -->
+    <text x="510" y="63" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="700">×1000</text>
+
+    <!-- TB -->
+    <circle cx="570" cy="70" r="14" fill="#f59e0b"/>
+    <text x="570" y="46" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="13">TB</text>
+    <text x="570" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">A big hard drive</text>
+    <text x="570" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">(your laptop: 0.5-2 TB)</text>
+
+    <!-- ×1000 -->
+    <text x="645" y="63" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="700">×1000</text>
+
+    <!-- PB -->
+    <circle cx="700" cy="70" r="16" fill="#ef4444"/>
+    <text x="700" y="44" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">PB</text>
+    <text x="700" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Netflix's library</text>
+    <text x="700" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">(~100 PB total)</text>
+
+    <!-- Bottom note -->
+    <rect x="130" y="145" width="500" height="40" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="163" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11" font-weight="600">Key rule: every 3 zeros = one step up the ladder</text>
+    <text x="380" y="178" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">1,000 KB = 1 MB. 1,000 MB = 1 GB. 1,000 GB = 1 TB. 1,000 TB = 1 PB.</text>
+  </svg>
+
+  <p>The main thing to remember: each step is roughly 1,000× bigger. So when you're estimating and you see a number like 10 trillion bytes, you can quickly jump: 10 trillion bytes → divide by 1,000 three times → 10 TB. Practice this conversion until it's instant.</p>
+
+
+  <!-- ─── Latency Numbers ─── -->
+  <h3>Latency Numbers Every Programmer Should Know</h3>
+
+  <p>These are based on Jeff Dean's famous <span class="tooltip-trigger">latency<span class="tooltip-content">The time it takes for a single request to complete, from send to response. Measured in milliseconds (ms) or microseconds (μs).</span></span> numbers, updated for modern hardware. The exact numbers change as hardware improves, but the <em>relative differences</em> stay the same — and those differences are what matter for system design.</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Operation</th><th>Time</th><th>Relative</th><th>What This Means</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>L1 cache read</td><td>1 ns</td><td>1×</td><td>Lightning fast — built into the CPU chip</td></tr>
+        <tr><td>L2 cache read</td><td>4 ns</td><td>4×</td><td>Still on-chip, slightly further away</td></tr>
+        <tr><td>RAM read</td><td>100 ns</td><td>100×</td><td>Main memory — very fast, but 100× slower than L1</td></tr>
+        <tr><td>SSD random read</td><td>100 μs</td><td>100,000×</td><td>Fast disk — but 1,000× slower than RAM</td></tr>
+        <tr><td>HDD random read</td><td>10 ms</td><td>10,000,000×</td><td>Spinning disk — 100× slower than SSD</td></tr>
+        <tr><td>Same datacenter round-trip</td><td>0.5 ms</td><td>500,000×</td><td>Network hop within one building</td></tr>
+        <tr><td>Cross-continent round-trip</td><td>150 ms</td><td>150,000,000×</td><td>New York to London and back</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SVG: Latency ladder -->
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Latency ladder showing orders of magnitude from L1 cache to network round-trip">
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Latency Ladder</text>
+    <text x="380" y="42" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Each rung is ~10-1000× slower than the one above</text>
+
+    <!-- Ladder rungs -->
+    <!-- L1 Cache -->
+    <rect x="100" y="55" width="560" height="32" rx="6" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="115" y="76" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">L1 Cache</text>
+    <text x="300" y="76" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">1 ns</text>
+    <rect x="380" y="62" width="3" height="18" rx="1" fill="#10b981"/>
+    <text x="450" y="76" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Blink of a quark</text>
+
+    <!-- RAM -->
+    <rect x="100" y="95" width="560" height="32" rx="6" fill="rgba(59,130,246,0.1)" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="115" y="116" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">RAM</text>
+    <text x="300" y="116" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">100 ns</text>
+    <rect x="380" y="102" width="20" height="18" rx="1" fill="#3b82f6" opacity="0.5"/>
+    <text x="450" y="116" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">100× slower — still fast</text>
+
+    <!-- SSD -->
+    <rect x="100" y="135" width="560" height="32" rx="6" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="115" y="156" fill="#8b5cf6" font-family="Inter, sans-serif" font-weight="700" font-size="11">SSD</text>
+    <text x="300" y="156" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">100 μs</text>
+    <rect x="380" y="142" width="80" height="18" rx="1" fill="#8b5cf6" opacity="0.3"/>
+    <text x="490" y="156" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">1,000× slower than RAM</text>
+
+    <!-- Same-DC network -->
+    <rect x="100" y="175" width="560" height="32" rx="6" fill="rgba(245,158,11,0.1)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="115" y="196" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">Network (same DC)</text>
+    <text x="300" y="196" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">0.5 ms</text>
+    <rect x="380" y="182" width="120" height="18" rx="1" fill="#f59e0b" opacity="0.3"/>
+    <text x="520" y="196" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">5× slower than SSD</text>
+
+    <!-- HDD -->
+    <rect x="100" y="215" width="560" height="32" rx="6" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="1.5"/>
+    <text x="115" y="236" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">HDD</text>
+    <text x="300" y="236" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">10 ms</text>
+    <rect x="380" y="222" width="200" height="18" rx="1" fill="#f97316" opacity="0.25"/>
+    <text x="600" y="236" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">100× slower than SSD</text>
+
+    <!-- Cross-continent -->
+    <rect x="100" y="255" width="560" height="32" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="115" y="276" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Cross-continent</text>
+    <text x="300" y="276" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">150 ms</text>
+    <rect x="380" y="262" width="270" height="18" rx="1" fill="#ef4444" opacity="0.2"/>
+    <text x="660" y="276" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Human-noticeable</text>
+
+    <!-- Bottom insight -->
+    <text x="380" y="315" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="11" font-style="italic">RAM is 1,000× faster than SSD. SSD is 100× faster than HDD. That's why caching in RAM is so powerful.</text>
+  </svg>
+
+  <p>The big takeaway: <strong>RAM is 1,000× faster than <span class="tooltip-trigger">SSD<span class="tooltip-content">Solid State Drive — storage that uses flash memory chips. 100-1000× faster than traditional spinning hard drives (HDD).</span></span>, and SSD is 100× faster than HDD</strong>. This is why caching matters so much. If your database reads from disk at 10ms per query, but you cache the result in RAM and serve it in 100ns, you've just made your system <strong>100,000× faster</strong> for cached items. That's not a small optimization — that's the difference between "works" and "doesn't work at scale."</p>
+
+  <div class="callout callout-warning">
+    <strong>Think about it:</strong> If a RAM access takes 1 second in human time (instead of 100 ns), then an SSD read would take 15 minutes, an HDD read would take 1.5 days, and a cross-continent network round-trip would take 4.5 years. That's how dramatic these differences are.
+  </div>
+
+
+  <!-- ─── Quick Conversion Tricks ─── -->
+  <h3>Quick Conversion Tricks</h3>
+
+  <p>These shortcuts turn slow mental math into instant answers. Memorize them and you'll never fumble with a calculator during an interview.</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Conversion</th><th>Exact</th><th>Quick Approximation</th><th>Why It Matters</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Seconds in a day</td><td>86,400</td><td><strong>~100,000 (10<sup>5</sup>)</strong></td><td>Dividing by 100K is easy mental math</td></tr>
+        <tr><td>Seconds in a month</td><td>~2,592,000</td><td><strong>~2.5 million</strong></td><td>Monthly totals → per-second rates</td></tr>
+        <tr><td>Seconds in a year</td><td>~31,536,000</td><td><strong>~30 million (3×10<sup>7</sup>)</strong></td><td>Yearly storage → per-second rates</td></tr>
+        <tr><td>1M requests/day</td><td>11.6 req/sec</td><td><strong>~12 QPS</strong></td><td>Fastest mental shortcut for QPS</td></tr>
+        <tr><td>1B requests/day</td><td>11,574 req/sec</td><td><strong>~12,000 QPS</strong></td><td>Just multiply the above by 1,000</td></tr>
+        <tr><td>Bytes to bits</td><td>× 8</td><td><strong>× 8</strong></td><td>Storage is bytes; network is bits</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The single most useful trick: <strong>1 million requests per day ≈ 12 QPS</strong>. Once you know this, any daily number instantly converts to per-second. 500 million requests/day? That's 500 × 12 = 6,000 QPS. Done. Two seconds of mental math.</p>
+
+  <!-- SVG: Quick reference card -->
+  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Quick reference card for daily-to-QPS conversions">
+    <rect x="30" y="10" width="700" height="210" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="380" y="40" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="14">Quick Reference: Daily → QPS</text>
+
+    <!-- Row 1 -->
+    <text x="100" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Daily Volume</text>
+    <text x="300" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">÷ 86,400</text>
+    <text x="500" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">≈ QPS</text>
+    <text x="660" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Peak (3×)</text>
+
+    <line x1="50" y1="85" x2="710" y2="85" stroke="#334155" stroke-width="1"/>
+
+    <!-- 100K -->
+    <text x="100" y="108" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">100K/day</text>
+    <text x="300" y="108" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="12">→</text>
+    <text x="500" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="12" font-weight="700">~1 QPS</text>
+    <text x="660" y="108" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="12">~3 QPS</text>
+
+    <!-- 1M -->
+    <text x="100" y="133" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">1M/day</text>
+    <text x="300" y="133" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="12">→</text>
+    <text x="500" y="133" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="12" font-weight="700">~12 QPS</text>
+    <text x="660" y="133" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="12">~36 QPS</text>
+
+    <!-- 100M -->
+    <text x="100" y="158" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">100M/day</text>
+    <text x="300" y="158" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="12">→</text>
+    <text x="500" y="158" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="12" font-weight="700">~1,200 QPS</text>
+    <text x="660" y="158" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="12">~3,600 QPS</text>
+
+    <!-- 1B -->
+    <text x="100" y="183" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">1B/day</text>
+    <text x="300" y="183" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="12">→</text>
+    <text x="500" y="183" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="12" font-weight="700">~12,000 QPS</text>
+    <text x="660" y="183" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="12">~36,000 QPS</text>
+
+    <!-- 100B -->
+    <text x="100" y="208" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">100B/day</text>
+    <text x="300" y="208" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="12">→</text>
+    <text x="500" y="208" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="12" font-weight="700">~1.2M QPS</text>
+    <text x="660" y="208" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="12">~3.6M QPS</text>
+  </svg>
+
+
+  <!-- ─── Common data sizes ─── -->
+  <h3>Common Data Sizes for Estimation</h3>
+
+  <p>When you're estimating storage, you need to know roughly how big different types of data are. Here's a cheat sheet:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Data Type</th><th>Typical Size</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A character (UTF-8, English)</td><td>1 byte</td><td>Chinese/Arabic/emoji: 2-4 bytes</td></tr>
+        <tr><td>A tweet / chat message</td><td>100-300 bytes</td><td>280 chars + metadata</td></tr>
+        <tr><td>A database row (typical)</td><td>200-500 bytes</td><td>Several columns, no blobs</td></tr>
+        <tr><td>A JSON API response</td><td>1-10 KB</td><td>Depends on nesting</td></tr>
+        <tr><td>A compressed photo (web)</td><td>200 KB - 2 MB</td><td>JPEG, phone quality</td></tr>
+        <tr><td>An MP3 song (4 min)</td><td>4 MB</td><td>128 kbps bitrate</td></tr>
+        <tr><td>A short video clip (1 min, 720p)</td><td>15-30 MB</td><td>Compressed for streaming</td></tr>
+        <tr><td>An HD movie (2 hours)</td><td>1-4 GB</td><td>Varies by codec</td></tr>
+        <tr><td>A user profile record</td><td>1-5 KB</td><td>Name, email, settings, avatar URL</td></tr>
+        <tr><td>A log entry</td><td>200-500 bytes</td><td>Timestamp + message + metadata</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>You don't need to memorize exact sizes — just the ballpark. A message is hundreds of bytes. A photo is a few megabytes. A video is tens of megabytes per minute. With these in your head, you can estimate the storage for any system in seconds.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>A system handles <strong>5 million requests per day</strong>. Without a calculator, estimate the QPS.</p>
+    <span class="think-hint">Use the shortcut: 1M/day ≈ 12 QPS. So 5M/day ≈ ? (Answer: ~60 QPS)</span>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Your system stores 50 million photos, each about 2 MB. How much total storage is that? Express it in TB.</p>
+    <span class="think-hint">50M × 2 MB = 100M MB = 100 TB. (Move the decimal: 100,000,000 MB ÷ 1,000 = 100,000 GB ÷ 1,000 = 100 TB)</span>
+  </div>
+
+
+  <!-- ─── Rounding Rules ─── -->
+  <h3>The Art of Rounding</h3>
+
+  <p>The secret weapon of fast estimation is aggressive rounding. The goal isn't exact math — it's "right order of magnitude" math. Here are the rules:</p>
+
+  <div class="callout callout-success">
+    <ul>
+      <li><strong>Round to the nearest power of 10.</strong> 86,400 → 100,000. 2,592,000 → 2,500,000. Close enough.</li>
+      <li><strong>Round intermediate numbers, not just the final one.</strong> If you're multiplying 47 × 823, just do 50 × 800 = 40,000. The real answer is 38,681. You're off by 3%. Nobody cares.</li>
+      <li><strong>Always round in the same direction for safety.</strong> If you're estimating infrastructure, round UP so you don't under-provision. If you're estimating cost to a budget committee, round UP too so there are no surprises.</li>
+      <li><strong>State your assumptions.</strong> In an interview, saying "I'll round 86,400 to 100,000 for simplicity" shows the interviewer you know it's approximate AND you're doing it intentionally. That's a signal of maturity.</li>
+    </ul>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>The golden rule of estimation:</strong> Being within 2-5× of the real number is a success. Being within 10× is acceptable. Being off by 100× or more means you made a fundamental mistake (like forgetting to account for replicas, or confusing bytes and bits). The method in Section 6 keeps you in the safe zone.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — The Variations (5 Types of Estimation)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-layer-group"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">The Variations — 5 Types of Estimation</h2>
+    </div>
+  </div>
+
+  <p>So far we've treated estimation as one thing. But in practice, interviewers (and real architects) care about <strong>five different kinds</strong> of numbers. Each one answers a different question about your system. Let's walk through them one at a time — each introduced through a real problem that needs it.</p>
+
+  <p>You might wonder: why bother splitting estimation into 5 types? Can't I just calculate "how much stuff" and be done? The answer is that each type drives a <em>different</em> architectural decision. Traffic estimation tells you how many servers to provision. Storage estimation tells you which database technology to use and when to shard. Bandwidth estimation tells you whether you need a CDN. Cache estimation tells you how much RAM to buy. Server estimation ties it all together into a bill of materials. If you lump them all into one number, you'll miss the nuance — and that nuance is exactly what separates a good design from a broken one.</p>
+
+  <!-- Card accordion: 5 estimation types -->
+
+  <!-- 1. Traffic Estimation -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-server icon-gap"></i> 1. Traffic Estimation (QPS) — "How many servers do I need?"</span></h3>
+    <div class="card-body">
+      <p>Traffic estimation is about counting <strong>requests per second</strong>. It's the most common type because it directly tells you how many servers to run. Think of it like a restaurant — you need to know how many customers walk in per hour to decide how many chefs and waiters you need.</p>
+
+      <p>There are three flavors of QPS you should always compute:</p>
+      <ul>
+        <li><strong>Average QPS</strong> — total requests ÷ seconds in a day. This is your baseline.</li>
+        <li><strong>Peak QPS</strong> — the busiest moment. Usually 2–10× the average. This is what your system must handle without crashing.</li>
+        <li><strong>Read vs Write QPS</strong> — most systems have 10–1000× more reads than writes. This tells you where to focus optimization.</li>
+      </ul>
+
+      <!-- SVG: Traffic distribution over 24 hours -->
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Traffic distribution over 24 hours showing peak vs average QPS">
+        <defs>
+          <linearGradient id="est-traf-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#10b981" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+          </linearGradient>
+        </defs>
+        <!-- Axes -->
+        <line x1="60" y1="20" x2="60" y2="250" stroke="#475569" stroke-width="1.5"/>
+        <line x1="60" y1="250" x2="740" y2="250" stroke="#475569" stroke-width="1.5"/>
+        <!-- Y-axis label -->
+        <text x="15" y="140" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11" transform="rotate(-90,15,140)">QPS (thousands)</text>
+        <!-- X-axis label -->
+        <text x="400" y="290" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11">Hour of Day</text>
+        <!-- Y ticks -->
+        <text x="50" y="250" text-anchor="end" fill="#64748b" font-family="Inter,sans-serif" font-size="10">0</text>
+        <text x="50" y="195" text-anchor="end" fill="#64748b" font-family="Inter,sans-serif" font-size="10">2K</text>
+        <text x="50" y="140" text-anchor="end" fill="#64748b" font-family="Inter,sans-serif" font-size="10">4K</text>
+        <text x="50" y="85" text-anchor="end" fill="#64748b" font-family="Inter,sans-serif" font-size="10">6K</text>
+        <text x="50" y="30" text-anchor="end" fill="#64748b" font-family="Inter,sans-serif" font-size="10">8K</text>
+        <!-- X ticks (every 4 hours) -->
+        <text x="100" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">0h</text>
+        <text x="213" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">4h</text>
+        <text x="326" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">8h</text>
+        <text x="440" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">12h</text>
+        <text x="553" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">16h</text>
+        <text x="666" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">20h</text>
+        <text x="720" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">24h</text>
+        <!-- Traffic curve (area fill) -->
+        <path d="M100,230 C150,225 190,220 213,200 C240,175 270,120 326,70 C370,45 410,40 440,38 C470,40 510,50 553,80 C600,120 640,170 666,200 C690,225 710,235 720,240 L720,250 L100,250 Z" fill="url(#est-traf-grad)"/>
+        <!-- Traffic curve (line) -->
+        <path d="M100,230 C150,225 190,220 213,200 C240,175 270,120 326,70 C370,45 410,40 440,38 C470,40 510,50 553,80 C600,120 640,170 666,200 C690,225 710,235 720,240" fill="none" stroke="#10b981" stroke-width="2.5"/>
+        <!-- Peak marker -->
+        <circle cx="440" cy="38" r="5" fill="#f43f5e" stroke="#fff" stroke-width="1.5"/>
+        <text x="440" y="25" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="700" font-size="11">PEAK: 8K QPS</text>
+        <!-- Average line -->
+        <line x1="60" y1="175" x2="740" y2="175" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="8,4"/>
+        <text x="745" y="175" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10" text-anchor="start">AVG: 3K</text>
+        <!-- Night valley label -->
+        <text x="130" y="215" fill="#64748b" font-family="Inter,sans-serif" font-size="10" font-style="italic">night valley</text>
+        <!-- Peak zone -->
+        <text x="440" y="60" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">lunch + afternoon peak</text>
+      </svg>
+
+      <p>Notice the huge difference between the night-time valley and the afternoon peak — that's easily a 5–8× gap. If you only design for the average, your system will crash during peak hours. <strong>Always design for peak.</strong></p>
+
+      <div class="callout callout-info">
+        <strong>Quick formula:</strong> Servers needed = Peak QPS ÷ QPS per server. If your peak is 8,000 QPS and each server handles 500 QPS, you need at least 16 servers. Add 30% headroom → 21 servers.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Storage Estimation -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-database icon-gap"></i> 2. Storage Estimation — "How big is my database in 5 years?"</span></h3>
+    <div class="card-body">
+      <p>Storage estimation tells you how much disk space your system will consume over time. It's the simplest multiplication: figure out <strong>how big one record is</strong>, figure out <strong>how many records you'll create</strong>, then multiply across the time horizon.</p>
+
+      <p>The formula looks like this:</p>
+
+      <div class="callout callout-success">
+        <strong>Storage = Per-record size × Records/day × Days of retention × Replication factor</strong>
+      </div>
+
+      <p>Replication factor is the one most people forget. In production, data is stored at least 3 times (one primary + two backups). So if you calculate 10 TB of raw data, the real storage is 30 TB.</p>
+
+      <div class="think-first-box">
+        <span class="think-label">Think First</span>
+        <p>Twitter stores <strong>500 million tweets per day</strong>. Each tweet is about 300 bytes of text + 200 bytes of metadata = 500 bytes total. How much storage does Twitter need per year (before replication)?</p>
+        <span class="think-hint">500M tweets/day × 500 bytes = 250 GB/day. 250 GB × 365 = ~91 TB/year. With 3× replication: ~273 TB/year. That's just text — media is far more.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Bandwidth Estimation -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-network-wired icon-gap"></i> 3. Bandwidth Estimation — "How fat do my pipes need to be?"</span></h3>
+    <div class="card-body">
+      <p>Bandwidth is about the <strong>speed of data flow</strong>, not the total amount. It's measured in bits per second (bps). There are two directions to think about:</p>
+
+      <ul>
+        <li><strong>Ingress</strong> (incoming) — data flowing INTO your system. Users uploading photos, posting messages, sending requests.</li>
+        <li><strong>Egress</strong> (outgoing) — data flowing OUT of your system. Users downloading feeds, streaming videos, receiving API responses.</li>
+      </ul>
+
+      <p>Here's the key insight most people miss: <strong>egress is almost always 10–100× bigger than ingress</strong>. One person uploads a photo, but a thousand people view it. One person writes a tweet, but millions read it.</p>
+
+      <!-- SVG: Ingress/Egress asymmetry -->
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ingress vs egress bandwidth asymmetry">
+        <defs>
+          <marker id="est-bw-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+          <marker id="est-bw-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+          </marker>
+        </defs>
+        <!-- Server box -->
+        <rect x="310" y="50" width="140" height="120" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="380" y="95" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="14">YOUR</text>
+        <text x="380" y="115" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="14">SYSTEM</text>
+        <text x="380" y="140" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">servers + storage</text>
+        <!-- Ingress arrow (thin) -->
+        <line x1="80" y1="85" x2="305" y2="85" stroke="#10b981" stroke-width="3" marker-end="url(#est-bw-arr)"/>
+        <text x="180" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="12">INGRESS</text>
+        <text x="180" y="102" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">100 Mbps (uploads)</text>
+        <!-- Egress arrow (FAT) -->
+        <line x1="455" y1="85" x2="700" y2="85" stroke="#f59e0b" stroke-width="10" marker-end="url(#est-bw-arr-r)"/>
+        <text x="575" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="12">EGRESS</text>
+        <text x="575" y="102" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">10 Gbps (downloads)</text>
+        <!-- Ratio label -->
+        <rect x="290" y="185" width="180" height="30" rx="8" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="380" y="205" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="12">Egress = 100× Ingress</text>
+      </svg>
+
+      <div class="callout callout-info">
+        <strong>Quick formula:</strong> Egress bandwidth = QPS × average response size. If you serve 5,000 QPS and each response is 200 KB, that's 5,000 × 200 KB = 1 GB/s = 8 Gbps.
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Memory/Cache Estimation -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-memory icon-gap"></i> 4. Memory / Cache Estimation — "How much RAM for my cache?"</span></h3>
+    <div class="card-body">
+      <p>Caching is one of the most powerful tools in system design — it keeps your most popular data in fast RAM instead of slow disk. But RAM is expensive, so you can't cache everything (and if you're not careful, a <span class="tooltip-trigger">cache stampede<span class="tooltip-content">When a cached item expires and hundreds of requests simultaneously hit the database to regenerate it, causing overload.</span></span> can overwhelm your database). That's where the <strong>80/20 rule</strong> comes in.</p>
+
+      <p>The <span class="tooltip-trigger">Pareto principle<span class="tooltip-content">Also called the 80/20 rule — roughly 80% of effects come from 20% of causes. In caching: 20% of data serves 80% of requests.</span></span> says that roughly <strong>20% of your data accounts for 80% of your traffic</strong>. So if you cache the top 20% of "hot" data, you'll serve 80% of requests from memory — a massive speedup.</p>
+
+      <div class="callout callout-success">
+        <strong>Cache size = Daily read requests × 0.2 × Average response size</strong>
+      </div>
+
+      <p>Example: If your system handles 10M read requests per day, and each response is 500 bytes, then: 10M × 0.2 × 500 bytes = 1 GB of cache. That's a single Redis instance — cheap and effective.</p>
+
+      <!-- SVG: 80/20 rule visual -->
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The 80/20 rule — cache the hot 20% to serve 80% of traffic">
+        <!-- Full bar (all data) -->
+        <rect x="40" y="30" width="680" height="50" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+        <text x="380" y="15" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11">ALL YOUR DATA</text>
+        <!-- Hot 20% -->
+        <rect x="40" y="30" width="136" height="50" rx="8" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="2"/>
+        <text x="108" y="60" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">20%</text>
+        <text x="108" y="72" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">HOT DATA</text>
+        <!-- Cold 80% -->
+        <text x="450" y="60" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="13">80% cold data</text>
+
+        <!-- Traffic bar -->
+        <rect x="40" y="120" width="680" height="50" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+        <text x="380" y="108" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11">TRAFFIC SERVED</text>
+        <!-- 80% from cache -->
+        <rect x="40" y="120" width="544" height="50" rx="8" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="2"/>
+        <text x="312" y="150" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">80% from cache (fast!)</text>
+        <!-- 20% from DB -->
+        <text x="652" y="150" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="11">20% DB</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 5. Server Count Estimation -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-computer icon-gap"></i> 5. Server Count Estimation — "How many machines?"</span></h3>
+    <div class="card-body">
+      <p>This is where everything comes together. You've estimated your QPS, storage, bandwidth, and cache — now you need to figure out how many physical (or virtual) servers to run. The trick is understanding that <strong>different workloads hit different bottlenecks</strong>:</p>
+
+      <ul>
+        <li><strong>CPU-bound</strong> — heavy computation (image processing, encryption). Bottleneck is processor speed. One server might only handle 100–500 QPS.</li>
+        <li><strong>Memory-bound</strong> — large working sets (caching, in-memory databases). Bottleneck is RAM capacity. You might need more servers just for memory, even if CPUs are idle.</li>
+        <li><strong>I/O-bound</strong> — lots of disk or network activity (video streaming, file uploads). Bottleneck is disk throughput or network bandwidth.</li>
+      </ul>
+
+      <!-- SVG: Server bottleneck comparison -->
+      <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CPU-bound vs Memory-bound vs IO-bound server bottlenecks">
+        <!-- CPU-bound -->
+        <rect x="30" y="30" width="220" height="140" rx="12" fill="#1e293b" stroke="#f43f5e" stroke-width="2"/>
+        <text x="140" y="55" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="700" font-size="13">CPU-BOUND</text>
+        <text x="140" y="78" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Image processing,</text>
+        <text x="140" y="93" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">ML inference, encryption</text>
+        <text x="140" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">~100–500 QPS/server</text>
+        <text x="140" y="155" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">Scale by adding CPU cores</text>
+        <!-- Memory-bound -->
+        <rect x="270" y="30" width="220" height="140" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+        <text x="380" y="55" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="13">MEMORY-BOUND</text>
+        <text x="380" y="78" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Caching (Redis),</text>
+        <text x="380" y="93" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">in-memory databases</text>
+        <text x="380" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">~5K–50K QPS/server</text>
+        <text x="380" y="155" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="10">Scale by adding RAM</text>
+        <!-- IO-bound -->
+        <rect x="510" y="30" width="220" height="140" rx="12" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="620" y="55" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">I/O-BOUND</text>
+        <text x="620" y="78" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Video streaming,</text>
+        <text x="620" y="93" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">file uploads, logging</text>
+        <text x="620" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">~50–500 QPS/server</text>
+        <text x="620" y="155" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">Scale by adding disks / NICs</text>
+      </svg>
+
+      <div class="callout callout-info">
+        <strong>Rule of thumb:</strong> A standard API server handles ~500 QPS. A static content server (images, CSS) handles ~10,000 QPS. A Redis cache server handles ~50,000 QPS. These are rough — the exact number depends on hardware and workload — but they get you in the right ballpark.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — At Scale (Real Company Numbers)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — Real Company Numbers</h2>
+    </div>
+  </div>
+
+  <p>Theory is great, but nothing makes estimation click like seeing <strong>real numbers from real companies</strong>. These are published or reliably estimated figures. Keep them in your back pocket — they're gold in interviews when you need to sanity-check your estimates.</p>
+
+  <!-- SVG: Scale comparison of companies by QPS -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="QPS comparison across major tech companies">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Read QPS Comparison</text>
+    <!-- Bars -->
+    <!-- WhatsApp -->
+    <rect x="60" y="45" width="50" height="200" rx="6" fill="rgba(16,185,129,0.25)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="85" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="10">WhatsApp</text>
+    <text x="85" y="40" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">1.2M</text>
+    <!-- YouTube -->
+    <rect x="160" y="70" width="50" height="175" rx="6" fill="rgba(244,63,94,0.25)" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="185" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="10">YouTube</text>
+    <text x="185" y="65" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="700" font-size="10">800K</text>
+    <!-- Google Search -->
+    <rect x="260" y="55" width="50" height="190" rx="6" fill="rgba(167,139,250,0.25)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="285" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="10">Google</text>
+    <text x="285" y="268" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Search</text>
+    <text x="285" y="50" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="10">100K</text>
+    <!-- Twitter -->
+    <rect x="360" y="90" width="50" height="155" rx="6" fill="rgba(56,189,248,0.25)" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="385" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="10">Twitter</text>
+    <text x="385" y="85" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="10">300K</text>
+    <!-- Instagram -->
+    <rect x="460" y="100" width="50" height="145" rx="6" fill="rgba(245,158,11,0.25)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="485" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="10">Instagram</text>
+    <text x="485" y="95" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="10">200K</text>
+    <!-- Slack -->
+    <rect x="560" y="190" width="50" height="55" rx="6" fill="rgba(148,163,184,0.25)" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="585" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="10">Slack</text>
+    <text x="585" y="185" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="700" font-size="10">20K</text>
+    <!-- Scale note -->
+    <text x="700" y="130" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9" font-style="italic">Approx. read</text>
+    <text x="700" y="142" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9" font-style="italic">QPS (peak)</text>
+  </svg>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Users</th>
+          <th>Throughput</th>
+          <th>Storage / Bandwidth</th>
+          <th>Fun Fact</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>WhatsApp</strong></td><td>2B users</td><td>100B messages/day</td><td>~10 TB new data/day</td><td>Ran by ~50 engineers for years</td></tr>
+        <tr><td><strong>YouTube</strong></td><td>2.5B monthly</td><td>500 hrs uploaded/min</td><td>Petabytes of egress/day</td><td>1B hours watched per day</td></tr>
+        <tr><td><strong>Twitter/X</strong></td><td>500M+ monthly</td><td>500M tweets/day</td><td>300K QPS reads, 6K writes</td><td>Read:Write ratio is 50:1</td></tr>
+        <tr><td><strong>Instagram</strong></td><td>2B monthly</td><td>100M photos/day</td><td>1.2M likes/sec at peak</td><td>1 photo upload → 100 views</td></tr>
+        <tr><td><strong>Slack</strong></td><td>750K orgs</td><td>12B messages/week</td><td>~20K QPS peak</td><td>Messages are tiny but numerous</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Notice something? Every one of these companies' numbers can be derived using the 5-step method from Section 6. WhatsApp: 2B users × 50% DAU × 100 messages × 100 bytes = 10 TB/day. Twitter: 500M users × 20% DAU × 2 tweets × 500 bytes = 100 GB/day for text alone. The method works at any scale — whether you're estimating for a startup with 1,000 users or a platform with 2 billion. The only thing that changes is the input numbers, not the process.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Netflix streams <strong>100 million hours of video per day</strong>. At an average bitrate of 5 Mbps, how much total bandwidth does Netflix use per second?</p>
+    <span class="think-hint">100M hours/day = ~4.17M hours/hour = ~69,400 concurrent hours at any moment. 69,400 streams × 5 Mbps = ~347 Gbps average. At peak (evening), it's 2-3× that — close to 1 Tbps. Netflix reportedly uses 12-15% of the world's internet bandwidth!</span>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Interview tip:</strong> You don't need to memorize all these numbers. But knowing the <em>order of magnitude</em> is powerful. "Twitter is hundreds of thousands of QPS" is enough. "Twitter is a few hundred QPS" would be wrong by 1000× — that's the kind of mistake to avoid.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — The Anti-Lesson (When Estimation Goes Wrong)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">The Anti-Lesson — When Estimation Goes Wrong</h2>
+    </div>
+  </div>
+
+  <p>Estimation is a superpower, but it can backfire in subtle ways. Here are the three most common traps that trip up even experienced engineers — and how to dodge them.</p>
+
+  <!-- SVG: Precision Theater -->
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The precision theater trap — calculating to 3 decimal places when the answer is off by 2x">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Precision Theater</text>
+    <!-- Overly precise box -->
+    <rect x="40" y="45" width="320" height="160" rx="12" fill="#1e293b" stroke="#f43f5e" stroke-width="2"/>
+    <text x="200" y="70" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="700" font-size="12">THE TRAP (15 minutes)</text>
+    <text x="200" y="95" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">86,400 sec × 365.25 days</text>
+    <text x="200" y="112" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">= 31,557,600 seconds/year</text>
+    <text x="200" y="129" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">× 1.073741824 (overhead)</text>
+    <text x="200" y="146" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">= 33,885,186.048 ...</text>
+    <text x="200" y="175" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-size="11" font-style="italic">...but the assumption was off by 2×</text>
+    <text x="200" y="192" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-size="11" font-style="italic">so all this precision is meaningless</text>
+    <!-- Good approach box -->
+    <rect x="400" y="45" width="320" height="160" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="560" y="70" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">THE WAY (30 seconds)</text>
+    <text x="560" y="100" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">~30M seconds/year</text>
+    <text x="560" y="120" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">× ~1 (close enough)</text>
+    <text x="560" y="140" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="11">≈ 30M</text>
+    <text x="560" y="170" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-style="italic">Same ballpark, saves 14 minutes</text>
+    <text x="560" y="187" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-style="italic">Time saved → better architecture</text>
+  </svg>
+
+  <!-- Trap 1 -->
+  <div class="collapsible open">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span><strong>Trap 1: The Over-Precision Trap</strong> — spending 15 minutes on math that doesn't matter</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>This is the most common mistake in interviews. Someone spends 15 minutes calculating to 3 decimal places... but their initial assumption (like "each user sends 10 messages/day") could easily be off by 2×. All that precision is wasted theater.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Round aggressively. If your estimate says 47 servers, just say "about 50." Nobody needs the exact number — they need to know it's not 5 and not 500.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trap 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Trap 2: The Wrong-Assumption Trap</strong> — using the wrong starting numbers</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>Using U.S.-centric numbers for a global system (or vice versa). For example: assuming all users are active during the same 8-hour window. In reality, a global system has traffic from every timezone, which actually <em>flattens</em> your peak. Or assuming broadband speeds when half your users are on 3G in Southeast Asia.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> State your assumptions out loud. "I'll assume the user base is primarily in North America, so I'll use a peak factor of 3×." This shows the interviewer you're aware of the limitation.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trap 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Trap 3: The "Just Add More Servers" Trap</strong> — hardware can't fix bad design</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>Not all problems can be solved by throwing more hardware at them. A poorly-designed database query that takes 5 seconds won't get faster by adding 100 more app servers — you'll just have 100 servers waiting on the same slow database. This is the classic <strong>vertical vs <span class="tooltip-trigger">horizontal scaling<span class="tooltip-content">Adding more machines to handle increased load, as opposed to making one machine bigger (vertical scaling).</span></span></strong> confusion.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Identify the bottleneck first (CPU? Memory? Disk? Network? Database?), then estimate whether the fix is more machines or a better design.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG A: The Estimation Cheat Sheet — decision tree -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision tree: Is your estimate close enough?">
+    <defs>
+      <marker id="est-s10-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">How Close Is Your Estimate?</text>
+
+    <!-- Starting question -->
+    <rect x="255" y="40" width="250" height="45" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/>
+    <text x="380" y="60" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="12">Compare estimate vs reality</text>
+    <text x="380" y="76" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">How far off are you?</text>
+
+    <!-- Arrow down to within 2x -->
+    <line x1="310" y1="85" x2="160" y2="115" stroke="#10b981" stroke-width="2" marker-end="url(#est-s10-arr)"/>
+
+    <!-- Within 2x — GREEN -->
+    <rect x="40" y="115" width="240" height="55" rx="10" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="2"/>
+    <text x="160" y="138" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">Within 2×</text>
+    <text x="160" y="158" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11">You're good. Move on to design.</text>
+
+    <!-- Arrow down to within 10x -->
+    <line x1="380" y1="85" x2="380" y2="115" stroke="#f59e0b" stroke-width="2" marker-end="url(#est-s10-arr)"/>
+
+    <!-- Within 10x — YELLOW -->
+    <rect x="260" y="115" width="240" height="55" rx="10" fill="rgba(245,158,11,0.1)" stroke="#f59e0b" stroke-width="2"/>
+    <text x="380" y="138" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">Within 10×</text>
+    <text x="380" y="158" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="11">Acceptable for planning.</text>
+
+    <!-- Arrow down to 100x+ -->
+    <line x1="450" y1="85" x2="600" y2="115" stroke="#ef4444" stroke-width="2" marker-end="url(#est-s10-arr)"/>
+
+    <!-- Off by 100x+ — RED -->
+    <rect x="480" y="115" width="240" height="55" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="2"/>
+    <text x="600" y="138" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">Off by 100×+</text>
+    <text x="600" y="158" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">Fundamental mistake — recheck.</text>
+
+    <!-- Bottom actions -->
+    <rect x="40" y="190" width="240" height="35" rx="8" fill="rgba(16,185,129,0.06)"/>
+    <text x="160" y="213" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Use the numbers to drive architecture</text>
+
+    <rect x="260" y="190" width="240" height="35" rx="8" fill="rgba(245,158,11,0.06)"/>
+    <text x="380" y="213" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Double-check biggest assumption</text>
+
+    <rect x="480" y="190" width="240" height="35" rx="8" fill="rgba(239,68,68,0.06)"/>
+    <text x="600" y="213" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Redo from Step 1 — wrong input</text>
+
+    <!-- Bottom insight -->
+    <rect x="140" y="240" width="480" height="30" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="261" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-weight="600">Most interviews only need "within 10×" — don't waste time chasing precision.</text>
+  </svg>
+
+  <p>The meta-lesson here is that estimation is a tool for THINKING, not a tool for precision. The moment you start optimizing your estimate instead of your architecture, you've lost the plot. Spend 2 minutes estimating, then spend the remaining 40 minutes designing. The estimate's job is to tell you the shape of the problem — are we dealing with gigabytes or petabytes, hundreds of QPS or millions? Once you know that, every design decision becomes clearer.</p>
+
+  <div class="callout callout-warning">
+    <strong>The bottom line:</strong> Your estimate is guaranteed wrong. The question is whether it's wrong by 2× (totally fine) or 1,000× (disaster). The method in Section 6 keeps you in the safe zone. The traps above are what push you into the danger zone.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — Common Mistakes
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bug"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — What Engineers Get Wrong</h2>
+    </div>
+  </div>
+
+  <p>These mistakes are dangerous because they feel invisible. Your math looks clean, your logic feels right, but one missed factor silently multiplies every number by 3× or 10×. You end up confident in an answer that's quietly off by an order of magnitude. The good news: once you learn to spot them, you'll never make them again. Each mistake below is something that trips up even experienced engineers — but after reading this section, you'll have a mental checklist that catches them every time.</p>
+
+  <p>These are the six mistakes that come up again and again in interviews and real engineering. Each one can throw your estimate off by 10× or more. Learn them once and you'll never make them.</p>
+
+  <!-- Mistake 1 -->
+  <div class="collapsible open">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span><strong>Mistake 1:</strong> Forgetting peak vs average</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>If you only plan for the average, your system crashes during peak hours. Peak traffic is typically <strong>2–10× the average</strong>, depending on the application. Social media spikes during evenings and events. E-commerce spikes during sales.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Multiply your average by 3× for a "normal" peak factor. For viral/event-driven systems, use 10× or higher.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 2:</strong> Confusing bytes and bits</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>This is embarrassingly common. <strong>8 bits = 1 byte</strong>. Storage is measured in bytes (KB, MB, GB). Bandwidth is measured in bits (Kbps, Mbps, Gbps). So 100 Mbps of bandwidth can transfer about 12.5 MB per second, not 100 MB.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Always clarify. Write "MBps" for megabytes and "Mbps" for megabits. And when converting bandwidth to throughput, divide by 8.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 3:</strong> Ignoring the read/write ratio</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>Most systems have vastly more reads than writes. Twitter has a 50:1 read-to-write ratio. YouTube is closer to 1000:1 (one upload, millions of views). If you estimate read and write QPS as equal, your storage, caching, and server allocation will all be wrong.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Always ask: "Is this a read-heavy or write-heavy system?" Then estimate them separately.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 4 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 4:</strong> Not accounting for replication</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>You calculate 10 TB of data. You buy 10 TB of disk. Then your server crashes and all your data is gone. In production, data is replicated at least <strong>3 times</strong> (usually 3 replicas across different <span class="tooltip-trigger">availability zones<span class="tooltip-content">Isolated data center locations within a cloud region. If one zone goes down, others keep running. Spreading replicas across zones protects against hardware failures.</span></span>). So that 10 TB is actually 30 TB.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Some databases (like HDFS) use 3× replication by default. Cloud databases often have it hidden in the pricing. Always multiply raw storage by your replication factor.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 5 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 5:</strong> Using daily numbers when you need per-second</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>"We handle 10 million requests per day" sounds impressive, but your servers don't care about daily totals — they care about <strong>requests per second</strong>. 10M/day ÷ 86,400 ≈ 116 QPS. That's... not very much. A single server could handle that.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> Always convert to per-second (divide by ~100K for easy math). Then multiply by your peak factor.
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 6 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 6:</strong> Forgetting metadata and indexes</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+      <p>You estimate the raw data size — say, 1 KB per user record. But the database also stores indexes (for fast lookup), internal metadata, and write-ahead logs. The total is typically <strong>2–3× the raw data size</strong>.</p>
+      <div class="callout callout-success">
+        <strong>The fix:</strong> For systems with many indexes (e.g., a search engine), the overhead can be 5× or more. Always mention this in your estimate: "Plus 2–3× for indexes and metadata."
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG B: Estimation Scorecard — 6 mistakes checklist -->
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Estimation scorecard checklist of 6 common mistakes to avoid">
+    <rect x="30" y="10" width="700" height="240" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="380" y="40" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="14">Estimation Scorecard — Did You Avoid These?</text>
+
+    <!-- Row 1 -->
+    <text x="60" y="72" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="85" y="72" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="12">Forgot peak vs average (2-10× off)</text>
+    <rect x="55" y="80" width="310" height="1" fill="#334155"/>
+
+    <!-- Row 2 -->
+    <text x="60" y="102" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="85" y="102" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="12">Confused bytes and bits (8× off)</text>
+    <rect x="55" y="110" width="310" height="1" fill="#334155"/>
+
+    <!-- Row 3 -->
+    <text x="60" y="132" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="85" y="132" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="12">Ignored read/write ratio (10-1000× off)</text>
+    <rect x="55" y="140" width="310" height="1" fill="#334155"/>
+
+    <!-- Row 4 -->
+    <text x="420" y="72" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="445" y="72" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="12">Skipped replication factor (3× off)</text>
+    <rect x="415" y="80" width="290" height="1" fill="#334155"/>
+
+    <!-- Row 5 -->
+    <text x="420" y="102" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="445" y="102" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="12">Used daily numbers, not per-second</text>
+    <rect x="415" y="110" width="290" height="1" fill="#334155"/>
+
+    <!-- Row 6 -->
+    <text x="420" y="132" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="445" y="132" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="12">Forgot metadata and indexes (2-3× off)</text>
+    <rect x="415" y="140" width="290" height="1" fill="#334155"/>
+
+    <!-- Divider -->
+    <rect x="55" y="160" width="650" height="1.5" fill="#475569"/>
+
+    <!-- Bottom message -->
+    <text x="380" y="185" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="12">Combined worst case: all 6 mistakes together = 100,000× off</text>
+    <text x="380" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11">Check each one BEFORE finalizing your estimate.</text>
+    <text x="380" y="225" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-weight="600">Turn every ✗ into a ✓ and you're in the safe zone.</text>
+  </svg>
+
+  <!-- SVG: Mistake impact scale -->
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Impact scale showing how much each mistake can throw off your estimate">
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">How Much Each Mistake Throws Off Your Estimate</text>
+    <!-- Scale bar -->
+    <line x1="60" y1="160" x2="720" y2="160" stroke="#475569" stroke-width="1.5"/>
+    <text x="60" y="175" fill="#64748b" font-family="Inter,sans-serif" font-size="10">1×</text>
+    <text x="280" y="175" fill="#64748b" font-family="Inter,sans-serif" font-size="10">10×</text>
+    <text x="500" y="175" fill="#64748b" font-family="Inter,sans-serif" font-size="10">100×</text>
+    <text x="720" y="175" fill="#64748b" font-family="Inter,sans-serif" font-size="10">1000×</text>
+    <!-- Markers for each mistake -->
+    <circle cx="200" cy="50" r="6" fill="#f59e0b"/>
+    <text x="210" y="54" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Peak vs Avg (2-10×)</text>
+    <line x1="200" y1="56" x2="200" y2="160" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4,3"/>
+
+    <circle cx="400" cy="70" r="6" fill="#f43f5e"/>
+    <text x="410" y="74" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Bytes vs Bits (8×)</text>
+    <line x1="400" y1="76" x2="400" y2="160" stroke="#f43f5e" stroke-width="1" stroke-dasharray="4,3"/>
+
+    <circle cx="550" cy="90" r="6" fill="#a78bfa"/>
+    <text x="560" y="94" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">R/W Ratio (10-1000×)</text>
+    <line x1="550" y1="96" x2="550" y2="160" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3"/>
+
+    <circle cx="280" cy="110" r="6" fill="#10b981"/>
+    <text x="290" y="114" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Replication (3×)</text>
+    <line x1="280" y1="116" x2="280" y2="160" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+
+    <circle cx="170" cy="130" r="6" fill="#38bdf8"/>
+    <text x="180" y="134" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Metadata (2-3×)</text>
+    <line x1="170" y1="136" x2="170" y2="160" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4,3"/>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — Interview Playbook
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-microphone"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — How to Present Estimation</h2>
+    </div>
+  </div>
+
+  <p>Knowing how to estimate is only half the battle. The other half is <strong>how you present it</strong> in an interview. The format, the timing, and the confidence all matter. Here's the playbook.</p>
+
+  <!-- SVG: Interview timeline -->
+  <svg viewBox="0 0 760 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview timeline showing when estimation happens in a 45-minute system design interview">
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">The 45-Minute Interview Timeline</text>
+    <!-- Timeline bar -->
+    <rect x="40" y="55" width="680" height="30" rx="6" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+    <!-- Phase 1: Requirements (0-5 min) -->
+    <rect x="40" y="55" width="76" height="30" rx="6" fill="rgba(167,139,250,0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="78" y="75" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="10">Clarify</text>
+    <!-- Phase 2: Estimation (5-10 min) -->
+    <rect x="116" y="55" width="76" height="30" rx="6" fill="rgba(16,185,129,0.4)" stroke="#10b981" stroke-width="2"/>
+    <text x="154" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">ESTIMATE</text>
+    <!-- Phase 3: High-level design (10-25 min) -->
+    <rect x="192" y="55" width="226" height="30" rx="6" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" stroke-width="1"/>
+    <text x="305" y="75" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">High-Level Design</text>
+    <!-- Phase 4: Deep dive (25-40 min) -->
+    <rect x="418" y="55" width="227" height="30" rx="6" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" stroke-width="1"/>
+    <text x="531" y="75" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">Deep Dive</text>
+    <!-- Phase 5: Wrap-up (40-45 min) -->
+    <rect x="645" y="55" width="75" height="30" rx="6" fill="rgba(148,163,184,0.2)" stroke="#94a3b8" stroke-width="1"/>
+    <text x="682" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="600" font-size="10">Wrap-up</text>
+    <!-- Time labels -->
+    <text x="40" y="105" fill="#64748b" font-family="Inter,sans-serif" font-size="10">0 min</text>
+    <text x="116" y="105" fill="#64748b" font-family="Inter,sans-serif" font-size="10">5</text>
+    <text x="192" y="105" fill="#64748b" font-family="Inter,sans-serif" font-size="10">10</text>
+    <text x="418" y="105" fill="#64748b" font-family="Inter,sans-serif" font-size="10">25</text>
+    <text x="645" y="105" fill="#64748b" font-family="Inter,sans-serif" font-size="10">40</text>
+    <text x="720" y="105" fill="#64748b" font-family="Inter,sans-serif" font-size="10">45</text>
+    <!-- Arrow pointing to estimation -->
+    <text x="154" y="135" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">↑ Do this BEFORE drawing boxes</text>
+    <text x="154" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">3-5 minutes max, sets the stage for everything after</text>
+  </svg>
+
+  <h3>The Format: What to Say Out Loud</h3>
+  <p>Interviewers want to hear your <em>thought process</em>, not just the final number. Follow this script:</p>
+
+  <div class="callout callout-success">
+    <ol>
+      <li><strong>"Let me start with some assumptions..."</strong> — State your user counts and activity levels. This gives the interviewer a chance to correct you early.</li>
+      <li><strong>"So the QPS would be..."</strong> — Show the multiplication. Write it on the whiteboard.</li>
+      <li><strong>"For storage, that means..."</strong> — Connect QPS to storage, bandwidth, and servers.</li>
+      <li><strong>"Based on these numbers, we'll need..."</strong> — State the conclusion (e.g., "about 20 servers, 50 TB of storage, and a CDN for egress").</li>
+      <li><strong>"I should note that..."</strong> — Mention one caveat (peak vs average, replication, etc.).</li>
+    </ol>
+  </div>
+
+  <h3>Sample Interview Dialogue</h3>
+  <div class="callout callout-success">
+    <p><strong>Interviewer:</strong> "Design a URL shortener."</p>
+    <p><strong>You:</strong> "Let me start with the scale. I'll assume we handle 100 million new URLs per month, which is about 40 QPS for writes. If the read-to-write ratio is 100:1, that's 4,000 QPS for reads. Each URL record is maybe 500 bytes — original URL, short code, timestamp, user ID. So monthly storage is 100M × 500 bytes = 50 GB/month, or about 600 GB/year. With 3× replication, call it 2 TB/year. For reads at 4,000 QPS, I'll need maybe 8 servers plus a cache layer for the hot URLs. Does that scale sound right?"</p>
+    <p><strong>Interviewer:</strong> "Yes, that's a good starting point. Let's move to the high-level design."</p>
+  </div>
+
+  <p>Notice what happened: the estimation took about 90 seconds, used round numbers, stated assumptions clearly, and ended with a check-in question. That's exactly what impresses interviewers.</p>
+
+  <!-- SVG C: What to Say vs What NOT to Say -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="What to say vs what not to say in estimation interviews">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Interview Phrases: Good vs Bad</text>
+
+    <!-- LEFT column: Good phrases -->
+    <rect x="30" y="40" width="340" height="220" rx="12" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="2"/>
+    <text x="200" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">What TO Say</text>
+
+    <circle cx="55" cy="98" r="8" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="55" y="102" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">1</text>
+    <text x="72" y="96" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">"Let me assume 100M DAU</text>
+    <text x="72" y="112" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">and work from there..."</text>
+
+    <circle cx="55" cy="148" r="8" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="55" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">2</text>
+    <text x="72" y="146" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">"At a 50:1 read ratio,</text>
+    <text x="72" y="162" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">that gives us 60K read QPS..."</text>
+
+    <circle cx="55" cy="198" r="8" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="55" y="202" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">3</text>
+    <text x="72" y="196" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">"With 3× replication,</text>
+    <text x="72" y="212" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">we need about 30 TB total..."</text>
+
+    <!-- RIGHT column: Bad phrases -->
+    <rect x="390" y="40" width="340" height="220" rx="12" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="2"/>
+    <text x="560" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">What NOT to Say</text>
+
+    <circle cx="415" cy="98" r="8" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="415" y="102" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">1</text>
+    <text x="432" y="96" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">"Probably a lot of data"</text>
+    <text x="432" y="112" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">← No numbers = no credibility</text>
+
+    <circle cx="415" cy="148" r="8" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="415" y="152" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">2</text>
+    <text x="432" y="146" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">"I think we need many servers"</text>
+    <text x="432" y="162" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">← How many? 5? 500? 50,000?</text>
+
+    <circle cx="415" cy="198" r="8" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="415" y="202" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">3</text>
+    <text x="432" y="196" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">"Storage shouldn't be an issue"</text>
+    <text x="432" y="212" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">← Famous last words before PBs</text>
+
+    <!-- Bottom insight -->
+    <text x="380" y="275" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="11" font-style="italic">Specific numbers show you've thought it through. Vague answers show you haven't.</text>
+  </svg>
+
+  <h3>Level-Specific Approaches</h3>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="est-int-beginner" role="tab" aria-selected="true">Beginner</button>
+      <button class="tab-btn" data-tab="est-int-intermediate" role="tab" aria-selected="false">Intermediate</button>
+      <button class="tab-btn" data-tab="est-int-advanced" role="tab" aria-selected="false">Advanced</button>
+    </div>
+    <div class="tab-panel active" id="est-int-beginner" role="tabpanel">
+      <p><strong>Focus: Get the basics right.</strong></p>
+      <ul>
+        <li>State users and QPS. Show the division from daily to per-second.</li>
+        <li>Estimate storage for one year (record size × records/day × 365).</li>
+        <li>Mention replication (3×) and peak factor (3×).</li>
+        <li>Don't worry about being precise — just show you can think in numbers.</li>
+      </ul>
+      <p>Even getting half of this right puts you above most junior candidates who skip estimation entirely.</p>
+    </div>
+    <div class="tab-panel" id="est-int-intermediate" role="tabpanel">
+      <p><strong>Focus: Separate read and write paths.</strong> At this level, you're showing the interviewer you understand that reads and writes are fundamentally different beasts — they stress different parts of the system and need different solutions.</p>
+      <ul>
+        <li><strong>Split QPS into reads and writes.</strong> Estimate the ratio explicitly — "Our system is 100:1 read-heavy."</li>
+        <li><strong>Calculate cache size</strong> using the 80/20 rule — "Top 20% of URLs = 1.4M × 500 bytes = 700 MB cache."</li>
+        <li><strong>Estimate bandwidth</strong> — break out ingress and egress separately. Mention that egress is typically 10-100× larger.</li>
+        <li><strong>Consider storage tiers:</strong> hot data on SSD, warm on HDD, cold on S3/Glacier. This shows cost awareness.</li>
+        <li><strong>Mention sharding triggers</strong> — "If storage exceeds ~2 TB for a relational DB, or writes exceed ~10K QPS, sharding becomes necessary."</li>
+      </ul>
+      <p>At this level, your estimation should directly inform your architecture diagram. "The 100:1 ratio tells me I need read replicas and a cache layer" is exactly what interviewers want to hear.</p>
+    </div>
+    <div class="tab-panel" id="est-int-advanced" role="tabpanel">
+      <p><strong>Focus: Drive the architecture from the numbers.</strong></p>
+      <ul>
+        <li>Use estimation to justify every architectural decision: "Since our read QPS is 100× writes, I'll use a <span class="tooltip-trigger">CQRS<span class="tooltip-content">Command Query Responsibility Segregation — separating read and write operations into different models or databases. Useful when read and write patterns differ dramatically.</span></span> pattern with read replicas."</li>
+        <li>Estimate cost: "20 c5.xlarge instances at ~$0.17/hr = ~$2,500/month for compute alone."</li>
+        <li>Consider geographic distribution: "With 40% of users in Asia, I'd place a CDN edge in Singapore."</li>
+        <li>Identify the bottleneck: "The limiting factor is database write throughput at 6K QPS — that drives us toward sharding by user_id."</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>What impresses interviewers:</strong> Not the exact number — the <strong>structured thinking</strong>. Can you identify the important dimensions? Can you make reasonable assumptions? Can you do quick math without a calculator? Can you use the numbers to drive design decisions? That's the real test.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — Hands-On Challenges
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="hands-on">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Hands-On Challenges — Practice Estimation</h2>
+    </div>
+  </div>
+
+  <p>Estimation is a skill that only gets better with practice. Here are five challenges at increasing difficulty. Set a timer — real interviews give you 3–5 minutes for this. Try each one before peeking at the hint or solution.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 1: Photo Sharing App Storage <span class="difficulty-tag difficulty-beginner">Beginner</span></div>
+    <p>Estimate the storage needed for a photo-sharing app with <strong>50 million daily active users</strong>. Assume 10% of users upload 3 photos per day. Each photo is 2 MB on average. How much new storage per day? Per year?</p>
+    <p><em>Time target: 2 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <p>Start with uploaders: 50M × 10% = 5M uploaders. Then photos per day: 5M × 3 = 15M photos. Then total size: 15M × 2 MB = ?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <ul>
+          <li>Uploaders per day: 50M × 0.1 = 5M</li>
+          <li>Photos per day: 5M × 3 = 15M</li>
+          <li>Storage per day: 15M × 2 MB = 30 TB/day</li>
+          <li>Storage per year: 30 TB × 365 ≈ 11 PB/year</li>
+          <li>With 3× replication: ~33 PB/year</li>
+          <li>With thumbnails (3 sizes, ~100 KB each): add ~4.5 TB/day = ~1.6 PB/year</li>
+        </ul>
+        <p><strong>Conclusion:</strong> You need about 35 PB of storage per year. That's a significant infrastructure investment — probably distributed across multiple data centers using object storage (like S3).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 2: URL Shortener QPS &amp; Servers <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>A URL shortener processes <strong>100 million new URLs per month</strong>. The read-to-write ratio is 100:1. Each server handles 500 QPS for writes and 2,000 QPS for reads. How many servers do you need (accounting for peak)?</p>
+    <p><em>Time target: 3 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <p>Convert monthly to per-second first: 100M/month ÷ 30 days ÷ 86,400 seconds. Then apply the read:write ratio. Then peak factor of 3×.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <ul>
+          <li>Write QPS: 100M ÷ 30 ÷ 86,400 ≈ 100M ÷ 2.5M ≈ 40 QPS (average)</li>
+          <li>Read QPS: 40 × 100 = 4,000 QPS (average)</li>
+          <li>Peak writes: 40 × 3 = 120 QPS</li>
+          <li>Peak reads: 4,000 × 3 = 12,000 QPS</li>
+          <li>Write servers: 120 ÷ 500 = 1 server (writes are easy here)</li>
+          <li>Read servers: 12,000 ÷ 2,000 = 6 servers</li>
+          <li>Total: ~7 servers + add 30% headroom ≈ <strong>9-10 servers</strong></li>
+        </ul>
+        <p><strong>Insight:</strong> The read side dominates — that's why URL shorteners are great candidates for caching (most URLs are accessed frequently right after creation).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 3: News Feed Cache Size <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>A social media app has <strong>500 million users</strong>. Each user's feed is generated from the latest 200 posts in their network. Each post is about 1 KB (text + metadata, no images). Use the 80/20 rule to estimate cache size.</p>
+    <p><em>Time target: 3 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <p>Not all 500M users are active daily. Assume ~20% DAU. Each active user's feed = 200 posts × 1 KB = 200 KB. Apply the 80/20 rule to decide what to cache.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <ul>
+          <li>DAU: 500M × 0.2 = 100M active users</li>
+          <li>Feed per user: 200 posts × 1 KB = 200 KB</li>
+          <li>Total if caching all active feeds: 100M × 200 KB = 20 TB</li>
+          <li>80/20 rule: cache feeds for top 20% most active: 20M users</li>
+          <li>Cache size: 20M × 200 KB = 4 TB</li>
+          <li>With overhead (pointers, hash maps): ~5-6 TB</li>
+        </ul>
+        <p><strong>Reality check:</strong> A single Redis cluster can hold ~1 TB. So you'd need about 5-6 Redis nodes. That's totally manageable — Facebook-scale companies actually do this.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 4: Video Streaming Infrastructure Cost <span class="difficulty-tag difficulty-advanced">Advanced</span></div>
+    <p>A video streaming service has <strong>10 million concurrent viewers</strong>. Average bitrate is 5 Mbps. CDN bandwidth costs $0.02 per GB. Estimate monthly bandwidth cost alone.</p>
+    <p><em>Time target: 4 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <p>Total bandwidth = 10M × 5 Mbps = 50 Tbps. Convert to GB/month: 50 Tbps × seconds in a month ÷ 8 (bits to bytes). Then multiply by the CDN rate.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <ul>
+          <li>Bandwidth: 10M streams × 5 Mbps = 50 Tbps = 50,000 Gbps</li>
+          <li>Bytes per second: 50,000 Gbps ÷ 8 = 6,250 GBps</li>
+          <li>Assume average 10M concurrent (not 24/7 — weight to ~6M average over the full day)</li>
+          <li>GB per month: 6,250 × 0.6 × 86,400 × 30 ≈ 6,250 × 0.6 × 2.6M ≈ 9.7 billion GB ≈ ~10 EB/month</li>
+          <li>Cost: 10B GB × $0.02 = ~$200 million/month on CDN alone</li>
+        </ul>
+        <p><strong>Reality check:</strong> Netflix reportedly spends $500M+/year on AWS. Bandwidth is the single biggest cost for video streaming — that's why Netflix built their own CDN (Open Connect).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 5: Multiplayer Game Infrastructure <span class="difficulty-tag difficulty-expert">Expert</span></div>
+    <p>Estimate <strong>everything</strong> for a real-time multiplayer game with 1 million concurrent players. The game sends a state update every 50ms (20 updates/sec). Each update is 200 bytes. Players are in rooms of 100. Estimate QPS, bandwidth, server count, and what bottleneck you'd hit first.</p>
+    <p><em>Time target: 5 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <p>Each player sends 20 updates/sec. But each update must be broadcast to 99 other players in the room. So the <span class="tooltip-trigger">fan-out<span class="tooltip-content">When one message is delivered to many recipients. A fan-out of 100 means each incoming message generates 100 outgoing messages.</span></span> is the key cost. Think about both inbound (player → server) and outbound (server → all players).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+        <ul>
+          <li><strong>Inbound QPS:</strong> 1M players × 20 updates/sec = 20M QPS inbound</li>
+          <li><strong>Rooms:</strong> 1M ÷ 100 = 10,000 rooms</li>
+          <li><strong>Outbound per room:</strong> Each update → 99 other players. 100 players × 20 updates/sec × 99 recipients = 198,000 messages/sec per room</li>
+          <li><strong>Total outbound:</strong> 10,000 rooms × 198,000 = ~2 billion messages/sec</li>
+          <li><strong>Inbound bandwidth:</strong> 20M × 200 bytes = 4 GB/sec = 32 Gbps</li>
+          <li><strong>Outbound bandwidth:</strong> 2B × 200 bytes = 400 GB/sec = 3.2 Tbps</li>
+          <li><strong>Servers (at 50K messages/sec each):</strong> 2B ÷ 50K = 40,000 servers</li>
+          <li><strong>Bottleneck:</strong> Network bandwidth. The 3.2 Tbps outbound is the killer. Each 10 Gbps server can push ~1.25 GB/s, so you need at least 320 servers just for bandwidth.</li>
+        </ul>
+        <p><strong>Real-world fix:</strong> Nobody actually broadcasts every update to every player. Games use interest management (only send updates for nearby entities), delta compression (only send what changed), and client-side prediction. This typically reduces bandwidth by 10–100×.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — Quick Reference (Cheat Cards)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bookmark"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Quick Reference — Cheat Cards</h2>
+    </div>
+  </div>
+
+  <p>Bookmark this section. These six cards contain everything you need for quick estimation — during an interview, at work, or while designing a new system. Print them, screenshot them, tattoo them on your arm.</p>
+
+  <div class="grid-3">
+    <!-- Card 1: 5-Step Method -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">The 5-Step Method</div>
+      <div class="cheat-card-body"><pre>1. Clarify scale (users, DAU)
+2. State assumptions (activity/user)
+3. Do the math (multiply, round)
+4. Convert units (day→sec, bytes→TB)
+5. Sanity-check (makes sense?)</pre></div>
+    </div>
+
+    <!-- Card 2: Key Numbers -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Numbers to Memorize</div>
+      <div class="cheat-card-body"><pre>1 day   = ~100K sec (86,400)
+1 month = ~2.5M sec
+1 year  = ~30M sec
+1M/day  ≈ 12 QPS
+1B/day  ≈ 12K QPS
+2¹⁰=1K  2²⁰=1M  2³⁰=1G</pre></div>
+    </div>
+
+    <!-- Card 3: Common Data Sizes -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Common Data Sizes</div>
+      <div class="cheat-card-body"><pre>Chat message:   200-500 B
+User profile:   1-5 KB
+API response:   1-10 KB
+Photo (JPEG):   200 KB - 2 MB
+Video (1min):   15-30 MB
+HD movie (2h):  1-4 GB</pre></div>
+    </div>
+
+    <!-- Card 4: Latency Numbers -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Latency Numbers</div>
+      <div class="cheat-card-body"><pre>L1 cache:       0.5 ns
+RAM access:     100 ns
+SSD read:       150 μs
+HDD seek:       10 ms
+Same DC:        0.5 ms
+Cross-continent: 150 ms</pre></div>
+    </div>
+
+    <!-- Card 5: Quick Formulas -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Quick Formulas</div>
+      <div class="cheat-card-body"><pre>QPS   = DAU × acts/day ÷ 86400
+Store = recs/day × size × days × 3
+BW    = QPS × response size
+Cache = daily reads × 0.2 × size
+Srvrs = peak QPS ÷ QPS/server</pre></div>
+    </div>
+
+    <!-- Card 6: Read/Write Ratios -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Read/Write Ratios</div>
+      <div class="cheat-card-body"><pre>Social feed:    100:1
+Messaging:      ~1:1
+URL shortener:  100:1
+E-commerce:     1000:1
+Logging:        1:10 (write-heavy)
+Search engine:  10000:1</pre></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — Connected Topics
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>Estimation doesn't exist in isolation — it connects to nearly every other system design topic. Here's how what you learned in this page feeds into the rest of your learning journey.</p>
+
+  <!-- SVG: How estimation connects to other topics -->
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How estimation connects to other system design topics">
+    <defs>
+      <marker id="est-conn-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <!-- Center: Estimation -->
+    <rect x="290" y="120" width="180" height="70" rx="14" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="2.5"/>
+    <text x="380" y="150" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="800" font-size="14">ESTIMATION</text>
+    <text x="380" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">QPS, Storage, BW, Cache</text>
+
+    <!-- Scalability (top-right) -->
+    <rect x="550" y="20" width="170" height="55" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="635" y="45" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="12">Scalability</text>
+    <text x="635" y="60" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"When to scale? Numbers say."</text>
+    <line x1="460" y1="130" x2="553" y2="65" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-conn-arr)"/>
+
+    <!-- Caching (right) -->
+    <rect x="560" y="120" width="170" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="645" y="145" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="12">Caching Strategies</text>
+    <text x="645" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Cache size = estimation output"</text>
+    <line x1="470" y1="155" x2="558" y2="150" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-conn-arr)"/>
+
+    <!-- Sharding (bottom-right) -->
+    <rect x="550" y="230" width="170" height="55" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="635" y="255" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="12">Sharding</text>
+    <text x="635" y="270" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"When DB > 1TB, shard."</text>
+    <line x1="460" y1="180" x2="553" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-conn-arr)"/>
+
+    <!-- Approach (top-left) -->
+    <rect x="30" y="20" width="170" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="115" y="45" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="12">SD Approach</text>
+    <text x="115" y="60" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Step 2 of the framework"</text>
+    <line x1="300" y1="130" x2="197" y2="65" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-conn-arr)"/>
+
+    <!-- Database (left) -->
+    <rect x="30" y="120" width="170" height="55" rx="10" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="115" y="145" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="12">Database Fundamentals</text>
+    <text x="115" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"SQL vs NoSQL depends on scale"</text>
+    <line x1="290" y1="155" x2="202" y2="150" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-conn-arr)"/>
+
+    <!-- URL Shortener (bottom-left) -->
+    <rect x="30" y="230" width="170" height="55" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="115" y="255" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="600" font-size="12">URL Shortener</text>
+    <text x="115" y="270" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Classic estimation-heavy case"</text>
+    <line x1="300" y1="180" x2="197" y2="240" stroke="#10b981" stroke-width="1.5" marker-end="url(#est-conn-arr)"/>
+  </svg>
+
+  <!-- SVG D: Your Learning Path -->
+  <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Learning path: Approach done, Estimation here, Scalability next">
+    <defs>
+      <marker id="est-s15b-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="est-s15b-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+      </marker>
+    </defs>
+
+    <!-- Step 1: Approach (done) -->
+    <rect x="30" y="30" width="160" height="55" rx="10" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="2"/>
+    <text x="110" y="52" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">SD Approach</text>
+    <text x="110" y="70" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">✓ Done</text>
+
+    <line x1="190" y1="57" x2="225" y2="57" stroke="#10b981" stroke-width="2" marker-end="url(#est-s15b-arr)"/>
+
+    <!-- Step 2: Estimation (YOU ARE HERE) -->
+    <rect x="230" y="25" width="170" height="65" rx="10" fill="rgba(16,185,129,0.25)" stroke="#10b981" stroke-width="3"/>
+    <text x="315" y="48" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="800" font-size="12">Estimation</text>
+    <text x="315" y="65" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">← YOU ARE HERE</text>
+    <text x="315" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">QPS, Storage, BW, Cache</text>
+
+    <line x1="400" y1="57" x2="435" y2="57" stroke="#64748b" stroke-width="2" marker-end="url(#est-s15b-arr-g)"/>
+
+    <!-- Step 3: Scalability (next) -->
+    <rect x="440" y="30" width="160" height="55" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="520" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="600" font-size="12">Scalability</text>
+    <text x="520" y="70" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Up next →</text>
+
+    <line x1="600" y1="57" x2="635" y2="57" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#est-s15b-arr-g)"/>
+
+    <!-- Step 4: More... -->
+    <rect x="640" y="30" width="90" height="55" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="685" y="57" text-anchor="middle" fill="#475569" font-family="Inter,sans-serif" font-size="12">. . .</text>
+    <text x="685" y="73" text-anchor="middle" fill="#475569" font-family="Inter,sans-serif" font-size="9">Caching, DB, etc.</text>
+
+    <!-- Bottom label -->
+    <text x="380" y="112" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10" font-style="italic">Each topic builds on the numbers from estimation.</text>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="../how-to-approach/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-compass"></i></div>
+      <div class="related-card-text">
+        <h4>How to Approach System Design</h4>
+        <p>The full interview framework — estimation is step 2</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-arrows-up-down-left-right"></i></div>
+      <div class="related-card-text">
+        <h4>Scalability</h4>
+        <p>Vertical vs horizontal — your numbers decide which path</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="related-card-text">
+        <h4>Caching Strategies</h4>
+        <p>How much to cache? Your estimation tells you.</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+      <div class="related-card-text">
+        <h4>Sharding &amp; Partitioning</h4>
+        <p>When storage exceeds one node, estimation triggers this decision</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-link"></i></div>
+      <div class="related-card-text">
+        <h4>URL Shortener Case Study</h4>
+        <p>The classic interview question where estimation drives every decision</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Database Fundamentals</h4>
+        <p>SQL vs NoSQL, indexing, replication — all sized by your estimates</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>

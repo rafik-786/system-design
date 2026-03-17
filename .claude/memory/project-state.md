@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 1 complete page (How to Approach System Design), 203 coming soon.
+**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 2 complete pages (How to Approach System Design + Back-of-Envelope Estimation), 202 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
