@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scalability — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="orange" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-arrow-up-right-dots"></i> Core Principles</div>
+    <h1>Scalability</h1>
+    <p class="hero-subtitle">Why your brilliant app crashes at 10,000 users — and the engineering toolkit that prevents it. From one server to ten thousand, without losing sleep.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 7 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 18 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 8 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> Scalability means handling more load by adding resources — not rewriting your system from scratch. Like a restaurant that seats more customers by adding tables (vertical) or opening new locations (horizontal).
+  </div>
+
+  <p>Here's the whole idea in plain English. You build an app. People like it. More people show up. Your one little server starts sweating. You have two choices: <strong>get a bigger server</strong> (vertical scaling) or <strong>get more servers</strong> (horizontal scaling). The first is simpler but has a ceiling — you literally can't buy a server bigger than the biggest one that exists. The second is harder to set up but has no theoretical limit. Most real systems use both.</p>
+
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scalability mental model: vertical scaling (bigger) vs horizontal scaling (more)">
+    <defs>
+      <marker id="sca-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Two Ways to Handle More Load</text>
+
+    <!-- Left: Vertical -->
+    <rect x="30" y="50" width="320" height="190" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="190" y="75" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">VERTICAL SCALING</text>
+    <text x="190" y="93" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">"Get a bigger server"</text>
+
+    <!-- Small server -->
+    <rect x="70" y="115" width="60" height="50" rx="6" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <text x="100" y="137" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">4 CPU</text>
+    <text x="100" y="152" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">8 GB</text>
+
+    <!-- Arrow -->
+    <line x1="145" y1="140" x2="185" y2="140" stroke="#f97316" stroke-width="2" marker-end="url(#sca-tldr-arr)"/>
+
+    <!-- Big server -->
+    <rect x="200" y="105" width="100" height="70" rx="8" fill="#334155" stroke="#f97316" stroke-width="2"/>
+    <text x="250" y="132" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">64 CPU</text>
+    <text x="250" y="148" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">256 GB</text>
+    <text x="250" y="163" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">NVMe SSD</text>
+
+    <text x="190" y="210" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">✓ Simple — no code changes</text>
+    <text x="190" y="228" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">✗ Has a ceiling — can't go forever</text>
+
+    <!-- Right: Horizontal -->
+    <rect x="410" y="50" width="320" height="190" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="570" y="75" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">HORIZONTAL SCALING</text>
+    <text x="570" y="93" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">"Get more servers"</text>
+
+    <!-- Multiple small servers -->
+    <rect x="440" y="115" width="55" height="40" rx="5" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <text x="467" y="139" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Server 1</text>
+    <rect x="510" y="115" width="55" height="40" rx="5" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <text x="537" y="139" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Server 2</text>
+    <rect x="580" y="115" width="55" height="40" rx="5" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <text x="607" y="139" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Server 3</text>
+    <rect x="650" y="115" width="55" height="40" rx="5" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <text x="677" y="139" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Server 4</text>
+
+    <!-- + more -->
+    <text x="570" y="180" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11" font-weight="600">+ add more whenever you need</text>
+
+    <text x="570" y="210" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">✓ No ceiling — scales forever</text>
+    <text x="570" y="228" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">✗ More complex — needs design changes</text>
+  </svg>
+
+  <p>A system is <strong>"scalable"</strong> when you can increase its capacity simply by adding resources — and the performance improves <em>proportionally</em>. Double the servers, handle (roughly) double the users. That's the dream. When it stops working that way — when doubling servers only gives you 20% more capacity — you've hit a <span class="tooltip-trigger">bottleneck<span class="tooltip-content">The single slowest part of your system that limits overall performance, like a narrow section of highway causing a traffic jam.</span></span>, and that's where the real engineering starts.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> Scalability isn't about handling a lot of traffic. It's about being able to handle <em>more</em> traffic by throwing resources at the problem instead of rewriting everything.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">Why You Need This</h2>
+    </div>
+  </div>
+
+  <p>You build a side project. A simple app — maybe a to-do list, maybe a social feed, maybe a marketplace. You deploy it on a single server. It works beautifully. You show it to friends. They love it. Word spreads. And then, very slowly at first and then all at once, things start breaking.</p>
+
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline of an app growing from 100 users to 50,000 and hitting scaling walls">
+    <defs>
+      <marker id="sca-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Life of a Growing App</text>
+
+    <!-- Timeline line -->
+    <line x1="60" y1="160" x2="700" y2="160" stroke="#334155" stroke-width="3"/>
+
+    <!-- Phase 1: Launch -->
+    <circle cx="100" cy="160" r="8" fill="#10b981"/>
+    <text x="100" y="140" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">DAY 1</text>
+    <text x="100" y="190" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">100 users</text>
+    <text x="100" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Everything fast</text>
+    <text x="100" y="218" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">20ms responses</text>
+    <text x="100" y="245" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">😊 "This is easy!"</text>
+
+    <!-- Phase 2: Growth -->
+    <circle cx="270" cy="160" r="8" fill="#eab308"/>
+    <text x="270" y="140" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="11">WEEK 2</text>
+    <text x="270" y="190" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">5,000 users</text>
+    <text x="270" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Getting slow...</text>
+    <text x="270" y="218" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">800ms responses</text>
+    <text x="270" y="245" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">😰 "Hmm, it'll be fine"</text>
+
+    <!-- Phase 3: Pain -->
+    <circle cx="440" cy="160" r="8" fill="#f97316"/>
+    <text x="440" y="140" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">MONTH 1</text>
+    <text x="440" y="190" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">20,000 users</text>
+    <text x="440" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">DB at 95% CPU</text>
+    <text x="440" y="218" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">3-second responses</text>
+    <text x="440" y="245" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">😫 "Why is it so slow?!"</text>
+
+    <!-- Phase 4: Crash -->
+    <circle cx="620" cy="160" r="10" fill="#ef4444"/>
+    <text x="620" y="140" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">MONTH 2</text>
+    <text x="620" y="190" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">50,000 users</text>
+    <text x="620" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Server crashes</text>
+    <text x="620" y="218" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">502 Bad Gateway</text>
+    <text x="620" y="245" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">🔥 "EVERYTHING IS ON FIRE"</text>
+
+    <!-- Bottom insight -->
+    <rect x="130" y="265" width="500" height="30" rx="8" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1"/>
+    <text x="380" y="285" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11" font-weight="600">You can't rewrite the whole thing. You need to SCALE what you have.</text>
+  </svg>
+
+  <p>This isn't a hypothetical story. This is the story of almost every successful app. The code didn't change. The architecture didn't change. What changed was the <strong>number of people using it</strong>. And that one variable — load — exposed every weakness in the system.</p>
+
+  <p>The database that handled 100 users without breaking a sweat is now drowning in 50,000 simultaneous queries. The single API server that responded in 20 milliseconds is now juggling so many requests that each one waits 3 seconds just to be processed. And the worst part? You can't just "fix the code." The code was never broken. It just wasn't designed for this many people.</p>
+
+  <p>That's what scalability solves. It's the engineering toolkit that lets you take a system that works at small scale and make it work at <em>any</em> scale — without starting over.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Your single server handles 500 requests per second comfortably. Your app just went viral and you're now getting 2,000 requests per second. The server is maxed out. <strong>What are your options?</strong></p>
+    <span class="think-hint">There are really only two fundamental approaches. One involves your existing server, the other involves getting new ones. Think about what each approach requires.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-arrow-up"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — Just Get a Bigger Server</h2>
+    </div>
+  </div>
+
+  <p>When your server is struggling, the most obvious solution is the simplest one: <strong>make it bigger</strong>. Upgrade the CPU from 4 cores to 16 cores. Bump the RAM from 8 GB to 64 GB. Swap the hard drive for a blazing-fast NVMe SSD. This approach has a name — <span class="tooltip-trigger">vertical scaling<span class="tooltip-content">Making a single machine more powerful by adding more CPU, RAM, or faster storage. Also called "scaling up."</span></span> (or "scaling up") — and it's the first thing most teams try because it requires zero code changes.</p>
+
+  <p>And honestly? It works. Upgrading hardware is like widening a single-lane road into a four-lane highway. More traffic can flow through without changing the route. Your database queries run faster because there's more RAM for caching. Your API handles more requests because there are more CPU cores to process them. You didn't rewrite anything. You just threw money at the problem. Problem solved.</p>
+
+  <p>Until it isn't.</p>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost vs capacity curve for vertical scaling showing exponential cost growth">
+    <defs>
+      <marker id="sca-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Vertical Scaling Cost Curve</text>
+
+    <!-- Y axis -->
+    <line x1="80" y1="50" x2="80" y2="280" stroke="#64748b" stroke-width="1.5"/>
+    <text x="35" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11" transform="rotate(-90,35,170)">Monthly Cost ($)</text>
+
+    <!-- X axis -->
+    <line x1="80" y1="280" x2="720" y2="280" stroke="#64748b" stroke-width="1.5"/>
+    <text x="400" y="310" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Capacity (requests/sec)</text>
+
+    <!-- Cost curve (exponential) -->
+    <path d="M100,265 Q200,260 280,240 Q360,215 430,170 Q500,110 540,70 Q560,50 570,45" fill="none" stroke="#f97316" stroke-width="3"/>
+
+    <!-- Data points -->
+    <circle cx="100" cy="265" r="5" fill="#10b981"/>
+    <text x="100" y="258" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">$50/mo</text>
+    <text x="100" y="295" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">500 rps</text>
+    <text x="100" y="306" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">4 CPU, 8GB</text>
+
+    <circle cx="280" cy="240" r="5" fill="#eab308"/>
+    <text x="280" y="233" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">$200/mo</text>
+    <text x="280" y="295" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">2,000 rps</text>
+    <text x="280" y="306" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">16 CPU, 32GB</text>
+
+    <circle cx="430" cy="170" r="5" fill="#f97316"/>
+    <text x="430" y="163" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">$1,500/mo</text>
+    <text x="430" y="295" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">5,000 rps</text>
+    <text x="430" y="306" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">32 CPU, 128GB</text>
+
+    <circle cx="570" cy="45" r="6" fill="#ef4444"/>
+    <text x="590" y="42" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">$12,000/mo</text>
+    <text x="570" y="295" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">8,000 rps</text>
+    <text x="570" y="306" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">64 CPU, 256GB</text>
+
+    <!-- The ceiling -->
+    <line x1="640" y1="45" x2="640" y2="280" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+    <text x="680" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="700">THE</text>
+    <text x="680" y="115" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="700">CEILING</text>
+    <text x="680" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">No bigger</text>
+    <text x="680" y="147" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">machine</text>
+    <text x="680" y="159" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">exists</text>
+
+    <!-- Annotation -->
+    <rect x="160" y="55" width="260" height="55" rx="8" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1"/>
+    <text x="290" y="75" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">10× the cost for just 4× the capacity</text>
+    <text x="290" y="93" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">After a point, throwing money at hardware</text>
+    <text x="290" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">gives diminishing returns</text>
+  </svg>
+
+  <p>See that curve? It's not linear. Going from 500 requests per second to 2,000 costs you 4× more money — that's fair, 4× the capacity for 4× the price. But going from 2,000 to 8,000? That costs you 60× more money for just 4× the capacity. The economics of vertical scaling get brutal fast.</p>
+
+  <p>And the cost isn't even the biggest problem. The biggest problem is that <strong>there's a ceiling</strong>. The most powerful single server you can buy today has around 128 CPU cores and a few terabytes of RAM. That's it. That's the physical limit of what one machine can do. If you need more than that — and any successful app eventually will — vertical scaling simply cannot help you.</p>
+
+  <div class="callout callout-warning">
+    <strong>The real-world math:</strong> A 64-core cloud server with 256 GB RAM costs roughly $12,000/month on AWS. A 16-core server with 32 GB RAM costs about $200/month. That's <strong>60× the price for only 4× the CPU</strong>. Vertical scaling doesn't just hit a ceiling — it hits your wallet long before it gets there.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You've upgraded to the biggest server money can buy. 128 cores, 2 TB RAM. It handles 10,000 requests per second. But your app keeps growing and now you need 30,000 requests per second. <strong>What do you do?</strong></p>
+    <span class="think-hint">You can't make one server bigger. What's the only remaining option?</span>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-heart-crack"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks</h2>
+    </div>
+  </div>
+
+  <p>Let's say you took the vertical scaling route. You upgraded to the beefiest server money can buy. For a while, life was good. But vertical scaling doesn't just have a cost problem — it has three fundamental problems that no amount of money can fix.</p>
+
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-skull-crossbones icon-gap"></i> Problem 1: Single Point of Failure</span></h3>
+    <div class="card-body">
+      <p>When everything runs on one server, that server is the single point of failure for your <em>entire</em> business. If the hard drive fails, if a kernel update goes wrong, if the power supply dies — <strong>every single user goes down at the same time</strong>. There's no fallback. There's no backup server picking up the slack. It's all or nothing.</p>
+
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Single server as a single point of failure — when it dies, all users are affected">
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Single Point of Failure</text>
+
+        <!-- Users on the left -->
+        <circle cx="80" cy="80" r="12" fill="none" stroke="#f1f5f9" stroke-width="1.5"/>
+        <text x="80" y="84" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">👤</text>
+        <circle cx="80" cy="120" r="12" fill="none" stroke="#f1f5f9" stroke-width="1.5"/>
+        <text x="80" y="124" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">👤</text>
+        <circle cx="80" cy="160" r="12" fill="none" stroke="#f1f5f9" stroke-width="1.5"/>
+        <text x="80" y="164" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">👤</text>
+        <text x="80" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">50,000 users</text>
+
+        <!-- Lines to server -->
+        <line x1="95" y1="80" x2="250" y2="110" stroke="#64748b" stroke-width="1"/>
+        <line x1="95" y1="120" x2="250" y2="120" stroke="#64748b" stroke-width="1"/>
+        <line x1="95" y1="160" x2="250" y2="130" stroke="#64748b" stroke-width="1"/>
+
+        <!-- Server with X -->
+        <rect x="250" y="85" width="100" height="70" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="300" y="110" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="24">✗</text>
+        <text x="300" y="140" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">SERVER DOWN</text>
+        <text x="300" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">3:17 AM Saturday</text>
+
+        <!-- Result -->
+        <rect x="420" y="75" width="300" height="90" rx="10" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="570" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">IMPACT</text>
+        <text x="570" y="120" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">50,000 users see "502 Bad Gateway"</text>
+        <text x="570" y="137" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">ALL data inaccessible</text>
+        <text x="570" y="154" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Recovery: 30 min to 4 hours</text>
+      </svg>
+
+      <p>Every company that runs a real business has been burned by this. Servers don't ask permission before failing. They fail at 3 AM on a Saturday, when nobody's watching the dashboards and the on-call engineer is at a barbecue.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-clock icon-gap"></i> Problem 2: Downtime During Upgrades</span></h3>
+    <div class="card-body">
+      <p>Here's a fun paradox: to make your server <em>handle more traffic</em>, you have to <em>take it offline</em> first. Upgrading RAM, swapping CPUs, migrating to a bigger instance — all of these require downtime. You're telling your users "sorry, we're closed for renovations so we can serve you better." That's fine for a blog. It's unacceptable for a payment system or a chat app.</p>
+
+      <div class="callout callout-danger">
+        <strong>The maintenance window trap:</strong> You schedule a 30-minute maintenance window at 2 AM. The RAM upgrade takes 45 minutes because the cloud provider is slow. Now your payment API has been down for 45 minutes during what you promised would be 30 minutes. Customers in different time zones are wide awake and angry.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-lock icon-gap"></i> Problem 3: Vendor Lock-in and Hardware Limits</span></h3>
+    <div class="card-body">
+      <p>Once you're on the biggest server your cloud provider offers, you're stuck. AWS's largest instance (as of 2024) has 448 vCPUs and 24 TB of RAM — the <code>u-24tb1.metal</code>. That's the ceiling. If you need more, there is no "Add to Cart" button for a bigger machine. It doesn't exist. Physics won't allow it.</p>
+
+      <p>And even before you hit the physical limit, you're hitting a <span class="tooltip-trigger">diminishing returns<span class="tooltip-content">When each additional unit of investment produces less and less benefit. Going from 4 to 8 CPUs might double your throughput, but going from 64 to 128 might only increase it by 30%.</span></span> problem. Operating systems and applications can't always use all the resources you give them. A database with 128 cores might only use 16 of them effectively because the queries are waiting on disk I/O, not CPU. You paid for 128 cores but only 16 are doing useful work.</p>
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>If your one server dies at 3 AM, <strong>what happens to your 50,000 users?</strong> And more importantly — how would you design the system so that one server dying is <em>not</em> a catastrophe?</p>
+    <span class="think-hint">The answer involves having more than one server. But if you have multiple servers, how do users know which one to talk to?</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-breakthrough">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-lightbulb"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Horizontal Scaling</h2>
+    </div>
+  </div>
+
+  <p>Here's the insight that changed everything: <strong>instead of making one server bigger, use many normal-sized servers working together</strong>.</p>
+
+  <p>Think about restaurants. If your restaurant is packed every night, you have two options. Option A: knock down the walls, expand the kitchen, add 200 more seats. That's expensive, takes months, and you can't serve customers during construction. Option B: open a second location across town. Each location handles its own customers independently. If one location has a plumbing emergency and closes for the day, the other keeps running. Want even more capacity? Open a third location. A fourth. There's no limit.</p>
+
+  <p>That's <span class="tooltip-trigger">horizontal scaling<span class="tooltip-content">Adding more machines to your system instead of making one machine bigger. Also called "scaling out." Each new machine shares the work.</span></span> — also called "scaling out." Instead of one mega-server, you run ten (or a hundred, or ten thousand) regular servers. Each one handles a fraction of the traffic. And the beautiful part? There's no ceiling. Need more capacity? Just add another server.</p>
+
+  <p>But this raises an immediate question: if you have 10 servers, how does a user's request know which server to go to? That's where the <span class="tooltip-trigger">load balancer<span class="tooltip-content">A server that sits in front of your application servers and distributes incoming requests across them. Think of it as a traffic cop directing cars to different lanes.</span></span> comes in.</p>
+
+  <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Horizontal scaling architecture with load balancer distributing traffic across multiple servers">
+    <defs>
+      <marker id="sca-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+      <marker id="sca-s5-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Horizontal Scaling with a Load Balancer</text>
+
+    <!-- Users -->
+    <rect x="20" y="110" width="110" height="140" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+    <text x="75" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10" font-weight="600">Users</text>
+    <text x="75" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">50,000 users</text>
+    <text x="75" y="172" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">2,000 req/sec</text>
+
+    <circle cx="55" cy="200" r="10" fill="none" stroke="#94a3b8" stroke-width="1"/>
+    <text x="55" y="204" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">👤</text>
+    <circle cx="75" cy="200" r="10" fill="none" stroke="#94a3b8" stroke-width="1"/>
+    <text x="75" y="204" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">👤</text>
+    <circle cx="95" cy="200" r="10" fill="none" stroke="#94a3b8" stroke-width="1"/>
+    <text x="95" y="204" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">👤</text>
+    <text x="75" y="230" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">+ thousands more</text>
+
+    <!-- Arrow to LB -->
+    <line x1="135" y1="180" x2="225" y2="180" stroke="#f97316" stroke-width="2" marker-end="url(#sca-s5-arr)"/>
+    <text x="180" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">all traffic</text>
+
+    <!-- Load Balancer -->
+    <rect x="230" y="140" width="120" height="80" rx="12" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="2.5"/>
+    <text x="290" y="168" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">LOAD</text>
+    <text x="290" y="183" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">BALANCER</text>
+    <text x="290" y="210" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">"traffic cop"</text>
+
+    <!-- Arrows to servers -->
+    <line x1="355" y1="155" x2="440" y2="80" stroke="#10b981" stroke-width="1.5" marker-end="url(#sca-s5-arr-g)"/>
+    <line x1="355" y1="170" x2="440" y2="145" stroke="#10b981" stroke-width="1.5" marker-end="url(#sca-s5-arr-g)"/>
+    <line x1="355" y1="185" x2="440" y2="210" stroke="#10b981" stroke-width="1.5" marker-end="url(#sca-s5-arr-g)"/>
+    <line x1="355" y1="200" x2="440" y2="275" stroke="#10b981" stroke-width="1.5" marker-end="url(#sca-s5-arr-g)"/>
+
+    <!-- Servers -->
+    <rect x="445" y="55" width="100" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+    <text x="495" y="76" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server 1</text>
+    <text x="495" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">500 req/sec</text>
+
+    <rect x="445" y="120" width="100" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+    <text x="495" y="141" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server 2</text>
+    <text x="495" y="157" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">500 req/sec</text>
+
+    <rect x="445" y="185" width="100" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+    <text x="495" y="206" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server 3</text>
+    <text x="495" y="222" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">500 req/sec</text>
+
+    <rect x="445" y="250" width="100" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+    <text x="495" y="271" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server 4</text>
+    <text x="495" y="287" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">500 req/sec</text>
+
+    <!-- Arrows to DB -->
+    <line x1="550" y1="80" x2="630" y2="155" stroke="#64748b" stroke-width="1" marker-end="url(#sca-s5-arr)"/>
+    <line x1="550" y1="145" x2="630" y2="165" stroke="#64748b" stroke-width="1"/>
+    <line x1="550" y1="210" x2="630" y2="185" stroke="#64748b" stroke-width="1"/>
+    <line x1="550" y1="275" x2="630" y2="195" stroke="#64748b" stroke-width="1"/>
+
+    <!-- Database -->
+    <ellipse cx="680" cy="160" rx="50" ry="15" fill="#334155" stroke="#a78bfa" stroke-width="1.5"/>
+    <rect x="630" y="160" width="100" height="50" fill="#334155" stroke="#a78bfa" stroke-width="1.5"/>
+    <ellipse cx="680" cy="210" rx="50" ry="15" fill="#334155" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="680" y="190" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="10" font-weight="600">Database</text>
+
+    <!-- Bottom summary -->
+    <rect x="150" y="320" width="460" height="30" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="340" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11" font-weight="600">4 servers × 500 req/sec = 2,000 req/sec total. Need more? Add Server 5.</text>
+  </svg>
+
+  <p>A load balancer is simply a server that sits in front of your application servers and distributes incoming requests across them. User sends a request, the load balancer picks a server (maybe round-robin, maybe the one with the least load), and forwards the request there. The user has no idea which server handled their request. They don't care. They just got a fast response.</p>
+
+  <p>But there's a catch. For horizontal scaling to work, your servers need to be <span class="tooltip-trigger">stateless<span class="tooltip-content">A server is stateless when it doesn't remember anything about previous requests. Each request contains everything the server needs to process it. No shopping carts stored in memory, no user sessions on disk.</span></span>. That word is important. A stateless server doesn't remember anything about previous requests. It doesn't store your shopping cart in its own memory. It doesn't keep your login session on its own hard drive. Every single request contains all the information the server needs to handle it.</p>
+
+  <p>Why does this matter? Because if Server 1 stores your shopping cart in its memory, and the load balancer sends your next request to Server 3, your cart is gone. Server 3 has never heard of you. Stateless servers avoid this problem — any server can handle any request, because all shared data lives in a separate place (like a database or a <span class="tooltip-trigger">cache<span class="tooltip-content">A fast, temporary storage layer (usually in RAM) that keeps copies of frequently accessed data so you don't have to hit the slower database every time.</span></span>).</p>
+
+  <div class="callout callout-success">
+    <strong>The key insight:</strong> Horizontal scaling has no ceiling. Need more capacity? Add another server. Need even more? Add ten more. Cloud providers make this trivial — you can spin up a new server in under a minute. But it only works if your application is designed to be stateless.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>What makes a server "stateless"? If you're building a shopping website, where does the user's cart data live if not on the server itself? <strong>Why does statelessness matter for horizontal scaling?</strong></p>
+    <span class="think-hint">Think about what happens when the load balancer sends consecutive requests from the same user to different servers. What breaks if each server has its own local state?</span>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (THE SCALING TOOLKIT)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-toolbox"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The Scaling Toolkit</h2>
+    </div>
+  </div>
+
+  <p>You don't use just one scaling technique. Real systems use a combination of tools, layered on top of each other as the system grows. Think of it like a toolbox — you pick the right tool for the problem you're facing right now. Here are the six most important tools, roughly in the order you'll need them.</p>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The scaling toolkit overview: six techniques from simplest to most complex">
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Scaling Toolkit — In Order of Complexity</text>
+
+    <!-- Timeline arrow -->
+    <line x1="40" y1="90" x2="720" y2="90" stroke="#334155" stroke-width="3"/>
+    <text x="40" y="80" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">SIMPLE</text>
+    <text x="690" y="80" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">COMPLEX</text>
+
+    <!-- 1: Vertical -->
+    <circle cx="80" cy="90" r="20" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="80" y="94" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">1</text>
+    <text x="80" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Vertical</text>
+    <text x="80" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Bigger machine</text>
+
+    <!-- 2: Horizontal -->
+    <circle cx="210" cy="90" r="20" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="210" y="94" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">2</text>
+    <text x="210" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Horizontal</text>
+    <text x="210" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">More machines</text>
+
+    <!-- 3: Caching -->
+    <circle cx="340" cy="90" r="20" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+    <text x="340" y="94" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">3</text>
+    <text x="340" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Caching</text>
+    <text x="340" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">RAM for hot data</text>
+
+    <!-- 4: Read Replicas -->
+    <circle cx="470" cy="90" r="20" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+    <text x="470" y="94" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">4</text>
+    <text x="470" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Read Replicas</text>
+    <text x="470" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">DB copies for reads</text>
+
+    <!-- 5: Async -->
+    <circle cx="600" cy="90" r="20" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="600" y="94" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">5</text>
+    <text x="600" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Async Queues</text>
+    <text x="600" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Background work</text>
+
+    <!-- 6: Sharding -->
+    <circle cx="710" cy="90" r="20" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="710" y="94" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">6</text>
+    <text x="710" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Sharding</text>
+    <text x="710" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Split the data</text>
+
+    <!-- Bottom note -->
+    <rect x="130" y="160" width="500" height="30" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1"/>
+    <text x="380" y="180" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Most systems use several of these together. Start simple, add complexity only when needed.</text>
+  </svg>
+
+  <!-- CARD 1: Vertical Scaling -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-arrow-up icon-gap"></i> Tool 1: Vertical Scaling — Bigger Machine</span></h3>
+    <div class="card-body">
+      <p>We covered this already, but let's be precise about when it's actually the <em>right</em> choice. Vertical scaling means upgrading your existing server's hardware: more CPU cores, more RAM, faster disks. No code changes needed. No architecture redesign. Just more power.</p>
+
+      <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vertical scaling: before and after upgrade">
+        <defs>
+          <marker id="sca-s6-v-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+
+        <!-- Before -->
+        <rect x="50" y="30" width="120" height="90" rx="8" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+        <text x="110" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Before</text>
+        <text x="110" y="75" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">4 CPU, 8 GB</text>
+        <text x="110" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">500 req/sec</text>
+        <text x="110" y="108" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">$50/mo</text>
+
+        <!-- Arrow -->
+        <line x1="185" y1="75" x2="255" y2="75" stroke="#f97316" stroke-width="2.5" marker-end="url(#sca-s6-v-arr)"/>
+        <text x="220" y="65" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">upgrade</text>
+
+        <!-- After -->
+        <rect x="270" y="20" width="150" height="110" rx="8" fill="#334155" stroke="#f97316" stroke-width="2"/>
+        <text x="345" y="48" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">After</text>
+        <text x="345" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">16 CPU, 64 GB</text>
+        <text x="345" y="83" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9">2,000 req/sec</text>
+        <text x="345" y="101" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">$400/mo</text>
+        <text x="345" y="118" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Zero code changes</text>
+
+        <!-- When to use / not use -->
+        <rect x="480" y="20" width="250" height="55" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+        <text x="605" y="40" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Good for</text>
+        <text x="605" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Databases, single-threaded workloads</text>
+        <text x="605" y="68" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Quick wins before doing real work</text>
+
+        <rect x="480" y="85" width="250" height="55" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+        <text x="605" y="105" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Bad for</text>
+        <text x="605" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Long-term growth, high availability</text>
+        <text x="605" y="133" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Any system that can't afford downtime</text>
+      </svg>
+
+      <p><strong>Real example:</strong> Your PostgreSQL database is running at 90% CPU on a 4-core server. You upgrade to 16 cores. CPU drops to 25%. Problem solved — for now. This buys you 3-6 months of runway while you plan the real fix (read replicas, caching, or sharding).</p>
+    </div>
+  </div>
+
+  <!-- CARD 2: Horizontal Scaling -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-server icon-gap"></i> Tool 2: Horizontal Scaling — More Machines</span></h3>
+    <div class="card-body">
+      <p>Add more servers behind a load balancer. Each server runs the exact same application code. The load balancer distributes requests across them. This is the bread and butter of modern web architecture — and it's how every major website in the world works.</p>
+
+      <p>The catch: your application must be <strong>stateless</strong>. That means no user sessions stored in server memory, no uploaded files saved to the local disk, no in-memory caches that differ between servers. All shared state goes to an external store — a database, Redis, or S3.</p>
+
+      <div class="callout callout-info">
+        <strong>Good for:</strong> API servers, web servers, microservices — anything that processes a request and returns a response without remembering previous requests. This is the easiest and most common form of scaling.
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>Bad for:</strong> Databases (they're inherently stateful), any service that relies on local state. You can't just "add more database servers" — reads and writes need to be coordinated, which is why database scaling gets its own set of tools.
+      </div>
+
+      <p><strong>Real example:</strong> Netflix runs thousands of API server instances behind load balancers. Each instance is identical. If one crashes, the load balancer routes traffic to the remaining ones. Users don't notice. Netflix can add or remove instances automatically based on traffic — more during evening hours, fewer at 4 AM.</p>
+    </div>
+  </div>
+
+  <!-- CARD 3: Caching -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-bolt icon-gap"></i> Tool 3: Caching — RAM for Hot Data</span></h3>
+    <div class="card-body">
+      <p>Here's a shocking number: reading data from RAM is about <strong>1,000 times faster</strong> than reading it from a database on disk. Caching means keeping a copy of your most frequently accessed data in a fast, in-memory store like <span class="tooltip-trigger">Redis<span class="tooltip-content">An open-source, in-memory key-value store used as a cache, message broker, and database. It stores data in RAM for extremely fast reads and writes.</span></span> or Memcached. When someone asks for that data, you check the cache first. If it's there (a "cache hit"), you return it instantly. If it's not (a "cache miss"), you get it from the database and put a copy in the cache for next time.</p>
+
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Caching flow: check cache first, hit returns instantly, miss goes to database">
+        <defs>
+          <marker id="sca-s6-c-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+          <marker id="sca-s6-c-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+          <marker id="sca-s6-c-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+          </marker>
+        </defs>
+
+        <!-- App -->
+        <rect x="30" y="70" width="90" height="50" rx="8" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+        <text x="75" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10" font-weight="600">App Server</text>
+
+        <!-- Arrow to cache -->
+        <line x1="125" y1="85" x2="220" y2="55" stroke="#f97316" stroke-width="2" marker-end="url(#sca-s6-c-arr)"/>
+        <text x="165" y="60" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8" font-weight="600">1. Check cache</text>
+
+        <!-- Cache -->
+        <rect x="225" y="25" width="110" height="55" rx="8" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="2"/>
+        <text x="280" y="48" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Redis Cache</text>
+        <text x="280" y="65" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">in-memory, ~0.5ms</text>
+
+        <!-- Cache hit path -->
+        <line x1="340" y1="40" x2="440" y2="40" stroke="#10b981" stroke-width="2" marker-end="url(#sca-s6-c-arr-g)"/>
+        <text x="390" y="32" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">HIT!</text>
+        <rect x="445" y="20" width="130" height="40" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="510" y="38" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Return instantly</text>
+        <text x="510" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~0.5ms response</text>
+
+        <!-- Cache miss path -->
+        <line x1="125" y1="105" x2="220" y2="140" stroke="#ef4444" stroke-width="2" marker-end="url(#sca-s6-c-arr-r)"/>
+        <text x="165" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">2. MISS → query DB</text>
+
+        <!-- Database -->
+        <rect x="225" y="120" width="110" height="55" rx="8" fill="#334155" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="280" y="143" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="10" font-weight="600">Database</text>
+        <text x="280" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">on disk, ~5-50ms</text>
+
+        <!-- Store in cache -->
+        <line x1="340" y1="140" x2="440" y2="140" stroke="#64748b" stroke-width="1.5" marker-end="url(#sca-s6-c-arr)"/>
+        <text x="390" y="132" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">3. Store in cache</text>
+        <rect x="445" y="120" width="130" height="40" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+        <text x="510" y="138" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Slower this time</text>
+        <text x="510" y="152" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~5-50ms, but next time → hit</text>
+
+        <!-- Stat -->
+        <rect x="610" y="65" width="130" height="60" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+        <text x="675" y="85" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="700">Typical hit rate</text>
+        <text x="675" y="103" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="16" font-weight="700">95%+</text>
+        <text x="675" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">of reads served from cache</text>
+      </svg>
+
+      <p>If 95% of your reads come from cache (which is typical), you've just reduced your database load by 95%. That's not an optimization — that's a lifeline. CricBuzz, the live cricket scores app, serves <strong>all</strong> its read traffic from Redis. The database handles only writes (score updates every 30 seconds). That's how they survive millions of concurrent users during a match.</p>
+
+      <div class="callout callout-info">
+        <strong>Good for:</strong> Read-heavy workloads (social feeds, product catalogs, user profiles). Anything where the same data is read much more often than it's written.
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>Bad for:</strong> Frequently changing data where staleness is unacceptable (bank balances, real-time inventory counts). Cache data can be slightly out of date — that's the trade-off.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 4: Read Replicas -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-clone icon-gap"></i> Tool 4: Read Replicas — Copy Your Database</span></h3>
+    <div class="card-body">
+      <p>Most applications read data far more often than they write it. Think about Instagram: for every photo you upload (1 write), a thousand people view it (1,000 reads). That's a 1000:1 read-to-write ratio. So why make one database handle both?</p>
+
+      <p>A <span class="tooltip-trigger">read replica<span class="tooltip-content">A copy of your primary database that stays in sync through replication. It handles read queries only, taking load off the primary database which handles writes.</span></span> is a copy of your database that stays in sync with the original. The original (called the "primary" or "master") handles all writes. The copies (replicas) handle reads. You can have 1 primary and 5 replicas — that means reads are distributed across 5 servers instead of 1.</p>
+
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read replica architecture: writes go to primary, reads distributed across replicas">
+        <defs>
+          <marker id="sca-s6-rr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+          <marker id="sca-s6-rr-arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#a78bfa"/>
+          </marker>
+        </defs>
+
+        <!-- App -->
+        <rect x="30" y="70" width="90" height="50" rx="8" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+        <text x="75" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10" font-weight="600">App Server</text>
+
+        <!-- Write arrow -->
+        <line x1="125" y1="80" x2="225" y2="50" stroke="#ef4444" stroke-width="2" marker-end="url(#sca-s6-rr-arr)"/>
+        <text x="170" y="57" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">WRITES</text>
+
+        <!-- Primary -->
+        <rect x="230" y="25" width="110" height="50" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+        <text x="285" y="48" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Primary DB</text>
+        <text x="285" y="63" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">writes only</text>
+
+        <!-- Replication arrows -->
+        <line x1="345" y1="50" x2="430" y2="50" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#sca-s6-rr-arr-b)"/>
+        <text x="385" y="42" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="7">replication</text>
+
+        <!-- Read arrows from app -->
+        <line x1="125" y1="100" x2="225" y2="120" stroke="#10b981" stroke-width="2" marker-end="url(#sca-s6-rr-arr)"/>
+        <text x="170" y="120" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">READS</text>
+
+        <!-- Replicas -->
+        <rect x="435" y="25" width="100" height="40" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="485" y="50" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Replica 1</text>
+
+        <rect x="435" y="80" width="100" height="40" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="485" y="105" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Replica 2</text>
+
+        <rect x="435" y="135" width="100" height="40" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="485" y="160" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Replica 3</text>
+
+        <line x1="345" y1="55" x2="430" y2="95" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3"/>
+        <line x1="345" y1="60" x2="430" y2="150" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <!-- Read split lines -->
+        <line x1="230" y1="125" x2="430" y2="45" stroke="#10b981" stroke-width="1"/>
+        <line x1="230" y1="130" x2="430" y2="100" stroke="#10b981" stroke-width="1"/>
+        <line x1="230" y1="135" x2="430" y2="155" stroke="#10b981" stroke-width="1"/>
+
+        <!-- Stat -->
+        <rect x="580" y="55" width="160" height="80" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+        <text x="660" y="78" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Result</text>
+        <text x="660" y="98" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Read capacity: <tspan fill="#10b981" font-weight="700">3×</tspan></text>
+        <text x="660" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Write capacity: unchanged</text>
+        <text x="660" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Add more replicas for more reads</text>
+      </svg>
+
+      <p>The trade-off? There's a slight delay between when data is written to the primary and when it appears on the replicas. This is called <span class="tooltip-trigger">replication lag<span class="tooltip-content">The delay between when a write happens on the primary database and when that change shows up on a read replica. Usually milliseconds, but can spike to seconds under heavy load.</span></span>. Usually it's milliseconds, but under heavy load it can be seconds. That means a user might update their profile and, for a brief moment, still see the old version. For most applications, that's perfectly acceptable. For a bank account balance, it's not.</p>
+
+      <div class="callout callout-info">
+        <strong>Good for:</strong> Read-heavy systems (90%+ reads). Social media feeds, product catalogs, content sites.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 5: Async Processing -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-clock-rotate-left icon-gap"></i> Tool 5: Async Processing — Background Queues</span></h3>
+    <div class="card-body">
+      <p>Not everything needs to happen <em>right now</em>. When a user places an order, they need to see the confirmation instantly. But sending the receipt email? Processing the loyalty points? Updating the analytics dashboard? None of that needs to happen in the same request. If you try to do all of it before returning a response, the user waits 3 seconds for what should be a 200ms operation.</p>
+
+      <p>Async processing means putting slow work on a <span class="tooltip-trigger">message queue<span class="tooltip-content">A system that holds tasks (messages) and delivers them to worker processes that handle them in the background. Think of it as a to-do list that workers pick tasks from.</span></span>. The API server drops a message on the queue ("send receipt to user 12345") and immediately returns a response to the user. In the background, worker processes pick up messages from the queue and handle them at their own pace.</p>
+
+      <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Async processing: API returns fast, slow work handled by background workers via queue">
+        <defs>
+          <marker id="sca-s6-q-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+
+        <!-- User -->
+        <rect x="20" y="50" width="80" height="45" rx="8" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+        <text x="60" y="78" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">User</text>
+
+        <!-- API -->
+        <rect x="150" y="40" width="100" height="60" rx="8" fill="#334155" stroke="#f97316" stroke-width="2"/>
+        <text x="200" y="62" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">API Server</text>
+        <text x="200" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">save order + ACK</text>
+        <text x="200" y="90" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">200ms</text>
+
+        <!-- Arrow user to API -->
+        <line x1="105" y1="70" x2="145" y2="70" stroke="#f97316" stroke-width="2" marker-end="url(#sca-s6-q-arr)"/>
+
+        <!-- Fast return -->
+        <line x1="145" y1="82" x2="105" y2="82" stroke="#10b981" stroke-width="1.5" marker-end="url(#sca-s6-q-arr)"/>
+        <text x="125" y="95" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7">instant ✓</text>
+
+        <!-- Arrow API to Queue -->
+        <line x1="255" y1="65" x2="340" y2="65" stroke="#f97316" stroke-width="2" marker-end="url(#sca-s6-q-arr)"/>
+        <text x="298" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">enqueue tasks</text>
+
+        <!-- Queue -->
+        <rect x="345" y="40" width="120" height="60" rx="8" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="2"/>
+        <text x="405" y="62" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Message Queue</text>
+        <text x="405" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Kafka / SQS / RabbitMQ</text>
+        <text x="405" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">holds tasks safely</text>
+
+        <!-- Workers -->
+        <line x1="470" y1="55" x2="540" y2="35" stroke="#64748b" stroke-width="1.5" marker-end="url(#sca-s6-q-arr)"/>
+        <line x1="470" y1="65" x2="540" y2="70" stroke="#64748b" stroke-width="1.5" marker-end="url(#sca-s6-q-arr)"/>
+        <line x1="470" y1="80" x2="540" y2="110" stroke="#64748b" stroke-width="1.5" marker-end="url(#sca-s6-q-arr)"/>
+
+        <rect x="545" y="15" width="100" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="595" y="37" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">📧 Email Worker</text>
+
+        <rect x="545" y="55" width="100" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="595" y="77" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">⭐ Points Worker</text>
+
+        <rect x="545" y="95" width="100" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="595" y="117" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">📊 Analytics Worker</text>
+
+        <!-- Background label -->
+        <rect x="530" y="140" width="130" height="25" rx="6" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1"/>
+        <text x="595" y="157" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8" font-weight="600">happens in background</text>
+      </svg>
+
+      <p><strong>Real example:</strong> When you place an order on Amazon, you see "Order Confirmed" in under a second. But the warehouse notification, the shipping label creation, the "your order has shipped" email, the recommendation engine update — all of those happen asynchronously over the next few minutes to hours. The user doesn't wait for any of it.</p>
+
+      <div class="callout callout-info">
+        <strong>Good for:</strong> Email sending, image processing, analytics, any work the user doesn't need to wait for.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 6: Sharding -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-scissors icon-gap"></i> Tool 6: Sharding — Split the Data</span></h3>
+    <div class="card-body">
+      <p>This is the nuclear option. When your single database can't handle the write load — even after caching and read replicas — you split the data itself across multiple databases. Each database holds a <em>portion</em> of the total data. This is called <span class="tooltip-trigger">sharding<span class="tooltip-content">Splitting a database's data across multiple independent database servers (shards). Each shard holds a subset of the data, determined by a shard key (like user_id % num_shards).</span></span>.</p>
+
+      <p>You pick a <strong>shard key</strong> — usually something like <code>user_id</code> — and use it to decide which shard a piece of data belongs to. User 1-1000 go to Shard A. User 1001-2000 go to Shard B. And so on. Each shard handles only 1/N of the total load.</p>
+
+      <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sharding: data split across 4 database shards by user_id">
+        <defs>
+          <marker id="sca-s6-sh-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Sharding by user_id</text>
+
+        <!-- Single DB before -->
+        <rect x="30" y="50" width="140" height="60" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+        <text x="100" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">One Giant DB</text>
+        <text x="100" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">1 billion users</text>
+        <text x="100" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">100K writes/sec 🔥</text>
+
+        <!-- Arrow -->
+        <line x1="175" y1="80" x2="250" y2="80" stroke="#f97316" stroke-width="2.5" marker-end="url(#sca-s6-sh-arr)"/>
+        <text x="213" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8" font-weight="600">shard!</text>
+
+        <!-- Shards -->
+        <rect x="260" y="40" width="110" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="315" y="60" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Shard A</text>
+        <text x="315" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Users 1-250M</text>
+        <text x="315" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">25K writes/sec</text>
+
+        <rect x="390" y="40" width="110" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="445" y="60" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Shard B</text>
+        <text x="445" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Users 250M-500M</text>
+        <text x="445" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">25K writes/sec</text>
+
+        <rect x="260" y="105" width="110" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="315" y="125" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Shard C</text>
+        <text x="315" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Users 500M-750M</text>
+        <text x="315" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">25K writes/sec</text>
+
+        <rect x="390" y="105" width="110" height="50" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="445" y="125" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Shard D</text>
+        <text x="445" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Users 750M-1B</text>
+        <text x="445" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">25K writes/sec</text>
+
+        <!-- Result -->
+        <rect x="540" y="55" width="200" height="85" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+        <text x="640" y="78" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Result</text>
+        <text x="640" y="98" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Each shard handles <tspan fill="#10b981" font-weight="700">1/4</tspan> the load</text>
+        <text x="640" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">100K writes → 25K per shard</text>
+        <text x="640" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Need more? Add more shards</text>
+
+        <!-- Warning -->
+        <rect x="140" y="175" width="480" height="28" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+        <text x="380" y="194" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">⚠ Sharding is powerful but adds enormous complexity. Use it as a last resort.</text>
+      </svg>
+
+      <p>Sharding is powerful but comes with serious complications. Cross-shard queries become hard (how do you find all orders across all shards?). Rebalancing data when you add new shards is painful. And picking the wrong shard key can lead to "hot shards" where one shard gets way more traffic than others. This is why sharding is usually the <em>last</em> tool you reach for, not the first.</p>
+
+      <div class="callout callout-danger">
+        <strong>Only shard when you've exhausted everything else.</strong> Vertical scaling → caching → read replicas → connection pooling → and THEN, only if you still need more write throughput, consider sharding. Many companies with millions of users never need to shard at all.
+      </div>
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You have a social media app with 10 million users. 95% of database traffic is reads (viewing feeds). Writes are rare (posting, commenting). The database is struggling. <strong>Which tools from the toolkit would you use, and in what order?</strong></p>
+    <span class="think-hint">Start with the cheapest, simplest option. Would caching help? Would read replicas help? Do you need sharding, or is this a read problem that doesn't require splitting data?</span>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — The Numbers Behind Scaling</h2>
+    </div>
+  </div>
+
+  <p>Adding more servers <em>should</em> give you proportionally more capacity. Double the servers, double the throughput. That's <strong>linear scaling</strong> — the gold standard. But in reality, it almost never works out that cleanly. Let's understand why, and learn how to spot the problems before they bite you.</p>
+
+  <!-- ── Linear Amplification ── -->
+  <div class="collapsible open">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span><strong>Linear Amplification:</strong> The dream scenario and why it breaks</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>In a perfect world, scaling would be simple multiplication. One server handles 500 requests per second. Two servers handle 1,000. Ten servers handle 5,000. That's linear amplification — your capacity grows in a straight line as you add resources.</p>
+
+        <div class="math-block">
+          <span class="math-label">Linear Scaling</span>
+          Capacity = (Number of servers) × (Capacity per server)
+          <span class="math-result">→ 10 servers × 500 req/sec = 5,000 req/sec</span>
+        </div>
+
+        <p>But here's what actually happens: you add 10 servers and get 3,500 req/sec instead of 5,000. Where did the other 1,500 go? The answer is always the same: something in your system is <strong>shared</strong> and can't be parallelized. Maybe all 10 servers are hitting one database. Maybe they're all fighting over a single lock. Maybe the network between servers is saturated. Whatever it is, that shared resource becomes the bottleneck.</p>
+
+        <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Linear vs real scaling: theoretical capacity vs actual capacity as servers increase">
+          <defs>
+            <marker id="sca-s7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+            </marker>
+          </defs>
+
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Linear Scaling vs. Reality</text>
+
+          <!-- Y axis -->
+          <line x1="80" y1="40" x2="80" y2="210" stroke="#64748b" stroke-width="1.5"/>
+          <text x="30" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" transform="rotate(-90,30,130)">Throughput</text>
+
+          <!-- X axis -->
+          <line x1="80" y1="210" x2="700" y2="210" stroke="#64748b" stroke-width="1.5"/>
+          <text x="400" y="240" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Number of Servers</text>
+
+          <!-- X labels -->
+          <text x="120" y="225" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">1</text>
+          <text x="220" y="225" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">2</text>
+          <text x="320" y="225" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">4</text>
+          <text x="420" y="225" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">8</text>
+          <text x="520" y="225" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">16</text>
+          <text x="620" y="225" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">32</text>
+
+          <!-- Linear (ideal) line -->
+          <line x1="120" y1="190" x2="620" y2="50" stroke="#10b981" stroke-width="2.5" stroke-dasharray="6,3"/>
+          <text x="640" y="50" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Ideal (linear)</text>
+
+          <!-- Real curve (sublinear) -->
+          <path d="M120,190 Q220,170 320,140 Q420,115 520,100 Q570,95 620,93" fill="none" stroke="#f97316" stroke-width="3"/>
+          <text x="640" y="93" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Reality</text>
+
+          <!-- Gap annotation -->
+          <line x1="520" y1="78" x2="520" y2="100" stroke="#ef4444" stroke-width="2"/>
+          <text x="558" y="78" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">The gap =</text>
+          <text x="558" y="92" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">wasted money</text>
+
+          <!-- Plateau annotation -->
+          <rect x="430" y="125" width="220" height="50" rx="8" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1"/>
+          <text x="540" y="143" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Real curve flattens because of</text>
+          <text x="540" y="160" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">shared bottlenecks (DB, locks, network)</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Amdahl's Law ── -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Amdahl's Law:</strong> Why adding 100 servers might only give you 5× speedup</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>In the 1960s, a computer scientist named Gene Amdahl figured out something that sounds obvious but has profound consequences: <strong>the maximum speedup from adding processors is limited by the percentage of work that can't be parallelized</strong>.</p>
+
+        <p>In plain English: if 80% of your work can be split across many servers, but 20% <em>must</em> happen on one server (like writing to a single database), then no matter how many servers you add, you can never go faster than 5×. That sequential 20% becomes the bottleneck that everything waits for.</p>
+
+        <div class="math-block">
+          <span class="math-label">Amdahl's Law (Simplified)</span>
+          Maximum Speedup = 1 / (sequential fraction)
+          <span class="math-result">→ If 20% is sequential: max speedup = 1/0.2 = 5×</span>
+        </div>
+
+        <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Amdahl's Law visual: with 20% sequential work, 100 servers only give 5x speedup">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Amdahl's Law — The Sequential Bottleneck</text>
+
+          <!-- Bar 1: 1 server -->
+          <rect x="80" y="50" width="600" height="30" rx="6" fill="#334155"/>
+          <rect x="80" y="50" width="480" height="30" rx="6" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1"/>
+          <rect x="560" y="50" width="120" height="30" rx="6" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="1"/>
+          <text x="320" y="70" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">80% parallelizable</text>
+          <text x="620" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">20% sequential</text>
+          <text x="40" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">1 server</text>
+
+          <!-- Bar 2: 4 servers -->
+          <rect x="80" y="95" width="240" height="30" rx="6" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1"/>
+          <rect x="320" y="95" width="120" height="30" rx="6" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="1"/>
+          <text x="180" y="115" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">÷4 servers</text>
+          <text x="380" y="115" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">still 20%</text>
+          <text x="40" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">4 servers</text>
+          <text x="480" y="115" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">→ <tspan fill="#f97316" font-weight="700">2.5× faster</tspan></text>
+
+          <!-- Bar 3: 16 servers -->
+          <rect x="80" y="140" width="150" height="30" rx="6" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1"/>
+          <rect x="230" y="140" width="120" height="30" rx="6" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="1"/>
+          <text x="155" y="160" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">÷16</text>
+          <text x="290" y="160" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">still 20%</text>
+          <text x="40" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">16 servers</text>
+          <text x="395" y="160" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">→ <tspan fill="#f97316" font-weight="700">4× faster</tspan></text>
+
+          <!-- Bar 4: 100 servers -->
+          <rect x="80" y="185" width="125" height="30" rx="6" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1"/>
+          <rect x="205" y="185" width="120" height="30" rx="6" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="1"/>
+          <text x="143" y="205" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">÷100</text>
+          <text x="265" y="205" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">STILL 20%</text>
+          <text x="40" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">100 servers</text>
+          <text x="370" y="205" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">→ <tspan fill="#f97316" font-weight="700">~5× faster</tspan> (not 100×!)</text>
+
+          <!-- Bottom insight -->
+          <rect x="120" y="228" width="520" height="28" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+          <text x="380" y="247" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">100 servers, but only 5× speedup. The sequential 20% is the ceiling.</text>
+        </svg>
+
+        <p>This is why the first question any scaling engineer asks is: <strong>"What's the sequential part?"</strong> If you can reduce the sequential fraction from 20% to 5%, your maximum speedup jumps from 5× to 20×. That's where the real optimization happens — not in adding more servers, but in making more of the work parallelizable.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Connection Pooling ── -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Connection Pooling:</strong> The invisible killer that takes down your database</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Here's a scaling trap that catches almost everyone. You've horizontally scaled your app servers — 50 servers behind a load balancer. Each server opens 10 connections to the database (a reasonable per-server pool). Quick math:</p>
+
+        <div class="math-block">
+          <span class="math-label">Connection Math</span>
+          50 app servers × 10 connections each = 500 database connections
+          <span class="math-result">→ PostgreSQL default max: 100 connections. You're 5× over the limit.</span>
+        </div>
+
+        <p>Every database connection consumes memory and CPU on the database server. PostgreSQL allocates about 10 MB per connection. At 500 connections, that's 5 GB of RAM consumed <em>just for holding connections open</em>, before a single query runs. At 1,000 connections, the database spends more time context-switching between connections than actually processing queries.</p>
+
+        <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Connection pooling problem: too many app servers overwhelming a single database">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">The Connection Explosion Problem</text>
+
+          <!-- App servers -->
+          <rect x="30" y="50" width="65" height="30" rx="4" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="62" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">App 1</text>
+          <rect x="30" y="85" width="65" height="30" rx="4" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="62" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">App 2</text>
+          <rect x="30" y="120" width="65" height="30" rx="4" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="62" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">... × 50</text>
+
+          <!-- Many lines (connections) -->
+          <line x1="100" y1="65" x2="220" y2="90" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="65" x2="220" y2="95" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="65" x2="220" y2="100" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="100" x2="220" y2="100" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="100" x2="220" y2="105" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="100" x2="220" y2="110" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="135" x2="220" y2="105" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="135" x2="220" y2="110" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+          <line x1="100" y1="135" x2="220" y2="115" stroke="#ef4444" stroke-width="0.5" opacity="0.6"/>
+
+          <text x="160" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">500 connections!</text>
+
+          <!-- DB dying -->
+          <rect x="225" y="70" width="110" height="60" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2.5"/>
+          <text x="280" y="93" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Database</text>
+          <text x="280" y="110" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">max_connections: 100</text>
+          <text x="280" y="122" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">🔥 OVERLOADED</text>
+
+          <!-- Solution arrow -->
+          <text x="395" y="95" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="700">FIX →</text>
+
+          <!-- PgBouncer -->
+          <rect x="435" y="55" width="100" height="45" rx="8" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="2"/>
+          <text x="485" y="74" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">PgBouncer</text>
+          <text x="485" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">connection pooler</text>
+
+          <!-- Fewer lines to DB -->
+          <line x1="540" y1="75" x2="610" y2="85" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="540" y1="80" x2="610" y2="90" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="540" y1="85" x2="610" y2="95" stroke="#10b981" stroke-width="1.5"/>
+
+          <!-- Happy DB -->
+          <rect x="615" y="70" width="110" height="50" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+          <text x="670" y="90" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Database</text>
+          <text x="670" y="107" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">20 connections ✓</text>
+
+          <!-- Labels -->
+          <text x="485" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">500 app connections →</text>
+          <text x="485" y="132" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">20 DB connections</text>
+
+          <!-- Bottom note -->
+          <rect x="150" y="150" width="460" height="28" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1"/>
+          <text x="380" y="169" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">A connection pooler multiplexes many app connections into few DB connections.</text>
+        </svg>
+
+        <p>The solution is a <span class="tooltip-trigger">connection pooler<span class="tooltip-content">A proxy that sits between your app servers and database. It maintains a small pool of actual database connections and shares them across many application connections. PgBouncer for PostgreSQL, ProxySQL for MySQL.</span></span> like PgBouncer (PostgreSQL) or ProxySQL (MySQL). It sits between your app servers and the database, accepting all 500 incoming connections but only opening 20 real connections to the database. App connections wait their turn in a queue instead of overwhelming the database. Simple middleware, massive impact.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Bottleneck Checklist ── -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>The Bottleneck Checklist:</strong> Where scaling breaks down</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>When you add servers but throughput doesn't increase proportionally, one of these six resources is the bottleneck. Here's how to identify each one:</p>
+
+        <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six common bottlenecks: CPU, RAM, Disk I/O, Network, Database, External APIs">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">The Six Bottlenecks</text>
+
+          <!-- Row 1 -->
+          <rect x="30" y="45" width="220" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+          <text x="55" y="68" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">CPU</text>
+          <text x="55" y="83" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Pegged at 100%</text>
+          <text x="55" y="98" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Fix: scale out, optimize code,</text>
+          <text x="55" y="108" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">or move to async processing</text>
+
+          <rect x="270" y="45" width="220" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+          <text x="295" y="68" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">RAM</text>
+          <text x="295" y="83" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Swapping to disk, OOM kills</text>
+          <text x="295" y="98" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Fix: vertical scale, reduce in-memory</text>
+          <text x="295" y="108" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">state, use external cache</text>
+
+          <rect x="510" y="45" width="220" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+          <text x="535" y="68" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">DISK I/O</text>
+          <text x="535" y="83" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">High iowait %, slow queries</text>
+          <text x="535" y="98" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Fix: SSD upgrade, add indexes,</text>
+          <text x="535" y="108" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">move hot data to cache (Redis)</text>
+
+          <!-- Row 2 -->
+          <rect x="30" y="135" width="220" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+          <text x="55" y="158" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">NETWORK</text>
+          <text x="55" y="173" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Bandwidth saturated</text>
+          <text x="55" y="188" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Fix: compress responses, use CDN,</text>
+          <text x="55" y="198" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">reduce payload size</text>
+
+          <rect x="270" y="135" width="220" height="70" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="295" y="158" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">DATABASE ← most common</text>
+          <text x="295" y="173" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Slow queries, connection limits</text>
+          <text x="295" y="188" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Fix: cache, read replicas, indexes,</text>
+          <text x="295" y="198" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">connection pooling, then sharding</text>
+
+          <rect x="510" y="135" width="220" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+          <text x="535" y="158" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">EXTERNAL APIs</text>
+          <text x="535" y="173" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Waiting on 3rd-party services</text>
+          <text x="535" y="188" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Fix: async calls, circuit breakers,</text>
+          <text x="535" y="198" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">cache external responses</text>
+
+          <!-- Bottom tip -->
+          <rect x="120" y="225" width="520" height="55" rx="10" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1"/>
+          <text x="380" y="245" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Debugging rule: "Adding servers didn't help" → check these six.</text>
+          <text x="380" y="263" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">The bottleneck is almost always the database. Start there.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You add 3× more app servers to handle a traffic spike. Throughput goes from 1,000 req/sec to 1,500 req/sec — not the 3,000 you expected. <strong>What's the bottleneck, and how would you diagnose it?</strong></p>
+    <span class="think-hint">If adding more app servers didn't help proportionally, the bottleneck isn't the app servers. It's something they all share. What do all your app servers connect to?</span>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — THE VARIATIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-variations">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-layer-group"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">The Variations — Scaling Different Components</h2>
+    </div>
+  </div>
+
+  <p>Not everything scales the same way. Scaling a stateless API server is trivially easy. Scaling a database is one of the hardest problems in all of computer science. Let's walk through how each component in your architecture scales — from easiest to hardest.</p>
+
+  <!-- CARD 1: Stateless Services -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-feather icon-gap"></i> Scaling Stateless Services (API Servers)</span></h3>
+    <div class="card-body">
+      <p>This is the easiest win in all of scaling. If your API server doesn't store any state locally — no sessions, no files, no in-memory caches that differ between instances — then scaling it is literally "run more copies behind a load balancer." That's it. You're done.</p>
+
+      <svg viewBox="0 0 760 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scaling stateless services: just add more instances behind a load balancer">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Scaling Stateless Services = Trivially Easy</text>
+
+        <!-- LB -->
+        <rect x="60" y="50" width="90" height="50" rx="8" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="2"/>
+        <text x="105" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Load</text>
+        <text x="105" y="85" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Balancer</text>
+
+        <!-- Servers (original) -->
+        <rect x="210" y="40" width="70" height="30" rx="5" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="245" y="60" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">API 1</text>
+        <rect x="210" y="78" width="70" height="30" rx="5" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="245" y="98" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">API 2</text>
+
+        <!-- Arrow -->
+        <text x="320" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="14" font-weight="700">→</text>
+        <text x="320" y="90" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8">need more?</text>
+
+        <!-- Servers (scaled) -->
+        <rect x="370" y="30" width="70" height="25" rx="4" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="405" y="47" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7">API 1</text>
+        <rect x="370" y="60" width="70" height="25" rx="4" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="405" y="77" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7">API 2</text>
+        <rect x="370" y="90" width="70" height="25" rx="4" fill="#334155" stroke="#f97316" stroke-width="2"/>
+        <text x="405" y="107" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="7" font-weight="600">API 3 ← new</text>
+        <rect x="370" y="120" width="70" height="25" rx="4" fill="#334155" stroke="#f97316" stroke-width="2"/>
+        <text x="405" y="137" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="7" font-weight="600">API 4 ← new</text>
+
+        <!-- Connections -->
+        <line x1="155" y1="68" x2="205" y2="55" stroke="#64748b" stroke-width="1"/>
+        <line x1="155" y1="80" x2="205" y2="93" stroke="#64748b" stroke-width="1"/>
+
+        <!-- Result -->
+        <rect x="490" y="45" width="240" height="65" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="610" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Difficulty: Trivial</text>
+        <text x="610" y="85" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Add instances → capacity grows linearly</text>
+        <text x="610" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Cloud auto-scaling handles this automatically</text>
+      </svg>
+
+      <p>Cloud providers even automate this. AWS Auto Scaling Groups, Kubernetes Horizontal Pod Autoscaler — they watch your CPU/memory metrics and add or remove servers automatically. During peak hours, you might have 50 instances. At 4 AM, you scale down to 5. You only pay for what you use.</p>
+
+      <div class="callout callout-success">
+        <strong>The golden rule:</strong> Design every API server to be stateless from day one. This one architectural decision makes horizontal scaling a non-event.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 2: Databases -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-database icon-gap"></i> Scaling Databases — The Hard Part</span></h3>
+    <div class="card-body">
+      <p>Databases are the opposite of stateless services. They are <em>inherently</em> stateful — they store your data and need to keep it consistent. You can't just "add more copies" without thinking about what happens when two copies get different writes. This is why database scaling is the most discussed (and most feared) topic in system design interviews.</p>
+
+      <p>There's a well-known framework (from Arpit Bhayani's lectures) that breaks database scaling into a 2×2 matrix based on whether your bottleneck is reads or writes, and whether the problem is data volume or query throughput.</p>
+
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Database scaling 2x2 matrix: read vs write bottleneck, and the tools for each">
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">The Database Scaling Playbook</text>
+
+        <!-- Column headers -->
+        <text x="310" y="55" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">READ bottleneck</text>
+        <text x="580" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">WRITE bottleneck</text>
+
+        <!-- Row headers -->
+        <text x="110" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Too many</text>
+        <text x="110" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">queries</text>
+
+        <text x="110" y="215" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Too much</text>
+        <text x="110" y="230" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">data</text>
+
+        <!-- Cell 1: Read + Query (top-left) -->
+        <rect x="180" y="70" width="250" height="75" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="305" y="93" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">Caching + Read Replicas</text>
+        <text x="305" y="110" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Put hot data in Redis (95% hit rate)</text>
+        <text x="305" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Add read replicas for the remaining 5%</text>
+        <text x="305" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Easiest DB scaling — do this first</text>
+
+        <!-- Cell 2: Write + Query (top-right) -->
+        <rect x="450" y="70" width="270" height="75" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="585" y="93" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Sharding</text>
+        <text x="585" y="110" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Split writes across multiple DBs</text>
+        <text x="585" y="125" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Each shard handles 1/N of the writes</text>
+        <text x="585" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Hardest — avoid if possible</text>
+
+        <!-- Cell 3: Read + Data (bottom-left) -->
+        <rect x="180" y="165" width="250" height="75" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+        <text x="305" y="188" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="11">Archiving + Partitioning</text>
+        <text x="305" y="205" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Move old data to cold storage</text>
+        <text x="305" y="220" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Partition tables by date/region</text>
+        <text x="305" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Medium difficulty</text>
+
+        <!-- Cell 4: Write + Data (bottom-right) -->
+        <rect x="450" y="165" width="270" height="75" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="585" y="188" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Sharding + Archiving</text>
+        <text x="585" y="205" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">The full toolkit: shard for writes,</text>
+        <text x="585" y="220" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">archive for storage, replicate for reads</text>
+        <text x="585" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Maximum complexity — Facebook/Google territory</text>
+
+        <!-- Bottom order -->
+        <rect x="100" y="260" width="560" height="30" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1"/>
+        <text x="380" y="280" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Order of attack: Indexes → Caching → Read Replicas → Connection Pooling → Sharding</text>
+      </svg>
+
+      <p>The key insight: <strong>most apps never need sharding</strong>. A well-optimized PostgreSQL instance with proper indexes, caching, and read replicas can handle millions of users. Sharding is for when you have write throughput problems that can't be solved any other way — and that typically means billions of records or tens of thousands of writes per second.</p>
+    </div>
+  </div>
+
+  <!-- CARD 3: Caches -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-memory icon-gap"></i> Scaling Caches</span></h3>
+    <div class="card-body">
+      <p>Even caches need scaling. A single Redis instance can handle around 100,000 operations per second — impressive, but not infinite. And if your dataset is larger than one machine's RAM, you need multiple cache nodes.</p>
+
+      <p>The standard approach is <span class="tooltip-trigger">consistent hashing<span class="tooltip-content">A technique for distributing data across multiple cache nodes so that adding or removing a node only moves a small fraction of data. Without it, adding a node would invalidate almost every cached item.</span></span>. Each cache key is hashed to determine which Redis node stores it. When you add a new node, only ~1/N of the keys need to move (instead of all of them). The biggest trap is <strong>hot keys</strong> — a single key that gets accessed millions of times per second (like a trending tweet). All that traffic goes to one cache node, even if you have 20 nodes. Solutions include replicating hot keys to multiple nodes or adding a local in-memory cache on each app server for the hottest data.</p>
+
+      <div class="callout callout-info">
+        <strong>At scale:</strong> Twitter runs hundreds of Redis/Memcached nodes. The caching layer handles more traffic than the database — by orders of magnitude. If the cache goes down, the database gets crushed by the sudden flood of requests (called a <strong>cache stampede</strong>).
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 4: Message Queues -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-envelopes-bulk icon-gap"></i> Scaling Message Queues</span></h3>
+    <div class="card-body">
+      <p>Message queues scale through <span class="tooltip-trigger">partitioning<span class="tooltip-content">Splitting a message queue's topic into multiple partitions. Each partition can live on a different server and be consumed independently, allowing parallel processing.</span></span>. A Kafka topic, for example, can be split into 100 partitions across 50 brokers. Producers write to different partitions (usually based on a key, like user_id). Consumers in a <span class="tooltip-trigger">consumer group<span class="tooltip-content">A set of consumers that work together to process messages from a topic. Each partition is assigned to exactly one consumer in the group, ensuring no message is processed twice.</span></span> divide the partitions among themselves — if you have 10 consumers and 100 partitions, each consumer handles 10 partitions.</p>
+
+      <p>The main scaling concern is <strong>backpressure</strong>: what happens when messages are produced faster than they can be consumed? The queue grows. If it grows faster than consumers can drain it, you either need more consumers or you need to apply backpressure to producers (slow them down). Kafka handles this gracefully because messages are stored on disk — the queue can grow to terabytes if needed, giving you time to add more consumers.</p>
+
+      <div class="callout callout-info">
+        <strong>At scale:</strong> LinkedIn's Kafka cluster processes over 7 trillion messages per day. That's 80 million messages per second. The secret is partitioning — thousands of partitions spread across hundreds of brokers.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 5: Storage -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-hard-drive icon-gap"></i> Scaling Storage (S3 / Blob Storage)</span></h3>
+    <div class="card-body">
+      <p>Good news: object storage services like Amazon S3, Azure Blob Storage, and Google Cloud Storage are already horizontally scaled for you. You don't need to think about it. S3 can handle virtually unlimited storage and thousands of requests per second without any configuration from your side.</p>
+
+      <p>The only scaling concern with blob storage is <strong>cost</strong>. Storing 1 petabyte on S3 costs around $23,000/month. At that scale, you start thinking about storage tiers: hot storage for frequently accessed data ($0.023/GB), infrequent access for older data ($0.0125/GB), and glacier/archive for data you rarely need ($0.004/GB). Netflix stores over 100 petabytes on S3 — and they use every storage tier strategically to keep costs manageable.</p>
+
+      <div class="callout callout-success">
+        <strong>The easy one:</strong> If you're only worried about storing and retrieving files (images, videos, documents), this is already solved. Cloud providers did the hard scaling work. Your job is managing cost, not capacity.
+      </div>
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You're designing a photo-sharing app like Instagram. Users upload photos (writes), but viewing photos (reads) happens 1,000× more often. Your database is the bottleneck. <strong>How would you scale the different components — the API servers, the database, the image storage, and the feed generation?</strong></p>
+    <span class="think-hint">Each component scales differently. API servers are stateless (easy). Images go to S3 (already scaled). The database needs caching + read replicas. The feed is the tricky part — think about what makes it hard.</span>
+  </div>
+</div>
+
+
+<!-- SECTIONS 9–15 BELOW -->
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — At Scale (Real Company Scaling Stories)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — Real Company Scaling Stories</h2>
+    </div>
+  </div>
+
+  <p>Theory is useful, but nothing makes scalability click like seeing what <strong>real companies actually did</strong> when their traffic exploded. These are published stories with real numbers. Each one teaches a different lesson about what works, what breaks, and what surprises you at scale.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Netflix serves <strong>100 million concurrent streams</strong>. If each stream needs 5 Mbps of bandwidth, and each server can push 10 Gbps, how many servers does Netflix need <em>just for streaming bandwidth alone</em>?</p>
+    <span class="think-hint">100M streams x 5 Mbps = 500 Tbps total. Each server pushes 10 Gbps. 500,000 Gbps / 10 Gbps = 50,000 servers — and that's only for bandwidth. Real deployments add replication, failover, and geographic distribution on top of that.</span>
+  </div>
+
+  <!-- SVG: Company scaling timeline -->
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scaling timeline showing how companies evolved their infrastructure">
+    <defs>
+      <marker id="sca-s9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">How Netflix Scaled (2008 - Today)</text>
+
+    <!-- Timeline line -->
+    <line x1="60" y1="80" x2="720" y2="80" stroke="#475569" stroke-width="2"/>
+
+    <!-- 2008: Monolith -->
+    <circle cx="100" cy="80" r="8" fill="#f43f5e" stroke="#1e293b" stroke-width="2"/>
+    <text x="100" y="60" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="700" font-size="10">2008</text>
+    <rect x="30" y="100" width="140" height="65" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="100" y="118" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">Monolith Era</text>
+    <text x="100" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Single Oracle DB</text>
+    <text x="100" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Frequent outages</text>
+
+    <!-- 2009: AWS migration -->
+    <circle cx="250" cy="80" r="8" fill="#f59e0b" stroke="#1e293b" stroke-width="2"/>
+    <text x="250" y="60" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="10">2009</text>
+    <rect x="180" y="100" width="140" height="65" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="250" y="118" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">AWS Migration</text>
+    <text x="250" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Move to cloud</text>
+    <text x="250" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">7-year migration</text>
+
+    <!-- 2011: Chaos Monkey -->
+    <circle cx="400" cy="80" r="8" fill="#a78bfa" stroke="#1e293b" stroke-width="2"/>
+    <text x="400" y="60" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="10">2011</text>
+    <rect x="330" y="100" width="140" height="65" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="400" y="118" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="10">Chaos Monkey</text>
+    <text x="400" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Intentional failures</text>
+    <text x="400" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Build resilience</text>
+
+    <!-- 2016: Multi-region -->
+    <circle cx="550" cy="80" r="8" fill="#38bdf8" stroke="#1e293b" stroke-width="2"/>
+    <text x="550" y="60" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="10">2016</text>
+    <rect x="480" y="100" width="140" height="65" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="550" y="118" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">Multi-Region</text>
+    <text x="550" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Active-active setup</text>
+    <text x="550" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">3 AWS regions</text>
+
+    <!-- Today -->
+    <circle cx="700" cy="80" r="8" fill="#10b981" stroke="#1e293b" stroke-width="2"/>
+    <text x="700" y="60" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">Today</text>
+    <rect x="630" y="100" width="140" height="65" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="700" y="118" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">Planet Scale</text>
+    <text x="700" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">100M+ concurrent</text>
+    <text x="700" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">190+ countries</text>
+
+    <!-- Lesson box at bottom -->
+    <rect x="130" y="200" width="500" height="55" rx="10" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="380" y="222" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="12">Key Lesson</text>
+    <text x="380" y="242" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Netflix didn't build for 100M users on day one. They scaled step by step over 15 years.</text>
+
+    <!-- Bottom timeline labels -->
+    <text x="100" y="290" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">10K users</text>
+    <text x="250" y="290" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">10M users</text>
+    <text x="400" y="290" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">30M users</text>
+    <text x="550" y="290" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">80M users</text>
+    <text x="700" y="290" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">260M+ users</text>
+    <line x1="60" y1="300" x2="720" y2="300" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="380" y="320" text-anchor="middle" fill="#475569" font-family="Inter,sans-serif" font-size="9" font-style="italic">Traffic grew 26,000x — but infrastructure evolved gradually, not all at once</text>
+  </svg>
+
+  <!-- Company cards -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-message icon-gap"></i> WhatsApp — Vertical Scaling Taken to the Extreme</span></h3>
+    <div class="card-body">
+      <p>WhatsApp is the poster child for doing more with less. At its peak before the Facebook acquisition, <strong>2 billion users</strong> were served by roughly <strong>50 engineers</strong>. How? They bet on <span class="tooltip-trigger">Erlang<span class="tooltip-content">A programming language originally built for telephone switches, designed to handle millions of concurrent connections with extreme reliability. Used by WhatsApp.</span></span> (a language built for telecom switches that handle millions of connections) running on FreeBSD (an operating system tuned for raw network performance). Each server handled <strong>2 million+ simultaneous connections</strong>.</p>
+      <p>The key insight: WhatsApp scaled <em>vertically</em> far longer than most companies would dare. Instead of adding hundreds of small servers, they squeezed maximum performance from each machine. They only went horizontal when absolutely necessary. This kept their architecture simple and their team tiny.</p>
+      <div class="callout callout-info">
+        <strong>Lesson:</strong> Don't assume horizontal scaling is always the answer. Sometimes the right language + right OS + disciplined engineering lets you scale vertically much further than you'd expect.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-camera icon-gap"></i> Instagram — 5 Engineers, Millions of Users</span></h3>
+    <div class="card-body">
+      <p>When Instagram launched in 2010, it had <strong>5 engineers</strong>. Within 18 months, it had <strong>30 million users</strong>. Their stack? PostgreSQL for data, Redis for caching, Memcached for session caching, and a handful of Django app servers behind an Nginx load balancer.</p>
+      <p>They scaled reads by putting a thick caching layer in front of everything. For every photo upload (write), there were roughly 100 photo views (reads). So instead of scaling the database, they scaled the <em>cache</em>. PostgreSQL stayed as the single source of truth while Redis handled the firehose of reads. By the time Facebook acquired them, they'd barely changed the core architecture.</p>
+      <div class="callout callout-info">
+        <strong>Lesson:</strong> Understand your read/write ratio. If reads dominate (they usually do), caching can delay the need for database sharding by months or even years.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-dove icon-gap"></i> Twitter — The Fail Whale Era</span></h3>
+    <div class="card-body">
+      <p>Twitter is the cautionary tale of what happens when growth outpaces architecture. In 2007-2010, Twitter was a Ruby on Rails monolith. When traffic spiked (celebrity tweets, world events), the entire site would crash. Users saw the famous "Fail Whale" error page so often it became a meme.</p>
+      <p>The problem? Every time you loaded your timeline, Twitter had to query the database for every person you follow, fetch their recent tweets, sort them, and serve the result — in real time. At 300,000+ QPS for reads, the monolith couldn't keep up. Their fix was a multi-year migration: Ruby to JVM (Scala), monolith to microservices, real-time fan-out to pre-computed timelines stored in Redis.</p>
+      <div class="callout callout-info">
+        <strong>Lesson:</strong> The architecture that gets you to 1M users is rarely the architecture that gets you to 100M. Plan for evolution, not perfection.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-film icon-gap"></i> Netflix — Chaos as a Strategy</span></h3>
+    <div class="card-body">
+      <p>Netflix serves <strong>100M+ concurrent streams</strong> across 190+ countries. Their secret isn't just good architecture — it's intentionally breaking things. They invented <strong><span class="tooltip-trigger">Chaos Monkey<span class="tooltip-content">A tool created by Netflix that randomly kills servers in production to test that the system survives failures automatically.</span></span></strong>, a tool that randomly kills servers in production. Why? Because if your system can survive random failures during normal traffic, it can survive anything.</p>
+      <p>Netflix runs <strong><span class="tooltip-trigger">active-active<span class="tooltip-content">A setup where multiple data centers all serve live traffic simultaneously, as opposed to active-passive where backup centers sit idle until needed.</span></span> across 3 AWS regions</strong>. If an entire region goes down (it has happened), traffic automatically routes to the surviving regions. They also built their own CDN — <strong>Open Connect</strong> — placing Netflix servers directly inside ISPs worldwide. This means your stream travels the shortest possible path from cache to your TV.</p>
+      <div class="callout callout-info">
+        <strong>Lesson:</strong> At massive scale, failures aren't exceptions — they're expected. Design for failure from day one rather than bolting on reliability as an afterthought.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-hashtag icon-gap"></i> Slack — The WebSocket Challenge</span></h3>
+    <div class="card-body">
+      <p>Slack went from a tiny gaming startup to <strong>750,000+ organizations</strong> sending billions of messages per week. Their unique scaling challenge? WebSockets. Unlike typical web apps where you request a page and get a response, Slack maintains a <strong>persistent, always-open connection</strong> for every active user. That means the servers need to hold millions of open connections simultaneously.</p>
+      <p>The problem compounds because each message in a channel needs to be pushed to every online member of that channel — instantly. A 5,000-person company channel means one message triggers 5,000 WebSocket pushes. Slack solved this with connection gateways (dedicated servers just for holding WebSocket connections) separated from the business logic servers that process messages.</p>
+      <div class="callout callout-info">
+        <strong>Lesson:</strong> Connection-oriented protocols (WebSockets, long-polling) create fundamentally different scaling challenges than request/response HTTP. Count your <em>concurrent connections</em>, not just your QPS.
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Scale</th>
+          <th>Key Strategy</th>
+          <th>Scaling Type</th>
+          <th>Main Bottleneck</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>WhatsApp</strong></td><td>2B users, 50 engineers</td><td>Erlang + FreeBSD + discipline</td><td>Vertical-first</td><td>Connections per server</td></tr>
+        <tr><td><strong>Instagram</strong></td><td>30M users, 5 engineers</td><td>Heavy caching (Redis + Memcached)</td><td>Cache-driven</td><td>Read throughput</td></tr>
+        <tr><td><strong>Twitter</strong></td><td>300K+ QPS reads</td><td>Pre-computed timelines + JVM migration</td><td>Horizontal rewrite</td><td>Fan-out writes</td></tr>
+        <tr><td><strong>Netflix</strong></td><td>100M+ concurrent streams</td><td>Multi-region active-active + own CDN</td><td>Global distribution</td><td>Bandwidth</td></tr>
+        <tr><td><strong>Slack</strong></td><td>750K orgs, billions of msgs</td><td>WebSocket gateways + message routing</td><td>Connection-oriented</td><td>Persistent connections</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>Notice the pattern:</strong> No two companies scaled the same way. WhatsApp went vertical. Instagram cached everything. Twitter rewrote everything. Netflix distributed globally. Slack separated connections from logic. The right scaling strategy depends on YOUR specific bottleneck — there's no universal answer.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — The Anti-Lesson (When Scaling Goes Wrong)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">The Anti-Lesson — When Scaling Goes Wrong</h2>
+    </div>
+  </div>
+
+  <p>Scaling isn't always heroic. For every Netflix success story, there are hundreds of teams that scaled the <em>wrong</em> thing, at the <em>wrong</em> time, for the <em>wrong</em> reasons — and wasted months of engineering effort in the process. Here are the three most common ways scaling goes sideways.</p>
+
+  <!-- SVG: The scaling mistakes spectrum -->
+  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three common scaling mistakes: too early, wrong target, over-engineered">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Three Scaling Sins</text>
+
+    <!-- Sin 1: Too Early -->
+    <rect x="30" y="45" width="220" height="140" rx="12" fill="#1e293b" stroke="#f43f5e" stroke-width="2"/>
+    <text x="140" y="72" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="700" font-size="13">Too Early</text>
+    <text x="140" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Building for 1M users</text>
+    <text x="140" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">when you have 100</text>
+    <line x1="80" y1="125" x2="200" y2="125" stroke="#334155" stroke-width="1"/>
+    <text x="140" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Cost: months of wasted</text>
+    <text x="140" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">engineering on infra</text>
+    <text x="140" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">nobody uses</text>
+
+    <!-- Sin 2: Wrong Target -->
+    <rect x="270" y="45" width="220" height="140" rx="12" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="380" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">Wrong Target</text>
+    <text x="380" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Adding app servers when</text>
+    <text x="380" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">the DB is the bottleneck</text>
+    <line x1="320" y1="125" x2="440" y2="125" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Cost: 10 new servers</text>
+    <text x="380" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">all waiting on the</text>
+    <text x="380" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">same slow query</text>
+
+    <!-- Sin 3: Over-Engineered -->
+    <rect x="510" y="45" width="220" height="140" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="620" y="72" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="13">Over-Engineered</text>
+    <text x="620" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Microservices + K8s + Kafka</text>
+    <text x="620" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">for a CRUD app with 500 users</text>
+    <line x1="560" y1="125" x2="680" y2="125" stroke="#334155" stroke-width="1"/>
+    <text x="620" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Cost: 6 months building</text>
+    <text x="620" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">infrastructure instead</text>
+    <text x="620" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">of product features</text>
+
+    <!-- Bottom bar -->
+    <rect x="130" y="200" width="500" height="3" rx="2" fill="linear-gradient(90deg, #f43f5e, #f59e0b, #a78bfa)"/>
+  </svg>
+
+  <!-- Collapsible 1: Premature Scaling -->
+  <div class="collapsible open">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span><strong>Sin 1: Premature Scaling</strong> — solving tomorrow's problem instead of today's</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>You have 100 users. You spend 3 months building a Kubernetes cluster with auto-scaling, Redis caching layer, message queues, and a sharded database. Your system can now handle 10 million users. Impressive, right?</p>
+        <p>Except your product hasn't found <span class="tooltip-trigger">product-market fit<span class="tooltip-content">The point where your product satisfies a real market demand. Before achieving it, investing heavily in infrastructure is premature.</span></span> yet. You pivot. Half that infrastructure is now useless. The three months you spent on scaling could have been spent talking to customers, iterating on features, and actually figuring out what users want. Premature scaling is the engineering equivalent of buying a 747 before you've confirmed anyone wants to fly.</p>
+        <div class="callout callout-success">
+          <strong>The fix:</strong> Follow the "Rule of 10." Only solve your <em>current</em> order of magnitude. If you have 1K users, build for 10K. If you have 10K, build for 100K. Don't skip levels. You'll learn what actually breaks at each stage, which is far more valuable than guessing.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2: Scaling the Wrong Thing -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Sin 2: Scaling the Wrong Thing</strong> — adding servers while ignoring the real bottleneck</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Your app is slow. Your instinct is "add more app servers." So you go from 4 servers to 12. The app is still slow. Why? Because all 12 servers are making the same slow database query that takes 3 seconds. The bottleneck was never the app servers — it was one missing database index.</p>
+        <p>This happens more than you'd think. Teams throw hardware at performance problems without first measuring where the time is actually spent. It's like adding more cashiers at a grocery store when the problem is that the shelves are empty — more cashiers doesn't help if there's nothing to sell.</p>
+        <div class="callout callout-success">
+          <strong>The fix:</strong> Always profile before scaling. Use monitoring tools (<span class="tooltip-trigger">APM<span class="tooltip-content">Application Performance Monitoring — tools like Datadog, New Relic, or Dynatrace that track where time is spent in your application.</span></span>, database slow query logs, flame graphs) to find the <em>actual</em> bottleneck. 80% of the time it's the database or a single slow endpoint, not the number of app servers.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3: Over-Engineering -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Sin 3: Over-Engineering</strong> — building Netflix infrastructure for a to-do app</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>You read about microservices, Kubernetes, event sourcing, and CQRS. They sound powerful. So you build your simple CRUD app as 12 microservices with Kafka for event streaming, Kubernetes for orchestration, separate read and write databases, and a service mesh. Your team of 3 now spends 60% of their time on infrastructure instead of features.</p>
+        <p>The irony? Your app has 500 users. A single Django/Rails/Express server with a PostgreSQL database would handle that traffic effortlessly — and you'd ship features 5x faster. Technology selection should match your <em>actual</em> needs, not your aspirations.</p>
+        <div class="callout callout-success">
+          <strong>The fix:</strong> Start with the simplest architecture that works: one app server, one database, one cache (maybe). Add complexity only when you have <em>evidence</em> (metrics, profiling, user growth) that you need it. Every added service is a new thing that can break, a new deployment to manage, and a new source of latency.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — Common Mistakes
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-bug"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — Myths &amp; Misconceptions</h2>
+    </div>
+  </div>
+
+  <p>Scalability is one of those topics where "common knowledge" is often wrong. Here are six mistakes that even experienced engineers make — and the truth behind each one.</p>
+
+  <!-- SVG: Myths vs Reality -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six common scalability myths shown as crossed-out beliefs">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Common Beliefs That Get You Into Trouble</text>
+
+    <!-- Row 1 -->
+    <rect x="20" y="40" width="230" height="45" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="135" y="60" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">"SQL doesn't scale"</text>
+    <text x="135" y="76" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">Facebook runs MySQL at massive scale</text>
+
+    <rect x="265" y="40" width="230" height="45" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="380" y="60" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">"More servers = faster"</text>
+    <text x="380" y="76" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">Not if the bottleneck is elsewhere</text>
+
+    <rect x="510" y="40" width="230" height="45" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="625" y="60" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">"Scaling = performance"</text>
+    <text x="625" y="76" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">Different problems, different solutions</text>
+
+    <!-- Row 2 -->
+    <rect x="20" y="100" width="230" height="45" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="135" y="120" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">"Stateless is always better"</text>
+    <text x="135" y="136" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">WebSockets and caches are stateful</text>
+
+    <rect x="265" y="100" width="230" height="45" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="380" y="120" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">"Cloud auto-scales everything"</text>
+    <text x="380" y="136" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">Your DB won't auto-scale itself</text>
+
+    <rect x="510" y="100" width="230" height="45" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="625" y="120" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">"10x servers = 10x capacity"</text>
+    <text x="625" y="136" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">Coordination overhead eats gains</text>
+
+    <!-- Bottom note -->
+    <text x="380" y="180" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10" font-style="italic">Each belief sounds reasonable — but leads to expensive mistakes at scale</text>
+  </svg>
+
+  <!-- Mistake 1 -->
+  <div class="collapsible open">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span><strong>Mistake 1:</strong> "Relational databases don't scale"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>This is probably the most pervasive myth in system design. People hear "NoSQL scales better" and assume PostgreSQL or MySQL can't handle large workloads. The truth? <strong>Facebook runs MySQL</strong> at a scale most NoSQL databases never see. Instagram uses PostgreSQL. Shopify runs MySQL for millions of merchants.</p>
+        <p>Relational databases scale just fine — especially with read replicas, connection pooling, proper indexing, and partitioning. The real question isn't "SQL or NoSQL?" but "What's my access pattern?" If you need flexible queries, transactions, and strong consistency, a relational database with proper scaling techniques is often the best choice.</p>
+        <div class="callout callout-info">
+          <strong>Reality:</strong> The choice between SQL and NoSQL should be based on your data model and access patterns — not on a myth about scale limits.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 2:</strong> Scaling before identifying the bottleneck</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>You notice the app is slow. Instead of profiling, you immediately spin up 5 more servers. The app is still slow because the bottleneck was a single database query doing a full table scan. Now you have 8 servers all waiting on the same slow query instead of 3.</p>
+        <p>This is the engineering equivalent of a doctor prescribing surgery before running tests. <strong>Measure first, scale second.</strong> Use tools like APMs (Application Performance Monitoring), database slow query logs, and distributed tracing to find where time is actually being spent.</p>
+        <div class="callout callout-info">
+          <strong>Rule of thumb:</strong> If you can't name the specific bottleneck (CPU? Disk I/O? Network? Lock contention? Missing index?), you're not ready to scale.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 3:</strong> Ignoring stateful vs stateless</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Scaling a <strong>stateless</strong> service (like a web API that just computes and responds) is easy — just add more instances behind a load balancer. Any server can handle any request. But scaling a <strong>stateful</strong> service (like a WebSocket server holding user connections, or a cache holding session data) is fundamentally different.</p>
+        <p>With stateful services, you can't just route any request to any server. The server holding User A's WebSocket connection is the only one that can push messages to User A. This means you need <span class="tooltip-trigger">sticky sessions<span class="tooltip-content">A load balancer configuration that routes a user's requests to the same server every time, needed when the server holds state for that user.</span></span>, state replication, or a separate state management layer. Ignoring this distinction leads to "works on one server, breaks on two" bugs.</p>
+        <div class="callout callout-info">
+          <strong>Strategy:</strong> Separate state from compute whenever possible. Keep your app servers stateless, and push all state into dedicated services (Redis, databases, message brokers) designed for distributed state.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 4 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 4:</strong> Forgetting that more servers = more failure points</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>If one server has a 0.1% chance of failing on any given day, and you have 1,000 servers, you'll see roughly <strong>one failure every day</strong>. With 10,000 servers, you'll see 10 failures per day. At Netflix scale (tens of thousands of servers), hardware failures are a constant background noise.</p>
+        <p>Scaling horizontally doesn't just add capacity — it adds complexity. More servers mean more network hops, more things to monitor, more deployments to coordinate, and more opportunities for partial failures. Your system needs to be designed to tolerate failure, not just avoid it.</p>
+        <div class="callout callout-info">
+          <strong>Key insight:</strong> At scale, failures aren't bugs — they're features of the environment. Design for <span class="tooltip-trigger">graceful degradation<span class="tooltip-content">The ability of a system to continue operating at reduced functionality when part of it fails, rather than crashing completely.</span></span> from day one.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 5 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 5:</strong> Not considering cost (10x servers does not equal 10x value)</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Scaling has diminishing returns. Going from 1 server to 2 might double your capacity. Going from 100 to 200 probably won't — because of coordination overhead, lock contention, database bottlenecks, and network latency between services. Meanwhile, your cloud bill literally doubles.</p>
+        <p>Worse, many teams don't track cost-per-request as they scale. They see "we handled the traffic spike!" but don't realize they spent $50,000/month doing what could have been done for $5,000/month with better architecture (caching, query optimization, CDN). Always ask: "Is there a cheaper way to handle this load?"</p>
+        <div class="callout callout-info">
+          <strong>Ask before scaling:</strong> What's my cost per 1,000 requests? If scaling 10x costs 10x but only delivers 5x capacity, there's an architectural problem to fix first.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 6 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><strong>Mistake 6:</strong> Confusing scaling with performance optimization</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Scaling</strong> means handling more load (more users, more requests, more data). <strong>Performance optimization</strong> means making existing load faster (lower latency, better throughput per server). They overlap but they're different problems with different solutions.</p>
+        <p>If each request takes 500ms, adding more servers lets you handle more requests simultaneously — but each individual request still takes 500ms. That's scaling. To make each request take 50ms instead, you'd optimize your code, fix slow queries, add caching — that's performance. The best systems do both, but mixing them up leads to solving the wrong problem.</p>
+        <div class="callout callout-info">
+          <strong>Simple test:</strong> Is the problem "too many requests for our servers" (scaling) or "each request is too slow" (performance)? The answer determines your strategy.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — Interview Playbook
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-microphone"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — How to Talk About Scaling</h2>
+    </div>
+  </div>
+
+  <p>Scalability comes up in <em>every</em> system design interview. The interviewer doesn't expect you to build Netflix in 45 minutes. What they want is to see that you <strong>think about scale systematically</strong> — that you start simple, identify bottlenecks, and evolve the design with evidence. Here's how to structure that conversation.</p>
+
+  <div class="callout callout-success">
+    <strong>The magic phrase:</strong> "I'll start with the simplest architecture that works, then scale based on the numbers." — This single sentence tells the interviewer you understand the core principle of scalability.
+  </div>
+
+  <!-- SVG: Interview flow for scaling discussion -->
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How to discuss scaling in a 45-minute interview: 4 phases">
+    <defs>
+      <marker id="sca-s12-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Scaling in a 45-Minute Interview</text>
+
+    <!-- Phase 1: Minutes 0-5 -->
+    <rect x="30" y="45" width="160" height="110" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+    <text x="110" y="68" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="12">Minutes 0-5</text>
+    <text x="110" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Clarify requirements</text>
+    <text x="110" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Ask: How many users?</text>
+    <text x="110" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Read/write ratio?</text>
+    <text x="110" y="133" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Peak vs average?</text>
+    <line x1="190" y1="100" x2="220" y2="100" stroke="#f59e0b" stroke-width="2" marker-end="url(#sca-s12-arr)"/>
+
+    <!-- Phase 2: Minutes 5-15 -->
+    <rect x="220" y="45" width="160" height="110" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="300" y="68" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Minutes 5-15</text>
+    <text x="300" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Start simple</text>
+    <text x="300" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Single server design</text>
+    <text x="300" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Show it works at</text>
+    <text x="300" y="133" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">small scale first</text>
+    <line x1="380" y1="100" x2="410" y2="100" stroke="#f59e0b" stroke-width="2" marker-end="url(#sca-s12-arr)"/>
+
+    <!-- Phase 3: Minutes 15-30 -->
+    <rect x="410" y="45" width="160" height="110" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="490" y="68" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="12">Minutes 15-30</text>
+    <text x="490" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Scale it up</text>
+    <text x="490" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Identify bottlenecks</text>
+    <text x="490" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Add LB, cache, replicas</text>
+    <text x="490" y="133" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Justify each change</text>
+    <line x1="570" y1="100" x2="600" y2="100" stroke="#f59e0b" stroke-width="2" marker-end="url(#sca-s12-arr)"/>
+
+    <!-- Phase 4: Minutes 30-45 -->
+    <rect x="600" y="45" width="140" height="110" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="670" y="68" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="12">Minutes 30-45</text>
+    <text x="670" y="88" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Deep dive</text>
+    <text x="670" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Trade-offs</text>
+    <text x="670" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Edge cases</text>
+    <text x="670" y="133" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Failure handling</text>
+
+    <!-- Sample dialogue box -->
+    <rect x="60" y="190" width="640" height="110" rx="10" fill="#0f172a" stroke="#475569" stroke-width="1.5"/>
+    <text x="380" y="212" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="12">Sample Dialogue</text>
+    <text x="80" y="235" fill="#38bdf8" font-family="JetBrains Mono,monospace" font-size="10">Interviewer:</text>
+    <text x="195" y="235" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"This handles 10K users. What if we need to support 10 million?"</text>
+    <text x="80" y="258" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="10">You:</text>
+    <text x="120" y="258" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">"Great question. Let me work through the numbers. 10M users x 10 req/day = 100M req/day</text>
+    <text x="120" y="275" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">= ~1,200 QPS avg, ~3,600 QPS peak. Our single DB handles ~1K QPS, so the database is</text>
+    <text x="120" y="292" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">the bottleneck. I'd add read replicas and a caching layer before adding more app servers."</text>
+  </svg>
+
+  <!-- Tabbed: Beginner | Intermediate | Advanced approaches -->
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="sca-int-beginner" role="tab" aria-selected="true">Beginner</button>
+      <button class="tab-btn" data-tab="sca-int-intermediate" role="tab" aria-selected="false">Intermediate</button>
+      <button class="tab-btn" data-tab="sca-int-advanced" role="tab" aria-selected="false">Advanced</button>
+    </div>
+    <div class="tab-panel active" id="sca-int-beginner" role="tabpanel">
+      <h4>Beginner: Show You Know the Vocabulary</h4>
+      <p>At minimum, show you understand the basic scaling concepts:</p>
+      <ul>
+        <li><strong>Vertical scaling</strong> — make the server bigger (more RAM, faster CPU)</li>
+        <li><strong>Horizontal scaling</strong> — add more servers behind a load balancer</li>
+        <li><strong>Caching</strong> — store frequently-read data in memory so you don't hit the database every time</li>
+        <li><strong>Database replication</strong> — copy your database to multiple machines so reads can be spread across them</li>
+      </ul>
+      <p>Even if your design is simple, <strong>naming these concepts</strong> and saying when you'd apply them shows the interviewer you have the foundation.</p>
+    </div>
+    <div class="tab-panel" id="sca-int-intermediate" role="tabpanel">
+      <h4>Intermediate: Show You Can Do the Math</h4>
+      <p>The interviewer is impressed when you back up your scaling decisions with numbers:</p>
+      <ul>
+        <li><strong>Estimate QPS</strong> — "10M users x 20% DAU x 5 requests = 10M requests/day = ~115 QPS average, ~350 QPS peak"</li>
+        <li><strong>Identify the bottleneck</strong> — "At 350 QPS, the app servers are fine (each handles 500 QPS). But the database needs read replicas."</li>
+        <li><strong>Size your cache</strong> — "80/20 rule: cache the top 20% of data. 1M records x 20% x 2 KB = 400 MB — fits in one Redis node."</li>
+        <li><strong>Compare costs</strong> — "Adding a $200/month Redis node eliminates 80% of DB load vs. adding a $500/month read replica."</li>
+      </ul>
+    </div>
+    <div class="tab-panel" id="sca-int-advanced" role="tabpanel">
+      <h4>Advanced: Show You Understand Trade-offs</h4>
+      <p>At senior level, interviewers want to see trade-off reasoning:</p>
+      <ul>
+        <li><strong>CAP theorem implications</strong> — "If we add a second region for availability, we accept eventual consistency on writes. Is that acceptable for this use case?"</li>
+        <li><strong>Sharding strategy</strong> — "We can shard by user ID (even distribution) or by geography (data locality). For a chat app, geography makes more sense because most conversations are within the same region."</li>
+        <li><strong>Graceful degradation</strong> — "During a traffic spike, we can serve stale cached data rather than overloading the database and returning errors."</li>
+        <li><strong>Cost optimization</strong> — "Instead of 100 always-on servers for a 30-minute daily peak, we use auto-scaling with spot instances — cutting costs by 60%."</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>Common interview mistake:</strong> Don't jump to microservices, Kubernetes, or sharding in the first 5 minutes. The interviewer wants to see you <em>evolve</em> the design. Start with a monolith. Let the numbers tell you when and what to scale. The journey matters more than the destination.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — Hands-On Challenges
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="challenges">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Hands-On Challenges — Practice Scaling Decisions</h2>
+    </div>
+  </div>
+
+  <p>Scalability is a muscle that gets stronger with practice. These five challenges range from beginner to expert. For each one, think through the problem before opening the hint. Real interviews don't have hints — build that habit now.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 1: Blog Scaling Plan <span class="difficulty-tag difficulty-beginner">Beginner</span></div>
+    <p>Your personal blog gets <strong>100 readers per day</strong>. You write a viral post and traffic grows to <strong>100,000 readers per day</strong>. List the scaling steps <em>in order</em> — what do you do first, second, third? Assume you're currently running a single server with WordPress and MySQL.</p>
+    <p><em>Time target: 3 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Think about the cheapest, fastest wins first. What can you do without changing your architecture at all? (Hint: CDN, caching plugin). Then think about what breaks first at 100K readers — it's probably the database, not the app server.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ol>
+            <li><strong>Add a CDN</strong> (Cloudflare free tier) — serves static files (images, CSS, JS) from edge servers. Zero code changes, 10 minutes to set up. Handles 80% of the bandwidth.</li>
+            <li><strong>Add page caching</strong> (WP Super Cache or Varnish) — serve pre-rendered HTML instead of hitting PHP + MySQL on every request. Single biggest performance win.</li>
+            <li><strong>Upgrade the server</strong> (vertical scaling) — if still struggling, move from a $5/month VPS to a $40/month one. More RAM = more cache = faster database queries.</li>
+            <li><strong>Add a MySQL read replica</strong> — if the database is the bottleneck (common with comment-heavy posts), offload reads to a replica.</li>
+            <li><strong>Separate static and dynamic</strong> — move images to object storage (S3 + CDN), keep the server focused on dynamic content only.</li>
+          </ol>
+          <p><strong>Key insight:</strong> You went from 100 to 100K readers without adding a single extra app server. Caching and CDN handled a 1,000x increase. That's the power of solving the right problem.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 2: Chat App Scaling Strategy <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>Design the scaling strategy for a real-time chat app growing from <strong>10,000 to 1,000,000 users</strong>. The app uses WebSockets for real-time messaging. Each user averages 50 messages per day. Each message is 200 bytes. What breaks first, and how do you fix it?</p>
+    <p><em>Time target: 5 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>With WebSockets, think about <em>concurrent connections</em>, not just QPS. If 20% of users are online at any time, that's 200K persistent connections at 1M users. A typical server handles ~50K WebSocket connections. Also consider: how does Server A send a message to a user connected to Server B?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li><strong>At 10K users:</strong> ~2K concurrent connections. One server handles this easily. Single PostgreSQL database. Simple architecture.</li>
+            <li><strong>At 100K users:</strong> ~20K concurrent connections. Still one server, but add a Redis pub/sub layer for message routing (prepares for multi-server). Add read replicas for message history queries.</li>
+            <li><strong>At 500K users:</strong> ~100K concurrent connections. Need 2-3 WebSocket servers behind a load balancer with sticky sessions. Redis pub/sub routes messages between servers. This is where the "which server has this user?" problem appears — add a connection registry in Redis.</li>
+            <li><strong>At 1M users:</strong> ~200K concurrent connections. 4-5 WebSocket gateway servers. Separate message processing from connection handling. Shard the database by user ID. Add a message queue (Kafka) between gateway and processing to handle burst traffic.</li>
+          </ul>
+          <p><strong>The bottleneck evolution:</strong> CPU (10K) → Connections per server (100K) → Cross-server routing (500K) → Database writes + connection registry (1M). Each stage has a different bottleneck.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 3: Database Read Scaling <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>Your database handles <strong>5,000 reads per second</strong> but you need <strong>50,000 reads per second</strong>. The data is 500 GB total. Read latency must stay under 10ms. What's your plan? List at least 3 approaches in order of preference.</p>
+    <p><em>Time target: 4 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>You need a 10x improvement. Think about the 80/20 rule — are 80% of reads hitting 20% of the data? If so, caching can absorb most of the load. If reads are evenly distributed, you'll need read replicas. Also consider: is the data structured in a way that supports partitioning?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ol>
+            <li><strong>Add Redis/Memcached cache</strong> (first choice) — if the access pattern is skewed (it usually is), cache the top 20% of data. 500 GB x 20% = 100 GB in Redis. Cache hit rate of 80%+ reduces DB reads from 50K to ~10K QPS. Cost: ~$500/month for a Redis cluster.</li>
+            <li><strong>Add read replicas</strong> (second choice) — create 4-5 PostgreSQL read replicas. Each handles ~5K QPS. With 5 replicas + primary, you get 30K QPS. Combined with caching, this easily exceeds 50K. Replication lag is usually under 100ms.</li>
+            <li><strong>Optimize queries + indexing</strong> (do this regardless) — review slow query logs. Missing indexes can make a query 100x slower. Adding the right composite index might double your effective QPS for free.</li>
+            <li><strong>Partition the data</strong> (if needed) — if queries are naturally scoped (e.g., by date range or user region), partition the table. Each partition is smaller and faster to query.</li>
+          </ol>
+          <p><strong>Key insight:</strong> Cache + replicas + indexing together can often achieve a 20-50x improvement without any application code changes. Sharding (splitting data across multiple databases) is the last resort, not the first.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 4: Multi-Region Payment System <span class="difficulty-tag difficulty-advanced">Advanced</span></div>
+    <p>Design a multi-region scaling strategy for a <strong>payment processing system</strong> that operates in 3 continents (North America, Europe, Asia). Requirements: under 200ms latency for all users, zero data loss on transactions, and compliance with data residency laws (EU data must stay in EU). How do you architect this?</p>
+    <p><em>Time target: 7 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Cross-continent latency is ~150ms one way. So a single-region database can't meet the 200ms SLA for users on the other side of the world. You need regional databases. But payment data needs strong consistency — eventual consistency isn't acceptable when money is involved. Think about which data is regional (user profiles, transaction history) vs global (exchange rates, merchant catalogs).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li><strong>Regional primary databases</strong> — each region (NA, EU, Asia) has its own primary database for users in that region. EU user data stays in EU (GDPR compliance). Transactions are processed locally for low latency.</li>
+            <li><strong>Cross-region reconciliation</strong> — for cross-border payments (US user pays EU merchant), use an async reconciliation service. The payment is recorded locally first (sub-200ms), then reconciled across regions asynchronously.</li>
+            <li><strong>Global read replicas</strong> — non-sensitive data (exchange rates, merchant catalogs) is replicated globally for fast reads. Use eventual consistency here since stale exchange rates for a few seconds are acceptable.</li>
+            <li><strong>Idempotency keys</strong> — every payment request includes a unique key. If a network glitch causes a retry, the system recognizes the duplicate and doesn't charge twice. This is essential for distributed payment systems.</li>
+            <li><strong>Regional failover</strong> — if the EU region goes down, route EU traffic to a warm standby in NA. Data residency is temporarily violated but service continues. Have legal pre-approval for this scenario.</li>
+          </ul>
+          <p><strong>Trade-off:</strong> You sacrifice simplicity (one database) for latency, compliance, and availability. The reconciliation layer adds complexity but keeps each region fast and independent.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 5: Flash Sale Surge Planning <span class="difficulty-tag difficulty-expert">Expert</span></div>
+    <p>Your e-commerce system handles <strong>100,000 requests/second</strong> normally. A flash sale is announced that's expected to bring <strong>10,000,000 requests/second</strong> for exactly 30 minutes. You have 2 weeks to prepare. Plan the entire strategy — infrastructure, architecture changes, failover, and graceful degradation.</p>
+    <p><em>Time target: 10 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>100x normal traffic for 30 minutes. You can't just 100x your servers — that would be absurdly expensive and most cloud providers need advance notice for that scale. Think in layers: (1) What can you serve from CDN/cache without hitting servers at all? (2) What can you queue instead of process immediately? (3) What features can you temporarily disable? (4) How do you protect your database from the flood?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Full Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Week 1 — Architecture preparation:</strong></p>
+          <ul>
+            <li><strong>Static content → CDN</strong>: Pre-render product pages as static HTML. Serve from CDN at edge. This handles 90% of "browsing" traffic without touching your servers.</li>
+            <li><strong>Virtual queue</strong>: When the sale starts, put users in a fair queue. Show a "you're #45,231 in line" page (served from CDN). Only let N users into the actual purchase flow at a time.</li>
+            <li><strong>Inventory in Redis</strong>: Move inventory counts from the database to Redis. Decrement atomically with DECR. Only write to the database when a purchase is confirmed.</li>
+            <li><strong>Order queue</strong>: Purchases go into a message queue (Kafka/SQS), not directly to the database. Process them asynchronously. The user sees "Order confirmed!" immediately while the actual processing happens in the background.</li>
+          </ul>
+          <p><strong>Week 2 — Infrastructure + testing:</strong></p>
+          <ul>
+            <li><strong>Pre-warm auto-scaling</strong>: Contact cloud provider to pre-provision capacity. Auto-scaling is too slow for a 100x spike — it takes minutes to spin up servers while requests are failing.</li>
+            <li><strong>Rate limiting</strong>: Max 1 purchase per user per sale item. Block bots with CAPTCHA on checkout.</li>
+            <li><strong>Feature toggles</strong>: Disable recommendations, reviews, wishlists during the 30-minute window. Focus all compute on browsing and purchasing.</li>
+            <li><strong>Load test</strong>: Simulate 10M req/sec with a load testing tool. Find the actual breaking points before the real event.</li>
+            <li><strong>Graceful degradation plan</strong>: If things go wrong, serve a "sale temporarily paused" page (from CDN) while you recover. Better than a crash page.</li>
+          </ul>
+          <p><strong>The key insight:</strong> You don't actually need 10M req/sec at your servers. By using CDN (90%), virtual queue (rate control), and async processing (smooth out writes), your actual server load might only be 500K-1M req/sec — a 5-10x increase, not 100x.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — Quick Reference (Cheat Cards)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-cards">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-bookmark"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Quick Reference — Cheat Cards</h2>
+    </div>
+  </div>
+
+  <p>Bookmark this section. Six cards covering the scaling decisions you'll face most often — in interviews, at work, or while whiteboarding a new system.</p>
+
+  <div class="grid-3">
+    <!-- Card 1: Scaling Decision Tree -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Scaling Decision Tree</div>
+      <div class="cheat-card-body"><pre>Is it slow?
+├─ Single request slow → Optimize
+│  ├─ Slow query → Add index
+│  ├─ Slow API → Add cache
+│  └─ CPU-bound → Optimize code
+└─ Too many requests → Scale
+   ├─ Reads heavy → Cache + replicas
+   ├─ Writes heavy → Shard + queue
+   └─ Both → All of the above</pre></div>
+    </div>
+
+    <!-- Card 2: Vertical vs Horizontal -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Vertical vs Horizontal</div>
+      <div class="cheat-card-body"><pre>VERTICAL (Scale Up)
++ Simple, no code changes
++ No distributed complexity
+- Hardware ceiling exists
+- Single point of failure
+
+HORIZONTAL (Scale Out)
++ Near-infinite capacity
++ Better fault tolerance
+- Distributed complexity
+- State management needed</pre></div>
+    </div>
+
+    <!-- Card 3: When to Use Each Technique -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">When to Use Each Technique</div>
+      <div class="cheat-card-body"><pre>CDN        → Static content
+Cache      → Read-heavy, repeat data
+Replicas   → Read scaling, HA
+Sharding   → Write scaling, big data
+Queue      → Burst traffic, async
+LB         → Multiple app servers
+Partitions → Time-series, geo data</pre></div>
+    </div>
+
+    <!-- Card 4: Bottleneck Checklist -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Bottleneck Checklist</div>
+      <div class="cheat-card-body"><pre>□ CPU > 80%? → Scale compute
+□ Memory > 85%? → Add RAM / cache
+□ Disk I/O saturated? → SSD / shard
+□ Network bandwidth? → CDN / compress
+□ DB connections maxed? → Pool / read
+□ Lock contention? → Shard / redesign
+□ Single slow query? → Index / rewrite</pre></div>
+    </div>
+
+    <!-- Card 5: Key Numbers -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Key Numbers to Know</div>
+      <div class="cheat-card-body"><pre>Web server:     1-10K QPS
+Redis:          100K+ ops/sec
+PostgreSQL:     5-20K QPS (tuned)
+MySQL:          5-15K QPS (tuned)
+Kafka:          100K+ msg/sec/partition
+S3:             5,500 GET/sec/prefix
+WebSocket:      50K conn/server
+Load balancer:  100K+ QPS</pre></div>
+    </div>
+
+    <!-- Card 6: Cost Rules of Thumb -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Cost Rules of Thumb</div>
+      <div class="cheat-card-body"><pre>Before adding servers, try:
+1. Add an index       (free)
+2. Add caching        ($50/mo)
+3. Add CDN            ($20/mo)
+4. Optimize queries   (free)
+5. Add read replica   ($200/mo)
+6. Vertical scale     ($100/mo)
+7. Horizontal scale   ($$$)
+8. Shard database     ($$$$)</pre></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — Connected Topics
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>Scalability doesn't exist in a vacuum — it connects to almost every other system design topic. Here's how what you learned in this page feeds into the rest of your learning journey.</p>
+
+  <!-- SVG: Topic connection map -->
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How scalability connects to other system design topics">
+    <defs>
+      <marker id="sca-s15-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+      </marker>
+    </defs>
+    <!-- Center: Scalability -->
+    <rect x="280" y="120" width="200" height="70" rx="14" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="2.5"/>
+    <text x="380" y="150" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="800" font-size="14">SCALABILITY</text>
+    <text x="380" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Vertical, Horizontal, Techniques</text>
+
+    <!-- Estimation (top-left) -->
+    <rect x="30" y="20" width="170" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="115" y="45" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="12">Estimation</text>
+    <text x="115" y="60" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Numbers trigger scaling decisions"</text>
+    <line x1="290" y1="130" x2="197" y2="65" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#sca-s15-arr)"/>
+
+    <!-- Reliability (top-right) -->
+    <rect x="550" y="20" width="170" height="55" rx="10" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="635" y="45" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="12">Reliability</text>
+    <text x="635" y="60" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"More servers = more failure points"</text>
+    <line x1="470" y1="130" x2="553" y2="65" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#sca-s15-arr)"/>
+
+    <!-- Load Balancers (right) -->
+    <rect x="560" y="120" width="170" height="55" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="645" y="145" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="12">Load Balancers</text>
+    <text x="645" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Distribute traffic across servers"</text>
+    <line x1="480" y1="155" x2="558" y2="150" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#sca-s15-arr)"/>
+
+    <!-- Caching (bottom-right) -->
+    <rect x="550" y="230" width="170" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="635" y="255" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="12">Caching Strategies</text>
+    <text x="635" y="270" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Scale reads without more servers"</text>
+    <line x1="460" y1="180" x2="553" y2="240" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#sca-s15-arr)"/>
+
+    <!-- Sharding (bottom-left) -->
+    <rect x="30" y="230" width="170" height="55" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="115" y="255" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="12">Sharding</text>
+    <text x="115" y="270" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Scale writes by splitting data"</text>
+    <line x1="300" y1="180" x2="197" y2="240" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#sca-s15-arr)"/>
+
+    <!-- Database (left) -->
+    <rect x="30" y="120" width="170" height="55" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="115" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="600" font-size="12">Database Fundamentals</text>
+    <text x="115" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"The DB is usually the bottleneck"</text>
+    <line x1="280" y1="155" x2="202" y2="150" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#sca-s15-arr)"/>
+  </svg>
+
+  <!-- Learning path SVG -->
+  <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Learning path: Estimation done, Scalability here, Reliability next">
+    <defs>
+      <marker id="sca-s15b-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+      </marker>
+      <marker id="sca-s15b-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+      </marker>
+    </defs>
+
+    <!-- Step 1: Estimation (done) -->
+    <rect x="30" y="30" width="160" height="55" rx="10" fill="rgba(16,185,129,0.12)" stroke="#10b981" stroke-width="2"/>
+    <text x="110" y="52" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Estimation</text>
+    <text x="110" y="70" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">Done</text>
+
+    <line x1="190" y1="57" x2="225" y2="57" stroke="#f59e0b" stroke-width="2" marker-end="url(#sca-s15b-arr)"/>
+
+    <!-- Step 2: Scalability (YOU ARE HERE) -->
+    <rect x="230" y="25" width="170" height="65" rx="10" fill="rgba(245,158,11,0.2)" stroke="#f59e0b" stroke-width="3"/>
+    <text x="315" y="48" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="800" font-size="12">Scalability</text>
+    <text x="315" y="65" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOU ARE HERE</text>
+    <text x="315" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Vertical, Horizontal, Techniques</text>
+
+    <line x1="400" y1="57" x2="435" y2="57" stroke="#64748b" stroke-width="2" marker-end="url(#sca-s15b-arr-g)"/>
+
+    <!-- Step 3: Reliability (next) -->
+    <rect x="440" y="30" width="170" height="55" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="525" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="600" font-size="12">Reliability</text>
+    <text x="525" y="70" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Up next</text>
+
+    <line x1="610" y1="57" x2="645" y2="57" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#sca-s15b-arr-g)"/>
+
+    <!-- Step 4: More... -->
+    <rect x="650" y="30" width="80" height="55" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="690" y="57" text-anchor="middle" fill="#475569" font-family="Inter,sans-serif" font-size="12">. . .</text>
+    <text x="690" y="73" text-anchor="middle" fill="#475569" font-family="Inter,sans-serif" font-size="9">LB, Caching, etc.</text>
+
+    <!-- Bottom label -->
+    <text x="380" y="112" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10" font-style="italic">Scalability decisions drive every topic that follows.</text>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="../estimation/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-calculator"></i></div>
+      <div class="related-card-text">
+        <h4>Back-of-Envelope Estimation</h4>
+        <p>The numbers that tell you when and how to scale</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="related-card-text">
+        <h4>Reliability &amp; Fault Tolerance</h4>
+        <p>What happens when scaled systems fail — and how to survive it</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div class="related-card-text">
+        <h4>Load Balancers</h4>
+        <p>The traffic cops that make horizontal scaling work</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="related-card-text">
+        <h4>Caching Strategies</h4>
+        <p>Scale reads by 10-100x without adding a single server</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+      <div class="related-card-text">
+        <h4>Sharding &amp; Partitioning</h4>
+        <p>When one database isn't enough — split data across machines</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Database Fundamentals</h4>
+        <p>SQL vs NoSQL, indexing, replication — the foundation of data scaling</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
