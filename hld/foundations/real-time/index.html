@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Real-Time Communication — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="blue" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-satellite-dish"></i> Networking Foundations</div>
+    <h1>Real-Time Communication</h1>
+    <p class="hero-subtitle">Four ways to make data show up the instant it happens — short polling, long polling, Server-Sent Events, and WebSockets. When to pick each, and how they scale.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 22 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-circle-info"></i> 17 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> Imagine you're waiting for a package. You could (1) call the post office every 5 minutes asking "is it here yet?", (2) call once and stay on the line until they say "it's here!", (3) ask them to call YOU when it arrives, or (4) set up a walkie-talkie so you can both talk whenever you want. Those are your four real-time strategies.
+  </div>
+
+  <p>Most of the web works on a simple pattern: the browser asks the server a question, the server answers, and the conversation is over. That's called <span class="tooltip-trigger">request-response<span class="tooltip-content">The standard HTTP model — the client sends a request, the server sends back a response, and the connection closes. Like sending a letter and waiting for a reply.</span></span>, and it powers every Google search, every page load, every form submission. But what happens when you need data to show up <em>the instant it happens</em> — a new chat message, a stock price change, a friend coming online?</p>
+
+  <p>That's the real-time problem, and there are exactly four mainstream solutions:</p>
+
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four real-time strategies overview">
+    <defs>
+      <marker id="rtc-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Four Ways to Get Real-Time Data</text>
+
+    <!-- Short Polling -->
+    <rect x="20" y="42" width="170" height="110" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="105" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Short Polling</text>
+    <text x="105" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"Are we there yet?"</text>
+    <text x="105" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Ask repeatedly on</text>
+    <text x="105" y="114" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">a timer (every N sec)</text>
+    <text x="105" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Simple but wasteful</text>
+
+    <!-- Long Polling -->
+    <rect x="205" y="42" width="170" height="110" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="290" y="65" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">Long Polling</text>
+    <text x="290" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"I'll wait right here"</text>
+    <text x="290" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Ask once, server holds</text>
+    <text x="290" y="114" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">the response until new data</text>
+    <text x="290" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Better, but still HTTP overhead</text>
+
+    <!-- SSE -->
+    <rect x="390" y="42" width="170" height="110" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="475" y="65" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Server-Sent Events</text>
+    <text x="475" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"Server calls you"</text>
+    <text x="475" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">One-way stream from</text>
+    <text x="475" y="114" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">server to client over HTTP</text>
+    <text x="475" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Great for push notifications</text>
+
+    <!-- WebSocket -->
+    <rect x="575" y="42" width="170" height="110" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="660" y="65" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">WebSockets</text>
+    <text x="660" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"Walkie-talkie"</text>
+    <text x="660" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Full two-way channel,</text>
+    <text x="660" y="114" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">always open, both sides talk</text>
+    <text x="660" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Most powerful, most complex</text>
+
+    <!-- Spectrum bar -->
+    <rect x="60" y="175" width="640" height="6" rx="3" fill="#334155"/>
+    <rect x="60" y="175" width="160" height="6" rx="3" fill="#ef4444" fill-opacity="0.5"/>
+    <rect x="220" y="175" width="160" height="6" rx="3" fill="#eab308" fill-opacity="0.5"/>
+    <rect x="380" y="175" width="160" height="6" rx="3" fill="#10b981" fill-opacity="0.5"/>
+    <rect x="540" y="175" width="160" height="6" rx="3" fill="#3b82f6" fill-opacity="0.5"/>
+    <text x="60" y="200" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Simplest</text>
+    <text x="700" y="200" text-anchor="end" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">Most Powerful</text>
+    <text x="380" y="200" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">← Complexity & Capability →</text>
+
+    <!-- Bottom summary -->
+    <rect x="60" y="215" width="640" height="50" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="237" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11" font-weight="600">Quick Rule of Thumb</text>
+    <text x="380" y="255" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Need one-way updates? → SSE.  Need two-way chat? → WebSocket.  Legacy/simple? → Long Polling.  Prototype? → Short Polling.</text>
+  </svg>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> Start with the simplest approach that meets your latency needs. Most apps don't need WebSockets — but the ones that do (chat, gaming, collaboration) can't live without them.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">Why You Need This — The Scenario</h2>
+    </div>
+  </div>
+
+  <p>You've just been asked to build a team chat application — think a simpler version of Slack. The core requirement sounds easy: when Alice sends a message, Bob should see it <em>immediately</em>. Not in 5 seconds. Not after refreshing the page. <strong>Instantly</strong>, like a text message on your phone.</p>
+
+  <p>You already know how normal websites work. The browser sends a request ("give me this page"), the server responds ("here you go"), and the connection closes. It's like ordering food at a counter — you ask, they hand it to you, transaction done. But chat is different. With chat, the server needs to <em>push</em> new messages to Bob the moment they arrive, even though Bob didn't ask for them. The server needs to tap Bob on the shoulder and say "hey, Alice just said something."</p>
+
+  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The core problem: server needs to push data to client">
+    <defs>
+      <marker id="rtc-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+      <marker id="rtc-s2-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Problem: HTTP Is Pull-Only</text>
+
+    <!-- Normal HTTP -->
+    <rect x="20" y="40" width="350" height="165" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+    <text x="195" y="65" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Normal HTTP (works fine)</text>
+    <rect x="50" y="80" width="80" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="90" y="102" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Browser</text>
+    <rect x="240" y="80" width="80" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="280" y="102" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Server</text>
+    <line x1="135" y1="90" x2="235" y2="90" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#rtc-s2-arr)"/>
+    <text x="185" y="85" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /page</text>
+    <line x1="235" y1="107" x2="135" y2="107" stroke="#10b981" stroke-width="1.5" marker-end="url(#rtc-s2-arr)"/>
+    <text x="185" y="120" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">200 OK + HTML</text>
+    <text x="195" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Client asks → Server answers → Done.</text>
+    <text x="195" y="168" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">✓ Perfect for loading pages</text>
+    <text x="195" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Connection opens, transfers data, closes.</text>
+
+    <!-- Chat problem -->
+    <rect x="390" y="40" width="350" height="165" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="565" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Chat App (broken!)</text>
+    <rect x="420" y="80" width="80" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="460" y="102" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Bob</text>
+    <rect x="610" y="80" width="80" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="650" y="102" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Server</text>
+    <line x1="595" y1="97" x2="505" y2="97" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#rtc-s2-arr-red)"/>
+    <text x="550" y="90" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">New message!</text>
+    <text x="460" y="130" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">🤔 But Bob didn't</text>
+    <text x="460" y="143" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">ask for anything...</text>
+    <text x="565" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Server wants to push → but HTTP only pulls</text>
+    <text x="565" y="186" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">✗ How does Bob get notified?</text>
+  </svg>
+
+  <p>This is the fundamental tension: <strong>HTTP was designed for the client to initiate every conversation</strong>. The server can't just reach out to the browser unprompted. It's like a waiter who can only bring food when you order — they can't walk up and say "the chef just made something amazing, here you go." So how do we get around this limitation?</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>If you could only use normal HTTP (client asks, server answers), how would you build a chat app where messages appear instantly? What's the simplest trick you can think of?</p>
+    <span class="think-hint">Hint: what if the client just kept asking really, really often?</span>
+  </div>
+
+  <p>That "keep asking" idea is exactly where our journey begins. It's the first and simplest approach, and understanding <em>why</em> it works (and where it falls apart) naturally leads us to each better solution.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — FIRST ATTEMPT: SHORT POLLING
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-clock"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">First Attempt — Just Keep Asking</h2>
+    </div>
+  </div>
+
+  <p>The simplest solution to the "how does Bob get new messages?" problem is embarrassingly obvious: <strong>Bob's browser asks the server "any new messages?" over and over and over again</strong>, on a timer. Maybe every second, maybe every 3 seconds. If the server says "nope, nothing new," the browser waits a bit and asks again. If the server says "yes, here's a new message from Alice," the browser shows it on screen.</p>
+
+  <p>This technique is called <span class="tooltip-trigger">short polling<span class="tooltip-content">A technique where the client repeatedly sends HTTP requests at regular intervals (e.g., every 1-5 seconds) to check if new data is available. Simple to implement but wasteful because most requests return empty responses.</span></span>, and it's the most basic form of "real-time" communication. It works the same way a kid in the back seat keeps asking "are we there yet?" — annoying but effective, eventually.</p>
+
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Short polling: client asks server repeatedly on a timer">
+    <defs>
+      <marker id="rtc-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+      <marker id="rtc-s3-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="rtc-s3-arr-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Short Polling — "Are We There Yet?"</text>
+
+    <!-- Timeline -->
+    <text x="30" y="52" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Bob's Browser</text>
+    <text x="630" y="52" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Chat Server</text>
+    <line x1="80" y1="65" x2="80" y2="300" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="680" y1="65" x2="680" y2="300" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Request 1: empty -->
+    <text x="15" y="82" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=0s</text>
+    <line x1="85" y1="78" x2="675" y2="78" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s3-arr)"/>
+    <text x="380" y="74" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /messages?since=0</text>
+    <line x1="675" y1="92" x2="85" y2="92" stroke="#64748b" stroke-width="1" marker-end="url(#rtc-s3-arr-gray)"/>
+    <text x="380" y="105" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">200 OK — [] (nothing new)</text>
+
+    <!-- Request 2: empty -->
+    <text x="15" y="132" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=3s</text>
+    <line x1="85" y1="128" x2="675" y2="128" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s3-arr)"/>
+    <text x="380" y="124" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /messages?since=0</text>
+    <line x1="675" y1="142" x2="85" y2="142" stroke="#64748b" stroke-width="1" marker-end="url(#rtc-s3-arr-gray)"/>
+    <text x="380" y="155" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">200 OK — [] (still nothing)</text>
+
+    <!-- Request 3: empty -->
+    <text x="15" y="182" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=6s</text>
+    <line x1="85" y1="178" x2="675" y2="178" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s3-arr)"/>
+    <text x="380" y="174" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /messages?since=0</text>
+    <line x1="675" y1="192" x2="85" y2="192" stroke="#64748b" stroke-width="1" marker-end="url(#rtc-s3-arr-gray)"/>
+    <text x="380" y="205" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">200 OK — [] (nope)</text>
+
+    <!-- Alice sends a message at t=7s -->
+    <rect x="690" y="210" width="60" height="20" rx="4" fill="#eab308" fill-opacity="0.2" stroke="#eab308" stroke-width="1"/>
+    <text x="720" y="224" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">Alice msg!</text>
+
+    <!-- Request 4: HIT -->
+    <text x="15" y="250" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=9s</text>
+    <line x1="85" y1="246" x2="675" y2="246" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s3-arr)"/>
+    <text x="380" y="242" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /messages?since=0</text>
+    <line x1="675" y1="260" x2="85" y2="260" stroke="#10b981" stroke-width="1.5" marker-end="url(#rtc-s3-arr-g)"/>
+    <text x="380" y="273" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">200 OK — [{from: "Alice", text: "Hey!"}]</text>
+
+    <!-- Delay label -->
+    <rect x="300" y="285" width="200" height="25" rx="5" fill="#ef4444" fill-opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+    <text x="400" y="302" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Alice sent at t=7s, Bob got it at t=9s → 2s delay</text>
+  </svg>
+
+  <p>Look at the diagram above. Alice sent her message at the 7-second mark, but Bob didn't find out about it until the 9-second mark, when his next poll happened. That's a <strong>2-second delay</strong>. And 3 out of 4 requests returned absolutely nothing useful — they were wasted trips to the server.</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="macos-filename">short-polling.js</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-javascript">// Short polling: ask for new messages every 3 seconds
+function startPolling() {
+  let lastMessageId = 0;
+
+  setInterval(async () => {
+    // Every 3 seconds, ask the server "anything new?"
+    const response = await fetch(`/api/messages?since=${lastMessageId}`);
+    const messages = await response.json();
+
+    if (messages.length > 0) {
+      // Got new messages! Show them on screen
+      messages.forEach(msg => displayMessage(msg));
+      lastMessageId = messages[messages.length - 1].id;
+    }
+    // If empty, do nothing — we'll ask again in 3 seconds
+  }, 3000);
+}
+
+startPolling();</code></pre>
+    </div>
+  </div>
+
+  <p>The code is dead simple — that's the appeal. A <code>setInterval</code>, a <code>fetch</code>, and you're done. It works. But if you zoom out and think about what's happening at scale, the problems become obvious fast.</p>
+
+  <div class="callout callout-warning">
+    <strong>The math gets ugly:</strong> If you have 10,000 users polling every 3 seconds, that's <strong>3,333 HTTP requests per second</strong> hitting your server — and most of them return empty responses. You're paying for bandwidth, CPU cycles, and database queries that produce zero useful work.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-heart-crack"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where Short Polling Breaks — Death by a Thousand Requests</h2>
+    </div>
+  </div>
+
+  <p>Short polling works fine on your laptop with 3 test users. But the moment you ship it to production, three brutal problems emerge — and they all get worse as your user count grows.</p>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three problems with short polling: latency, wasted requests, server load">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Three Problems That Kill Short Polling at Scale</text>
+
+    <!-- Problem 1: Latency -->
+    <rect x="20" y="45" width="230" height="135" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="135" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">1. Latency Gap</text>
+    <text x="135" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Poll every 3 seconds?</text>
+    <text x="135" y="106" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Average delay = 1.5 seconds.</text>
+    <text x="135" y="122" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Poll every 1 second?</text>
+    <text x="135" y="138" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Average delay = 0.5 seconds.</text>
+    <text x="135" y="158" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Faster polling = less delay</text>
+    <text x="135" y="172" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">...but 3x the server load</text>
+
+    <!-- Problem 2: Wasted Requests -->
+    <rect x="265" y="45" width="230" height="135" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="380" y="70" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">2. Wasted Requests</text>
+    <text x="380" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">In a typical chat app, you</text>
+    <text x="380" y="106" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">get maybe 1 new message</text>
+    <text x="380" y="122" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">per minute. At 1 poll/sec,</text>
+    <text x="380" y="138" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">that's 59 useless requests</text>
+    <text x="380" y="154" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">for every 1 useful one.</text>
+    <text x="380" y="172" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">~98% of traffic is wasted</text>
+
+    <!-- Problem 3: Server Load -->
+    <rect x="510" y="45" width="230" height="135" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="625" y="70" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="12">3. Server Meltdown</text>
+    <text x="625" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">10K users × 1 poll/sec</text>
+    <text x="625" y="106" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">= 10,000 req/sec</text>
+    <text x="625" y="122" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Each request: TCP handshake</text>
+    <text x="625" y="138" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">+ HTTP headers + DB query</text>
+    <text x="625" y="154" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">+ JSON serialize + response</text>
+    <text x="625" y="172" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="9" font-weight="600">Your database is crying</text>
+
+    <!-- Scale chart -->
+    <rect x="60" y="200" width="640" height="125" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="225" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">The Latency-vs-Load Trade-off</text>
+    <!-- Table-like rows -->
+    <text x="110" y="250" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Interval</text>
+    <text x="250" y="250" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Avg Delay</text>
+    <text x="400" y="250" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Req/sec (10K users)</text>
+    <text x="580" y="250" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">Verdict</text>
+
+    <text x="110" y="270" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Every 5 sec</text>
+    <text x="250" y="270" fill="#eab308" font-family="Inter, sans-serif" font-size="10">2.5 sec</text>
+    <text x="400" y="270" fill="#10b981" font-family="Inter, sans-serif" font-size="10">2,000</text>
+    <text x="580" y="270" fill="#eab308" font-family="Inter, sans-serif" font-size="10">Laggy but survivable</text>
+
+    <text x="110" y="290" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Every 1 sec</text>
+    <text x="250" y="290" fill="#10b981" font-family="Inter, sans-serif" font-size="10">0.5 sec</text>
+    <text x="400" y="290" fill="#eab308" font-family="Inter, sans-serif" font-size="10">10,000</text>
+    <text x="580" y="290" fill="#eab308" font-family="Inter, sans-serif" font-size="10">Fast but expensive</text>
+
+    <text x="110" y="310" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Every 100ms</text>
+    <text x="250" y="310" fill="#10b981" font-family="Inter, sans-serif" font-size="10">50ms</text>
+    <text x="400" y="310" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">100,000</text>
+    <text x="580" y="310" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">Server on fire 🔥</text>
+  </svg>
+
+  <p>See the dilemma? You can have <em>fast</em> updates or <em>cheap</em> infrastructure, but not both. The faster you want messages to appear, the more requests you hammer the server with. And most of those requests come back empty-handed.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>What if instead of Bob repeatedly asking "got anything?", he asked once and <em>the server didn't answer until there actually was something</em>? The server would just... hold the connection open, silently, waiting for new data. How would that change the math?</p>
+    <span class="think-hint">This one idea — "don't respond until you have something to say" — is the entire foundation of long polling.</span>
+  </div>
+
+  <p>That insight — "just don't respond until there's real data" — is the first major breakthrough in real-time communication. It reduces wasted requests to nearly zero, and it's been powering real-time features since the early 2000s. Let's see how.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH: LONG POLLING
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Persistent Connections</h2>
+    </div>
+  </div>
+
+  <p>The fix for short polling's wastefulness is surprisingly elegant: instead of the server immediately responding "nothing new" to every request, <strong>the server holds the request open and waits</strong>. It doesn't send a response at all until there's actual data to deliver. The client sends one request, then just sits there, patiently, with the connection open. When new data finally arrives (maybe 30 seconds later, maybe 2 milliseconds later), the server sends its response. The client processes it, then immediately opens a <em>new</em> request, and the cycle repeats.</p>
+
+  <p>This technique is called <span class="tooltip-trigger">long polling<span class="tooltip-content">A variation of polling where the server holds the client's request open until new data is available (or a timeout occurs). This dramatically reduces the number of empty responses compared to short polling. Used by early Facebook Messenger and old-school chat applications.</span></span>, and it was the backbone of real-time features for years before WebSockets existed. Facebook's original chat, early Google Talk, and many other systems used this approach.</p>
+
+  <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Long polling: server holds request until data is ready">
+    <defs>
+      <marker id="rtc-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+      <marker id="rtc-s5-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Long Polling — "I'll Wait Right Here"</text>
+
+    <text x="30" y="52" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Bob's Browser</text>
+    <text x="630" y="52" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Chat Server</text>
+    <line x1="80" y1="65" x2="80" y2="310" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="680" y1="65" x2="680" y2="310" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Request 1: held open -->
+    <text x="15" y="82" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=0s</text>
+    <line x1="85" y1="78" x2="675" y2="78" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s5-arr)"/>
+    <text x="380" y="74" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /messages?since=0 (long poll)</text>
+
+    <!-- Waiting period -->
+    <rect x="660" y="85" width="40" height="80" rx="4" fill="#3b82f6" fill-opacity="0.1" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="680" y="130" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8" transform="rotate(-90, 680, 130)">waiting...</text>
+
+    <!-- Alice sends message -->
+    <rect x="690" y="155" width="60" height="20" rx="4" fill="#eab308" fill-opacity="0.2" stroke="#eab308" stroke-width="1"/>
+    <text x="720" y="169" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">Alice msg!</text>
+    <text x="15" y="175" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=12s</text>
+
+    <!-- Response immediately -->
+    <line x1="675" y1="180" x2="85" y2="180" stroke="#10b981" stroke-width="1.5" marker-end="url(#rtc-s5-arr-g)"/>
+    <text x="380" y="195" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">200 OK — [{from: "Alice", text: "Hey!"}] — instant!</text>
+
+    <!-- Immediately re-open -->
+    <text x="15" y="220" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">t=12s</text>
+    <line x1="85" y1="216" x2="675" y2="216" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s5-arr)"/>
+    <text x="380" y="212" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /messages?since=1 (new long poll)</text>
+
+    <!-- Another wait -->
+    <rect x="660" y="223" width="40" height="50" rx="4" fill="#3b82f6" fill-opacity="0.1" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="680" y="252" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8" transform="rotate(-90, 680, 252)">waiting...</text>
+
+    <!-- Summary box -->
+    <rect x="100" y="280" width="560" height="28" rx="6" fill="#10b981" fill-opacity="0.1" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="298" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Only 1 request before Alice's message! (Short polling would have sent 4)</text>
+  </svg>
+
+  <p>The difference is dramatic. With short polling (3-second interval), Bob's browser would have fired 4 requests in those 12 seconds, 3 of which were useless. With long polling, Bob's browser fired <strong>just 1 request</strong>, and it got a response the <em>instant</em> Alice's message arrived. Zero wasted requests, near-zero latency.</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="macos-filename">long-polling.js</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-javascript">// Long polling: one request at a time, server holds until data exists
+async function longPoll(lastMessageId = 0) {
+  try {
+    // This request might hang for 30+ seconds — that's intentional!
+    const response = await fetch(`/api/messages?since=${lastMessageId}&wait=true`);
+    const messages = await response.json();
+
+    if (messages.length > 0) {
+      messages.forEach(msg => displayMessage(msg));
+      lastMessageId = messages[messages.length - 1].id;
+    }
+  } catch (error) {
+    // Network error? Wait a bit before retrying
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+
+  // Immediately start the next long poll
+  longPoll(lastMessageId);
+}
+
+longPoll();</code></pre>
+    </div>
+  </div>
+
+  <p>But long polling isn't perfect. It still uses standard HTTP requests under the hood, which means each cycle involves full <span class="tooltip-trigger">HTTP headers<span class="tooltip-content">Metadata sent with every HTTP request and response — things like Content-Type, cookies, authentication tokens, caching directives. These headers typically add 200-800 bytes of overhead per request, which is wasteful when you're sending tiny messages like "user is typing..."</span></span> (easily 500+ bytes of overhead per message). The connection is also one-directional per cycle: the server can only push data to the client when responding to an existing request. If the client needs to send something (like a chat message), that requires a separate HTTP request.</p>
+
+  <p>This brings us to an even better idea: <strong>what if the connection never closed at all?</strong> What if both sides could send data whenever they wanted, with zero overhead per message?</p>
+
+  <div class="callout callout-info">
+    <strong>The evolution:</strong> Short polling → Long polling → SSE/WebSockets. Each step reduces overhead and latency. Long polling was a clever hack that worked within HTTP's limitations. The next solutions — SSE and WebSockets — were purpose-built for real-time from the ground up.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (4 techniques deep dive)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How Each Technique Works — The Full Picture</h2>
+    </div>
+  </div>
+
+  <p>Now that you understand the "why" — the journey from "just keep asking" to "keep the connection open" — let's look at each of the four techniques in detail. We'll see exactly what happens on the wire, what the code looks like, and where each one shines or stumbles.</p>
+
+  <!-- ─── Card 1: Short Polling ─── -->
+  <h3 class="card-title">1. Short Polling — The Brute-Force Approach</h3>
+  <div class="card-body">
+    <p>We covered this in Section 3, but let's add the complete picture. Short polling is the most basic form of "real-time" — the client sends regular HTTP requests on a timer, and the server responds immediately with whatever data is available (or an empty response).</p>
+
+    <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Short polling sequence diagram showing repeated requests">
+      <defs>
+        <marker id="rtc-s6a-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+        </marker>
+        <marker id="rtc-s6a-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+        </marker>
+      </defs>
+      <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Short Polling — Every Request Is Independent</text>
+
+      <!-- Client/Server lines -->
+      <rect x="55" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+      <text x="90" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Client</text>
+      <rect x="635" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+      <text x="670" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server</text>
+      <line x1="90" y1="58" x2="90" y2="195" stroke="#64748b" stroke-width="1"/>
+      <line x1="670" y1="58" x2="670" y2="195" stroke="#64748b" stroke-width="1"/>
+
+      <!-- Req/Res pairs -->
+      <line x1="95" y1="70" x2="665" y2="70" stroke="#ef4444" stroke-width="1" marker-end="url(#rtc-s6a-arr)"/>
+      <text x="380" y="66" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Request</text>
+      <line x1="665" y1="80" x2="95" y2="80" stroke="#64748b" stroke-width="1" marker-end="url(#rtc-s6a-arr-g)"/>
+      <text x="380" y="92" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">Response (empty)</text>
+
+      <!-- gap -->
+      <text x="90" y="108" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">⏱ wait 3s</text>
+
+      <line x1="95" y1="118" x2="665" y2="118" stroke="#ef4444" stroke-width="1" marker-end="url(#rtc-s6a-arr)"/>
+      <text x="380" y="114" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Request</text>
+      <line x1="665" y1="128" x2="95" y2="128" stroke="#64748b" stroke-width="1" marker-end="url(#rtc-s6a-arr-g)"/>
+      <text x="380" y="140" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">Response (empty)</text>
+
+      <text x="90" y="156" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">⏱ wait 3s</text>
+
+      <line x1="95" y1="166" x2="665" y2="166" stroke="#ef4444" stroke-width="1" marker-end="url(#rtc-s6a-arr)"/>
+      <text x="380" y="162" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Request</text>
+      <line x1="665" y1="176" x2="95" y2="176" stroke="#10b981" stroke-width="1.5" marker-end="url(#rtc-s6a-arr-g)"/>
+      <text x="380" y="190" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">Response (new data!)</text>
+    </svg>
+
+    <div class="callout callout-warning">
+      <strong>When to use it:</strong> Prototypes, admin dashboards that refresh every 30 seconds, or any situation where "good enough" latency (seconds, not milliseconds) is acceptable and simplicity matters more than efficiency.
+    </div>
+  </div>
+
+  <!-- ─── Card 2: Long Polling ─── -->
+  <h3 class="card-title">2. Long Polling — The Patient Waiter</h3>
+  <div class="card-body">
+    <p>Long polling flips the script: the client sends a request, and the server <em>holds it open</em> until there's data to send. No timer on the client side, no wasted empty responses. The server is the one who decides when to respond.</p>
+
+    <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Long polling sequence showing server holding request">
+      <defs>
+        <marker id="rtc-s6b-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
+        </marker>
+        <marker id="rtc-s6b-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+        </marker>
+      </defs>
+      <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Long Polling — Server Holds Until Data Arrives</text>
+
+      <rect x="55" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#eab308" stroke-width="1"/>
+      <text x="90" y="46" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">Client</text>
+      <rect x="635" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#eab308" stroke-width="1"/>
+      <text x="670" y="46" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server</text>
+      <line x1="90" y1="58" x2="90" y2="210" stroke="#64748b" stroke-width="1"/>
+      <line x1="670" y1="58" x2="670" y2="210" stroke="#64748b" stroke-width="1"/>
+
+      <!-- Request 1 -->
+      <line x1="95" y1="70" x2="665" y2="70" stroke="#eab308" stroke-width="1" marker-end="url(#rtc-s6b-arr)"/>
+      <text x="380" y="66" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">Request (long poll)</text>
+
+      <!-- Server holding -->
+      <rect x="658" y="75" width="24" height="55" rx="3" fill="#eab308" fill-opacity="0.1" stroke="#eab308" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="670" y="107" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="7" transform="rotate(-90,670,107)">holding...</text>
+
+      <!-- Data arrives -->
+      <text x="720" y="135" fill="#10b981" font-family="Inter, sans-serif" font-size="8">data!</text>
+
+      <!-- Response -->
+      <line x1="665" y1="140" x2="95" y2="140" stroke="#10b981" stroke-width="1.5" marker-end="url(#rtc-s6b-arr-g)"/>
+      <text x="380" y="153" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">Response (with data) — instant delivery!</text>
+
+      <!-- Immediately re-open -->
+      <line x1="95" y1="168" x2="665" y2="168" stroke="#eab308" stroke-width="1" marker-end="url(#rtc-s6b-arr)"/>
+      <text x="380" y="164" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">New request (immediately re-opens)</text>
+
+      <rect x="658" y="173" width="24" height="30" rx="3" fill="#eab308" fill-opacity="0.1" stroke="#eab308" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="670" y="192" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="7" transform="rotate(-90,670,192)">hold</text>
+    </svg>
+
+    <p>The key trade-off: long polling still uses one HTTP request per data delivery. Each response triggers a new request, which means new HTTP headers, a new TCP roundtrip (unless <span class="tooltip-trigger">keep-alive<span class="tooltip-content">An HTTP/1.1 feature that reuses the same TCP connection for multiple HTTP requests instead of opening a new connection each time. This saves the overhead of TCP handshakes but doesn't eliminate HTTP header overhead.</span></span> is active), and new overhead. For applications with frequent updates (like fast-paced games), this overhead adds up.</p>
+
+    <div class="callout callout-success">
+      <strong>When to use it:</strong> When you need near-instant delivery but WebSocket support is uncertain (old proxies, corporate firewalls), or when your framework makes it easy (e.g., SignalR uses long polling as a fallback). Facebook used this for their original chat in 2008.
+    </div>
+  </div>
+
+  <!-- ─── Card 3: Server-Sent Events ─── -->
+  <h3 class="card-title">3. Server-Sent Events (SSE) — The News Ticker</h3>
+  <div class="card-body">
+    <p>What if instead of closing the connection after each response, the server just... kept sending data on the same connection, over and over? That's exactly what <span class="tooltip-trigger">Server-Sent Events<span class="tooltip-content">A browser API (EventSource) that opens a persistent HTTP connection to the server. The server can then push text-based events to the client at any time. It's one-directional (server → client only), auto-reconnects on failure, and works over standard HTTP. Perfect for live feeds, notifications, and dashboards.</span></span> (SSE) does. The client opens a single HTTP connection, and the server streams events down that connection for as long as it wants — minutes, hours, even days.</p>
+
+    <p>Think of it like subscribing to a news ticker. You tune in once, and headlines keep scrolling across your screen without you having to refresh. But it's one-way — you can't talk back through the ticker. If you need to send data to the server (like posting a chat message), you'd use a separate regular HTTP request.</p>
+
+    <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SSE: one persistent connection, server pushes events">
+      <defs>
+        <marker id="rtc-s6c-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+        </marker>
+        <marker id="rtc-s6c-arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+        </marker>
+      </defs>
+      <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">SSE — One Connection, Many Events</text>
+
+      <rect x="55" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#10b981" stroke-width="1"/>
+      <text x="90" y="46" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Client</text>
+      <rect x="635" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#10b981" stroke-width="1"/>
+      <text x="670" y="46" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server</text>
+      <line x1="90" y1="58" x2="90" y2="225" stroke="#64748b" stroke-width="1"/>
+      <line x1="670" y1="58" x2="670" y2="225" stroke="#64748b" stroke-width="1"/>
+
+      <!-- Initial request -->
+      <line x1="95" y1="70" x2="665" y2="70" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s6c-arr-b)"/>
+      <text x="380" y="66" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">GET /events (Accept: text/event-stream)</text>
+
+      <!-- Persistent connection bracket -->
+      <rect x="88" y="80" width="585" height="135" rx="6" fill="#10b981" fill-opacity="0.04" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="380" y="95" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Connection stays open — server pushes events as they happen</text>
+
+      <!-- Event 1 -->
+      <line x1="665" y1="110" x2="95" y2="110" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s6c-arr)"/>
+      <text x="380" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">event: message → "Alice: Hey!"</text>
+
+      <!-- Event 2 -->
+      <line x1="665" y1="140" x2="95" y2="140" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s6c-arr)"/>
+      <text x="380" y="138" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">event: typing → "Carol is typing..."</text>
+
+      <!-- Event 3 -->
+      <line x1="665" y1="170" x2="95" y2="170" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s6c-arr)"/>
+      <text x="380" y="168" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">event: message → "Carol: What's up?"</text>
+
+      <!-- Event 4 -->
+      <line x1="665" y1="200" x2="95" y2="200" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s6c-arr)"/>
+      <text x="380" y="198" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">event: online → "Dave joined"</text>
+    </svg>
+
+    <div class="tab-container">
+      <div class="tab-header" role="tablist">
+        <button class="tab-btn active" data-tab="rtc-sse-client" role="tab" aria-selected="true">Client Code</button>
+        <button class="tab-btn" data-tab="rtc-sse-server" role="tab" aria-selected="false">Server Response Format</button>
+      </div>
+      <div class="tab-panel active" id="rtc-sse-client" role="tabpanel">
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="macos-filename">sse-client.js</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-javascript">// SSE: the browser does most of the work for you
+const source = new EventSource('/api/events');
+
+// Listen for specific event types
+source.addEventListener('message', (event) => {
+  const data = JSON.parse(event.data);
+  displayMessage(data);    // Show new chat message
+});
+
+source.addEventListener('typing', (event) => {
+  showTypingIndicator(event.data);  // "Alice is typing..."
+});
+
+source.addEventListener('online', (event) => {
+  updateUserList(event.data);  // Someone came online
+});
+
+// Auto-reconnects if connection drops!
+source.onerror = () => {
+  console.log('Connection lost, browser will auto-reconnect...');
+};</code></pre>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="rtc-sse-server" role="tabpanel">
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="macos-filename">SSE Response Format</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-http">HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+
+event: message
+data: {"from": "Alice", "text": "Hey!"}
+
+event: typing
+data: Carol
+
+event: message
+data: {"from": "Carol", "text": "What's up?"}
+
+event: online
+data: Dave</code></pre>
+          </div>
+        </div>
+        <p>Each event is a plain-text block separated by a blank line. The <code>event:</code> line names the type, the <code>data:</code> line carries the payload. Incredibly simple format — no binary protocol, no framing, just text.</p>
+      </div>
+    </div>
+
+    <p>SSE's killer feature is <strong>automatic reconnection</strong>. If the connection drops (Wi-Fi glitch, server restart), the browser automatically reconnects and sends a <code>Last-Event-ID</code> header so the server knows where to resume. You get this for free — no code needed. It also supports named event types, so you can have different listeners for "message", "typing", "online" events on the same connection.</p>
+
+    <div class="callout callout-info">
+      <strong>When to use it:</strong> Live dashboards, stock tickers, notification feeds, news updates — anything where the server pushes data and the client just listens. SSE is simpler than WebSockets, works over standard HTTP (proxy-friendly), and auto-reconnects. If you don't need the client to send data back through the same channel, SSE is usually the right choice.
+    </div>
+  </div>
+
+  <!-- ─── Card 4: WebSockets ─── -->
+  <h3 class="card-title">4. WebSockets — The Full Duplex Channel</h3>
+  <div class="card-body">
+    <p>WebSockets are the "gold standard" for real-time communication on the web. Unlike SSE (which is server-to-client only), a <span class="tooltip-trigger">WebSocket<span class="tooltip-content">A protocol (RFC 6455) that provides full-duplex (two-way) communication over a single TCP connection. Unlike HTTP, both the client and server can send messages at any time without waiting for a request. The connection starts as HTTP then "upgrades" to the WebSocket protocol.</span></span> gives you a <strong>full two-way channel</strong> where both the client and server can send messages at any time, independently, with minimal overhead. It's like having an open phone call — both sides can talk whenever they want.</p>
+
+    <p>WebSockets start life as a normal HTTP request, then "upgrade" to a different protocol entirely. Once upgraded, the HTTP overhead disappears — messages are sent as tiny binary <span class="tooltip-trigger">frames<span class="tooltip-content">In the WebSocket protocol, data is sent in small units called frames. Each frame has just 2-14 bytes of overhead (compared to hundreds of bytes for HTTP headers). This makes WebSockets extremely efficient for frequent, small messages like chat, gaming inputs, or real-time collaboration.</span></span> with just 2-14 bytes of overhead (compared to 500+ bytes for HTTP headers).</p>
+
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WebSocket: HTTP upgrade then full duplex communication">
+      <defs>
+        <marker id="rtc-s6d-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+        </marker>
+        <marker id="rtc-s6d-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+        </marker>
+        <marker id="rtc-s6d-arr-p" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#a78bfa"/>
+        </marker>
+      </defs>
+      <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">WebSocket — Upgrade Once, Then Talk Freely</text>
+
+      <rect x="55" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#3b82f6" stroke-width="1"/>
+      <text x="90" y="46" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="600">Client</text>
+      <rect x="635" y="30" width="70" height="24" rx="4" fill="#334155" stroke="#3b82f6" stroke-width="1"/>
+      <text x="670" y="46" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server</text>
+      <line x1="90" y1="58" x2="90" y2="275" stroke="#64748b" stroke-width="1"/>
+      <line x1="670" y1="58" x2="670" y2="275" stroke="#64748b" stroke-width="1"/>
+
+      <!-- HTTP Upgrade handshake -->
+      <rect x="85" y="62" width="590" height="45" rx="4" fill="#eab308" fill-opacity="0.06" stroke="#eab308" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="380" y="75" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">HTTP Upgrade Handshake (happens once)</text>
+      <line x1="95" y1="87" x2="665" y2="87" stroke="#eab308" stroke-width="1" marker-end="url(#rtc-s6d-arr)"/>
+      <text x="380" y="84" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">GET / HTTP/1.1 — Upgrade: websocket</text>
+      <line x1="665" y1="97" x2="95" y2="97" stroke="#eab308" stroke-width="1" marker-end="url(#rtc-s6d-arr)"/>
+      <text x="380" y="96" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">101 Switching Protocols</text>
+
+      <!-- Full duplex zone -->
+      <rect x="85" y="115" width="590" height="155" rx="6" fill="#3b82f6" fill-opacity="0.04" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="380" y="132" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="600">Full Duplex — Both Sides Talk Freely</text>
+
+      <!-- Client sends -->
+      <line x1="95" y1="148" x2="665" y2="148" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s6d-arr)"/>
+      <text x="380" y="144" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">Bob: "Hey Alice!"</text>
+
+      <!-- Server pushes -->
+      <line x1="665" y1="168" x2="95" y2="168" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s6d-arr-g)"/>
+      <text x="380" y="164" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Alice: "Hi Bob!"</text>
+
+      <!-- Client sends again -->
+      <line x1="95" y1="188" x2="665" y2="188" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s6d-arr)"/>
+      <text x="380" y="184" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">Bob: "typing..." indicator</text>
+
+      <!-- Server pushes -->
+      <line x1="665" y1="208" x2="95" y2="208" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s6d-arr-g)"/>
+      <text x="380" y="204" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Server: "Carol joined the chat"</text>
+
+      <!-- Both at once -->
+      <line x1="95" y1="230" x2="665" y2="230" stroke="#a78bfa" stroke-width="1" marker-end="url(#rtc-s6d-arr-p)"/>
+      <line x1="665" y1="240" x2="95" y2="240" stroke="#a78bfa" stroke-width="1" marker-end="url(#rtc-s6d-arr-p)"/>
+      <text x="380" y="256" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="8" font-weight="600">Both sides can send simultaneously — no turns needed!</text>
+    </svg>
+
+    <div class="macos-window">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-yellow"></span>
+        <span class="dot dot-green"></span>
+        <span class="macos-filename">websocket-client.js</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-javascript">// WebSocket: full two-way communication
+const ws = new WebSocket('wss://chat.example.com/ws');
+
+// Connection opened
+ws.onopen = () => {
+  console.log('Connected! Both sides can talk now.');
+};
+
+// Server sends us something
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'message') displayMessage(data);
+  if (data.type === 'typing')  showTypingIndicator(data.user);
+  if (data.type === 'online')  updateUserList(data.user);
+};
+
+// We send something to the server (no HTTP request needed!)
+function sendMessage(text) {
+  ws.send(JSON.stringify({ type: 'message', text }));
+}
+
+// Handle disconnection
+ws.onclose = () => {
+  console.log('Disconnected. Reconnecting...');
+  setTimeout(() => connectWebSocket(), 3000);
+};</code></pre>
+      </div>
+    </div>
+
+    <p>Notice the difference from SSE: the client can call <code>ws.send()</code> at any time to send data <em>through the same connection</em> — no separate HTTP request needed. This makes WebSockets perfect for truly interactive applications like chat, multiplayer games, and collaborative editors where data flows in both directions constantly.</p>
+
+    <div class="callout callout-success">
+      <strong>When to use it:</strong> Chat applications, multiplayer games, collaborative editing (Google Docs-style), live auctions, trading platforms — any time both client and server need to send messages at any time. WebSockets are the most powerful option, but also the most complex to scale.
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>For each of these use cases, which technique would you pick: (1) A dashboard showing server CPU usage, updating every second. (2) A multiplayer word game where players take turns. (3) An auction where the current bid updates in real-time. (4) A news feed that shows breaking headlines.</p>
+    <span class="think-hint">Think about whether data flows one-way or two-ways, and how fast updates need to be.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — WebSocket Internals &amp; Scaling</h2>
+    </div>
+  </div>
+
+  <p>WebSockets are the most powerful real-time technique, but they're also the trickiest to run at scale. Let's peel back the layers and understand what's actually happening under the hood — the protocol upgrade, connection management, and the scaling challenges that hit you when you go from 100 users to 100,000.</p>
+
+  <!-- Protocol Upgrade -->
+  <h3 class="card-title">The WebSocket Handshake (Protocol Upgrade)</h3>
+  <div class="card-body">
+    <p>Every WebSocket connection starts as a normal HTTP request. The client sends a special header saying "I'd like to upgrade this connection to the WebSocket protocol, please." If the server supports it, it responds with "101 Switching Protocols" and from that moment on, the connection speaks WebSocket instead of HTTP.</p>
+
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WebSocket upgrade handshake showing HTTP request and 101 response">
+      <defs>
+        <marker id="rtc-s7a-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+        </marker>
+        <marker id="rtc-s7a-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">The WebSocket Upgrade — Step by Step</text>
+
+      <!-- Step boxes -->
+      <rect x="20" y="35" width="230" height="85" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="135" y="55" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">Step 1: Client Request</text>
+      <text x="135" y="72" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="8">GET /ws HTTP/1.1</text>
+      <text x="135" y="85" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="8">Upgrade: websocket</text>
+      <text x="135" y="98" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="8">Connection: Upgrade</text>
+      <text x="135" y="111" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="8">Sec-WebSocket-Key: dGhlIH...</text>
+
+      <!-- Arrow -->
+      <line x1="255" y1="77" x2="275" y2="77" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#rtc-s7a-arr)"/>
+
+      <rect x="280" y="35" width="200" height="85" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+      <text x="380" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">Step 2: Server Response</text>
+      <text x="380" y="72" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="8">HTTP/1.1 101 Switching</text>
+      <text x="380" y="85" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="8">Upgrade: websocket</text>
+      <text x="380" y="98" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="8">Connection: Upgrade</text>
+      <text x="380" y="111" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="8">Sec-WebSocket-Accept: ...</text>
+
+      <!-- Arrow -->
+      <line x1="485" y1="77" x2="505" y2="77" stroke="#10b981" stroke-width="1.5" marker-end="url(#rtc-s7a-arr-g)"/>
+
+      <rect x="510" y="35" width="230" height="85" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="625" y="55" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="11">Step 3: Full Duplex</text>
+      <text x="625" y="75" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">No more HTTP!</text>
+      <text x="625" y="92" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Binary frames, 2-14</text>
+      <text x="625" y="106" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">bytes overhead each.</text>
+
+      <!-- Bottom: frame comparison -->
+      <rect x="60" y="140" width="640" height="100" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <text x="380" y="162" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Overhead Comparison Per Message</text>
+      <rect x="100" y="175" width="260" height="20" rx="4" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="1"/>
+      <text x="230" y="189" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">HTTP Request: ~800 bytes of headers</text>
+      <rect x="100" y="200" width="30" height="20" rx="4" fill="#10b981" fill-opacity="0.3" stroke="#10b981" stroke-width="1"/>
+      <text x="230" y="214" fill="#10b981" font-family="Inter, sans-serif" font-size="9">WebSocket Frame: ~6 bytes of overhead</text>
+      <text x="560" y="195" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="11" font-weight="700">~130x less overhead</text>
+      <text x="560" y="212" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">per message sent</text>
+    </svg>
+
+    <p>That 130x reduction in per-message overhead is why WebSockets dominate for high-frequency messaging. If your chat app sends 100 messages per second across all users, the bandwidth savings are enormous.</p>
+  </div>
+
+  <!-- Scaling WebSockets -->
+  <h3 class="card-title">Scaling WebSockets with Redis Pub/Sub</h3>
+  <div class="card-body">
+    <p>Here's the challenge nobody tells you about until it's too late: <strong>WebSocket connections are <span class="tooltip-trigger">stateful<span class="tooltip-content">A stateful connection means the server must remember information about each connected client (who they are, what rooms they're in, what their last message was). This is the opposite of stateless HTTP, where each request is independent. Stateful connections make horizontal scaling much harder.</span></span></strong>. Each user has a persistent TCP connection to a specific server. If Alice is connected to Server 1 and Bob is connected to Server 2, and Alice sends a message — how does Bob get it? Server 1 has the message, but Bob isn't connected to Server 1.</p>
+
+    <p>The standard solution: use a <span class="tooltip-trigger">message broker<span class="tooltip-content">A middleware system (like Redis, RabbitMQ, or Kafka) that sits between servers and routes messages. When Server 1 publishes a message, the broker ensures all other servers receive it so they can forward it to their connected clients. Think of it as a central post office that all servers check for new mail.</span></span> like Redis to relay messages between servers.</p>
+
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scaling WebSockets with Redis pub/sub across multiple servers">
+      <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Scaling WebSockets Across Multiple Servers</text>
+
+      <!-- Users on left -->
+      <rect x="20" y="50" width="70" height="30" rx="6" fill="#334155" stroke="#3b82f6" stroke-width="1"/>
+      <text x="55" y="69" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">Alice</text>
+      <rect x="20" y="90" width="70" height="30" rx="6" fill="#334155" stroke="#3b82f6" stroke-width="1"/>
+      <text x="55" y="109" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">Carol</text>
+      <rect x="20" y="200" width="70" height="30" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="219" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Bob</text>
+      <rect x="20" y="240" width="70" height="30" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="259" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Dave</text>
+
+      <!-- Server 1 -->
+      <rect x="160" y="40" width="130" height="90" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="225" y="65" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">Server 1</text>
+      <text x="225" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Alice + Carol</text>
+      <text x="225" y="96" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">connected here</text>
+      <line x1="93" y1="65" x2="155" y2="65" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,2"/>
+      <line x1="93" y1="105" x2="155" y2="95" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,2"/>
+
+      <!-- Server 2 -->
+      <rect x="160" y="190" width="130" height="90" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+      <text x="225" y="215" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">Server 2</text>
+      <text x="225" y="232" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Bob + Dave</text>
+      <text x="225" y="246" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">connected here</text>
+      <line x1="93" y1="215" x2="155" y2="225" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+      <line x1="93" y1="255" x2="155" y2="255" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+
+      <!-- Redis -->
+      <rect x="380" y="120" width="130" height="70" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+      <text x="445" y="148" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Redis Pub/Sub</text>
+      <text x="445" y="165" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Message Broker</text>
+      <text x="445" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">(relays between servers)</text>
+
+      <!-- Connections to Redis -->
+      <line x1="295" y1="90" x2="375" y2="140" stroke="#eab308" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="295" y1="235" x2="375" y2="170" stroke="#eab308" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+      <!-- Flow description -->
+      <rect x="550" y="45" width="195" height="225" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <text x="647" y="68" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="11">Message Flow</text>
+      <text x="560" y="90" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">1.</text>
+      <text x="575" y="90" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Alice sends "Hello"</text>
+      <text x="575" y="103" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">→ arrives at Server 1</text>
+      <text x="560" y="125" fill="#eab308" font-family="Inter, sans-serif" font-size="9">2.</text>
+      <text x="575" y="125" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Server 1 publishes</text>
+      <text x="575" y="138" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">→ to Redis channel</text>
+      <text x="560" y="160" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">3.</text>
+      <text x="575" y="160" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Redis broadcasts</text>
+      <text x="575" y="173" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">→ to ALL servers</text>
+      <text x="560" y="195" fill="#10b981" font-family="Inter, sans-serif" font-size="9">4.</text>
+      <text x="575" y="195" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Server 2 pushes</text>
+      <text x="575" y="208" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">→ to Bob's WebSocket</text>
+      <text x="647" y="240" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Bob sees Alice's message!</text>
+      <text x="647" y="255" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~5ms total latency</text>
+    </svg>
+
+    <p>This Redis Pub/Sub pattern is what powers most production WebSocket systems. Slack, Discord, and countless chat apps use exactly this architecture. The broker ensures that a message sent to any server reaches every connected client, no matter which server they're on.</p>
+  </div>
+
+  <!-- Connection Limits & Heartbeats -->
+  <h3 class="card-title">Connection Limits &amp; Heartbeats</h3>
+  <div class="card-body">
+    <p>Each WebSocket connection is a persistent TCP connection, which means it consumes resources on the server: a <span class="tooltip-trigger">file descriptor<span class="tooltip-content">An operating system handle for an open connection (or file). Each TCP connection uses one file descriptor. Linux defaults to ~1,024 per process, but production servers raise this to 100K-1M. Running out of file descriptors means the server can't accept new connections.</span></span>, some memory for buffers, and a slot in the kernel's connection table. A single server can typically handle <strong>10,000 to 100,000 concurrent WebSocket connections</strong> depending on hardware and how much memory each connection needs.</p>
+
+    <p>But connections can go stale. A user might close their laptop lid, walk through a dead Wi-Fi zone, or their ISP might silently drop idle connections. To detect these "zombie connections," servers send <span class="tooltip-trigger">heartbeat<span class="tooltip-content">A small, periodic message (often called a "ping") sent between client and server to verify the connection is still alive. If one side doesn't receive a heartbeat response within a timeout (e.g., 30 seconds), it assumes the connection is dead and closes it. WebSocket has built-in ping/pong frames for this.</span></span> messages — tiny "are you still there?" pings.</p>
+
+    <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Heartbeat mechanism: ping/pong to detect dead connections">
+      <defs>
+        <marker id="rtc-s7c-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+        </marker>
+        <marker id="rtc-s7c-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+        </marker>
+        <marker id="rtc-s7c-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+        </marker>
+      </defs>
+      <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Heartbeats — Detecting Dead Connections</text>
+
+      <line x1="90" y1="35" x2="90" y2="185" stroke="#64748b" stroke-width="1"/>
+      <line x1="670" y1="35" x2="670" y2="185" stroke="#64748b" stroke-width="1"/>
+      <text x="90" y="32" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10" font-weight="600">Server</text>
+      <text x="670" y="32" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10" font-weight="600">Client</text>
+
+      <!-- Healthy heartbeat -->
+      <line x1="95" y1="50" x2="665" y2="50" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s7c-arr)"/>
+      <text x="380" y="46" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">PING</text>
+      <line x1="665" y1="65" x2="95" y2="65" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s7c-arr-g)"/>
+      <text x="380" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">PONG ✓ (alive!)</text>
+
+      <!-- Another healthy -->
+      <text x="380" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">...30 seconds later...</text>
+      <line x1="95" y1="108" x2="665" y2="108" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s7c-arr)"/>
+      <text x="380" y="104" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">PING</text>
+      <line x1="665" y1="123" x2="95" y2="123" stroke="#10b981" stroke-width="1" marker-end="url(#rtc-s7c-arr-g)"/>
+      <text x="380" y="136" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">PONG ✓ (still alive!)</text>
+
+      <!-- Dead connection -->
+      <text x="380" y="154" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">...30 seconds later...</text>
+      <line x1="95" y1="164" x2="665" y2="164" stroke="#3b82f6" stroke-width="1" marker-end="url(#rtc-s7c-arr)"/>
+      <text x="380" y="160" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">PING</text>
+      <text x="670" y="178" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">💀 (no response)</text>
+      <text x="90" y="185" text-anchor="start" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">→ Close connection, free resources</text>
+    </svg>
+
+    <div class="callout callout-info">
+      <strong>Production tip:</strong> Set heartbeat intervals to 30-60 seconds. Too frequent wastes bandwidth; too infrequent means zombie connections linger and consume resources. The WebSocket protocol has built-in ping/pong frames specifically for this — use them.
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — COMPARISON TABLE
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-scale-balanced"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Head-to-Head Comparison</h2>
+    </div>
+  </div>
+
+  <p>Now that you understand how all four techniques work, let's put them side by side. This comparison table is the single most useful reference for choosing the right approach for your system.</p>
+
+  <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Comparison table of all four real-time techniques">
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Complete Comparison</text>
+
+    <!-- Header row -->
+    <rect x="10" y="30" width="120" height="30" rx="4" fill="#334155"/>
+    <text x="70" y="50" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9" font-weight="600">Criteria</text>
+    <rect x="135" y="30" width="145" height="30" rx="4" fill="#ef4444" fill-opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+    <text x="207" y="50" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="700">Short Polling</text>
+    <rect x="285" y="30" width="145" height="30" rx="4" fill="#eab308" fill-opacity="0.15" stroke="#eab308" stroke-width="1"/>
+    <text x="357" y="50" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="700">Long Polling</text>
+    <rect x="435" y="30" width="145" height="30" rx="4" fill="#10b981" fill-opacity="0.15" stroke="#10b981" stroke-width="1"/>
+    <text x="507" y="50" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="700">SSE</text>
+    <rect x="585" y="30" width="165" height="30" rx="4" fill="#3b82f6" fill-opacity="0.15" stroke="#3b82f6" stroke-width="1"/>
+    <text x="667" y="50" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="700">WebSocket</text>
+
+    <!-- Row: Direction -->
+    <text x="70" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Direction</text>
+    <text x="207" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Client → Server</text>
+    <text x="357" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Client → Server</text>
+    <text x="507" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Server → Client</text>
+    <text x="667" y="82" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Both ways ✓</text>
+    <line x1="10" y1="92" x2="750" y2="92" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Latency -->
+    <text x="70" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Latency</text>
+    <text x="207" y="112" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">High (interval/2)</text>
+    <text x="357" y="112" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Low (near instant)</text>
+    <text x="507" y="112" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Very low</text>
+    <text x="667" y="112" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Lowest (&lt;10ms)</text>
+    <line x1="10" y1="122" x2="750" y2="122" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Server Load -->
+    <text x="70" y="142" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server Load</text>
+    <text x="207" y="142" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Very High</text>
+    <text x="357" y="142" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Medium</text>
+    <text x="507" y="142" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Low</text>
+    <text x="667" y="142" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Low (per msg)</text>
+    <line x1="10" y1="152" x2="750" y2="152" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Complexity -->
+    <text x="70" y="172" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Complexity</text>
+    <text x="207" y="172" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Trivial</text>
+    <text x="357" y="172" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Easy</text>
+    <text x="507" y="172" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Easy</text>
+    <text x="667" y="172" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Moderate-Hard</text>
+    <line x1="10" y1="182" x2="750" y2="182" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Scaling -->
+    <text x="70" y="202" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Scaling</text>
+    <text x="207" y="202" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Stateless (easy)</text>
+    <text x="357" y="202" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Semi-stateful</text>
+    <text x="507" y="202" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Semi-stateful</text>
+    <text x="667" y="202" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Stateful (hard)</text>
+    <line x1="10" y1="212" x2="750" y2="212" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Browser -->
+    <text x="70" y="232" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Browser Support</text>
+    <text x="207" y="232" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Universal</text>
+    <text x="357" y="232" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Universal</text>
+    <text x="507" y="232" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">All except IE</text>
+    <text x="667" y="232" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">All modern</text>
+    <line x1="10" y1="242" x2="750" y2="242" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Proxy Friendly -->
+    <text x="70" y="262" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Proxy Friendly</text>
+    <text x="207" y="262" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Yes (standard HTTP)</text>
+    <text x="357" y="262" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Mostly (timeouts)</text>
+    <text x="507" y="262" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Yes (HTTP)</text>
+    <text x="667" y="262" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Some block it</text>
+    <line x1="10" y1="272" x2="750" y2="272" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Auto Reconnect -->
+    <text x="70" y="292" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="600">Auto-Reconnect</text>
+    <text x="207" y="292" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">N/A (each req new)</text>
+    <text x="357" y="292" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Manual</text>
+    <text x="507" y="292" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Built-in ✓</text>
+    <text x="667" y="292" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Manual</text>
+    <line x1="10" y1="302" x2="750" y2="302" stroke="#1e293b" stroke-width="1"/>
+
+    <!-- Row: Best For -->
+    <text x="70" y="325" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9" font-weight="700">Best For</text>
+    <text x="207" y="318" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Prototypes,</text>
+    <text x="207" y="332" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">admin dashboards</text>
+    <text x="357" y="318" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">Legacy support,</text>
+    <text x="357" y="332" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">firewall compat</text>
+    <text x="507" y="318" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Live feeds, tickers,</text>
+    <text x="507" y="332" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">notifications</text>
+    <text x="667" y="318" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">Chat, gaming,</text>
+    <text x="667" y="332" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">collaboration</text>
+
+    <!-- Decision helper -->
+    <rect x="60" y="355" width="640" height="55" rx="8" fill="#3b82f6" fill-opacity="0.08" stroke="#3b82f6" stroke-width="1"/>
+    <text x="380" y="375" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">Quick Decision Guide</text>
+    <text x="380" y="395" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">One-way push? → SSE.  Two-way interactive? → WebSocket.  Need fallback? → Long Poll.  Just prototyping? → Short Poll.</text>
+  </svg>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You're building an Uber-like ride tracking feature where the passenger watches the driver's car move on a map in real-time. The passenger doesn't need to send data, just watch. Which technique would you use and why?</p>
+    <span class="think-hint">Consider: data flows one direction (server → client), updates are frequent (every 1-2 seconds), and you need it to work reliably across mobile networks.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — AT SCALE (Real-World Examples)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How the Giants Do It</h2>
+    </div>
+  </div>
+
+  <p>The techniques we've been discussing aren't academic exercises — they're the backbone of the services you use every day. Let's look at how real companies solve real-time communication at massive scale.</p>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Real world examples of real-time tech: Slack, Discord, stock tickers, Firebase">
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Real-Time in the Real World</text>
+
+    <!-- Slack -->
+    <rect x="20" y="40" width="350" height="130" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="195" y="62" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">Slack — WebSockets</text>
+    <text x="195" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Each user opens one WebSocket connection on login.</text>
+    <text x="195" y="96" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Messages, reactions, typing indicators, presence — all</text>
+    <text x="195" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">flow through this single pipe. At peak: millions of</text>
+    <text x="195" y="128" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">concurrent connections. Uses long polling as fallback</text>
+    <text x="195" y="144" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">when WebSocket upgrade is blocked by corporate proxies.</text>
+    <text x="195" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Architecture: HAProxy → Go servers → Redis Pub/Sub</text>
+
+    <!-- Discord -->
+    <rect x="390" y="40" width="350" height="130" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="565" y="62" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="12">Discord — WebSockets + Erlang</text>
+    <text x="565" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Handles 10+ million concurrent WebSocket</text>
+    <text x="565" y="96" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">connections. Uses Erlang/Elixir for their "Gateway"</text>
+    <text x="565" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">service — chosen because Erlang was literally built</text>
+    <text x="565" y="128" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">for managing millions of telecom connections.</text>
+    <text x="565" y="144" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Single server handles 1M+ connections.</text>
+    <text x="565" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Architecture: Gateway (Elixir) → Guilds → Voice servers</text>
+
+    <!-- Stock Tickers -->
+    <rect x="20" y="190" width="350" height="130" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="195" y="212" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Stock Tickers — SSE / WebSockets</text>
+    <text x="195" y="230" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Financial data platforms (Bloomberg Terminal,</text>
+    <text x="195" y="246" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Yahoo Finance, Robinhood) push price updates</text>
+    <text x="195" y="262" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">hundreds of times per second. Web dashboards</text>
+    <text x="195" y="278" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">often use SSE (one-way push is enough).</text>
+    <text x="195" y="294" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Trading APIs use WebSockets for order placement.</text>
+    <text x="195" y="312" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Latency: &lt;50ms from exchange to your screen</text>
+
+    <!-- Firebase -->
+    <rect x="390" y="190" width="350" height="130" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="565" y="212" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">Firebase — WebSockets + Long Polling</text>
+    <text x="565" y="230" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Google's Firebase Realtime Database uses</text>
+    <text x="565" y="246" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">WebSockets as the primary transport and falls</text>
+    <text x="565" y="262" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">back to long polling. Any data change triggers</text>
+    <text x="565" y="278" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">an instant push to every listening client.</text>
+    <text x="565" y="294" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Powers millions of mobile + web apps.</text>
+    <text x="565" y="312" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Key insight: automatic fallback for reliability</text>
+  </svg>
+
+  <div class="callout callout-success">
+    <strong>Pattern:</strong> Every production-grade system uses <strong>multiple techniques with automatic fallback</strong>. The typical stack is: try WebSocket first → fall back to SSE → fall back to long polling → last resort: short polling. Libraries like <span class="tooltip-trigger">Socket.IO<span class="tooltip-content">A popular JavaScript library that abstracts away real-time transport details. It tries WebSocket first, then automatically falls back to HTTP long polling if WebSockets are blocked. Used by millions of applications. Not a protocol — it's a library that sits on top of WebSockets and HTTP.</span></span>, <span class="tooltip-trigger">SignalR<span class="tooltip-content">Microsoft's real-time library for .NET. Like Socket.IO, it automatically negotiates the best transport (WebSocket → SSE → Long Polling). It handles reconnection, connection groups, and scales with Redis or Azure SignalR Service. Built into ASP.NET Core.</span></span>, and SockJS handle this fallback chain automatically.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — DECISION FRAMEWORK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="decision-framework">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-check-double"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Decision Framework — Picking the Right Technique</h2>
+    </div>
+  </div>
+
+  <p>In a system design interview (or a real architecture decision), you won't just be asked "which one is best?" — you'll need to explain <em>why</em> you chose it based on the specific constraints. Here's a decision flowchart that covers the most common scenarios.</p>
+
+  <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision flowchart for choosing a real-time technique">
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Which Real-Time Technique Should You Use?</text>
+
+    <!-- Start -->
+    <polygon points="380,40 440,65 380,90 320,65" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="380" y="69" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="600">Start</text>
+
+    <!-- Q1: Does client need to send data? -->
+    <rect x="280" y="105" width="200" height="40" rx="8" fill="#1e293b" stroke="#f1f5f9" stroke-width="1.5"/>
+    <text x="380" y="122" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Does client send data</text>
+    <text x="380" y="136" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">through same channel?</text>
+    <line x1="380" y1="90" x2="380" y2="105" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- No branch: SSE path -->
+    <text x="185" y="128" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">No</text>
+    <line x1="280" y1="125" x2="200" y2="125" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="200" y1="125" x2="200" y2="160" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Q: Is auto-reconnect important? -->
+    <rect x="100" y="160" width="200" height="40" rx="8" fill="#1e293b" stroke="#f1f5f9" stroke-width="1.5"/>
+    <text x="200" y="177" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Need auto-reconnect</text>
+    <text x="200" y="191" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">and simple setup?</text>
+
+    <!-- Yes → SSE -->
+    <text x="80" y="205" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Yes</text>
+    <line x1="100" y1="180" x2="60" y2="180" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="60" y1="180" x2="60" y2="230" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="10" y="230" width="100" height="35" rx="6" fill="#10b981" fill-opacity="0.2" stroke="#10b981" stroke-width="2"/>
+    <text x="60" y="252" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11" font-weight="700">Use SSE</text>
+
+    <!-- No → Short polling? -->
+    <text x="320" y="205" fill="#eab308" font-family="Inter, sans-serif" font-size="10" font-weight="600">No</text>
+    <line x1="300" y1="180" x2="340" y2="180" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="340" y1="180" x2="340" y2="230" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="280" y="230" width="120" height="35" rx="6" fill="#eab308" fill-opacity="0.2" stroke="#eab308" stroke-width="2"/>
+    <text x="340" y="252" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="11" font-weight="700">Short Poll OK</text>
+
+    <!-- Yes branch: bidirectional -->
+    <text x="500" y="128" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">Yes</text>
+    <line x1="480" y1="125" x2="560" y2="125" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="560" y1="125" x2="560" y2="160" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Q: High frequency? -->
+    <rect x="460" y="160" width="200" height="40" rx="8" fill="#1e293b" stroke="#f1f5f9" stroke-width="1.5"/>
+    <text x="560" y="177" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">High frequency messages</text>
+    <text x="560" y="191" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">(&gt;1 per second)?</text>
+
+    <!-- Yes → WebSocket -->
+    <text x="690" y="205" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">Yes</text>
+    <line x1="660" y1="180" x2="700" y2="180" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="700" y1="180" x2="700" y2="230" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="640" y="230" width="110" height="35" rx="6" fill="#3b82f6" fill-opacity="0.2" stroke="#3b82f6" stroke-width="2"/>
+    <text x="695" y="252" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="11" font-weight="700">WebSocket</text>
+
+    <!-- No → more questions -->
+    <text x="460" y="225" fill="#eab308" font-family="Inter, sans-serif" font-size="10" font-weight="600">No</text>
+    <line x1="560" y1="200" x2="560" y2="240" stroke="#64748b" stroke-width="1.5"/>
+
+    <rect x="460" y="240" width="200" height="40" rx="8" fill="#1e293b" stroke="#f1f5f9" stroke-width="1.5"/>
+    <text x="560" y="257" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Can you use WebSocket</text>
+    <text x="560" y="271" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">(no proxy/firewall issues)?</text>
+
+    <!-- Yes → still WebSocket -->
+    <text x="690" y="280" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">Yes → WS</text>
+    <line x1="660" y1="260" x2="700" y2="260" stroke="#64748b" stroke-width="1"/>
+
+    <!-- No → Long Polling -->
+    <text x="460" y="305" fill="#eab308" font-family="Inter, sans-serif" font-size="10" font-weight="600">No</text>
+    <line x1="560" y1="280" x2="560" y2="310" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="500" y="310" width="120" height="35" rx="6" fill="#eab308" fill-opacity="0.2" stroke="#eab308" stroke-width="2"/>
+    <text x="560" y="332" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="11" font-weight="700">Long Polling</text>
+
+    <!-- Bottom summary -->
+    <rect x="100" y="380" width="560" height="50" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="380" y="400" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">The Golden Rule</text>
+    <text x="380" y="418" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">In production, use a library (Socket.IO, SignalR) that tries WebSocket first, then auto-falls back. Don't hand-roll it.</text>
+  </svg>
+
+  <p>The flowchart above handles 90% of real-world decisions. But here's the nuance that separates good answers from great ones in interviews: <strong>most production systems don't pick just one</strong>. They use WebSockets for the main real-time channel, SSE for secondary feeds (like notifications), and short polling for non-critical data (like "last seen" status updates that can be a few seconds stale). This multi-transport approach is sometimes called a <span class="tooltip-trigger">hybrid architecture<span class="tooltip-content">Using multiple real-time techniques in the same application, each chosen for the specific use case. For example: WebSockets for chat messages, SSE for notification badges, and short polling for "5 users online" counters. This avoids over-engineering while ensuring each feature gets the right trade-off of complexity vs. performance.</span></span>.</p>
+
+  <svg viewBox="0 0 760 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hybrid architecture: multiple techniques in one app">
+    <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Hybrid Architecture — One App, Multiple Techniques</text>
+    <rect x="20" y="35" width="220" height="80" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="130" y="55" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="10">WebSocket</text>
+    <text x="130" y="72" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Chat messages, typing</text>
+    <text x="130" y="86" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">indicators, presence</text>
+    <text x="130" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Needs: bidirectional, fast</text>
+    <rect x="270" y="35" width="220" height="80" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">SSE</text>
+    <text x="380" y="72" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Notification bell, live</text>
+    <text x="380" y="86" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">activity feed updates</text>
+    <text x="380" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Needs: server push only</text>
+    <rect x="520" y="35" width="220" height="80" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="630" y="55" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="10">Short Polling</text>
+    <text x="630" y="72" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">"5 users online" counter,</text>
+    <text x="630" y="86" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">analytics dashboard</text>
+    <text x="630" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Needs: simple, stale OK</text>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — COMMON PITFALLS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="pitfalls">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Pitfalls &amp; Mistakes</h2>
+    </div>
+  </div>
+
+  <p>Real-time systems have failure modes that catch experienced developers off-guard. Here are the mistakes that burn teams the most often.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You deploy a WebSocket-based chat app. Everything works perfectly in testing. Then you go live, and users report that messages "disappear" randomly — they send a message but the other person never sees it. What could cause this?</p>
+    <span class="think-hint">Think about what happens when a connection drops silently, without either side knowing.</span>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header">
+      <span>Pitfall 1: Not handling reconnection</span>
+    </div>
+    <div class="collapsible-content">
+      <p><strong>The mistake:</strong> Assuming WebSocket connections stay open forever. In reality, connections drop constantly — mobile users switch from Wi-Fi to cellular, corporate proxies timeout idle connections after 60 seconds, servers restart during deployments.</p>
+      <p><strong>Why it's bad:</strong> Without reconnection logic, users silently stop receiving updates. They see a frozen UI and think the app is broken.</p>
+      <p><strong>The fix:</strong> Always implement exponential backoff reconnection. Start with a 1-second retry, double it each attempt (2s, 4s, 8s...), cap at 30 seconds. Add jitter (random 0-1s) to prevent all clients reconnecting at once after a server restart (a <span class="tooltip-trigger">thundering herd<span class="tooltip-content">When a server restarts or recovers from an outage, all disconnected clients try to reconnect at the exact same moment, overwhelming the server before it can stabilize. Adding random jitter (small random delays) to reconnection timers prevents this stampede.</span></span>).</p>
+
+      <svg viewBox="0 0 760 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Exponential backoff reconnection strategy">
+        <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Exponential Backoff with Jitter</text>
+        <!-- Timeline -->
+        <line x1="40" y1="70" x2="720" y2="70" stroke="#334155" stroke-width="2"/>
+        <!-- Attempts -->
+        <rect x="60" y="45" width="40" height="20" rx="4" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="1"/>
+        <text x="80" y="59" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Fail</text>
+        <text x="80" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">0s</text>
+
+        <text x="140" y="59" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">wait 1s</text>
+        <rect x="180" y="45" width="40" height="20" rx="4" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="1"/>
+        <text x="200" y="59" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Fail</text>
+        <text x="200" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">1s</text>
+
+        <text x="270" y="59" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">wait 2s</text>
+        <rect x="320" y="45" width="40" height="20" rx="4" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="1"/>
+        <text x="340" y="59" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Fail</text>
+        <text x="340" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">3s</text>
+
+        <text x="420" y="59" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">wait 4s</text>
+        <rect x="480" y="45" width="40" height="20" rx="4" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="1"/>
+        <text x="500" y="59" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">Fail</text>
+        <text x="500" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">7s</text>
+
+        <text x="570" y="59" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">wait 8s</text>
+        <rect x="630" y="45" width="50" height="20" rx="4" fill="#10b981" fill-opacity="0.2" stroke="#10b981" stroke-width="1"/>
+        <text x="655" y="59" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Success!</text>
+        <text x="655" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">15s</text>
+
+        <text x="380" y="120" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">+ random jitter (0-1s) on each retry to avoid thundering herd</text>
+        <text x="380" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Pattern: wait = min(2^attempt + random(0,1), maxDelay)</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header">
+      <span>Pitfall 2: Using WebSockets when SSE would suffice</span>
+    </div>
+    <div class="collapsible-content">
+      <p><strong>The mistake:</strong> Defaulting to WebSockets for every real-time feature, even when data only flows from server to client.</p>
+      <p><strong>Why it's bad:</strong> WebSockets are harder to scale (stateful connections, need Redis Pub/Sub), harder to debug (binary protocol, not visible in standard HTTP logs), and harder to deploy (some proxies and CDNs don't support them). If all you need is "server pushes updates to client," SSE gives you 90% of the benefit with 20% of the complexity.</p>
+      <p><strong>The fix:</strong> Ask "does the client need to send data through this connection?" If no → SSE. If yes → WebSocket. Dashboard updates, live scores, notification feeds, stock tickers — all SSE candidates.</p>
+
+      <svg viewBox="0 0 760 110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision: SSE vs WebSocket">
+        <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">The SSE-vs-WebSocket Decision</text>
+        <rect x="20" y="35" width="350" height="60" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="195" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">SSE ✓ (server → client only)</text>
+        <text x="195" y="73" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Dashboards, live scores, notifications,</text>
+        <text x="195" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">news feeds, stock tickers, log tailing</text>
+        <rect x="390" y="35" width="350" height="60" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="565" y="55" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">WebSocket ✓ (both directions)</text>
+        <text x="565" y="73" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Chat, gaming, collaborative editing,</text>
+        <text x="565" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">live auctions, trading platforms</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header">
+      <span>Pitfall 3: Forgetting about message ordering and delivery guarantees</span>
+    </div>
+    <div class="collapsible-content">
+      <p><strong>The mistake:</strong> Assuming messages arrive in order and exactly once. With WebSockets, if the connection drops and reconnects, you might miss messages sent during the gap. Or if the server reprocesses a message, you might get duplicates.</p>
+      <p><strong>Why it's bad:</strong> In a chat app, messages appear out of order. In a trading app, you might execute the same trade twice. In a collaborative editor, you get data corruption.</p>
+      <p><strong>The fix:</strong> Assign each message a <span class="tooltip-trigger">sequence number<span class="tooltip-content">A monotonically increasing integer assigned to each message. When the client reconnects, it tells the server "I last received message #42" and the server replays everything from #43 onward. This ensures no messages are lost during disconnection and duplicates can be detected and ignored.</span></span> or timestamp. On reconnection, the client sends "I last saw message #42" and the server replays everything from #43. Deduplicate on the client side using message IDs.</p>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header">
+      <span>Pitfall 4: No backpressure on fast producers</span>
+    </div>
+    <div class="collapsible-content">
+      <p><strong>The mistake:</strong> A server producing events faster than clients can consume them. If 1,000 stock price updates arrive per second but the client can only render 30 frames per second, the client's message buffer grows without bound.</p>
+      <p><strong>Why it's bad:</strong> Client memory explodes. Browser tabs crash. On mobile, the OS kills your app.</p>
+      <p><strong>The fix:</strong> Implement server-side throttling (send at most 1 update per 100ms per client), or use <span class="tooltip-trigger">backpressure<span class="tooltip-content">A flow control mechanism where the consumer signals the producer to slow down when it can't keep up. In WebSockets, this might mean monitoring the send buffer size and dropping or batching updates when the client is falling behind. Without backpressure, fast producers overwhelm slow consumers.</span></span> mechanisms where the server detects slow consumers and either batches updates or drops intermediate ones (sending only the latest state).</p>
+
+      <svg viewBox="0 0 760 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Backpressure: fast producer vs slow consumer buffer overflow">
+        <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">What Happens Without Backpressure</text>
+        <rect x="30" y="35" width="100" height="45" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="80" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Server</text>
+        <text x="80" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">1000 msgs/sec</text>
+        <!-- Arrows flooding -->
+        <text x="165" y="55" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">→→→→→</text>
+        <!-- Buffer -->
+        <rect x="230" y="30" width="200" height="55" rx="6" fill="#0f172a" stroke="#eab308" stroke-width="1.5"/>
+        <text x="330" y="50" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">Client Buffer (growing!)</text>
+        <rect x="240" y="60" width="180" height="12" rx="3" fill="#334155"/>
+        <rect x="240" y="60" width="160" height="12" rx="3" fill="#ef4444" fill-opacity="0.5"/>
+        <text x="330" y="70" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="7">████████████████░░</text>
+        <!-- Slow consumer -->
+        <text x="455" y="55" fill="#10b981" font-family="Inter, sans-serif" font-size="10">→</text>
+        <rect x="480" y="35" width="100" height="45" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="530" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Browser</text>
+        <text x="530" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">30 renders/sec</text>
+        <!-- Result -->
+        <rect x="620" y="35" width="120" height="45" rx="6" fill="#ef4444" fill-opacity="0.1" stroke="#ef4444" stroke-width="1"/>
+        <text x="680" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">💥 OOM Crash</text>
+        <text x="680" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Tab killed</text>
+        <text x="380" y="110" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="10" font-weight="600">Fix: Server-side throttling → send only latest state, batch updates</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — EXERCISES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Practice Exercises</h2>
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Before looking at the exercises, try to sketch on paper the complete architecture for a WebSocket-based system with 3 servers and Redis. Draw where messages flow when User A on Server 1 sends a message to User B on Server 3.</p>
+    <span class="think-hint">Include: the client, the load balancer, the WebSocket servers, Redis, and the arrows showing message flow.</span>
+  </div>
+
+  <div class="exercise-card">
+    <h4>Exercise 1: Choose the Right Technique</h4>
+    <p>For each scenario, pick the best real-time technique and explain why:</p>
+    <p>(a) A live sports scoreboard showing scores for 20 concurrent games.</p>
+    <p>(b) A Google Docs-like collaborative text editor.</p>
+    <p>(c) An IoT dashboard showing sensor readings every 10 seconds.</p>
+    <p>(d) A multiplayer chess game.</p>
+    <p>(e) A Twitter-like social feed that shows new tweets as they appear.</p>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Hints</span></div>
+      <div class="collapsible-content">
+        <p>Think about: (1) direction of data flow, (2) how often updates happen, (3) whether the client needs to send data back through the same channel.</p>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-content">
+        <p>(a) <strong>SSE</strong> — Scores flow one direction (server → client), moderate frequency, no client input needed.</p>
+        <p>(b) <strong>WebSocket</strong> — Users type (client → server) and see others' edits (server → client). Very high frequency, needs to be bidirectional and fast.</p>
+        <p>(c) <strong>SSE or Short Polling</strong> — Every 10 seconds is slow enough that even short polling works. SSE is cleaner if you want instant updates when sensors spike.</p>
+        <p>(d) <strong>WebSocket</strong> — Both players need to send moves and see the opponent's moves. Although moves are infrequent, the bidirectional nature and low latency requirement (clock is ticking!) make WebSocket the right fit.</p>
+        <p>(e) <strong>SSE</strong> — New tweets push from server to client. User interactions (liking, retweeting) go through separate REST API calls.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <h4>Exercise 2: Estimate WebSocket Server Capacity</h4>
+    <p>You're designing a chat app. Each WebSocket connection uses ~10 KB of server memory. Your server has 8 GB of RAM available for connections. How many concurrent users can one server handle? If you have 500,000 users online simultaneously, how many servers do you need?</p>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-content">
+        <p>8 GB = 8,000,000 KB. At 10 KB per connection: <strong>800,000 connections per server</strong>.</p>
+        <p>For 500,000 users: technically 1 server is enough (500K < 800K). But in production you'd use at least 3 servers for redundancy, load distribution, and headroom during traffic spikes. A common rule: plan for 50% utilization, so you'd want 500K / 400K = <strong>2 servers minimum, 3 for safety</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <h4>Exercise 3: Design the Fallback Chain</h4>
+    <p>Your application needs to work behind strict corporate firewalls that block WebSocket upgrade requests, old browsers that don't support SSE, and modern browsers on fast networks. Design a transport negotiation strategy that picks the best available option. Write pseudocode for the client-side logic.</p>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-content">
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="macos-filename">transport-negotiation.js</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-javascript">async function connectRealTime() {
+  // Try 1: WebSocket (best option)
+  if ('WebSocket' in window) {
+    try {
+      const ws = new WebSocket('wss://api.example.com/ws');
+      await waitForOpen(ws, 5000); // 5s timeout
+      return { type: 'websocket', connection: ws };
+    } catch (e) {
+      console.log('WebSocket failed, trying SSE...');
+    }
+  }
+
+  // Try 2: Server-Sent Events (good for one-way push)
+  if ('EventSource' in window) {
+    try {
+      const sse = new EventSource('/api/events');
+      await waitForOpen(sse, 5000);
+      return { type: 'sse', connection: sse };
+    } catch (e) {
+      console.log('SSE failed, falling back to long polling...');
+    }
+  }
+
+  // Try 3: Long Polling (works everywhere)
+  return { type: 'longpoll', connection: startLongPoll() };
+}</code></pre>
+          </div>
+        </div>
+        <p>This is essentially what Socket.IO and SignalR do internally. The key insight: start with the best, gracefully degrade.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <h4>Exercise 4: Spot the Bug</h4>
+    <p>This long-polling implementation has a critical bug that will eventually crash the browser. Can you find it?</p>
+    <div class="macos-window">
+      <div class="macos-titlebar">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-yellow"></span>
+        <span class="dot dot-green"></span>
+        <span class="macos-filename">buggy-long-poll.js</span>
+      </div>
+      <div class="macos-body">
+<pre><code class="language-javascript">async function longPoll() {
+  try {
+    const res = await fetch('/api/events?wait=true');
+    const data = await res.json();
+    handleData(data);
+  } catch (error) {
+    console.error('Poll failed:', error);
+  }
+  longPoll();  // Immediately retry
+}</code></pre>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-content">
+        <p><strong>The bug:</strong> When the server is down, every <code>fetch()</code> fails immediately (no 30-second hold). The <code>catch</code> block runs and immediately calls <code>longPoll()</code> again, which fails instantly again. This creates an infinite loop of rapid-fire failed requests — thousands per second — which will crash the browser tab and DDoS your own server.</p>
+        <p><strong>The fix:</strong> Add a delay in the <code>catch</code> block before retrying:</p>
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="macos-filename">fixed-long-poll.js</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-javascript">async function longPoll() {
+  try {
+    const res = await fetch('/api/events?wait=true');
+    const data = await res.json();
+    handleData(data);
+    longPoll();  // Success: retry immediately
+  } catch (error) {
+    console.error('Poll failed:', error);
+    await sleep(3000);  // Failure: wait 3s before retry!
+    longPoll();
+  }
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <h4>Exercise 5: Interview Scenario</h4>
+    <p>You're asked to design the real-time notification system for a platform like GitHub. Users should see notifications instantly when someone mentions them, reviews their PR, or comments on their issue. There are 20 million registered users, but only about 2 million are online at any given time. How would you architect the real-time delivery?</p>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Hints</span></div>
+      <div class="collapsible-content">
+        <p>Think about: (1) Which technique for the browser connection? (2) How do you route a notification to the right server if you have many? (3) What happens to notifications when the user is offline? (4) How many servers do you need?</p>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-content">
+        <p><strong>Transport:</strong> SSE for browser delivery (notifications are server → client only; users don't need to send data back through the notification channel). WebSocket is overkill here.</p>
+        <p><strong>Architecture:</strong> 2M connections at ~10KB each = ~20GB total. With 8GB/server at 50% utilization: ~5 servers for SSE connections. Use a connection registry (Redis hash: userId → serverId) so when a notification is generated, the system knows which server to route it to. Use Redis Pub/Sub to broadcast to the correct server.</p>
+        <p><strong>Offline users:</strong> Store undelivered notifications in a database. When the user reconnects, they fetch missed notifications via a regular REST API call (GET /notifications?since=lastSeen).</p>
+        <p><strong>Scaling:</strong> The notification <em>generation</em> service is separate from the notification <em>delivery</em> service. Generation writes to a queue (Kafka/RabbitMQ). Delivery workers consume from the queue, look up the user's server in Redis, and push through SSE.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — CHEAT SHEET
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-table-cells"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Cheat Sheet</h2>
+    </div>
+  </div>
+
+  <svg viewBox="0 0 760 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolution timeline: short poll to WebSocket">
+    <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">The Evolution of Real-Time on the Web</text>
+    <line x1="60" y1="55" x2="700" y2="55" stroke="#334155" stroke-width="3"/>
+    <circle cx="120" cy="55" r="10" fill="#ef4444" fill-opacity="0.3" stroke="#ef4444" stroke-width="2"/>
+    <text x="120" y="59" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">SP</text>
+    <text x="120" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~2000</text>
+    <circle cx="310" cy="55" r="10" fill="#eab308" fill-opacity="0.3" stroke="#eab308" stroke-width="2"/>
+    <text x="310" y="59" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8" font-weight="600">LP</text>
+    <text x="310" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~2005</text>
+    <circle cx="500" cy="55" r="10" fill="#10b981" fill-opacity="0.3" stroke="#10b981" stroke-width="2"/>
+    <text x="500" y="59" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7" font-weight="600">SSE</text>
+    <text x="500" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~2010</text>
+    <circle cx="640" cy="55" r="12" fill="#3b82f6" fill-opacity="0.3" stroke="#3b82f6" stroke-width="2"/>
+    <text x="640" y="59" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="7" font-weight="600">WS</text>
+    <text x="640" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">2011 (RFC 6455)</text>
+  </svg>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <h4>Short Polling</h4>
+      <p>Client asks on a timer. Simple, wasteful. Best for prototypes and slow-update dashboards.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>Long Polling</h4>
+      <p>Server holds request until data exists. Near-instant delivery. Fallback when WebSocket/SSE blocked.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>SSE</h4>
+      <p>One-way stream, server → client. Auto-reconnect. Perfect for feeds, tickers, notifications.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>WebSocket</h4>
+      <p>Full duplex, 2-byte overhead. Chat, gaming, collaboration. Hardest to scale (stateful).</p>
+    </div>
+    <div class="cheat-card">
+      <h4>Scaling WS</h4>
+      <p>Redis Pub/Sub to relay messages between servers. Connection registry to route to right server.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>Production Rule</h4>
+      <p>Use a library (Socket.IO, SignalR) that auto-negotiates transport. Never hand-roll fallback logic.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>Reconnection</h4>
+      <p>Exponential backoff + jitter. Start 1s, double each retry, cap at 30s. Prevents thundering herd.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>Message Ordering</h4>
+      <p>Assign sequence numbers. On reconnect, send last-seen ID. Server replays missed messages.</p>
+    </div>
+    <div class="cheat-card">
+      <h4>Interview Tip</h4>
+      <p>Always mention fallback chain and how you'd handle reconnection. Shows you think about reliability, not just the happy path.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — INTERVIEW PITCH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-pitch">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-microphone"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Interview Pitch — 30-Second Answer</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>When asked "How would you add real-time features to this system?"</strong>
+  </div>
+
+  <p>"There are four main approaches to real-time on the web, each with different trade-offs. <strong>Short polling</strong> is simplest — the client asks on a timer — but it wastes bandwidth and adds latency. <strong>Long polling</strong> improves this by having the server hold the request until data exists, giving near-instant delivery. <strong>Server-Sent Events</strong> open a persistent one-way channel from server to client — great for feeds and notifications, with built-in auto-reconnect. <strong>WebSockets</strong> give full two-way communication with minimal overhead — the gold standard for chat, gaming, and collaboration."</p>
+
+  <p>"For this system, I'd choose [your pick] because [reason based on data direction, frequency, and scaling needs]. In production, I'd use a library like SignalR or Socket.IO that auto-negotiates the best transport and falls back gracefully. For scaling, I'd use Redis Pub/Sub to relay messages across multiple server instances, with heartbeats to detect and clean up dead connections."</p>
+
+  <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview answer structure">
+    <text x="380" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Strong Interview Answer Structure</text>
+    <rect x="20" y="35" width="140" height="70" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="90" y="58" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="10">1. Name Options</text>
+    <text x="90" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Show you know all 4</text>
+    <text x="90" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">techniques exist</text>
+
+    <text x="175" y="70" fill="#64748b" font-family="Inter, sans-serif" font-size="14">→</text>
+
+    <rect x="200" y="35" width="140" height="70" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="270" y="58" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">2. Pick + Justify</text>
+    <text x="270" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Explain WHY this</text>
+    <text x="270" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">one fits your case</text>
+
+    <text x="355" y="70" fill="#64748b" font-family="Inter, sans-serif" font-size="14">→</text>
+
+    <rect x="380" y="35" width="140" height="70" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="450" y="58" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="10">3. Scale Plan</text>
+    <text x="450" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Redis Pub/Sub, LB,</text>
+    <text x="450" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">connection registry</text>
+
+    <text x="535" y="70" fill="#64748b" font-family="Inter, sans-serif" font-size="14">→</text>
+
+    <rect x="560" y="35" width="180" height="70" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="650" y="58" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="10">4. Reliability</text>
+    <text x="650" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Reconnection, fallback,</text>
+    <text x="650" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">heartbeats, msg ordering</text>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — RELATED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="related">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-arrow-right"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Related Topics — What to Study Next</h2>
+    </div>
+  </div>
+
+  <div class="related-grid">
+    <a class="related-card" href="../tcp-udp/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-plug"></i></div>
+      <div class="related-card-text">
+        <h4>TCP &amp; UDP</h4>
+        <p>Understand the transport layer underneath WebSockets and HTTP — why TCP is used for reliable delivery</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../http-evolution/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-globe"></i></div>
+      <div class="related-card-text">
+        <h4>HTTP Evolution</h4>
+        <p>HTTP/1.1 → HTTP/2 → HTTP/3 and how multiplexing and QUIC change the real-time landscape</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-envelopes-bulk"></i></div>
+      <div class="related-card-text">
+        <h4>Message Queues</h4>
+        <p>Kafka, RabbitMQ, SQS — how servers communicate asynchronously when real-time delivery meets backend processing</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div class="related-card-text">
+        <h4>Load Balancers</h4>
+        <p>L4 vs L7 load balancing for WebSocket connections — sticky sessions and connection draining</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Redis</h4>
+        <p>The in-memory store that powers Pub/Sub for WebSocket scaling — caching, sessions, and real-time messaging</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../scalability/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-arrow-up-right-dots"></i></div>
+      <div class="related-card-text">
+        <h4>Scalability</h4>
+        <p>Horizontal scaling, stateful vs stateless services, and why real-time connections complicate scaling strategies</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
