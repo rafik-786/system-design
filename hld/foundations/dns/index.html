@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DNS — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="green" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-satellite-dish"></i> Networking Foundations</div>
+    <h1>DNS — The Internet's Phone Book</h1>
+    <p class="hero-subtitle">Every time you type a URL, a hidden lookup turns that human-friendly name into an IP address a computer can actually reach. That lookup is DNS — and if it breaks, the entire internet feels broken.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 7 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 22 SVG Diagrams</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 20 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> DNS is the internet's phone book. You know your friend's <em>name</em> ("google.com"), but the internet only understands <em>numbers</em> ("142.250.80.46"). DNS translates names into numbers so you never have to memorize IP addresses. It's hierarchical (like a tree), heavily cached (so lookups are fast), and distributed across thousands of servers worldwide (so no single failure kills it).
+  </div>
+
+  <p>Think about how you use contacts on your phone. You tap "Mom" — you don't dial 555-012-3456 from memory. DNS does the same thing for the internet. When you type <code>www.google.com</code> into your browser, DNS figures out which <span class="tooltip-trigger">IP address<span class="tooltip-content">An IP (Internet Protocol) address is a unique number that identifies every device on the internet — like a street address for computers. Example: 142.250.80.46 (IPv4) or 2607:f8b0:4004:800::200e (IPv6).</span></span> that name points to, so your browser knows where to send its request.</p>
+
+  <!-- TL;DR mental model SVG -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DNS mental model: name to IP translation">
+    <defs>
+      <marker id="dns-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">DNS in One Picture</text>
+
+    <!-- You type -->
+    <rect x="20" y="50" width="180" height="70" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="110" y="75" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">YOU TYPE</text>
+    <text x="110" y="100" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="12">www.google.com</text>
+
+    <!-- Arrow -->
+    <line x1="205" y1="85" x2="275" y2="85" stroke="#10b981" stroke-width="2" marker-end="url(#dns-tldr-arr)"/>
+    <text x="240" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">DNS</text>
+
+    <!-- Phone book -->
+    <rect x="280" y="45" width="200" height="80" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="380" y="70" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">INTERNET'S PHONE BOOK</text>
+    <text x="380" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">google.com → 142.250.80.46</text>
+    <text x="380" y="106" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">github.com → 140.82.121.3</text>
+
+    <!-- Arrow -->
+    <line x1="485" y1="85" x2="555" y2="85" stroke="#10b981" stroke-width="2" marker-end="url(#dns-tldr-arr)"/>
+    <text x="520" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">result</text>
+
+    <!-- Browser connects -->
+    <rect x="560" y="50" width="180" height="70" rx="12" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="650" y="75" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">BROWSER CONNECTS</text>
+    <text x="650" y="100" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="12">142.250.80.46</text>
+
+    <!-- Bottom note -->
+    <text x="380" y="165" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">This happens <tspan fill="#f1f5f9" font-weight="600">billions</tspan> of times per day — usually in under 50 ms</text>
+    <text x="380" y="185" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">Without DNS, you'd need to memorize IP addresses for every website you visit</text>
+  </svg>
+
+  <p>The genius of DNS is that it's <em>distributed</em> — no single server holds all the answers. Instead, responsibility is split across a hierarchy: root servers at the top, then servers for <code>.com</code>, <code>.org</code>, <code>.io</code>, and so on, then servers for individual domains. And every step along the way, results get <span class="tooltip-trigger">cached<span class="tooltip-content">Caching means storing a copy of data closer to where it's needed so you don't have to fetch it from the original source every time. DNS caches exist in your browser, your OS, your router, and your ISP.</span></span> — so most lookups never travel the full chain.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> DNS translates human-readable domain names into machine-readable IP addresses, using a distributed hierarchy of servers and aggressive caching to do it billions of times per day.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="scenario">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-film"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario — "The Internet Is Down!"</h2>
+    </div>
+  </div>
+
+  <p>It's Friday afternoon. Your teammate slacks you: <em>"Hey, is the internet down? I can't reach any website."</em> You try loading a page — same problem. Chrome shows <code>ERR_NAME_NOT_RESOLVED</code>. But then you try something odd: you type <code>142.250.80.46</code> directly into the address bar. Google loads instantly.</p>
+
+  <p>The internet isn't down. The websites are all running fine. But something between "typing a name" and "reaching the server" is broken. That something is <strong>DNS</strong>. The phone book is offline, so your browser can't translate names into addresses. Every name-based request fails, even though the servers behind those names are perfectly healthy.</p>
+
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scenario: DNS failure makes the internet feel broken">
+    <defs>
+      <marker id="dns-sc-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+      <marker id="dns-sc-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">DNS Down ≠ Internet Down (But It Feels Like It)</text>
+
+    <!-- Browser -->
+    <rect x="20" y="55" width="140" height="55" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="90" y="78" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">Browser</text>
+    <text x="90" y="96" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">google.com</text>
+
+    <!-- Arrow to DNS (broken) -->
+    <line x1="165" y1="82" x2="260" y2="82" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#dns-sc-arr)"/>
+    <text x="212" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">who is this?</text>
+
+    <!-- DNS (broken) -->
+    <rect x="265" y="50" width="150" height="65" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="340" y="73" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">DNS SERVER</text>
+    <text x="340" y="92" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="20">✕</text>
+    <text x="340" y="108" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">OFFLINE</text>
+
+    <!-- X mark -->
+    <text x="212" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="700">ERR_NAME_NOT_RESOLVED</text>
+
+    <!-- Meanwhile, server is fine -->
+    <rect x="560" y="50" width="170" height="65" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="645" y="73" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">GOOGLE SERVER</text>
+    <text x="645" y="92" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">142.250.80.46</text>
+    <text x="645" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">Running fine ✓</text>
+
+    <!-- Direct IP works line -->
+    <rect x="20" y="155" width="140" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="90" y="178" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">Browser</text>
+    <text x="90" y="196" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="9">142.250.80.46</text>
+
+    <line x1="165" y1="182" x2="555" y2="182" stroke="#10b981" stroke-width="2" marker-end="url(#dns-sc-arr-g)"/>
+    <text x="360" y="172" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Direct IP → skips DNS → works!</text>
+
+    <text x="380" y="230" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">The server was never down. Only the <tspan fill="#ef4444" font-weight="600">name-to-number translation</tspan> was broken.</text>
+  </svg>
+
+  <p>This exact scenario played out on a massive scale on <strong>October 21, 2016</strong>, when a <span class="tooltip-trigger">DDoS attack<span class="tooltip-content">A Distributed Denial-of-Service (DDoS) attack floods a server with so much fake traffic that it can't handle real requests anymore. Like 10,000 people calling the same phone number at once — nobody gets through.</span></span> hit Dyn, a major DNS provider. Twitter, GitHub, Netflix, Reddit, Spotify — all "went down." Except they didn't. Their servers were fine. The DNS provider that translated their names into IP addresses was overwhelmed. Users couldn't look up the addresses, so it felt like the entire internet was broken.</p>
+
+  <div class="callout callout-warning">
+    <strong>The takeaway:</strong> DNS is invisible when it works and catastrophic when it doesn't. It's one of the most critical pieces of internet infrastructure, yet most developers never think about it until something breaks.
+  </div>
+
+  <div class="think-first">
+    <div class="think-first-header">
+      <i class="fa-solid fa-brain" aria-hidden="true"></i> Think First
+    </div>
+    <p>If DNS is just a "name → number" lookup, why can't we just store all the mappings in one giant database? There are only about 350 million registered domain names. A single server with a big hard drive could hold all of them. Why doesn't the internet work that way?</p>
+    <p><em>Think about it before scrolling down.</em></p>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-person-walking"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — Hardcoded IPs &amp; Host Files</h2>
+    </div>
+  </div>
+
+  <p>Before DNS existed, this is literally how the internet worked. Every computer had a file — called the <span class="tooltip-trigger"><code>hosts</code> file<span class="tooltip-content">A plain text file on every computer that maps hostnames to IP addresses. On Linux/Mac it's at /etc/hosts, on Windows at C:\Windows\System32\drivers\etc\hosts. It still exists today and is checked BEFORE DNS.</span></span> — that listed every known computer's name and IP address. If you wanted to reach a new machine, someone at Stanford (yes, literally one person) would update a master file, and everyone else would download the updated copy.</p>
+
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The hosts file era: one file, manually maintained">
+    <defs>
+      <marker id="dns-hf-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Hosts File Era (pre-1983)</text>
+
+    <!-- Stanford SRI -->
+    <rect x="260" y="50" width="240" height="80" rx="12" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="380" y="73" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="12">Stanford Research Institute</text>
+    <text x="380" y="93" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono, monospace" font-size="10">HOSTS.TXT (master file)</text>
+    <text x="380" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Maintained by ONE person</text>
+
+    <!-- Computer 1 -->
+    <rect x="30" y="170" width="160" height="55" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="110" y="192" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">MIT Computer</text>
+    <text x="110" y="210" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">/etc/hosts (copy)</text>
+
+    <!-- Computer 2 -->
+    <rect x="220" y="170" width="160" height="55" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="300" y="192" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">UCLA Computer</text>
+    <text x="300" y="210" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">/etc/hosts (copy)</text>
+
+    <!-- Computer 3 -->
+    <rect x="410" y="170" width="160" height="55" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="490" y="192" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">BBN Computer</text>
+    <text x="490" y="210" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">/etc/hosts (copy)</text>
+
+    <!-- Computer 4 -->
+    <rect x="600" y="170" width="140" height="55" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="670" y="192" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">DARPA Computer</text>
+    <text x="670" y="210" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">/etc/hosts (copy)</text>
+
+    <!-- Arrows from Stanford down -->
+    <line x1="330" y1="132" x2="110" y2="167" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#dns-hf-arr)"/>
+    <line x1="360" y1="132" x2="300" y2="167" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#dns-hf-arr)"/>
+    <line x1="400" y1="132" x2="490" y2="167" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#dns-hf-arr)"/>
+    <line x1="430" y1="132" x2="670" y2="167" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#dns-hf-arr)"/>
+    <text x="380" y="155" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">everyone downloads the latest copy</text>
+  </svg>
+
+  <p>Here's what the file looked like — and still looks like today on your machine:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="macos-filename">/etc/hosts</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-plaintext"># Host Database — the original "DNS"
+# name            IP address
+#
+127.0.0.1         localhost
+10.0.0.1          mit-ai-lab
+10.0.0.2          stanford-server
+10.0.0.3          ucla-nmc
+10.0.0.4          bbn-tenex
+10.0.0.5          rand-rcc
+# ... every computer on the ARPANET listed here</code></pre>
+    </div>
+  </div>
+
+  <p>When there were only a few hundred computers on the <span class="tooltip-trigger">ARPANET<span class="tooltip-content">The Advanced Research Projects Agency Network — the precursor to the modern internet, funded by the US Department of Defense. It connected universities and research labs starting in 1969.</span></span>, this worked fine. The file was small, updates were rare, and everyone knew each other. It was like a small-town phone book where the librarian updates it by hand.</p>
+
+  <div class="callout callout-info">
+    <strong>Fun fact:</strong> The hosts file still exists on every computer today. It's checked <em>before</em> DNS. That's why developers add lines like <code>127.0.0.1 myapp.local</code> to test local websites — the hosts file overrides DNS.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-heart-crack"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — Why One File Can't Scale</h2>
+    </div>
+  </div>
+
+  <p>By the early 1980s, the ARPANET was growing fast. Hundreds of new computers were joining every month. The single-file approach was crumbling under its own weight. Here's exactly what went wrong:</p>
+
+  <div class="think-first">
+    <div class="think-first-header">
+      <i class="fa-solid fa-brain" aria-hidden="true"></i> Think First
+    </div>
+    <p>Imagine you're in charge of maintaining the master hosts file for a network that doubles in size every year. What are the three biggest problems you'd face?</p>
+  </div>
+
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four problems with the hosts file approach at scale">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Why the Hosts File Approach Collapsed</text>
+
+    <!-- Problem 1 -->
+    <rect x="20" y="50" width="350" height="110" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="40" y="75" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">1. SINGLE POINT OF FAILURE</text>
+    <text x="40" y="95" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">One server at Stanford holds the master file.</text>
+    <text x="40" y="112" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">If it goes down, no one can get updates.</text>
+    <text x="40" y="132" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Stale copies = wrong addresses = broken internet</text>
+    <text x="40" y="148" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Also: one person maintaining it = vacation = chaos</text>
+
+    <!-- Problem 2 -->
+    <rect x="390" y="50" width="350" height="110" rx="12" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="410" y="75" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="12">2. NAME COLLISIONS</text>
+    <text x="410" y="95" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Flat namespace = every name must be unique.</text>
+    <text x="410" y="112" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">MIT wants "mail-server." UCLA also wants "mail-server."</text>
+    <text x="410" y="132" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">No hierarchy = no way to have the same name twice</text>
+    <text x="410" y="148" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Imagine every person on Earth needing a unique first name</text>
+
+    <!-- Problem 3 -->
+    <rect x="20" y="180" width="350" height="110" rx="12" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="40" y="205" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">3. BANDWIDTH &amp; FRESHNESS</text>
+    <text x="40" y="225" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Every computer downloads the entire file regularly.</text>
+    <text x="40" y="242" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">10,000 computers × 1 MB file = 10 GB per update cycle.</text>
+    <text x="40" y="262" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Updates happen weekly → entries stale for days</text>
+    <text x="40" y="278" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">IP changes? Too bad, wait for next week's download</text>
+
+    <!-- Problem 4 -->
+    <rect x="390" y="180" width="350" height="110" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="410" y="205" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">4. AUTHORITY</text>
+    <text x="410" y="225" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Who decides that "mail-server" = 10.0.0.5?</text>
+    <text x="410" y="242" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">One central authority for the whole internet?</text>
+    <text x="410" y="262" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Doesn't scale organizationally</text>
+    <text x="410" y="278" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Each org should control their own names</text>
+
+    <text x="380" y="312" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11" font-weight="600">All four problems have the same root cause: CENTRALIZATION</text>
+  </svg>
+
+  <p>The math tells the story. The ARPANET had about 200 hosts in 1980. By 1983, it had over 500 and growing exponentially. That master file at Stanford? It was being downloaded thousands of times a day, yet still couldn't stay current. New machines would join the network and be unreachable for days because the file hadn't been updated yet.</p>
+
+  <p>The fundamental issue was <strong>centralization</strong>. One file, one server, one person, one namespace. Every single problem — failure, collisions, staleness, authority — traces back to trying to put everything in one place. The solution needed to be the opposite: <em>distributed</em>.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Hierarchical Naming</h2>
+    </div>
+  </div>
+
+  <p>In 1983, Paul Mockapetris published <span class="tooltip-trigger">RFC 882 and RFC 883<span class="tooltip-content">RFCs (Request for Comments) are the official documents that define how internet protocols work. RFC 882 and 883 defined the original DNS specification. They were later superseded by RFC 1034 and 1035, which are still the foundation of DNS today.</span></span>, and DNS was born. The breakthrough idea was beautifully simple: <strong>don't put everything in one place — organize names into a tree, and let each branch of the tree manage itself.</strong></p>
+
+  <p>Think about how street addresses work. "123 Main Street, Springfield, Illinois, USA" isn't stored in one giant global address book. Instead:</p>
+  <ul>
+    <li><strong>The USA</strong> knows about its 50 states</li>
+    <li><strong>Illinois</strong> knows about its cities</li>
+    <li><strong>Springfield</strong> knows about its streets</li>
+    <li><strong>Main Street</strong> knows about its house numbers</li>
+  </ul>
+  <p>Nobody has to know everything. Each level only knows about the level directly below it. That's exactly how DNS works.</p>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DNS hierarchy as a tree: root, TLDs, domains, subdomains">
+    <defs>
+      <marker id="dns-bt-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The DNS Tree — Each Level Manages the Next</text>
+
+    <!-- Root -->
+    <rect x="330" y="45" width="100" height="40" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="380" y="70" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="13">. (root)</text>
+
+    <!-- TLDs -->
+    <rect x="80" y="120" width="100" height="40" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="130" y="145" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">.com</text>
+
+    <rect x="250" y="120" width="100" height="40" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="300" y="145" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">.org</text>
+
+    <rect x="420" y="120" width="100" height="40" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="470" y="145" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">.io</text>
+
+    <rect x="590" y="120" width="100" height="40" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="640" y="145" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">.dev</text>
+
+    <!-- Lines from root to TLDs -->
+    <line x1="350" y1="85" x2="130" y2="118" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="370" y1="85" x2="300" y2="118" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="390" y1="85" x2="470" y2="118" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="410" y1="85" x2="640" y2="118" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Domains under .com -->
+    <rect x="20" y="200" width="100" height="40" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="70" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">google</text>
+
+    <rect x="140" y="200" width="100" height="40" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="190" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">github</text>
+
+    <!-- Domains under .org -->
+    <rect x="260" y="200" width="100" height="40" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="310" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">wikipedia</text>
+
+    <!-- Lines from .com to domains -->
+    <line x1="100" y1="160" x2="70" y2="198" stroke="#64748b" stroke-width="1.5"/>
+    <line x1="150" y1="160" x2="190" y2="198" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Line from .org to domain -->
+    <line x1="300" y1="160" x2="310" y2="198" stroke="#64748b" stroke-width="1.5"/>
+
+    <!-- Subdomains under google -->
+    <rect x="5" y="280" width="60" height="35" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="35" y="302" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">www</text>
+
+    <rect x="80" y="280" width="60" height="35" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="110" y="302" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">mail</text>
+
+    <rect x="155" y="280" width="60" height="35" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="185" y="302" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">maps</text>
+
+    <!-- Lines from google to subdomains -->
+    <line x1="50" y1="240" x2="35" y2="278" stroke="#64748b" stroke-width="1.2"/>
+    <line x1="70" y1="240" x2="110" y2="278" stroke="#64748b" stroke-width="1.2"/>
+    <line x1="80" y1="240" x2="185" y2="278" stroke="#64748b" stroke-width="1.2"/>
+
+    <!-- Legend -->
+    <rect x="470" y="200" width="270" height="120" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="490" y="222" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Reading the tree bottom-up:</text>
+    <text x="490" y="244" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-size="10">www</text>
+    <text x="520" y="244" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">.</text>
+    <text x="527" y="244" fill="#10b981" font-family="JetBrains Mono, monospace" font-size="10">google</text>
+    <text x="575" y="244" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">.</text>
+    <text x="582" y="244" fill="#a855f7" font-family="JetBrains Mono, monospace" font-size="10">com</text>
+    <text x="607" y="244" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">.</text>
+    <text x="614" y="244" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-size="10">(root)</text>
+    <text x="490" y="266" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">= www.google.com.</text>
+    <text x="490" y="288" fill="#64748b" font-family="Inter, sans-serif" font-size="9">The trailing dot is the root — usually hidden</text>
+    <text x="490" y="305" fill="#64748b" font-family="Inter, sans-serif" font-size="9">but technically always there!</text>
+  </svg>
+
+  <p>This solved every problem from the hosts file era:</p>
+
+  <div class="callout callout-success">
+    <div class="callout-title"><i class="fa-solid fa-check"></i> How the Tree Fixes Everything</div>
+    <ul>
+      <li><strong>No single point of failure</strong> — thousands of servers share the work, each responsible for their slice of the tree</li>
+      <li><strong>No name collisions</strong> — "mail.google.com" and "mail.yahoo.com" are totally different because they live in different branches</li>
+      <li><strong>No bandwidth problem</strong> — you only ask for the one name you need, not the whole file</li>
+      <li><strong>Distributed authority</strong> — Google controls everything under <code>google.com</code>. Wikipedia controls everything under <code>wikipedia.org</code>. No central gatekeeper needed</li>
+    </ul>
+  </div>
+
+  <p>The name for each part of this tree has a specific term. The invisible dot at the very top is the <span class="tooltip-trigger">root zone<span class="tooltip-content">The root zone is the very top of the DNS tree. It's represented by a single dot (.) and managed by 13 root server clusters operated by organizations like ICANN, NASA, the US Army, and universities. Every DNS query ultimately traces back to root.</span></span>. The next level down — <code>.com</code>, <code>.org</code>, <code>.uk</code> — are called <span class="tooltip-trigger">Top-Level Domains (TLDs)<span class="tooltip-content">TLDs are the highest level of domain names in the DNS hierarchy. They include generic TLDs (.com, .org, .net), country-code TLDs (.uk, .de, .jp), and newer ones (.io, .dev, .app). There are over 1,500 TLDs today.</span></span>. Below that are the domains you recognize — <code>google</code>, <code>github</code>, <code>wikipedia</code> — each managed by whoever registered them. And below those are <span class="tooltip-trigger">subdomains<span class="tooltip-content">A subdivision of a domain. In "mail.google.com," "mail" is a subdomain of "google.com." Domain owners can create unlimited subdomains — www, api, staging, dev — without asking anyone's permission.</span></span> like <code>www</code>, <code>mail</code>, and <code>api</code>.</p>
+
+  <div class="think-first">
+    <div class="think-first-header">
+      <i class="fa-solid fa-brain" aria-hidden="true"></i> Think First
+    </div>
+    <p>You type <code>maps.google.com</code> into your browser. Your computer doesn't know the IP. Walk through how you think the lookup would work using this tree structure. Which servers would be contacted, and in what order?</p>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The Full Resolution Journey</h2>
+    </div>
+  </div>
+
+  <p>When you type <code>www.example.com</code> into your browser, a chain of lookups happens behind the scenes — usually in under 50 milliseconds. Let's meet every player involved, then watch the full journey end-to-end.</p>
+
+  <!-- Card 1: Recursive Resolver -->
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-1 text-green" aria-hidden="true"></i> The Recursive Resolver — Your DNS Agent</span>
+    </h3>
+    <div class="card-body">
+      <p>When your browser needs to resolve a domain name, it doesn't go hunting through the DNS tree itself. Instead, it asks a <span class="tooltip-trigger">recursive resolver<span class="tooltip-content">A DNS server (usually run by your ISP or a public provider like 8.8.8.8) that does all the legwork of querying the DNS tree on your behalf. You ask it one question; it chases down the answer through multiple servers and hands it back to you.</span></span> — a middleman server whose entire job is to do the lookup on your behalf.</p>
+      <p>Think of it like calling a librarian. You say "I need the phone number for John Smith at 123 Main St, Springfield, IL." You don't walk through the library yourself — the librarian does the searching and comes back with the answer. That's the recursive resolver.</p>
+      <p>Your computer is pre-configured to know the IP address of at least one recursive resolver. Usually it's your ISP's resolver (set up automatically when you connect to the internet), but you can change it to a public resolver like Google's <code>8.8.8.8</code> or Cloudflare's <code>1.1.1.1</code>.</p>
+
+      <svg viewBox="0 0 500 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Recursive resolver acts as middleman">
+        <defs>
+          <marker id="dns-rr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <rect x="10" y="40" width="110" height="55" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="65" y="63" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">Your Computer</text>
+        <text x="65" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">1 question</text>
+
+        <line x1="125" y1="67" x2="185" y2="67" stroke="#10b981" stroke-width="2" marker-end="url(#dns-rr-arr)"/>
+
+        <rect x="190" y="30" width="140" height="75" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="260" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">RECURSIVE RESOLVER</text>
+        <text x="260" y="72" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Does all the work</text>
+        <text x="260" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Queries 3-4 servers for you</text>
+
+        <line x1="335" y1="67" x2="385" y2="67" stroke="#10b981" stroke-width="2" marker-end="url(#dns-rr-arr)"/>
+
+        <rect x="390" y="40" width="100" height="55" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="440" y="63" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">DNS Tree</text>
+        <text x="440" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Root → TLD → Auth</text>
+
+        <text x="260" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">You ask once. The resolver chases the answer through the tree.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Card 2: Root Name Servers -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-2 text-green" aria-hidden="true"></i> Root Name Servers — The Starting Point</span>
+    </h3>
+    <div class="card-body">
+      <p>The recursive resolver's first stop is always a <span class="tooltip-trigger">root name server<span class="tooltip-content">The 13 root server clusters (named A through M) are the starting point for every DNS lookup. They don't know individual domain IPs — they only know which servers handle each TLD (.com, .org, .uk, etc.). There are actually hundreds of physical servers behind these 13 addresses, spread across the globe using anycast.</span></span>. Root servers don't know the IP address of <code>www.example.com</code> — they only know one thing: "Who's in charge of <code>.com</code>?"</p>
+      <p>There are 13 root server clusters, labeled A through M. But "13" is misleading — behind those 13 addresses are over 1,700 physical servers spread across every continent (yes, even Antarctica research stations can reach them). They use a clever networking trick called <span class="tooltip-trigger">anycast<span class="tooltip-content">A routing technique where the same IP address is announced from multiple locations around the world. When you send a packet to that IP, the internet's routing system automatically sends it to the nearest physical server. This is how 13 root server IPs can serve the entire planet.</span></span> to route you to the nearest one.</p>
+
+      <svg viewBox="0 0 500 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="13 root server clusters spanning the globe">
+        <text x="250" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">13 Root Server Clusters (A through M)</text>
+        <rect x="15" y="35" width="55" height="35" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="42" y="57" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-weight="700" font-size="11">A</text>
+        <rect x="80" y="35" width="55" height="35" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="107" y="57" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-weight="700" font-size="11">B</text>
+        <rect x="145" y="35" width="55" height="35" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="172" y="57" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-weight="700" font-size="11">C</text>
+        <rect x="210" y="35" width="55" height="35" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="237" y="57" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="10">D-L</text>
+        <rect x="275" y="35" width="55" height="35" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="302" y="57" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-weight="700" font-size="11">M</text>
+
+        <text x="370" y="50" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">← 13 addresses</text>
+        <text x="370" y="65" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">← 1,700+ actual servers</text>
+
+        <text x="250" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Resolver asks: "Who handles <tspan fill="#a855f7" font-weight="600">.com</tspan>?"</text>
+        <text x="250" y="115" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">Root answers: "Try 192.5.6.30 — that's the .com TLD server."</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Card 3: TLD Name Servers -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-3 text-green" aria-hidden="true"></i> TLD Name Servers — The Category Index</span>
+    </h3>
+    <div class="card-body">
+      <p>Now the resolver knows which server handles <code>.com</code>. It goes there next and asks: "Who handles <code>example.com</code>?" The <span class="tooltip-trigger">TLD server<span class="tooltip-content">TLD (Top-Level Domain) name servers are responsible for an entire domain extension like .com, .org, or .uk. Verisign operates the .com and .net TLD servers. Each country manages its own country-code TLD (e.g., .uk, .de, .jp).</span></span> doesn't know the final IP address either — but it knows which servers are <em>authoritative</em> for that specific domain.</p>
+      <p>Think of it like a library's section index. The root server told you "fiction is on the 3rd floor." The 3rd floor index tells you "books by Author X are in aisle 7." You're getting closer, but you haven't found the exact book yet.</p>
+      <p>The <code>.com</code> TLD is managed by Verisign and handles lookups for over 160 million registered <code>.com</code> domains. It's one of the busiest parts of the DNS infrastructure.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: Authoritative Name Servers -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-4 text-green" aria-hidden="true"></i> Authoritative Name Servers — The Final Answer</span>
+    </h3>
+    <div class="card-body">
+      <p>This is the server that actually knows the answer. The <span class="tooltip-trigger">authoritative name server<span class="tooltip-content">The DNS server that holds the actual, official records for a domain. When you buy "example.com" and set up DNS records (A, CNAME, MX, etc.), those records live on your authoritative name server. It's the "source of truth" for that domain.</span></span> for <code>example.com</code> holds the real records — the actual IP addresses, mail server addresses, and other data for that domain.</p>
+      <p>When you register a domain and set up DNS (through services like Cloudflare, Route 53, or GoDaddy), you're configuring records on an authoritative name server. This is the "source of truth" — if it says <code>www.example.com</code> points to <code>93.184.216.34</code>, then that's the official answer.</p>
+      <p>The authoritative server responds with the IP address and a <span class="tooltip-trigger">TTL<span class="tooltip-content">Time-To-Live — a number (in seconds) that tells caches how long they can keep this answer before they must ask again. A TTL of 300 means "cache this for 5 minutes." Low TTL = fresher data but more DNS traffic. High TTL = less traffic but slower updates.</span></span> (time-to-live) value that says "you can cache this answer for X seconds." That's the final piece of the puzzle.</p>
+    </div>
+  </div>
+
+  <!-- Card 5: DNS Cache -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-5 text-green" aria-hidden="true"></i> DNS Caching — Why Most Lookups Are Instant</span>
+    </h3>
+    <div class="card-body">
+      <p>If every DNS lookup required traveling root → TLD → authoritative, the internet would be painfully slow. That's where caching saves the day. DNS responses are cached at <em>multiple</em> levels, so most lookups get answered instantly from a nearby copy.</p>
+
+      <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four layers of DNS caching">
+        <text x="350" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Four Layers of DNS Caching</text>
+
+        <rect x="10" y="45" width="155" height="60" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="87" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">Browser Cache</text>
+        <text x="87" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~1-2 min TTL</text>
+
+        <rect x="185" y="45" width="155" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="262" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">OS Cache</text>
+        <text x="262" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Respects TTL from record</text>
+
+        <rect x="360" y="45" width="155" height="60" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="437" y="68" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="600" font-size="11">Router Cache</text>
+        <text x="437" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Shared by all home devices</text>
+
+        <rect x="535" y="45" width="155" height="60" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="612" y="68" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">ISP Resolver Cache</text>
+        <text x="612" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Shared by millions of users</text>
+
+        <text x="87" y="130" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">Fastest</text>
+        <text x="87" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">< 1 ms</text>
+
+        <text x="262" y="130" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Fast</text>
+        <text x="262" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~ 1 ms</text>
+
+        <text x="437" y="130" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="600">Quick</text>
+        <text x="437" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~ 1-5 ms</text>
+
+        <text x="612" y="130" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-size="10" font-weight="600">Good</text>
+        <text x="612" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~ 5-20 ms</text>
+
+        <text x="350" y="175" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">Full lookup (no cache): 50-200 ms  |  Cached: < 5 ms</text>
+      </svg>
+
+      <p>The first time you visit <code>google.com</code>, the full chain runs. But for the next 5 minutes (or whatever the TTL says), every subsequent lookup is answered instantly from cache — no network round-trips at all. Since popular sites like Google and Facebook set TTLs of 60-300 seconds, and millions of people visit them constantly, the ISP resolver almost always has a cached copy ready.</p>
+    </div>
+  </div>
+
+  <!-- Full DNS Resolution Journey SVG -->
+  <h3 class="sub">The Complete Resolution Journey</h3>
+  <p>Now let's watch the full lookup for <code>www.example.com</code> from start to finish, assuming nothing is cached (a "cold" lookup).</p>
+
+  <svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Complete DNS resolution: 8 steps from browser to IP address">
+    <defs>
+      <marker id="dns-res-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="dns-res-arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+      <marker id="dns-res-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Full DNS Resolution — 8 Steps (Cold Lookup)</text>
+
+    <!-- Browser -->
+    <rect x="10" y="50" width="120" height="50" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="70" y="72" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">Browser</text>
+    <text x="70" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">www.example.com</text>
+
+    <!-- Recursive Resolver -->
+    <rect x="10" y="180" width="120" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="70" y="200" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">Recursive</text>
+    <text x="70" y="215" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">Resolver</text>
+
+    <!-- Root -->
+    <rect x="300" y="120" width="120" height="50" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="360" y="142" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">Root Server</text>
+    <text x="360" y="158" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">. (dot)</text>
+
+    <!-- TLD -->
+    <rect x="480" y="120" width="120" height="50" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="540" y="142" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="11">TLD Server</text>
+    <text x="540" y="158" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">.com</text>
+
+    <!-- Authoritative -->
+    <rect x="630" y="200" width="120" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="690" y="220" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="10">Authoritative</text>
+    <text x="690" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">example.com</text>
+
+    <!-- Step 1: Browser → Resolver -->
+    <line x1="70" y1="102" x2="70" y2="177" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#dns-res-arr-b)"/>
+    <circle cx="40" cy="140" r="11" fill="#3b82f6"/>
+    <text x="40" y="144" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">1</text>
+    <text x="95" y="140" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">"What's www.example.com?"</text>
+
+    <!-- Step 2: Resolver → Root -->
+    <line x1="132" y1="195" x2="297" y2="152" stroke="#10b981" stroke-width="1.5" marker-end="url(#dns-res-arr)"/>
+    <circle cx="210" cy="168" r="11" fill="#10b981"/>
+    <text x="210" y="172" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">2</text>
+    <text x="210" y="155" fill="#10b981" font-family="Inter, sans-serif" font-size="9">"Who handles .com?"</text>
+
+    <!-- Step 3: Root → Resolver (reply) -->
+    <line x1="300" y1="162" x2="133" y2="200" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#dns-res-arr-r)"/>
+    <circle cx="220" cy="188" r="11" fill="#f59e0b"/>
+    <text x="220" y="192" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">3</text>
+
+    <!-- Step 4: Resolver → TLD -->
+    <line x1="132" y1="190" x2="478" y2="145" stroke="#10b981" stroke-width="1.5" marker-end="url(#dns-res-arr)"/>
+    <circle cx="340" cy="200" r="11" fill="#10b981"/>
+    <text x="340" y="204" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">4</text>
+    <text x="340" y="218" fill="#10b981" font-family="Inter, sans-serif" font-size="9">"Who handles example.com?"</text>
+
+    <!-- Step 5: TLD → Resolver (reply) -->
+    <line x1="480" y1="160" x2="133" y2="205" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#dns-res-arr-r)"/>
+    <circle cx="350" cy="225" r="11" fill="#a855f7"/>
+    <text x="350" y="229" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">5</text>
+
+    <!-- Step 6: Resolver → Authoritative -->
+    <line x1="132" y1="210" x2="628" y2="220" stroke="#10b981" stroke-width="1.5" marker-end="url(#dns-res-arr)"/>
+    <circle cx="400" cy="260" r="11" fill="#10b981"/>
+    <text x="400" y="264" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">6</text>
+    <text x="400" y="278" fill="#10b981" font-family="Inter, sans-serif" font-size="9">"What's the IP for www.example.com?"</text>
+
+    <!-- Step 7: Authoritative → Resolver (reply) -->
+    <line x1="630" y1="240" x2="133" y2="215" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#dns-res-arr-r)"/>
+    <circle cx="420" cy="290" r="11" fill="#ef4444"/>
+    <text x="420" y="294" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">7</text>
+    <text x="500" y="295" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">93.184.216.34 (TTL: 300s)</text>
+
+    <!-- Step 8: Resolver → Browser -->
+    <line x1="70" y1="178" x2="70" y2="104" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#dns-res-arr-b)"/>
+    <circle cx="40" cy="158" r="11" fill="#3b82f6"/>
+    <text x="40" y="162" text-anchor="middle" fill="#fff" font-family="Inter, sans-serif" font-weight="700" font-size="10">8</text>
+
+    <!-- Steps legend -->
+    <rect x="10" y="320" width="740" height="110" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="30" y="345" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">Step 1:</text>
+    <text x="80" y="345" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Browser asks resolver "What's www.example.com?"</text>
+    <text x="30" y="362" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Step 2-3:</text>
+    <text x="95" y="362" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Resolver asks Root "Who handles .com?" → Root says "Try 192.5.6.30"</text>
+    <text x="30" y="379" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">Step 4-5:</text>
+    <text x="95" y="379" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Resolver asks .com TLD "Who handles example.com?" → TLD says "Try 199.43.135.53"</text>
+    <text x="30" y="396" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Step 6-7:</text>
+    <text x="95" y="396" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Resolver asks Authoritative "What's www.example.com?" → "93.184.216.34, cache for 300s"</text>
+    <text x="30" y="413" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">Step 8:</text>
+    <text x="80" y="413" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Resolver returns IP to browser. Browser connects. Total time: 50-200 ms (uncached).</text>
+  </svg>
+
+  <div class="callout callout-info">
+    <strong>Key insight:</strong> Your browser only makes <em>one</em> request (step 1). The recursive resolver handles all the back-and-forth (steps 2-7) and caches the result. Next time anyone on your ISP asks for <code>www.example.com</code> within the TTL window, the resolver answers instantly from cache — no tree-walking needed.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — Record Types, TTL &amp; GeoDNS</h2>
+    </div>
+  </div>
+
+  <p>DNS doesn't just map names to IP addresses. A domain can have many different kinds of records, each serving a different purpose. When the authoritative server answers a query, it returns a specific <span class="tooltip-trigger">record type<span class="tooltip-content">DNS records are key-value entries stored on authoritative name servers. Each record has a type (A, AAAA, CNAME, MX, etc.), a name (the domain or subdomain), a value (IP address, hostname, etc.), and a TTL (how long to cache it).</span></span> depending on what was asked.</p>
+
+  <h3 class="sub">DNS Record Types</h3>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="dns-rec-common" role="tab" aria-selected="true" aria-controls="dns-rec-common">Common Records</button>
+      <button class="tab-btn" data-tab="dns-rec-advanced" role="tab" aria-selected="false" aria-controls="dns-rec-advanced">Advanced Records</button>
+    </div>
+
+    <div class="tab-panel active" id="dns-rec-common" role="tabpanel">
+      <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Common DNS record types: A, AAAA, CNAME, MX, NS">
+        <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The 5 Record Types You'll Use Most</text>
+
+        <!-- A Record -->
+        <rect x="20" y="50" width="220" height="75" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="40" y="73" fill="#10b981" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">A Record</text>
+        <text x="40" y="93" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Maps name → IPv4 address</text>
+        <text x="40" y="112" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">google.com → 142.250.80.46</text>
+
+        <!-- AAAA Record -->
+        <rect x="260" y="50" width="240" height="75" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+        <text x="280" y="73" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">AAAA Record</text>
+        <text x="280" y="93" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Maps name → IPv6 address</text>
+        <text x="280" y="112" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">google.com → 2607:f8b0:4004::200e</text>
+
+        <!-- CNAME Record -->
+        <rect x="520" y="50" width="220" height="75" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+        <text x="540" y="73" fill="#a855f7" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">CNAME Record</text>
+        <text x="540" y="93" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Maps name → another name (alias)</text>
+        <text x="540" y="112" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">www.ex.com → ex.com</text>
+
+        <!-- MX Record -->
+        <rect x="20" y="150" width="350" height="75" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="40" y="173" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">MX Record</text>
+        <text x="40" y="193" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Mail exchanger — where to deliver email for this domain</text>
+        <text x="40" y="212" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">gmail.com → alt1.gmail-smtp-in.l.google.com (priority: 5)</text>
+
+        <!-- NS Record -->
+        <rect x="390" y="150" width="350" height="75" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="410" y="173" fill="#ef4444" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">NS Record</text>
+        <text x="410" y="193" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Name server — which DNS servers are authoritative</text>
+        <text x="410" y="212" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">example.com → ns1.cloudflare.com</text>
+
+        <!-- Plain English summary -->
+        <rect x="20" y="250" width="720" height="75" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+        <text x="40" y="275" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">A</text>
+        <text x="60" y="275" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">= "This name lives at this IPv4 number"</text>
+        <text x="350" y="275" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">AAAA</text>
+        <text x="388" y="275" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">= "Same, but the newer IPv6 number"</text>
+        <text x="40" y="295" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">CNAME</text>
+        <text x="90" y="295" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">= "This name is just a nickname for that other name"</text>
+        <text x="350" y="295" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="600" font-size="11">MX</text>
+        <text x="375" y="295" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">= "Send emails for this domain to that mail server"</text>
+        <text x="40" y="315" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="11">NS</text>
+        <text x="60" y="315" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">= "The authoritative DNS server for this domain is over there"</text>
+      </svg>
+    </div>
+
+    <div class="tab-panel" id="dns-rec-advanced" role="tabpanel">
+      <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Advanced DNS record types: TXT, SRV, PTR, SOA">
+        <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Advanced Record Types</text>
+
+        <!-- TXT -->
+        <rect x="20" y="50" width="350" height="80" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="40" y="73" fill="#10b981" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">TXT Record</text>
+        <text x="40" y="93" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Arbitrary text — used for domain verification &amp; email security</text>
+        <text x="40" y="112" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">SPF, DKIM, DMARC records live here. Google uses TXT to verify</text>
+        <text x="40" y="125" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">you own a domain when setting up Search Console.</text>
+
+        <!-- SRV -->
+        <rect x="390" y="50" width="350" height="80" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="410" y="73" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">SRV Record</text>
+        <text x="410" y="93" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Service locator — specifies host, port, and priority for a service</text>
+        <text x="410" y="112" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Used by VOIP, XMPP chat, and game servers to say "connect to</text>
+        <text x="410" y="125" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">this server on this port with this priority."</text>
+
+        <!-- PTR -->
+        <rect x="20" y="150" width="350" height="80" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="40" y="173" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">PTR Record</text>
+        <text x="40" y="193" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Reverse lookup — maps IP address back to a domain name</text>
+        <text x="40" y="213" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">142.250.80.46 → google.com. Used by email servers to verify</text>
+        <text x="40" y="226" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">that a sender's IP matches their claimed domain.</text>
+
+        <!-- SOA -->
+        <rect x="390" y="150" width="350" height="80" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="410" y="173" fill="#a855f7" font-family="JetBrains Mono, monospace" font-weight="700" font-size="13">SOA Record</text>
+        <text x="410" y="193" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Start of Authority — zone metadata (primary NS, admin email, serial)</text>
+        <text x="410" y="213" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Controls how secondary DNS servers sync with the primary. The serial</text>
+        <text x="410" y="226" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">number increments on every update — secondaries check this.</text>
+      </svg>
+    </div>
+  </div>
+
+  <h3 class="sub">TTL — The Freshness Timer</h3>
+
+  <p><span class="tooltip-trigger">TTL (Time-To-Live)<span class="tooltip-content">A value in seconds attached to every DNS record that tells caches "you can use this answer for this long, then you must ask again." Common values: 300 (5 min) for dynamic services, 86400 (24 hours) for stable records.</span></span> is the number that controls how long a DNS answer stays cached. It's a trade-off between two competing goals:</p>
+
+  <div class="think-first">
+    <div class="think-first-header">
+      <i class="fa-solid fa-brain" aria-hidden="true"></i> Think First
+    </div>
+    <p>You're setting up DNS for your company. The ops team wants a TTL of 86,400 seconds (24 hours) for stability. The dev team wants 60 seconds so changes propagate fast. Who's right? What are the trade-offs?</p>
+  </div>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TTL trade-off spectrum: low TTL vs high TTL">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The TTL Trade-off</text>
+
+    <!-- Low TTL side -->
+    <rect x="20" y="50" width="340" height="100" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="190" y="73" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">LOW TTL (60-300 seconds)</text>
+    <text x="40" y="93" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Changes propagate in minutes</text>
+    <text x="40" y="110" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Fast failover — switch IPs quickly</text>
+    <text x="40" y="127" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ More DNS queries = more load</text>
+    <text x="40" y="144" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Slightly slower (more cache misses)</text>
+
+    <!-- High TTL side -->
+    <rect x="400" y="50" width="340" height="100" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="570" y="73" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">HIGH TTL (3600-86400 seconds)</text>
+    <text x="420" y="93" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Fewer DNS queries = less load</text>
+    <text x="420" y="110" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Faster for users (always cached)</text>
+    <text x="420" y="127" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Changes take hours to propagate</text>
+    <text x="420" y="144" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Slow failover — users stuck on old IP</text>
+
+    <!-- Bottom recommendation -->
+    <text x="380" y="182" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="11" font-weight="600">Common strategy: Use 300s (5 min) normally. Drop to 60s before a migration. Raise to 3600s+ for stable records.</text>
+  </svg>
+
+  <h3 class="sub">GeoDNS — Location-Aware Resolution</h3>
+
+  <p>Here's a problem: your users are spread across the globe, but your servers are in specific regions. A user in Tokyo shouldn't be routed to a server in Virginia — that's 200+ ms of unnecessary latency. <span class="tooltip-trigger">GeoDNS<span class="tooltip-content">A DNS technique where the authoritative server returns different IP addresses based on the geographic location of the user making the query. A user in Asia gets routed to an Asian server, a user in Europe gets a European server — same domain name, different IPs.</span></span> solves this by returning different IP addresses depending on where the user is located.</p>
+
+  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GeoDNS returns different IPs based on user location">
+    <defs>
+      <marker id="dns-geo-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">GeoDNS — Same Domain, Different Servers</text>
+
+    <!-- DNS Server (center) -->
+    <rect x="290" y="60" width="180" height="60" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="380" y="85" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">GeoDNS Server</text>
+    <text x="380" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">api.myapp.com → ???</text>
+
+    <!-- US User -->
+    <rect x="20" y="50" width="140" height="45" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="90" y="70" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">User in New York</text>
+    <text x="90" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">api.myapp.com?</text>
+
+    <!-- EU User -->
+    <rect x="20" y="120" width="140" height="45" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="90" y="140" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">User in London</text>
+    <text x="90" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">api.myapp.com?</text>
+
+    <!-- Asia User -->
+    <rect x="20" y="185" width="140" height="45" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="90" y="205" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="600" font-size="10">User in Tokyo</text>
+    <text x="90" y="220" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">api.myapp.com?</text>
+
+    <!-- Lines to DNS -->
+    <line x1="163" y1="72" x2="287" y2="80" stroke="#3b82f6" stroke-width="1.2"/>
+    <line x1="163" y1="142" x2="287" y2="90" stroke="#a855f7" stroke-width="1.2"/>
+    <line x1="163" y1="207" x2="287" y2="100" stroke="#f59e0b" stroke-width="1.2"/>
+
+    <!-- US Server -->
+    <rect x="600" y="50" width="140" height="40" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="670" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">US-East Server</text>
+    <text x="670" y="82" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">52.1.0.10</text>
+
+    <!-- EU Server -->
+    <rect x="600" y="105" width="140" height="40" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="670" y="123" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">EU-West Server</text>
+    <text x="670" y="137" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">34.89.0.10</text>
+
+    <!-- Asia Server -->
+    <rect x="600" y="160" width="140" height="40" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="670" y="178" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="600" font-size="10">AP-NE Server</text>
+    <text x="670" y="192" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="9">13.230.0.10</text>
+
+    <!-- Lines from DNS to servers -->
+    <line x1="473" y1="80" x2="597" y2="70" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#dns-geo-arr)"/>
+    <line x1="473" y1="90" x2="597" y2="125" stroke="#a855f7" stroke-width="1.5" marker-end="url(#dns-geo-arr)"/>
+    <line x1="473" y1="100" x2="597" y2="180" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#dns-geo-arr)"/>
+
+    <text x="380" y="222" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Same question, 3 different answers — each user gets the nearest server</text>
+  </svg>
+
+  <p>This is how <span class="tooltip-trigger">CDNs<span class="tooltip-content">Content Delivery Networks (like Cloudflare, Akamai, CloudFront) use GeoDNS to route users to the nearest edge server. When you load an image from a CDN, DNS resolves to a server in your region — that's why CDN-served content feels instant.</span></span> work under the hood. When Netflix serves you a movie, GeoDNS ensures the video streams from a server near you, not from a server on the other side of the planet.</p>
+
+  <h3 class="sub">DNS Propagation — Why Changes Take Time</h3>
+
+  <p>You update your domain's IP address in your DNS provider dashboard. You hit save. Then you check — and nothing changed. You check again 10 minutes later. Some users see the new IP, others still see the old one. This maddening experience is called <span class="tooltip-trigger">DNS propagation<span class="tooltip-content">The process of DNS changes spreading across the internet's cache hierarchy. Since every resolver, ISP, browser, and OS has cached the old answer with its own TTL countdown, they won't ask for the new answer until their cache expires. This is why DNS changes "propagate" gradually — different caches expire at different times.</span></span>.</p>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DNS propagation: caches expire at different times">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Why DNS Changes Don't Happen Instantly</text>
+
+    <!-- Timeline -->
+    <line x1="50" y1="80" x2="710" y2="80" stroke="#334155" stroke-width="2"/>
+    <text x="50" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">T+0</text>
+    <text x="200" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">T+5 min</text>
+    <text x="380" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">T+1 hr</text>
+    <text x="550" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">T+12 hr</text>
+    <text x="710" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">T+48 hr</text>
+
+    <!-- Dots on timeline -->
+    <circle cx="50" cy="80" r="5" fill="#ef4444"/>
+    <circle cx="200" cy="80" r="5" fill="#f59e0b"/>
+    <circle cx="380" cy="80" r="5" fill="#f59e0b"/>
+    <circle cx="550" cy="80" r="5" fill="#10b981"/>
+    <circle cx="710" cy="80" r="5" fill="#10b981"/>
+
+    <text x="50" y="105" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">You change IP</text>
+
+    <text x="200" y="105" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">Browser caches</text>
+    <text x="200" y="118" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">expire</text>
+
+    <text x="380" y="105" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">Local resolvers</text>
+    <text x="380" y="118" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">expire</text>
+
+    <text x="550" y="105" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Most ISP caches</text>
+    <text x="550" y="118" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">expire</text>
+
+    <text x="710" y="105" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Stragglers clear</text>
+    <text x="710" y="118" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">(worst case)</text>
+
+    <rect x="100" y="140" width="560" height="45" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="160" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10" font-weight="600">Pro tip: Lower your TTL to 60s a few days BEFORE a migration.</text>
+    <text x="380" y="176" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">By migration day, all caches have short TTLs → changes propagate in minutes, not hours.</text>
+  </svg>
+
+  <p>It's not that DNS is "slow to propagate" — it's that thousands of caches around the world each have their own countdown timer, and they all started at different times. There's no "flush all caches" button for the internet. You just have to wait for each cache to expire naturally.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — VARIATIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-code-branch"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations — Different Flavors of DNS</h2>
+    </div>
+  </div>
+
+  <p>The basic DNS we've covered so far is "plain old DNS" — queries travel over <span class="tooltip-trigger">UDP<span class="tooltip-content">User Datagram Protocol — a lightweight network protocol that sends packets without establishing a connection first. It's fast but unreliable (packets can be lost). DNS uses UDP because queries are tiny and speed matters more than guaranteed delivery.</span></span> on port 53, completely unencrypted. But the DNS ecosystem has evolved to solve different problems. Here are the key variations you'll encounter.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="dns-var-public" role="tab" aria-selected="true" aria-controls="dns-var-public">Public vs Private DNS</button>
+      <button class="tab-btn" data-tab="dns-var-secure" role="tab" aria-selected="false" aria-controls="dns-var-secure">Encrypted DNS</button>
+      <button class="tab-btn" data-tab="dns-var-split" role="tab" aria-selected="false" aria-controls="dns-var-split">Split-Horizon DNS</button>
+    </div>
+
+    <div class="tab-panel active" id="dns-var-public" role="tabpanel">
+      <h3 class="sub">Public DNS vs Private DNS</h3>
+      <p><strong>Public DNS</strong> is what your browser uses to resolve any domain on the internet. Google (<code>8.8.8.8</code>), Cloudflare (<code>1.1.1.1</code>), and your ISP all run public resolvers. Anyone can query them.</p>
+      <p><strong>Private DNS</strong> is used inside companies to resolve <em>internal</em> names that don't exist on the public internet. For example, a company might have <code>jenkins.internal.corp</code> or <code>db-primary.prod.internal</code> — names that only make sense inside their network.</p>
+
+      <svg viewBox="0 0 700 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Public DNS resolves internet domains; Private DNS resolves internal names">
+        <rect x="10" y="20" width="330" height="130" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="175" y="45" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">PUBLIC DNS</text>
+        <text x="30" y="68" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">google.com → 142.250.80.46</text>
+        <text x="30" y="85" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">github.com → 140.82.121.3</text>
+        <text x="30" y="102" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">netflix.com → 54.237.226.164</text>
+        <text x="30" y="125" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Resolvers: 8.8.8.8, 1.1.1.1, ISP default</text>
+        <text x="30" y="140" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Anyone on the internet can query these</text>
+
+        <rect x="360" y="20" width="330" height="130" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="525" y="45" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">PRIVATE DNS</text>
+        <text x="380" y="68" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">jenkins.internal → 10.0.1.50</text>
+        <text x="380" y="85" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">db-primary.prod → 10.0.2.10</text>
+        <text x="380" y="102" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">api.staging.corp → 10.0.3.20</text>
+        <text x="380" y="125" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Resolvers: internal servers, AWS Route53 private zones</text>
+        <text x="380" y="140" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Only accessible from within the company network</text>
+      </svg>
+
+      <p>Most cloud providers offer private DNS zones. AWS has Route 53 Private Hosted Zones, GCP has Cloud DNS Private Zones, and Azure has Private DNS Zones. They let services find each other by name without exposing internal infrastructure to the public internet.</p>
+    </div>
+
+    <div class="tab-panel" id="dns-var-secure" role="tabpanel">
+      <h3 class="sub">DNS-over-HTTPS (DoH) &amp; DNS-over-TLS (DoT)</h3>
+      <p>Traditional DNS has a big privacy problem: queries travel in plain text. Your ISP (and anyone snooping on the network) can see every domain you visit. Even if the website itself uses HTTPS, the DNS query to find that website's IP is completely visible.</p>
+      <p><strong>DNS-over-HTTPS (DoH)</strong> wraps DNS queries inside regular HTTPS traffic on port 443. To anyone watching the network, it looks like normal web browsing. Firefox and Chrome support this natively.</p>
+      <p><strong>DNS-over-TLS (DoT)</strong> encrypts DNS queries using <span class="tooltip-trigger">TLS<span class="tooltip-content">Transport Layer Security — the encryption protocol that makes HTTPS work. It creates an encrypted tunnel between two computers so that no one in between can read the data being exchanged.</span></span> on port 853. It's the same encryption HTTPS uses, but on a dedicated port.</p>
+
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plain DNS is visible to snoops; encrypted DNS is private">
+        <rect x="10" y="15" width="680" height="55" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="30" y="38" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">PLAIN DNS (port 53, UDP)</text>
+        <text x="260" y="38" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Query: "What's the IP for private-medical-site.com?"</text>
+        <text x="30" y="58" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">ISP, hackers, governments can see: ✓ domain name ✓ your IP ✓ timestamp</text>
+
+        <rect x="10" y="85" width="680" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="30" y="108" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">ENCRYPTED DNS (DoH / DoT)</text>
+        <text x="320" y="108" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Query: 🔒 [encrypted blob]</text>
+        <text x="30" y="128" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Snoopers see: ✓ you're talking to a DNS server ✗ can't see what you're asking</text>
+      </svg>
+    </div>
+
+    <div class="tab-panel" id="dns-var-split" role="tabpanel">
+      <h3 class="sub">Split-Horizon DNS</h3>
+      <p>Sometimes the same domain name should resolve to <em>different</em> IPs depending on whether the query comes from inside or outside the company network. This is called split-horizon (or split-brain) DNS.</p>
+      <p>For example, <code>api.mycompany.com</code> might resolve to a public IP (<code>203.0.113.50</code>) for external users, but to a private IP (<code>10.0.1.50</code>) for employees on the corporate network — skipping the load balancer and firewall for faster internal access.</p>
+
+      <svg viewBox="0 0 700 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Split-horizon DNS: same name, different answers based on source">
+        <defs>
+          <marker id="dns-sh-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <text x="350" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Split-Horizon: Same Name, Different Answers</text>
+
+        <rect x="260" y="50" width="180" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="350" y="72" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">DNS Server</text>
+        <text x="350" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">api.mycompany.com</text>
+
+        <rect x="10" y="130" width="210" height="35" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="115" y="148" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10">External user → 203.0.113.50</text>
+
+        <rect x="480" y="130" width="210" height="35" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="585" y="148" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="10">Internal user → 10.0.1.50</text>
+
+        <line x1="300" y1="102" x2="115" y2="128" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#dns-sh-arr)"/>
+        <line x1="400" y1="102" x2="585" y2="128" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#dns-sh-arr)"/>
+      </svg>
+
+      <p>This is commonly used in corporate environments, especially with tools like <span class="tooltip-trigger">AWS Route 53<span class="tooltip-content">Amazon's managed DNS service. It supports public hosted zones (internet-facing), private hosted zones (VPC-only), health checks, failover routing, GeoDNS, and weighted routing. It's one of the most popular DNS services for cloud infrastructure.</span></span> private hosted zones or CoreDNS in Kubernetes clusters.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — AT SCALE
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How the Big Players Use DNS</h2>
+    </div>
+  </div>
+
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-cloud text-blue" aria-hidden="true"></i> Cloudflare — 1.1.1.1 and the Fastest Resolver</span>
+    </h3>
+    <div class="card-body">
+      <p>Cloudflare launched their public resolver <code>1.1.1.1</code> on April 1, 2018 (not a joke). It became the fastest public DNS resolver in the world, with median query times under 15 ms globally. How? <span class="tooltip-trigger">Anycast<span class="tooltip-content">Anycast announces the same IP address from hundreds of locations worldwide. When you query 1.1.1.1, the internet's routing automatically sends your packet to the nearest Cloudflare data center — one of 300+ locations across 100+ countries.</span></span> across 300+ data centers in 100+ countries.</p>
+      <p>Cloudflare also runs one of the largest authoritative DNS services. Websites using Cloudflare DNS get automatic DDoS protection, because Cloudflare can absorb massive traffic spikes across their global network — the same network that handles roughly 20% of all internet traffic.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-aws text-yellow" aria-hidden="true"></i> AWS Route 53 — DNS as Infrastructure</span>
+    </h3>
+    <div class="card-body">
+      <p>Amazon's Route 53 (named after DNS port 53) is more than a DNS service — it's a traffic management platform. Beyond basic resolution, it offers:</p>
+      <ul>
+        <li><strong>Health checks</strong> — Route 53 pings your servers. If one goes down, it automatically stops routing traffic there</li>
+        <li><strong>Weighted routing</strong> — send 90% of traffic to the main server, 10% to a canary deployment</li>
+        <li><strong>Latency-based routing</strong> — like GeoDNS but based on actual latency measurements, not just geography</li>
+        <li><strong>Failover routing</strong> — primary/secondary setup where the secondary only gets traffic if the primary's health check fails</li>
+      </ul>
+      <p>This turns DNS from a simple name lookup into a powerful tool for <span class="tooltip-trigger">load balancing<span class="tooltip-content">Distributing incoming traffic across multiple servers so no single server gets overwhelmed. DNS-based load balancing is the cheapest kind — it doesn't require a dedicated load balancer device — but it's also the crudest (no per-request intelligence, limited by TTL caching).</span></span> and failover — all without the user noticing anything.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-skull-crossbones text-red" aria-hidden="true"></i> The Dyn DDoS Attack (2016) — When DNS Goes Down</span>
+    </h3>
+    <div class="card-body">
+      <p>On October 21, 2016, a massive DDoS attack targeted Dyn, a major DNS provider. The attack used a <span class="tooltip-trigger">botnet<span class="tooltip-content">A network of compromised devices (often IoT devices like cameras, routers, and DVRs) controlled by an attacker. The Mirai botnet that attacked Dyn consisted of ~100,000 infected devices, each flooding Dyn's DNS servers with fake queries.</span></span> called Mirai — roughly 100,000 compromised IoT devices (security cameras, routers, DVRs) all flooding Dyn's DNS servers with fake queries simultaneously.</p>
+      <p>The result: Twitter, GitHub, Netflix, Reddit, Spotify, Airbnb, The New York Times, and dozens of other major sites became unreachable for hours. Not because their servers were down, but because <em>nobody could look up their IP addresses</em>.</p>
+
+      <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dyn DDoS attack: IoT botnet overwhelms DNS provider">
+        <text x="350" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">The Dyn Attack — October 21, 2016</text>
+
+        <rect x="280" y="40" width="140" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="350" y="62" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Dyn DNS</text>
+        <text x="350" y="80" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">OVERWHELMED</text>
+
+        <!-- Botnet arrows -->
+        <text x="80" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">100K IoT devices</text>
+        <line x1="140" y1="55" x2="277" y2="60" stroke="#ef4444" stroke-width="1" opacity="0.6"/>
+        <line x1="140" y1="60" x2="277" y2="62" stroke="#ef4444" stroke-width="1" opacity="0.6"/>
+        <line x1="140" y1="65" x2="277" y2="65" stroke="#ef4444" stroke-width="1" opacity="0.6"/>
+        <line x1="140" y1="70" x2="277" y2="68" stroke="#ef4444" stroke-width="1" opacity="0.6"/>
+        <line x1="140" y1="75" x2="277" y2="70" stroke="#ef4444" stroke-width="1" opacity="0.6"/>
+
+        <!-- Affected sites -->
+        <rect x="140" y="110" width="80" height="28" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="180" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Twitter ✗</text>
+
+        <rect x="235" y="110" width="80" height="28" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="275" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">GitHub ✗</text>
+
+        <rect x="330" y="110" width="80" height="28" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="370" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Netflix ✗</text>
+
+        <rect x="425" y="110" width="80" height="28" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="465" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Reddit ✗</text>
+
+        <rect x="520" y="110" width="80" height="28" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="560" y="128" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Spotify ✗</text>
+
+        <text x="350" y="155" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">Lesson: A single DNS provider is a single point of failure. Use multiple providers.</text>
+      </svg>
+
+      <p>The key lesson the industry learned: never rely on a single DNS provider. After the Dyn attack, companies like Netflix and Twitter added secondary DNS providers (or moved to providers with massive global anycast networks). If one provider gets attacked, the other still answers queries.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — THE ANTI-LESSON
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-ban"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">The Anti-Lesson — When DNS Is the Wrong Tool</h2>
+    </div>
+  </div>
+
+  <p>DNS is powerful, but people sometimes try to use it for things it was never designed to do. Here's when DNS is the <em>wrong</em> answer.</p>
+
+  <div class="think-first">
+    <div class="think-first-header">
+      <i class="fa-solid fa-brain" aria-hidden="true"></i> Think First
+    </div>
+    <p>Your team wants to use DNS-based load balancing to distribute traffic evenly across 10 servers. Sounds reasonable — each DNS query returns a different server IP using round-robin. What could go wrong?</p>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span>DNS Load Balancing Has No Brains</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>DNS round-robin returns server IPs in rotation: request 1 gets Server A, request 2 gets Server B, etc. But it has zero awareness of what's actually happening:</p>
+        <ul>
+          <li><strong>No health checks</strong> — DNS keeps returning a dead server's IP until someone manually removes it</li>
+          <li><strong>No load awareness</strong> — one server might be drowning while another is idle, DNS doesn't care</li>
+          <li><strong>Caching ruins distribution</strong> — ISP resolvers cache the answer, so millions of users behind one ISP all hit the same server</li>
+          <li><strong>No session affinity</strong> — a user might hit Server A for login, then Server B for the next page (different session)</li>
+        </ul>
+        <p>For real load balancing, use an actual load balancer (HAProxy, Nginx, AWS ALB). DNS can do <em>coarse</em> geographic routing (GeoDNS), but per-request balancing? That's not DNS's job.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>DNS as a Service Discovery Hack</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>In microservice architectures, some teams try to use DNS for service discovery — Service A needs to find Service B, so they resolve <code>service-b.internal</code> via DNS. This works for simple cases, but breaks down when:</p>
+        <ul>
+          <li>Services scale up/down frequently (DNS caches stale IPs)</li>
+          <li>You need metadata about the service (version, health status, capabilities)</li>
+          <li>You need sub-second failover (DNS TTL is too slow)</li>
+        </ul>
+        <p>For dynamic microservices, use proper service discovery tools like Consul, etcd, or Kubernetes DNS (which has very low TTLs and tight integration with the container lifecycle).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Ultra-Low TTL = Pretending DNS Is Real-Time</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Setting TTL to 1 second because you want "instant" failover is a trap. Many resolvers and operating systems enforce minimum TTLs (often 30-60 seconds) regardless of what you set. Java's default DNS cache is <em>infinite</em> (it caches forever until the JVM restarts). Browser DNS caches have their own minimum TTLs.</p>
+        <p>If you need sub-minute failover, DNS alone won't do it. Combine DNS with health-check-based load balancers, or use tools like Route 53 health checks which can failover within 30-60 seconds by using low TTLs <em>and</em> active health monitoring together.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>The bottom line:</strong> DNS is a <em>naming</em> system, not a load balancer, not a service mesh, not a real-time health monitor. It's excellent at what it does — mapping names to addresses — but forcing it into other roles leads to fragile, unpredictable behavior.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — COMMON MISTAKES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — What Engineers Get Wrong</h2>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span>Mistake #1: "I changed the DNS record, why hasn't it updated?"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people think:</strong> Changing a DNS record is like flipping a switch — instant everywhere.</p>
+        <p><strong>The truth:</strong> Every cache in the chain (browser, OS, router, ISP resolver) holds the old answer until its TTL expires. If your old TTL was 86,400 seconds (24 hours), some users will see the old IP for up to 24 hours after your change.</p>
+        <p><strong>The fix:</strong> Lower TTL to 60 seconds <em>days before</em> the change. Wait for the old high TTL to expire everywhere. Then make the change. Then raise TTL back when the migration is confirmed.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #2: Using CNAME at the zone apex</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people try:</strong> Setting a <span class="tooltip-trigger">CNAME record<span class="tooltip-content">A CNAME (Canonical Name) record creates an alias — it says "this name is actually just another name for THAT name." The DNS resolver follows the chain until it reaches an A record with an actual IP. CNAMEs can't coexist with other record types at the same name.</span></span> for the naked domain (<code>example.com</code>) pointing to a load balancer (<code>lb.provider.com</code>).</p>
+        <p><strong>Why it breaks:</strong> The DNS spec (RFC 1034) says CNAME records cannot coexist with other record types at the same name. But the zone apex (<code>example.com</code>) MUST have NS and SOA records. So a CNAME there violates the spec, and most DNS servers reject it.</p>
+        <p><strong>The fix:</strong> Use an <strong>ALIAS</strong> or <strong>ANAME</strong> record (a non-standard but widely supported extension), or use Cloudflare's "CNAME flattening." These behave like CNAMEs but resolve to A records at query time, avoiding the spec violation.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #3: Single DNS provider with no redundancy</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people do:</strong> Use one DNS provider because "DNS is boring, it just works."</p>
+        <p><strong>What happens:</strong> That provider gets DDoS'd (Dyn 2016), has an outage (Cloudflare 2020), or makes a config error (Facebook BGP incident 2021 — took out their own DNS servers), and your entire online presence vanishes.</p>
+        <p><strong>The fix:</strong> Configure at least two NS records pointing to different providers. Many registrars let you set NS records from multiple providers. Tools like NS1, Cloudflare, and Route 53 all support secondary/backup configurations.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #4: Forgetting that DNS uses UDP (mostly)</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people assume:</strong> DNS is reliable like HTTP.</p>
+        <p><strong>The truth:</strong> DNS queries use UDP, which has no built-in retry or acknowledgment. If the packet is lost, it's just gone. Your OS has its own retry logic (typically 2-3 retries with increasing timeouts), but if all retries fail, you get <code>ERR_NAME_NOT_RESOLVED</code>.</p>
+        <p><strong>Why it matters:</strong> In cloud environments with aggressive network policies, DNS UDP packets can be dropped by overloaded <span class="tooltip-trigger">conntrack tables<span class="tooltip-content">Connection tracking tables in Linux firewalls that track every network connection. In high-traffic environments (especially Kubernetes), these tables can fill up, causing random packet drops — DNS queries being a common victim since they're small, frequent, and use UDP.</span></span>. This causes intermittent, maddening DNS failures. If you're running Kubernetes, you've probably hit this.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #5: Not understanding negative caching</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people don't realize:</strong> DNS caches "this domain doesn't exist" responses too. This is called <span class="tooltip-trigger">negative caching<span class="tooltip-content">When a DNS query returns NXDOMAIN (domain does not exist), resolvers cache that non-existence answer too, governed by the SOA record's minimum TTL. This prevents repeated lookups for domains that don't exist, but it also means a typo in your DNS config can haunt you even after you fix it.</span></span>.</p>
+        <p><strong>The scenario:</strong> You try to access <code>api.newservice.com</code> before setting up the DNS record. The resolver caches "NXDOMAIN" (doesn't exist). You then add the record. But the resolver still returns "doesn't exist" for the next 5-60 minutes because it cached the negative result.</p>
+        <p><strong>The fix:</strong> Always set up DNS records <em>before</em> you need them. If you're hit by negative caching, flush your local DNS cache (<code>ipconfig /flushdns</code> on Windows, <code>sudo dscacheutil -flushcache</code> on macOS) and wait for upstream caches to expire.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — INTERVIEW PLAYBOOK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-microphone"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — How DNS Shows Up</h2>
+    </div>
+  </div>
+
+  <p>DNS almost never gets its own dedicated interview question. Instead, it comes up naturally when you're designing any system. Here's how to bring it up and how deep to go at each level.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="dns-int-junior" role="tab" aria-selected="true" aria-controls="dns-int-junior">Junior Level</button>
+      <button class="tab-btn" data-tab="dns-int-mid" role="tab" aria-selected="false" aria-controls="dns-int-mid">Mid Level</button>
+      <button class="tab-btn" data-tab="dns-int-senior" role="tab" aria-selected="false" aria-controls="dns-int-senior">Senior Level</button>
+    </div>
+
+    <div class="tab-panel active" id="dns-int-junior" role="tabpanel">
+      <h3 class="sub">What They Ask</h3>
+      <p>"What happens when you type a URL into a browser?"</p>
+      <h3 class="sub">What They Want to Hear</h3>
+      <ul>
+        <li>Browser checks its DNS cache</li>
+        <li>If not cached, asks the OS, which asks a recursive resolver</li>
+        <li>Resolver walks the DNS tree: root → TLD → authoritative</li>
+        <li>Gets back an IP address, browser connects via TCP/HTTPS</li>
+      </ul>
+      <h3 class="sub">Sample Answer</h3>
+      <p><em>"First, the browser needs to turn the domain name into an IP address — that's DNS. It checks its local cache first. If the cache is empty, it asks the operating system, which asks a recursive resolver — usually your ISP's or a public one like 8.8.8.8. The resolver walks the DNS hierarchy: root servers point to .com servers, which point to example.com's authoritative servers, which return the actual IP. The resolver caches the result based on the TTL. Then the browser opens a TCP connection to that IP, does a TLS handshake for HTTPS, and sends the HTTP request."</em></p>
+    </div>
+
+    <div class="tab-panel" id="dns-int-mid" role="tabpanel">
+      <h3 class="sub">What They Ask</h3>
+      <p>"How would you handle DNS for a globally distributed application?"</p>
+      <h3 class="sub">What They Want to Hear</h3>
+      <ul>
+        <li>GeoDNS / latency-based routing to direct users to nearest region</li>
+        <li>Health checks + automatic failover (Route 53 style)</li>
+        <li>Low TTLs during migrations, higher TTLs for stability</li>
+        <li>Multiple DNS providers for redundancy</li>
+      </ul>
+      <h3 class="sub">Sample Answer</h3>
+      <p><em>"I'd use a managed DNS service like Route 53 or Cloudflare with latency-based routing. Users in Asia resolve to our Singapore servers, Europeans get Frankfurt, Americans get Virginia. Each record has health checks — if Singapore goes down, Route 53 automatically stops returning that IP and falls back to the next closest healthy region. I'd keep TTLs at 60 seconds so failover happens within a minute. And I'd configure a secondary DNS provider as backup, so even if our primary DNS gets DDoS'd, resolution still works."</em></p>
+    </div>
+
+    <div class="tab-panel" id="dns-int-senior" role="tabpanel">
+      <h3 class="sub">What They Ask</h3>
+      <p>"Our P99 latency spiked and we traced it to DNS resolution. How would you investigate and fix it?"</p>
+      <h3 class="sub">What They Want to Hear</h3>
+      <ul>
+        <li>Check if it's internal DNS (Kubernetes CoreDNS, etc.) or external</li>
+        <li>Investigate conntrack table overflows in Kubernetes (common cause)</li>
+        <li>Check for negative caching issues or stale records</li>
+        <li>Consider local DNS caching (nodelocaldns in k8s, nscd on Linux)</li>
+        <li>Measure: <code>dig +stats</code>, <code>systemd-resolve --statistics</code>, Prometheus metrics for CoreDNS</li>
+      </ul>
+      <h3 class="sub">Sample Answer</h3>
+      <p><em>"First, I'd isolate whether it's internal DNS (service-to-service within the cluster) or external. For internal, the usual culprit in Kubernetes is CoreDNS getting overwhelmed or conntrack table overflows dropping UDP packets. I'd check CoreDNS pod resource usage, look at conntrack entries with `conntrack -S`, and check for SERVFAIL or timeout rates in CoreDNS metrics. Quick wins: deploy NodeLocalDNS cache (DaemonSet that runs a cache on every node), increase CoreDNS replicas, or tune ndots in resolv.conf to reduce unnecessary search domain expansions. For external DNS, I'd check if we're hitting rate limits on our provider, consider adding a local unbound caching resolver, and verify TTLs aren't set absurdly low."</em></p>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Interview tip:</strong> Whenever you draw a system design diagram, mention DNS at the very first step. "Users hit our domain, which goes through DNS — we use GeoDNS with Route 53 for regional routing and failover." It shows you think about the full request path, not just the backend.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — EXERCISES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Exercises — Hands-On Practice</h2>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-terminal text-green" aria-hidden="true"></i> Exercise 1: Trace a Real DNS Lookup
+      <span class="difficulty-tag beginner">Beginner</span>
+    </div>
+    <p>Open your terminal and run <code>dig +trace www.google.com</code> (Linux/macOS) or <code>nslookup -type=A www.google.com</code> (Windows). Observe each step of the resolution chain. Identify the root server, TLD server, and authoritative server in the output.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>With <code>dig +trace</code>, you'll see 3-4 groups of responses. The first group comes from root servers (look for lines ending in <code>.</code>), the second from .com TLD servers, and the final group from Google's authoritative servers (ns1.google.com, etc.). The last A record in the output is the final IP address.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-list text-blue" aria-hidden="true"></i> Exercise 2: Explore Record Types
+      <span class="difficulty-tag beginner">Beginner</span>
+    </div>
+    <p>Use <code>dig</code> or <code>nslookup</code> to look up the A, MX, NS, and TXT records for <code>google.com</code>. For each record type, write one sentence explaining what it tells you about Google's infrastructure.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Try: <code>dig google.com A</code>, <code>dig google.com MX</code>, <code>dig google.com NS</code>, <code>dig google.com TXT</code>. The MX records show multiple mail servers with priority numbers — lower priority = preferred server. The TXT records reveal SPF email verification and various service verifications.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-clock text-yellow" aria-hidden="true"></i> Exercise 3: TTL Experiment
+      <span class="difficulty-tag intermediate">Intermediate</span>
+    </div>
+    <p>Pick 5 popular websites and look up their A record TTLs using <code>dig</code>. Compare the TTLs. Which sites use low TTLs? Which use high TTLs? Hypothesize why each site chose its TTL value based on what you know about their infrastructure.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>The TTL value appears in the answer section of <code>dig</code> output (the number between the domain name and the record type). Sites behind CDNs (Cloudflare) often have low TTLs (60-300s) because they want flexibility to reroute traffic. Sites with stable infrastructure might have TTLs of 3600s or higher. Note: the TTL you see may be less than the original because your resolver has been counting down from when it cached the record.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-shield-halved text-purple" aria-hidden="true"></i> Exercise 4: Design a DNS Failover Strategy
+      <span class="difficulty-tag advanced">Advanced</span>
+    </div>
+    <p>You're running a critical API at <code>api.yourcompany.com</code> with servers in US-East and EU-West. Design a DNS configuration that: (1) routes users to the nearest region, (2) fails over to the other region if one goes down, (3) propagates the failover within 2 minutes. Write out the DNS records, TTLs, and health check configuration you'd use.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Use Route 53 with latency-based routing + health checks. Create two A records for <code>api.yourcompany.com</code>, each pointing to a different region's IP, with routing policy set to "latency." Attach health checks that ping each region every 10 seconds. Set TTL to 60 seconds. When a health check fails, Route 53 stops returning that IP. With 60s TTL + 30s health check detection, failover happens within ~90 seconds. Consider also adding a failover policy as a backup strategy.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-bug text-red" aria-hidden="true"></i> Exercise 5: Debug a DNS Outage
+      <span class="difficulty-tag expert">Expert</span>
+    </div>
+    <p>Scenario: Your Kubernetes cluster is experiencing intermittent DNS failures. About 1 in 50 DNS queries from application pods are timing out. The application logs show <code>SERVFAIL</code> responses. CoreDNS pods show normal CPU/memory usage. The issue started after a traffic spike. Walk through your debugging process step by step, including the exact commands you'd run.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Classic conntrack table overflow. Steps: (1) Check <code>conntrack -S</code> for "insert_failed" counters. (2) Check <code>dmesg | grep conntrack</code> for "table full" messages. (3) Increase conntrack table size: <code>sysctl -w net.netfilter.nf_conntrack_max=262144</code>. (4) Long-term: deploy NodeLocalDNS (runs a DNS cache on every node as a DaemonSet, bypassing conntrack for local queries). (5) Also check <code>resolv.conf</code> ndots setting — if ndots is 5 (Kubernetes default), every query expands to 5-10 DNS queries (trying each search domain). Setting <code>ndots: 2</code> can reduce DNS traffic dramatically.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — CHEAT CARDS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-table-cells"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Cheat Cards — Quick Reference</h2>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title">DNS Resolution Chain</div>
+      <div class="cheat-card-body">
+<pre>Browser cache
+  → OS cache
+    → Router cache
+      → ISP Recursive Resolver
+        → Root (13 clusters, 1700+ servers)
+          → TLD (.com, .org, .io)
+            → Authoritative (final answer)
+              → Cache result (TTL seconds)</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Record Types</div>
+      <div class="cheat-card-body">
+<pre>A      → name → IPv4
+AAAA   → name → IPv6
+CNAME  → name → another name (alias)
+MX     → domain → mail server
+NS     → domain → authoritative DNS
+TXT    → domain → arbitrary text
+PTR    → IP → name (reverse lookup)
+SOA    → zone metadata
+SRV    → service → host:port</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">TTL Quick Guide</div>
+      <div class="cheat-card-body">
+<pre>60s    → Pre-migration, fast failover
+300s   → Standard for dynamic services
+3600s  → Stable services, low traffic
+86400s → Rarely changing records
+
+Pro move:
+  Day -3: lower TTL to 60s
+  Day 0:  make DNS change
+  Day +1: raise TTL back up</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Public Resolvers</div>
+      <div class="cheat-card-body">
+<pre>Google:     8.8.8.8 / 8.8.4.4
+Cloudflare: 1.1.1.1 / 1.0.0.1
+Quad9:      9.9.9.9 / 149.112.112.112
+OpenDNS:    208.67.222.222
+
+DoH endpoints:
+  https://dns.google/dns-query
+  https://cloudflare-dns.com/dns-query</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Useful Commands</div>
+      <div class="cheat-card-body">
+<pre># Full trace through DNS tree
+dig +trace example.com
+
+# Query specific record type
+dig example.com MX
+
+# Check a specific resolver
+dig @8.8.8.8 example.com A
+
+# Reverse lookup
+dig -x 142.250.80.46
+
+# Windows
+nslookup -type=A example.com
+ipconfig /flushdns</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">DNS Routing Strategies</div>
+      <div class="cheat-card-body">
+<pre>Simple       → 1 name, 1 IP
+Round-robin  → 1 name, rotate IPs
+Weighted     → 90% to A, 10% to B
+Latency      → Nearest region by RTT
+GeoDNS       → By user location
+Failover     → Primary → backup if down
+Multivalue   → Return multiple IPs,
+               client picks one</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — CONNECTED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-arrow-right"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>DNS touches almost every other topic in system design. Here are the most important connections.</p>
+
+  <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DNS connections to other system design topics">
+    <text x="350" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">DNS Connects To Everything</text>
+
+    <!-- Center: DNS -->
+    <rect x="280" y="70" width="140" height="50" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="350" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">DNS</text>
+
+    <!-- Connected topics -->
+    <rect x="20" y="40" width="130" height="40" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="85" y="65" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">Load Balancing</text>
+    <line x1="152" y1="65" x2="278" y2="88" stroke="#334155" stroke-width="1.2"/>
+
+    <rect x="20" y="110" width="130" height="40" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="85" y="135" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">CDNs</text>
+    <line x1="152" y1="130" x2="278" y2="100" stroke="#334155" stroke-width="1.2"/>
+
+    <rect x="550" y="40" width="130" height="40" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="615" y="65" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="600" font-size="10">Caching</text>
+    <line x1="548" y1="65" x2="422" y2="88" stroke="#334155" stroke-width="1.2"/>
+
+    <rect x="550" y="110" width="130" height="40" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="615" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Networking</text>
+    <line x1="548" y1="130" x2="422" y2="100" stroke="#334155" stroke-width="1.2"/>
+
+    <rect x="200" y="150" width="130" height="40" rx="8" fill="#1e293b" stroke="#ec4899" stroke-width="1.5"/>
+    <text x="265" y="175" text-anchor="middle" fill="#ec4899" font-family="Inter, sans-serif" font-weight="600" font-size="10">Service Discovery</text>
+    <line x1="310" y1="150" x2="340" y2="122" stroke="#334155" stroke-width="1.2"/>
+
+    <rect x="370" y="150" width="130" height="40" rx="8" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
+    <text x="435" y="175" text-anchor="middle" fill="#06b6d4" font-family="Inter, sans-serif" font-weight="600" font-size="10">Security (DDoS)</text>
+    <line x1="400" y1="150" x2="365" y2="122" stroke="#334155" stroke-width="1.2"/>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div class="related-card-text">
+        <h4>Load Balancing</h4>
+        <p>DNS is the first layer of load balancing — routing users to regions. Then hardware/software LBs take over for per-request distribution.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-globe"></i></div>
+      <div class="related-card-text">
+        <h4>CDNs &amp; Edge Computing</h4>
+        <p>CDNs rely on GeoDNS to route users to the nearest edge server. Understanding DNS is key to understanding how CDN routing works.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Caching Strategies</h4>
+        <p>DNS is one of the internet's most aggressive caching systems. The TTL-based cache hierarchy mirrors patterns used in application-level caching.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div class="related-card-text">
+        <h4>Networking Fundamentals</h4>
+        <p>TCP/IP, UDP, anycast routing, BGP — the networking concepts that make DNS work under the hood. Essential for debugging DNS issues.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+      <div class="related-card-text">
+        <h4>Service Discovery</h4>
+        <p>Kubernetes DNS, Consul, etcd — how microservices find each other. DNS is the simplest form of service discovery.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="related-card-text">
+        <h4>Security &amp; DDoS Protection</h4>
+        <p>DNS amplification attacks, DNSSEC, DNS-based firewalls — the security landscape around the internet's most critical infrastructure.</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
