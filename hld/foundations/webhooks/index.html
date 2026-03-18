@@ -1,0 +1,1720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webhooks — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪝</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="green" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-satellite-dish"></i> API &amp; Communication Patterns</div>
+    <h1>Webhooks</h1>
+    <p class="hero-subtitle">Don't call us, we'll call you — the event-driven HTTP callback pattern that powers every payment confirmation, CI/CD pipeline, and third-party integration on the modern web.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 16 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 4 Exercises</span>
+      <span><i class="fa-solid fa-circle-info"></i> 16 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — Don't Call Us, We'll Call You</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> Instead of refreshing your email every 10 seconds to see if you got a reply, imagine the post office knocks on your door the moment a letter arrives. That's a webhook — the sender tells YOU when something happens, so you never have to ask.
+  </div>
+
+  <p>Most APIs work like a question-and-answer conversation: your code asks a server "did anything happen?", the server says "nope", and you ask again a few seconds later. This is called <span class="tooltip-trigger">polling<span class="tooltip-content">Repeatedly sending requests to a server at regular intervals to check if new data is available — like refreshing a webpage over and over.</span></span>, and it works, but it's horribly wasteful. Imagine calling a restaurant every minute to ask "Is my food ready yet?" — wouldn't it be better if the restaurant just called you when it's done?</p>
+
+  <p>That's exactly what a <strong>webhook</strong> does. Instead of your code constantly asking "anything new?", you give the other service a URL and say "POST to this URL whenever something interesting happens." The service remembers your URL, and when an event fires — a payment succeeds, a commit is pushed, an order ships — it sends an HTTP POST to your endpoint with all the details. No wasted requests. No delay. Instant notification.</p>
+
+  <!-- TL;DR overview SVG -->
+  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Webhook overview: provider pushes event to your URL">
+    <defs>
+      <marker id="whk-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Polling vs Webhooks — The Core Idea</text>
+
+    <!-- Polling row -->
+    <rect x="30" y="48" width="130" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="95" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR APP</text>
+    <text x="95" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(polls endlessly)</text>
+
+    <line x1="160" y1="65" x2="290" y2="65" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#whk-tldr-arr)"/>
+    <text x="225" y="58" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">"Anything new?" ×1000</text>
+
+    <rect x="295" y="48" width="130" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="360" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">PROVIDER</text>
+    <text x="360" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"No. No. No. No."</text>
+
+    <text x="475" y="75" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">← WASTEFUL</text>
+
+    <!-- Webhook row -->
+    <rect x="30" y="130" width="130" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="95" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR APP</text>
+    <text x="95" y="167" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(just waits)</text>
+
+    <line x1="290" y1="147" x2="162" y2="147" stroke="#10b981" stroke-width="2" marker-end="url(#whk-tldr-arr)"/>
+    <text x="225" y="140" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">POST /webhook — "Payment done!"</text>
+
+    <rect x="295" y="130" width="130" height="50" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="360" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">PROVIDER</text>
+    <text x="360" y="167" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(pushes when ready)</text>
+
+    <text x="475" y="157" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">← EFFICIENT</text>
+
+    <!-- Bottom summary -->
+    <rect x="130" y="195" width="500" height="30" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="215" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-weight="600">Webhooks flip the direction — the provider pushes data to you when events happen.</text>
+  </svg>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> A webhook is a user-defined HTTP callback — you register a URL, and the provider POSTs to it when an event occurs. Zero wasted requests, near-instant delivery.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — The Scenario
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="scenario">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-map"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario — Payment Confirmation</h2>
+    </div>
+  </div>
+
+  <p>Let's say you're building an e-commerce checkout. A customer clicks "Pay Now" and your server sends the payment details to a payment provider like Stripe. The provider talks to the customer's bank, runs fraud checks, and eventually either approves or declines the charge. This process can take anywhere from 1 second to 30 seconds — sometimes even longer for international cards.</p>
+
+  <p>Your checkout page needs to know the result so it can show "Payment successful!" or "Payment failed, try again." The question is: <strong>how does your server find out what happened?</strong></p>
+
+  <div class="callout callout-warning">
+    <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> The Core Problem</div>
+    <p class="body-text">The payment provider is doing work asynchronously. Your server sent the request and got back a "we're processing it" response. Now what? You need to know when it's done — but you can't just sit there waiting forever. You have thousands of other customers to serve.</p>
+  </div>
+
+  <!-- Scenario SVG: async payment flow -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Async payment flow: your server sends payment, provider processes, result needed">
+    <defs>
+      <marker id="whk-sc-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="whk-sc-arr-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+      </marker>
+    </defs>
+
+    <!-- Your Server -->
+    <rect x="30" y="50" width="140" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="100" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Your Server</text>
+    <text x="100" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">e-commerce backend</text>
+
+    <!-- Arrow 1: Send payment -->
+    <line x1="170" y1="70" x2="285" y2="70" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-sc-arr)"/>
+    <text x="228" y="63" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">POST /charge</text>
+
+    <!-- Stripe -->
+    <rect x="290" y="40" width="170" height="80" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="375" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Payment Provider</text>
+    <text x="375" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Fraud checks, bank talk...</text>
+    <text x="375" y="105" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="9" font-weight="600">⏳ 1–30 seconds</text>
+
+    <!-- Arrow 2: 202 Accepted -->
+    <line x1="290" y1="95" x2="172" y2="95" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#whk-sc-arr-gray)"/>
+    <text x="228" y="108" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">202 Accepted</text>
+
+    <!-- Question mark -->
+    <rect x="540" y="50" width="180" height="60" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3"/>
+    <text x="630" y="75" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">How do you know</text>
+    <text x="630" y="92" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">when it's done?</text>
+
+    <line x1="460" y1="80" x2="538" y2="80" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#whk-sc-arr)"/>
+
+    <!-- Bottom note -->
+    <text x="380" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Two approaches: keep asking (polling) or get notified (webhooks).</text>
+  </svg>
+
+  <p>There are two approaches. The naive one — polling — is what most beginners try first. The better one — webhooks — is what production systems actually use. Let's explore both so you understand <em>why</em> webhooks exist.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — First Attempt (Polling)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-rotate"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">First Attempt — Polling Every Few Seconds</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-purple">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p class="body-text">If a friend is baking your birthday cake and you want to know when it's done, the simplest approach is to call them every 5 minutes and ask "Is it ready?" That's polling. It works — but it's annoying for both of you.</p>
+  </div>
+
+  <p>The straightforward solution: after sending the payment request, start a loop. Every few seconds, call the payment provider's status API and ask "Is this payment done yet?" When the response finally says "completed" or "failed", you update your database and show the result to the customer.</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="macos-filename">PaymentPoller.py</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-python"># The naive approach: poll until we get a final answer
+import time
+import requests
+
+def wait_for_payment(payment_id):
+    """Keep asking Stripe: 'Is it done yet?'"""
+    while True:
+        response = requests.get(
+            f"https://api.stripe.com/v1/charges/{payment_id}"
+        )
+        status = response.json()["status"]
+
+        if status == "succeeded":
+            return "Payment successful!"
+        elif status == "failed":
+            return "Payment failed."
+
+        # Not done yet — wait 5 seconds and ask again
+        time.sleep(5)</code></pre>
+    </div>
+  </div>
+
+  <p>This code is easy to understand: ask, wait, ask again. But even in this tiny example, you can see the problem forming. What if the payment takes 30 seconds? That's 6 wasted API calls. What if you have 10,000 customers checking out simultaneously? That's 60,000 requests that all get the same answer: "not yet."</p>
+
+  <!-- Polling timeline SVG -->
+  <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling timeline showing repeated wasted requests">
+    <defs>
+      <marker id="whk-poll-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Polling Timeline — 30 Seconds of Waste</text>
+
+    <!-- Timeline line -->
+    <line x1="50" y1="80" x2="720" y2="80" stroke="#334155" stroke-width="2"/>
+
+    <!-- Poll 1 -->
+    <line x1="80" y1="55" x2="80" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="80" cy="55" r="4" fill="#ef4444"/>
+    <text x="80" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">0s</text>
+    <text x="80" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+
+    <!-- Poll 2 -->
+    <line x1="180" y1="55" x2="180" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="180" cy="55" r="4" fill="#ef4444"/>
+    <text x="180" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">5s</text>
+    <text x="180" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+
+    <!-- Poll 3 -->
+    <line x1="280" y1="55" x2="280" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="280" cy="55" r="4" fill="#ef4444"/>
+    <text x="280" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">10s</text>
+    <text x="280" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+
+    <!-- Poll 4 -->
+    <line x1="380" y1="55" x2="380" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="380" cy="55" r="4" fill="#ef4444"/>
+    <text x="380" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">15s</text>
+    <text x="380" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+
+    <!-- Poll 5 -->
+    <line x1="480" y1="55" x2="480" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="480" cy="55" r="4" fill="#ef4444"/>
+    <text x="480" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">20s</text>
+    <text x="480" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+
+    <!-- Poll 6 -->
+    <line x1="580" y1="55" x2="580" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="580" cy="55" r="4" fill="#ef4444"/>
+    <text x="580" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">25s</text>
+    <text x="580" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+
+    <!-- Poll 7: Finally! -->
+    <line x1="680" y1="55" x2="680" y2="80" stroke="#10b981" stroke-width="2"/>
+    <circle cx="680" cy="55" r="5" fill="#10b981"/>
+    <text x="680" y="46" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8" font-weight="700">30s</text>
+    <text x="680" y="100" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8" font-weight="600">"Done!"</text>
+
+    <!-- Waste label -->
+    <line x1="80" y1="125" x2="580" y2="125" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="330" y="145" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">6 requests wasted — server said "nope" every time</text>
+    <text x="330" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">× 10,000 customers = 60,000 useless API calls</text>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — Where It Breaks
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-heart-crack"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — The Cost of "Are We There Yet?"</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-purple">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p class="body-text">Imagine a call center where 10,000 people call every 5 seconds to ask "Is my order shipped?" 99% of the time the answer is "not yet." You'd need an army of operators just to say "no" — and the phone lines would be jammed for people who actually need help.</p>
+  </div>
+
+  <p>Polling seems harmless for one customer, but it falls apart at scale. Here are the three problems that make it a bad choice for production systems:</p>
+
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-1 text-red" aria-hidden="true"></i> Wasted Bandwidth &amp; Server Load</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Every poll is a full HTTP request-response cycle. If you poll every 5 seconds and 99% of responses are "nothing new", you're burning server CPU, network bandwidth, and <span class="tooltip-trigger">API rate limits<span class="tooltip-content">Most APIs cap how many requests you can make per minute or hour. Wasting them on empty polls means you might run out when you actually need them.</span></span> on requests that deliver zero value. At 10,000 concurrent users polling every 5 seconds, that's 2,000 requests per second — just to hear "no."</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-2 text-red" aria-hidden="true"></i> Latency Gap</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">If you poll every 5 seconds, the event could have happened 4.9 seconds ago and you wouldn't know. On average, there's a delay of half your polling interval between the event happening and your code finding out. Poll every 5 seconds? Average 2.5-second delay. Want sub-second awareness? You'd need to poll multiple times per second, which makes the bandwidth problem even worse.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-3 text-red" aria-hidden="true"></i> Provider Rate Limits &amp; Throttling</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Payment providers, GitHub, Twilio — they all enforce <span class="tooltip-trigger">rate limits<span class="tooltip-content">A maximum number of API requests allowed in a time window (e.g., 100 requests per minute). Exceeding it returns HTTP 429 "Too Many Requests."</span></span>. Stripe allows 100 reads per second in live mode. If your polling loop burns through your rate limit, you won't be able to make actual business requests (like creating new charges). Worse, the provider might temporarily ban your API key.</p>
+    </div>
+  </div>
+
+  <!-- Cost comparison SVG -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling cost vs webhook cost comparison">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Daily Cost Comparison: 10,000 Users</text>
+
+    <!-- Polling bar -->
+    <rect x="60" y="50" width="560" height="40" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="75" y="75" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">Polling: ~17.3 million requests/day</text>
+    <text x="540" y="75" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">99% wasted</text>
+
+    <!-- Webhook bar -->
+    <rect x="60" y="110" width="30" height="40" rx="6" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="105" y="135" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Webhooks: ~10,000 requests/day</text>
+    <text x="390" y="135" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">1 request per actual event</text>
+
+    <!-- Ratio label -->
+    <rect x="220" y="165" width="320" height="28" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="184" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-weight="600">Webhooks use ~1,730× fewer requests for the same result</text>
+  </svg>
+
+  <p>The bottom line: polling is a quick hack for prototyping, but it doesn't belong in production when the provider supports webhooks. Every major API — Stripe, GitHub, Twilio, Shopify, PayPal — offers webhooks precisely because polling doesn't scale.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — The Breakthrough
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Let Them Call You</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-purple">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p class="body-text">You're waiting for a delivery. Instead of checking the front door every 5 minutes, you put a doorbell there. The delivery driver presses it when they arrive. You do zero work until you hear the ring. That doorbell is your webhook endpoint.</p>
+  </div>
+
+  <p>The key insight behind webhooks is simple: <strong>reverse the direction of communication</strong>. Instead of your code pulling data from the provider, let the provider push data to your code. You expose an HTTP endpoint (a URL that accepts POST requests), and you tell the provider: "When something happens, send the details to this URL."</p>
+
+  <p>This pattern is sometimes called a <span class="tooltip-trigger">callback<span class="tooltip-content">A function (or in this case, a URL) that you hand to someone else, saying 'call this when you're done.' The same concept exists in programming — you pass a function to be called later.</span></span> — you give someone your phone number and say "call me when it's ready." In web terms, you give them a URL and say "POST to this when the event fires."</p>
+
+  <!-- Webhook flow SVG -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Webhook registration and delivery flow">
+    <defs>
+      <marker id="whk-brk-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="whk-brk-arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Webhook Lifecycle — Register Once, Receive Forever</text>
+
+    <!-- Step 1: Register -->
+    <rect x="30" y="50" width="150" height="55" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="105" y="72" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="11">① REGISTER</text>
+    <text x="105" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Give provider your URL</text>
+
+    <line x1="180" y1="77" x2="240" y2="77" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#whk-brk-arr-b)"/>
+
+    <!-- Provider stores it -->
+    <rect x="245" y="45" width="180" height="65" rx="10" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="335" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="600" font-size="11">Provider saves URL</text>
+    <text x="335" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">https://you.com/webhook</text>
+    <text x="335" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">+ event types to listen for</text>
+
+    <!-- Step 2: Event happens -->
+    <rect x="490" y="50" width="150" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="565" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">② EVENT FIRES</text>
+    <text x="565" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Payment succeeds</text>
+
+    <!-- Arrow down from event -->
+    <line x1="565" y1="105" x2="565" y2="140" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#whk-brk-arr)"/>
+
+    <!-- Step 3: Provider POSTs -->
+    <rect x="450" y="145" width="230" height="55" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="565" y="167" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">③ PROVIDER POSTs TO YOU</text>
+    <text x="565" y="184" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">POST https://you.com/webhook</text>
+
+    <!-- Arrow to Your Server -->
+    <line x1="450" y1="172" x2="230" y2="172" stroke="#10b981" stroke-width="2" marker-end="url(#whk-brk-arr)"/>
+    <text x="340" y="165" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">JSON payload with event data</text>
+
+    <!-- Your server receives -->
+    <rect x="50" y="145" width="175" height="55" rx="10" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
+    <text x="138" y="167" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">④ YOU PROCESS IT</text>
+    <text x="138" y="184" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Update DB, notify customer</text>
+
+    <!-- Step 4: Return 200 -->
+    <line x1="138" y1="200" x2="138" y2="235" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-brk-arr)"/>
+    <rect x="60" y="238" width="155" height="30" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="138" y="258" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">⑤ Return HTTP 200 OK</text>
+  </svg>
+
+  <p>That's the entire pattern. Five steps: register your URL, wait for events, receive the POST, process the data, return 200. No polling loop. No wasted requests. The provider does the heavy lifting of tracking events and delivering them to you.</p>
+
+  <div class="callout callout-info">
+    <strong>Why "webhook"?</strong> The name combines "web" (HTTP) with "hook" (a place where you attach your own code). You're "hooking into" the provider's event system via a web URL. Some people call them "HTTP callbacks" or "reverse APIs" — same idea, different names.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — How It Works (5 Cards)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The Five Building Blocks</h2>
+    </div>
+  </div>
+
+  <p>A webhook system isn't just "send a POST." In production, five pieces work together to make webhooks reliable. Let's walk through each one.</p>
+
+  <!-- Card 1: Event → POST -->
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-1 text-green" aria-hidden="true"></i> Event → HTTP POST</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">When an event happens on the provider's side (a payment succeeds, a pull request is merged, an SMS is received), the provider immediately sends an HTTP POST request to the URL you registered. The body of that POST contains a <span class="tooltip-trigger">JSON payload<span class="tooltip-content">JSON (JavaScript Object Notation) is a lightweight text format for sending structured data. A 'payload' is the actual data being carried in a request — like the contents of a package.</span></span> describing what happened.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+          <span class="macos-filename">Incoming Webhook POST</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-json">POST /webhooks/stripe HTTP/1.1
+Host: your-app.com
+Content-Type: application/json
+Stripe-Signature: t=1614...,v1=abc123...
+
+{
+  "id": "evt_1Nh7Ac2eZvKYlo2C",
+  "type": "payment_intent.succeeded",
+  "created": 1695123456,
+  "data": {
+    "object": {
+      "id": "pi_3Nh7Ab2eZvKYlo2C",
+      "amount": 2000,
+      "currency": "usd",
+      "status": "succeeded",
+      "customer": "cus_OjN1abc123"
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <p class="body-text">Notice the structure: there's an event <strong>type</strong> (what happened), a <strong>timestamp</strong> (when it happened), and a <strong>data object</strong> (the full details). Your endpoint receives this and acts on it — update the order status, send a confirmation email, trigger shipping.</p>
+    </div>
+  </div>
+
+  <!-- Card 2: Payload Design -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-2 text-green" aria-hidden="true"></i> Payload Design — What's in the Box?</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Well-designed webhook payloads follow a consistent pattern. Every payload should tell you three things: <strong>what</strong> happened (event type), <strong>when</strong> it happened (timestamp), and <strong>the details</strong> (the changed resource). Some providers send the full resource in the payload; others send only an ID and expect you to fetch the full details — this is called a <span class="tooltip-trigger">"thin" vs "fat" payload<span class="tooltip-content">A 'fat' payload includes all the data you need right in the webhook body. A 'thin' payload only sends an event type and resource ID — you then call the API to get the details. Fat is faster to process; thin is more secure (less data in transit).</span></span>.</p>
+
+      <!-- Thin vs Fat SVG -->
+      <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fat payload vs thin payload comparison">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Fat vs Thin Payloads</text>
+
+        <!-- Fat payload -->
+        <rect x="30" y="42" width="330" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="195" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Fat Payload</text>
+        <text x="195" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">All data included in the POST</text>
+        <text x="195" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">✓ Process immediately, no extra API call</text>
+        <text x="195" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">✗ Larger payloads, data could be stale</text>
+        <text x="195" y="135" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9" font-style="italic">Used by: Stripe, Shopify</text>
+        <text x="195" y="150" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9" font-weight="600">Best for: speed-critical workflows</text>
+
+        <!-- Thin payload -->
+        <rect x="400" y="42" width="330" height="120" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="565" y="65" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="12">Thin Payload</text>
+        <text x="565" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Just event type + resource ID</text>
+        <text x="565" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">✓ Small, secure, always fresh data</text>
+        <text x="565" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">✗ Requires extra API call to get details</text>
+        <text x="565" y="135" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9" font-style="italic">Used by: GitHub (some events)</text>
+        <text x="565" y="150" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-size="9" font-weight="600">Best for: security-sensitive data</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Card 3: HMAC Signatures -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-3 text-green" aria-hidden="true"></i> HMAC Signature Verification — Is This Really From Stripe?</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Here's a scary thought: your webhook URL is just a public endpoint. Anyone who knows it could send a fake POST pretending to be Stripe, telling your app "this payment succeeded" when it didn't. You'd ship products to someone who never paid. This is why <span class="tooltip-trigger">signature verification<span class="tooltip-content">A way to prove a message really came from who it claims to be from. The sender signs the message with a secret key, and you verify it using the same key. If the signature matches, the message is authentic.</span></span> is absolutely critical.</p>
+
+      <p class="body-text">The solution is called <span class="tooltip-trigger">HMAC<span class="tooltip-content">Hash-based Message Authentication Code. A cryptographic method where the sender hashes the message body together with a shared secret key. The receiver does the same hash — if they match, the message is authentic and hasn't been tampered with.</span></span> — Hash-based Message Authentication Code. Here's how it works in plain English:</p>
+
+      <!-- HMAC flow SVG -->
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HMAC signature verification flow">
+        <defs>
+          <marker id="whk-hmac-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">HMAC Signature Verification</text>
+
+        <!-- Provider side -->
+        <rect x="30" y="45" width="200" height="75" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="130" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">PROVIDER</text>
+        <text x="130" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">payload + secret key</text>
+        <text x="130" y="96" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">→ HMAC-SHA256 → signature</text>
+        <text x="130" y="112" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Sends signature in header</text>
+
+        <!-- Arrow -->
+        <line x1="230" y1="82" x2="330" y2="82" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-hmac-arr)"/>
+        <text x="280" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8">POST + sig header</text>
+
+        <!-- Your side -->
+        <rect x="335" y="45" width="200" height="75" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="435" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR SERVER</text>
+        <text x="435" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">payload + same secret key</text>
+        <text x="435" y="96" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">→ HMAC-SHA256 → your hash</text>
+        <text x="435" y="112" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Compare with received sig</text>
+
+        <!-- Result -->
+        <line x1="535" y1="82" x2="600" y2="82" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-hmac-arr)"/>
+
+        <!-- Match box -->
+        <rect x="605" y="52" width="130" height="30" rx="8" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="670" y="72" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">Match? ✓ Authentic</text>
+
+        <rect x="605" y="88" width="130" height="30" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="670" y="108" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">No match? ✗ Reject</text>
+
+        <!-- Bottom explanation -->
+        <rect x="100" y="145" width="560" height="55" rx="10" fill="rgba(16,185,129,0.04)" stroke="#10b981" stroke-width="1"/>
+        <text x="380" y="167" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">The secret key is shared between you and the provider during setup.</text>
+        <text x="380" y="183" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">An attacker doesn't know the key, so they can't forge a valid signature.</text>
+      </svg>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="whk-hmac-py" role="tab" aria-selected="true" aria-controls="whk-hmac-py">Python</button>
+          <button class="tab-btn" data-tab="whk-hmac-node" role="tab" aria-selected="false" aria-controls="whk-hmac-node">Node.js</button>
+        </div>
+        <div class="tab-panel active" id="whk-hmac-py" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+              <span class="macos-filename">verify_signature.py</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-python">import hmac
+import hashlib
+
+def verify_webhook(payload_body, signature_header, secret):
+    """Verify the webhook really came from the provider."""
+    # Compute what the signature SHOULD be
+    expected = hmac.new(
+        key=secret.encode('utf-8'),
+        msg=payload_body,
+        digestmod=hashlib.sha256
+    ).hexdigest()
+
+    # Compare securely (prevents timing attacks)
+    if not hmac.compare_digest(expected, signature_header):
+        raise ValueError("Invalid signature — possible forgery!")
+
+    return True  # Signature matches, safe to process</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="whk-hmac-node" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+              <span class="macos-filename">verifySignature.js</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-javascript">const crypto = require('crypto');
+
+function verifyWebhook(payloadBody, signatureHeader, secret) {
+  // Compute what the signature SHOULD be
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payloadBody)
+    .digest('hex');
+
+  // Compare securely (constant-time comparison)
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signatureHeader)
+  );
+
+  if (!isValid) throw new Error('Invalid signature!');
+  return true; // Safe to process
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Retry + Backoff -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-4 text-green" aria-hidden="true"></i> Retry with Exponential Backoff</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Networks are unreliable. Your server might be down for maintenance, or it might return a 500 error because of a temporary database outage. If the provider sends a webhook and doesn't get a 200 OK back, it needs to try again. But it can't just retry immediately a thousand times — that would overwhelm your server the moment it comes back up.</p>
+
+      <p class="body-text">The solution is <span class="tooltip-trigger">exponential backoff<span class="tooltip-content">A retry strategy where the wait time doubles after each failure: first retry after 1 minute, then 2 minutes, then 4, then 8, etc. This prevents hammering a server that's already struggling.</span></span>: wait a little, then wait longer, then even longer. Typically: 1 minute → 5 minutes → 30 minutes → 2 hours → 12 hours. After a certain number of attempts (usually 5-10), the provider gives up and marks the delivery as failed.</p>
+
+      <!-- Retry timeline SVG -->
+      <svg viewBox="0 0 760 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Exponential backoff retry timeline">
+        <defs>
+          <marker id="whk-retry-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Exponential Backoff — Growing Wait Times</text>
+
+        <!-- Timeline -->
+        <line x1="40" y1="75" x2="720" y2="75" stroke="#334155" stroke-width="2"/>
+
+        <!-- Attempt 1: Fail -->
+        <circle cx="60" cy="75" r="6" fill="#ef4444" stroke="#ef4444" stroke-width="1"/>
+        <text x="60" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9" font-weight="600">Fail</text>
+        <text x="60" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">0 min</text>
+
+        <!-- Wait 1 min -->
+        <text x="120" y="68" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">1 min</text>
+
+        <!-- Attempt 2: Fail -->
+        <circle cx="175" cy="75" r="6" fill="#ef4444"/>
+        <text x="175" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9" font-weight="600">Fail</text>
+
+        <!-- Wait 5 min -->
+        <text x="248" y="68" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">5 min</text>
+
+        <!-- Attempt 3: Fail -->
+        <circle cx="320" cy="75" r="6" fill="#ef4444"/>
+        <text x="320" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9" font-weight="600">Fail</text>
+
+        <!-- Wait 30 min -->
+        <text x="400" y="68" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">30 min</text>
+
+        <!-- Attempt 4: Fail -->
+        <circle cx="480" cy="75" r="6" fill="#ef4444"/>
+        <text x="480" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9" font-weight="600">Fail</text>
+
+        <!-- Wait 2 hours -->
+        <text x="555" y="68" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">2 hrs</text>
+
+        <!-- Attempt 5: Success -->
+        <circle cx="630" cy="75" r="8" fill="#10b981"/>
+        <text x="630" y="55" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9" font-weight="700">Success!</text>
+
+        <!-- Bottom note -->
+        <rect x="140" y="120" width="480" height="35" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+        <text x="380" y="138" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Each wait gets longer — prevents overwhelming a recovering server.</text>
+        <text x="380" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">After max retries, event goes to the dead letter queue.</text>
+      </svg>
+
+      <div class="callout callout-warning">
+        <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> Always Return 200 Quickly</div>
+        <p class="body-text">Your webhook endpoint should return HTTP 200 as fast as possible — ideally within 5 seconds. If you need to do heavy processing (sending emails, updating multiple databases), accept the webhook, put it on a <span class="tooltip-trigger">message queue<span class="tooltip-content">A buffer that holds tasks to be processed later. Your webhook handler quickly drops the event into the queue and returns 200. A background worker picks it up and does the slow work — without making the provider wait.</span></span>, return 200, and process it asynchronously. Otherwise the provider might time out and retry, causing duplicate processing.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 5: Dead Letter Queue -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-5 text-green" aria-hidden="true"></i> Dead Letter Queue — When All Retries Fail</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">What happens when all retry attempts are exhausted and the webhook still can't be delivered? The event goes to a <span class="tooltip-trigger">dead letter queue<span class="tooltip-content">A holding area for messages that couldn't be delivered after all retry attempts. Named after the 'dead letter office' in postal services — where undeliverable mail ends up. Engineers review these to fix the root cause and replay failed events.</span></span> (DLQ). Think of it like the "return to sender" pile at the post office — letters that couldn't be delivered after multiple attempts.</p>
+
+      <p class="body-text">A dead letter queue is critical because it means <strong>no events are silently lost</strong>. You can inspect the queue, fix whatever was wrong (maybe your server was misconfigured, or the endpoint URL changed), and replay the failed events. Most providers like Stripe give you a dashboard where you can see failed webhook deliveries and manually retry them.</p>
+
+      <!-- DLQ SVG -->
+      <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dead letter queue flow: retries exhausted, events stored for replay">
+        <defs>
+          <marker id="whk-dlq-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+          <marker id="whk-dlq-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+          </marker>
+        </defs>
+
+        <!-- Event -->
+        <rect x="30" y="40" width="120" height="45" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="90" y="60" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">Event</text>
+        <text x="90" y="75" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">payment.succeeded</text>
+
+        <!-- Arrow to retries -->
+        <line x1="150" y1="62" x2="205" y2="62" stroke="#ef4444" stroke-width="1.5" marker-end="url(#whk-dlq-arr-r)"/>
+
+        <!-- Retry box -->
+        <rect x="210" y="40" width="130" height="45" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="275" y="58" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="10">Retries (5×)</text>
+        <text x="275" y="73" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">All failed ✗</text>
+
+        <!-- Arrow to DLQ -->
+        <line x1="340" y1="62" x2="405" y2="62" stroke="#ef4444" stroke-width="1.5" marker-end="url(#whk-dlq-arr-r)"/>
+
+        <!-- DLQ -->
+        <rect x="410" y="35" width="160" height="55" rx="8" fill="rgba(245,158,11,0.1)" stroke="#f59e0b" stroke-width="2"/>
+        <text x="490" y="56" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">Dead Letter Queue</text>
+        <text x="490" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Stored safely for review</text>
+        <text x="490" y="84" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">No data lost!</text>
+
+        <!-- Arrow to fix & replay -->
+        <line x1="570" y1="62" x2="625" y2="62" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-dlq-arr)"/>
+
+        <!-- Fix & Replay -->
+        <rect x="630" y="40" width="110" height="45" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="685" y="58" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">Fix &amp; Replay</text>
+        <text x="685" y="73" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Manual retry ✓</text>
+
+        <!-- Bottom note -->
+        <text x="380" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Events are never silently lost — they wait in the DLQ until you fix the problem.</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — Going Deeper
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — Production Concerns</h2>
+    </div>
+  </div>
+
+  <p>The five building blocks get you started, but real production webhook systems need to handle four additional challenges. These are the things that separate a weekend project from a system that handles millions of events without breaking.</p>
+
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-fingerprint text-blue" aria-hidden="true"></i> Idempotency — Handling Duplicate Deliveries</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Here's a tricky situation: the provider sends a webhook, your server processes it and updates the database, but right before it returns 200 OK, the network connection drops. The provider never got the 200, so it assumes delivery failed and retries. Now your server processes the same event <em>again</em> — maybe charging a customer twice or sending two confirmation emails.</p>
+
+      <p class="body-text">The fix is making your webhook handler <span class="tooltip-trigger">idempotent<span class="tooltip-content">An operation is 'idempotent' if doing it once has the same effect as doing it ten times. Like pressing an elevator button — pressing it twice doesn't call two elevators. Your webhook handler should work the same way: processing the same event twice should produce the same result as processing it once.</span></span> — processing the same event twice should produce the same result as processing it once. Most providers include an <strong>idempotency key</strong> (usually the event ID) in each webhook. Store this ID in your database, and before processing any webhook, check: "Have I seen this ID before?" If yes, skip it and return 200.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+          <span class="macos-filename">idempotent_handler.py</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-python">def handle_webhook(event):
+    event_id = event["id"]  # e.g., "evt_1Nh7Ac2eZvKYlo2C"
+
+    # Check if we've already processed this event
+    if db.processed_events.exists(event_id):
+        return 200  # Already handled — skip, but return 200!
+
+    # Process the event (update order, send email, etc.)
+    process_payment_event(event)
+
+    # Record that we've processed this event
+    db.processed_events.insert(event_id)
+
+    return 200</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-arrow-down-1-9 text-blue" aria-hidden="true"></i> Event Ordering — They Don't Always Arrive In Order</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Imagine a customer creates an order, then updates the shipping address, then cancels it. Three events, in that order. But webhooks might arrive as: cancel → create → update. Why? Because each webhook is an independent HTTP request. Network conditions, retry timing, and provider-side queuing can all scramble the order.</p>
+
+      <p class="body-text">Your handler needs to handle out-of-order delivery gracefully. Common strategies:</p>
+      <ul>
+        <li><strong>Timestamps:</strong> Each event has a timestamp. Before processing, check if you already have a newer version of this resource. If so, ignore the older event.</li>
+        <li><strong>Version numbers:</strong> Some providers include a sequence number. Only process events with a higher sequence than what you've stored.</li>
+        <li><strong>Fetch latest state:</strong> Instead of trusting the payload, use it as a signal and always fetch the current state from the provider's API. This guarantees you have the freshest data regardless of delivery order.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-shield-halved text-blue" aria-hidden="true"></i> Security Beyond HMAC</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">HMAC signatures verify the sender, but there are more security layers to add:</p>
+      <ul>
+        <li><strong>HTTPS only:</strong> Never expose a webhook endpoint over plain HTTP. The payload and signature would be visible to anyone on the network.</li>
+        <li><strong>IP allowlisting:</strong> Some providers publish the IP addresses they send webhooks from. You can configure your firewall to reject requests from any other IP. Stripe, for example, publishes their webhook IPs.</li>
+        <li><strong>Timestamp validation:</strong> Check that the event timestamp is recent (within the last 5 minutes). This prevents <span class="tooltip-trigger">replay attacks<span class="tooltip-content">An attacker captures a legitimate webhook and re-sends it hours or days later. If your handler just checks the signature (which is still valid), it would process the stale event. Checking the timestamp prevents this.</span></span> — where an attacker captures a valid webhook and re-sends it days later.</li>
+        <li><strong>Secret rotation:</strong> Periodically generate new signing secrets. Good providers let you have two active secrets during rotation so you don't miss events during the switch.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-clock text-blue" aria-hidden="true"></i> Timeout &amp; Processing Strategy</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Most providers give your endpoint 5-30 seconds to respond with a 200. If your handler takes longer (maybe it's writing to a slow database or calling another API), the provider considers it a failure and retries. This creates a nasty loop: slow processing → timeout → retry → more slow processing → more timeouts.</p>
+
+      <p class="body-text">The golden rule: <strong>accept fast, process later</strong>. Your webhook endpoint should do exactly three things: (1) verify the signature, (2) drop the event onto an internal queue, (3) return 200 OK. A background worker then picks up the event from the queue and does the real processing — updating databases, sending emails, calling other APIs. This decoupling means your endpoint always responds in milliseconds, regardless of how complex the processing is.</p>
+
+      <!-- Accept-fast SVG -->
+      <svg viewBox="0 0 760 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Accept fast, process later pattern">
+        <defs>
+          <marker id="whk-af-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+
+        <!-- Webhook arrives -->
+        <rect x="20" y="35" width="110" height="45" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="75" y="55" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Webhook POST</text>
+        <text x="75" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">arrives</text>
+
+        <line x1="130" y1="57" x2="168" y2="57" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-af-arr)"/>
+
+        <!-- Verify -->
+        <rect x="172" y="35" width="100" height="45" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="222" y="55" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">① Verify sig</text>
+        <text x="222" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">~1ms</text>
+
+        <line x1="272" y1="57" x2="310" y2="57" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-af-arr)"/>
+
+        <!-- Enqueue -->
+        <rect x="314" y="35" width="100" height="45" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="364" y="55" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">② Enqueue</text>
+        <text x="364" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">~5ms</text>
+
+        <line x1="414" y1="57" x2="452" y2="57" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-af-arr)"/>
+
+        <!-- Return 200 -->
+        <rect x="456" y="35" width="90" height="45" rx="8" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
+        <text x="501" y="55" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="9">③ Return 200</text>
+        <text x="501" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">~1ms total</text>
+
+        <!-- Async arrow down -->
+        <line x1="364" y1="80" x2="364" y2="110" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#whk-af-arr)"/>
+
+        <!-- Background worker -->
+        <rect x="290" y="110" width="150" height="25" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="365" y="127" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Background worker processes later</text>
+
+        <!-- Fast label -->
+        <rect x="580" y="40" width="160" height="35" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+        <text x="660" y="58" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Total: &lt; 10ms response</text>
+        <text x="660" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Provider is happy ✓</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — Variations
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-scale-balanced"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations — Webhooks vs Polling vs SSE vs WebSockets</h2>
+    </div>
+  </div>
+
+  <p>Webhooks aren't the only way to push data. Let's compare the four main patterns for getting real-time updates, so you know when to pick each one.</p>
+
+  <div class="callout callout-purple">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p class="body-text">Think of four ways to know when dinner's ready: (1) walk to the kitchen every 5 minutes and check <em>(polling)</em>, (2) give the chef your phone number so they text you <em>(webhook)</em>, (3) leave a baby monitor in the kitchen so you can hear them say "it's ready" <em>(SSE)</em>, (4) get on a walkie-talkie where you and the chef can both talk anytime <em>(WebSocket)</em>.</p>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Polling</th>
+          <th>Webhooks</th>
+          <th>SSE</th>
+          <th>WebSockets</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Direction</strong></td>
+          <td>Client → Server</td>
+          <td>Server → Client (HTTP POST)</td>
+          <td>Server → Client (stream)</td>
+          <td>Bidirectional</td>
+        </tr>
+        <tr>
+          <td><strong>Connection</strong></td>
+          <td>New per request</td>
+          <td>New per event</td>
+          <td>Long-lived, one-way</td>
+          <td>Long-lived, two-way</td>
+        </tr>
+        <tr>
+          <td><strong>Latency</strong></td>
+          <td>Half of poll interval</td>
+          <td>Near-instant</td>
+          <td>Near-instant</td>
+          <td>Near-instant</td>
+        </tr>
+        <tr>
+          <td><strong>Complexity</strong></td>
+          <td>Low</td>
+          <td>Medium</td>
+          <td>Medium</td>
+          <td>High</td>
+        </tr>
+        <tr>
+          <td><strong>Best for</strong></td>
+          <td>Prototyping, low-frequency</td>
+          <td>Server-to-server events</td>
+          <td>Live feeds (stock prices)</td>
+          <td>Chat, gaming, collaboration</td>
+        </tr>
+        <tr>
+          <td><strong>Requires public URL?</strong></td>
+          <td>No</td>
+          <td>Yes — your endpoint must be reachable</td>
+          <td>No</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td><strong>Built-in retry?</strong></td>
+          <td>You manage it</td>
+          <td>Provider retries automatically</td>
+          <td>Browser auto-reconnects</td>
+          <td>You manage it</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Comparison decision SVG -->
+  <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision tree for choosing between polling, webhooks, SSE, and WebSockets">
+    <defs>
+      <marker id="whk-dec-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Quick Decision Guide</text>
+
+    <!-- Start -->
+    <rect x="280" y="35" width="200" height="35" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="380" y="57" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">Server-to-server event?</text>
+
+    <!-- Yes: Webhooks -->
+    <line x1="330" y1="70" x2="160" y2="110" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-dec-arr)"/>
+    <text x="225" y="87" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9" font-weight="600">Yes</text>
+    <rect x="70" y="110" width="180" height="35" rx="8" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
+    <text x="160" y="132" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">→ Use Webhooks</text>
+
+    <!-- No: Need bidirectional? -->
+    <line x1="430" y1="70" x2="560" y2="110" stroke="#64748b" stroke-width="1.5" marker-end="url(#whk-dec-arr)"/>
+    <text x="510" y="87" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">No (browser client)</text>
+    <rect x="470" y="110" width="200" height="35" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="570" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="11">Need two-way comms?</text>
+
+    <!-- Yes: WebSocket -->
+    <line x1="520" y1="145" x2="440" y2="175" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#whk-dec-arr)"/>
+    <text x="465" y="160" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="9">Yes</text>
+    <rect x="330" y="175" width="160" height="30" rx="6" fill="rgba(167,139,250,0.1)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="410" y="195" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="10">→ Use WebSockets</text>
+
+    <!-- No: SSE -->
+    <line x1="620" y1="145" x2="660" y2="175" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#whk-dec-arr)"/>
+    <text x="650" y="160" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-size="9">No</text>
+    <rect x="590" y="175" width="140" height="30" rx="6" fill="rgba(56,189,248,0.1)" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="660" y="195" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">→ Use SSE</text>
+  </svg>
+
+  <div class="callout callout-info">
+    <strong>Key distinction:</strong> Webhooks are <em>server-to-server</em> — your backend receives events from another backend. SSE and WebSockets are <em>server-to-browser</em> — they push data to a user's browser in real time. If you're integrating with Stripe, GitHub, or Twilio, webhooks are the right choice. If you're building a live chat UI, look at WebSockets.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — At Scale
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How Stripe, GitHub &amp; Twilio Do It</h2>
+    </div>
+  </div>
+
+  <p>Webhooks aren't just a learning exercise — they're the backbone of almost every integration you use. Let's look at how three major platforms implement them, so you can see real-world patterns in action.</p>
+
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-credit-card text-green" aria-hidden="true"></i> Stripe — Payment Events</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Stripe sends webhooks for over 200 event types — <code>payment_intent.succeeded</code>, <code>customer.subscription.deleted</code>, <code>invoice.payment_failed</code>, and more. Their webhook system is one of the most mature in the industry:</p>
+      <ul>
+        <li><strong>Signature:</strong> HMAC-SHA256 with the <code>Stripe-Signature</code> header. Includes a timestamp to prevent replay attacks.</li>
+        <li><strong>Retries:</strong> Up to 3 days, with exponential backoff. Starts at ~1 hour between retries.</li>
+        <li><strong>Dashboard:</strong> You can see every delivery attempt, inspect payloads, and manually retry failed events.</li>
+        <li><strong>Testing:</strong> The <code>stripe listen</code> CLI command forwards live events to your local machine during development — no need to deploy to test webhooks.</li>
+      </ul>
+      <p class="body-text">Stripe processes billions of webhook deliveries per month. Their advice to developers: always verify signatures, always handle events idempotently, and always return 200 within 20 seconds.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-brands fa-github text-green" aria-hidden="true"></i> GitHub — Repository Events</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">GitHub webhooks trigger on repository activity: pushes, pull requests, issues, releases, workflow runs. This is what powers CI/CD pipelines — when you push code, GitHub sends a webhook to Jenkins/CircleCI/GitHub Actions telling it to run your build.</p>
+      <ul>
+        <li><strong>Signature:</strong> HMAC-SHA256 in the <code>X-Hub-Signature-256</code> header.</li>
+        <li><strong>Retries:</strong> Failed deliveries are retried for up to 3 days.</li>
+        <li><strong>Events:</strong> You choose which events to subscribe to (push, pull_request, issues, etc.) — you don't get everything.</li>
+        <li><strong>Ping event:</strong> When you first set up a webhook, GitHub sends a <code>ping</code> event to verify your endpoint is reachable.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-comment-sms text-green" aria-hidden="true"></i> Twilio — SMS &amp; Call Events</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Twilio uses webhooks to notify your app about incoming SMS messages, call status changes, and delivery receipts. When someone texts your Twilio number, Twilio sends a webhook to your URL with the message body, sender, and phone number.</p>
+      <ul>
+        <li><strong>Signature:</strong> Uses an authentication token and request URL to generate a signature in the <code>X-Twilio-Signature</code> header.</li>
+        <li><strong>Unique twist:</strong> Twilio webhooks can return <span class="tooltip-trigger">TwiML<span class="tooltip-content">Twilio Markup Language — an XML format that tells Twilio what to do in response to a webhook. Your endpoint can return TwiML saying 'play this audio' or 'forward this call to another number.'</span></span> in the response body to control the call/message flow. Your webhook isn't just receiving data — it's sending instructions back.</li>
+        <li><strong>Fallback URL:</strong> You can configure a backup URL. If your primary webhook fails, Twilio automatically tries the fallback before giving up.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- At-scale comparison SVG -->
+  <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Comparison of Stripe, GitHub, and Twilio webhook implementations">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Production Webhook Patterns — What They All Share</text>
+
+    <!-- Shared patterns in center -->
+    <rect x="180" y="40" width="400" height="100" rx="12" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="2"/>
+    <text x="380" y="62" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Every Major Provider Does These 5 Things</text>
+    <text x="380" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">① HMAC signature verification</text>
+    <text x="380" y="96" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">② Exponential backoff retries   ③ Event type filtering</text>
+    <text x="380" y="110" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">④ Delivery logs / dashboard   ⑤ Idempotency keys in payloads</text>
+    <text x="380" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">These patterns are universal — learn them once, use them everywhere.</text>
+
+    <!-- Left: Stripe -->
+    <rect x="20" y="55" width="140" height="35" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="90" y="77" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="10">Stripe</text>
+    <line x1="160" y1="72" x2="178" y2="72" stroke="#a78bfa" stroke-width="1"/>
+
+    <!-- Right: GitHub -->
+    <rect x="600" y="45" width="140" height="35" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="670" y="67" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">GitHub</text>
+    <line x1="580" y1="62" x2="600" y2="62" stroke="#38bdf8" stroke-width="1"/>
+
+    <!-- Right: Twilio -->
+    <rect x="600" y="95" width="140" height="35" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="670" y="117" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="10">Twilio</text>
+    <line x1="580" y1="112" x2="600" y2="112" stroke="#f43f5e" stroke-width="1"/>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — Anti-Lesson
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bomb"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Anti-Lesson — What Goes Wrong Without Webhooks</h2>
+    </div>
+  </div>
+
+  <p>Let's look at a real-world scenario that goes catastrophically wrong when you rely on polling instead of webhooks.</p>
+
+  <div class="callout callout-danger">
+    <div class="callout-title"><i class="fa-solid fa-skull-crossbones"></i> The Black Friday Incident</div>
+    <p class="body-text">An e-commerce startup launches a flash sale. Their payment integration uses polling — every customer's checkout flow polls Stripe every 3 seconds to check payment status. Traffic spikes to 50,000 concurrent checkouts. That's 16,667 poll requests per second hitting Stripe's API. Stripe rate-limits them. Now nobody can check out — not just slow, completely blocked. The sale fails. Revenue lost. Customer trust destroyed.</p>
+  </div>
+
+  <p>With webhooks, the same 50,000 checkouts would generate exactly 50,000 webhook deliveries (one per payment result) — spread naturally over minutes, with Stripe handling the delivery timing. No rate limit issues. No wasted requests. The architecture scales effortlessly because the work is proportional to actual events, not to the number of impatient clients checking repeatedly.</p>
+
+  <!-- Anti-lesson SVG -->
+  <svg viewBox="0 0 760 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling disaster vs webhook success under load">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">50,000 Checkouts: Polling vs Webhooks</text>
+
+    <!-- Polling -->
+    <rect x="30" y="42" width="330" height="50" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="195" y="62" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Polling: ~16,700 req/sec</text>
+    <text x="195" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">→ Rate limited → Checkout broken for everyone</text>
+
+    <!-- Webhook -->
+    <rect x="30" y="105" width="330" height="50" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="195" y="125" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">Webhooks: ~50,000 total deliveries</text>
+    <text x="195" y="143" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">→ Spread over minutes → Everything works fine</text>
+
+    <!-- Result -->
+    <rect x="420" y="42" width="310" height="50" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+    <text x="575" y="62" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="10">💥 $2M revenue lost</text>
+    <text x="575" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">CTO fired, investors angry</text>
+
+    <rect x="420" y="105" width="310" height="50" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="575" y="125" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">✓ Record sales day</text>
+    <text x="575" y="143" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Team celebrates, investors happy</text>
+  </svg>
+
+  <div class="callout callout-info">
+    <strong>The lesson:</strong> Polling multiplies traffic by the number of clients checking. Webhooks keep traffic proportional to the number of actual events. Under spiky load, that difference is the difference between success and catastrophic failure.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — Common Mistakes
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — Webhook Pitfalls</h2>
+    </div>
+  </div>
+
+  <p>Even experienced developers make these mistakes when building webhook consumers. Each one can cause data loss, security holes, or mysterious bugs in production.</p>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug text-red icon-gap"></i> Not Verifying Signatures</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Accepting every POST to your webhook URL without checking the HMAC signature.</p>
+        <p class="body-text"><strong>Why it's bad:</strong> Anyone who discovers your webhook URL can send fake events. An attacker could fake a "payment succeeded" event and get free products.</p>
+        <p class="body-text"><strong>The fix:</strong> Always compute the HMAC using the shared secret and compare it to the signature header before processing any event. Reject requests with missing or invalid signatures immediately with HTTP 401.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug text-red icon-gap"></i> Doing Heavy Processing Before Returning 200</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Your webhook handler calls external APIs, sends emails, writes to multiple databases — all before returning the HTTP response.</p>
+        <p class="body-text"><strong>Why it's bad:</strong> The provider times out waiting for your 200. It retries. Now you're processing the same event multiple times, sending duplicate emails, and creating duplicate database records.</p>
+        <p class="body-text"><strong>The fix:</strong> Verify the signature, write the event to a queue, return 200. Do all the heavy processing in a background worker. This pattern is sometimes called <span class="tooltip-trigger">"fire and forget"<span class="tooltip-content">The webhook handler 'fires' the event into a queue and 'forgets' about it immediately, returning 200. The background worker 'remembers' it and processes it at its own pace.</span></span>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug text-red icon-gap"></i> Not Handling Duplicates (No Idempotency)</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Assuming each webhook will be delivered exactly once and processing every incoming event without checking for duplicates.</p>
+        <p class="body-text"><strong>Why it's bad:</strong> Webhooks are delivered <em>at least once</em>, not exactly once. Network glitches, provider retries, and your own intermittent failures mean you will receive duplicates. Charging a customer twice because of a duplicate webhook is a very bad day.</p>
+        <p class="body-text"><strong>The fix:</strong> Store the event ID after processing. Before processing any event, check if that ID already exists. If it does, return 200 immediately and do nothing.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug text-red icon-gap"></i> Using HTTP Instead of HTTPS</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Registering an <code>http://</code> webhook URL instead of <code>https://</code>.</p>
+        <p class="body-text"><strong>Why it's bad:</strong> Without TLS encryption, the entire webhook payload — including customer data, payment amounts, and the HMAC signature — travels in plain text. Any network observer can read it, and an attacker could perform a man-in-the-middle attack.</p>
+        <p class="body-text"><strong>The fix:</strong> Always use HTTPS. Most providers (Stripe, GitHub) refuse to send webhooks to HTTP URLs entirely. If you're testing locally, use a tool like <code>ngrok</code> that provides a temporary HTTPS tunnel.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug text-red icon-gap"></i> Assuming Events Arrive in Order</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Writing handler logic that assumes <code>order.created</code> always arrives before <code>order.updated</code>, which always arrives before <code>order.cancelled</code>.</p>
+        <p class="body-text"><strong>Why it's bad:</strong> Network conditions and retry timing can scramble delivery order. If <code>order.cancelled</code> arrives before <code>order.created</code>, your handler might try to cancel a non-existent order, then create it — leaving a ghost order in your database.</p>
+        <p class="body-text"><strong>The fix:</strong> Check timestamps or version numbers. If the incoming event is older than what you've already processed for that resource, discard it. Or use the "fetch latest" strategy — treat the webhook as a notification to fetch the current state from the API.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — Interview Playbook
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-microphone"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — Webhook Questions</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-purple">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p class="body-text">Webhooks come up in system design interviews whenever the design involves third-party integrations, async events, or notification systems. The interviewer wants to see that you understand push vs pull tradeoffs, reliability concerns, and security.</p>
+  </div>
+
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-q text-green" aria-hidden="true"></i> "How would you handle payment notifications in your e-commerce design?"</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text"><strong>Strong answer:</strong> "I'd register a webhook URL with the payment provider. When a payment succeeds or fails, the provider POSTs the event to my endpoint. My handler verifies the HMAC signature, checks idempotency (have I seen this event ID before?), drops the event onto an internal queue, and returns 200 OK immediately. A background worker picks it up and updates the order status, sends confirmation emails, and triggers fulfillment. This gives me near-instant notification with zero polling overhead. For reliability, I'd also run a daily reconciliation job that compares my records with the provider's — that catches any events that fell through the cracks."</p>
+
+      <!-- Answer SVG -->
+      <svg viewBox="0 0 760 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview answer flow: webhook receive, verify, queue, process">
+        <defs>
+          <marker id="whk-int-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+
+        <rect x="20" y="25" width="110" height="40" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="75" y="42" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Webhook POST</text>
+        <text x="75" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">from Stripe</text>
+
+        <line x1="130" y1="45" x2="160" y2="45" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-int-arr)"/>
+
+        <rect x="165" y="25" width="100" height="40" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="215" y="42" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Verify HMAC</text>
+        <text x="215" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">+ dedup check</text>
+
+        <line x1="265" y1="45" x2="295" y2="45" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-int-arr)"/>
+
+        <rect x="300" y="25" width="90" height="40" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="345" y="42" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Enqueue</text>
+        <text x="345" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">SQS/RabbitMQ</text>
+
+        <line x1="390" y1="45" x2="420" y2="45" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-int-arr)"/>
+
+        <rect x="425" y="25" width="85" height="40" rx="8" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
+        <text x="468" y="42" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="9">200 OK</text>
+        <text x="468" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">&lt; 10ms</text>
+
+        <line x1="345" y1="65" x2="345" y2="90" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#whk-int-arr)"/>
+
+        <rect x="265" y="90" width="160" height="30" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="345" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Worker: update DB, email, fulfill</text>
+
+        <!-- Reconciliation -->
+        <rect x="555" y="25" width="170" height="40" rx="8" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="640" y="42" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="9">Daily Reconciliation</text>
+        <text x="640" y="55" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">safety net for missed events</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-q text-green" aria-hidden="true"></i> "What if the webhook provider is down and can't send events?"</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text"><strong>Strong answer:</strong> "Webhooks are inherently a <em>push</em> model — if the provider can't push, you won't receive events during the outage. That's why production systems should never rely 100% on webhooks alone. I'd combine webhooks with a periodic <span class="tooltip-trigger">reconciliation job<span class="tooltip-content">A scheduled process (e.g., running every hour or daily) that pulls records from the provider's API and compares them with your database to catch any discrepancies or missed events.</span></span> — say, every hour, my system fetches recent transactions from the provider's API and compares them with what I've received via webhooks. Any missing events get processed. This 'belt and suspenders' approach means neither a webhook failure nor a provider outage causes permanent data loss."</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-q text-green" aria-hidden="true"></i> "How do you test webhooks during development?"</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text"><strong>Strong answer:</strong> "Three strategies: (1) Use the provider's CLI tool (like <code>stripe listen --forward-to localhost:4242/webhook</code>) which tunnels real events to my local machine. (2) Use <code>ngrok</code> to create a temporary public URL that points to my local server. (3) For automated tests, I mock the webhook request by constructing the payload and computing the HMAC signature with my test secret. I always test the signature verification path — both valid and invalid signatures — to make sure my security logic is correct."</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-q text-green" aria-hidden="true"></i> "What's the difference between webhooks and event-driven architecture?"</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text"><strong>Strong answer:</strong> "Webhooks are one implementation of event-driven architecture that works across organizational boundaries — company A notifies company B via HTTP. Event-driven architecture is the broader pattern: when something happens, publish an event, and interested parties react. Inside a single system, you'd typically use a message broker like Kafka or RabbitMQ rather than HTTP webhooks. Webhooks are the HTTP-based, cross-boundary version of event-driven communication — they're simpler to set up (just a URL) but less reliable and performant than internal message queues."</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — Exercises
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Exercises — Build Your Own Webhook System</h2>
+    </div>
+  </div>
+
+  <p>Theory is great, but you only truly understand webhooks once you've built a handler and dealt with the edge cases yourself. Try these exercises in order — each one builds on the previous.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-code text-green" aria-hidden="true"></i> Exercise 1: Basic Webhook Receiver
+      <span class="difficulty-tag easy">Easy</span>
+    </div>
+    <p class="body-text">Build a simple HTTP endpoint that receives a POST request, parses the JSON body, and logs the event type and key data to the console. Test it using <code>curl</code> to send a sample Stripe-like payload.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-lightbulb text-yellow icon-gap"></i> Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Use any framework — Flask (Python), Express (Node), or Sinatra (Ruby). The endpoint should accept POST, parse <code>request.body</code> as JSON, and extract <code>event.type</code> and <code>event.data</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-check text-green icon-gap"></i> Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+              <span class="macos-filename">app.py</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-python">from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    event = request.get_json()
+    print(f"Event type: {event['type']}")
+    print(f"Event data: {event['data']}")
+    return jsonify({"received": True}), 200
+
+if __name__ == '__main__':
+    app.run(port=4242)</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-shield-halved text-blue" aria-hidden="true"></i> Exercise 2: Add HMAC Verification
+      <span class="difficulty-tag medium">Medium</span>
+    </div>
+    <p class="body-text">Extend Exercise 1: add HMAC-SHA256 signature verification. Use a shared secret of <code>"whsec_test123"</code>. Reject any request whose signature doesn't match. Test with both valid and forged signatures.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-lightbulb text-yellow icon-gap"></i> Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Compute <code>hmac.new(secret, body, sha256).hexdigest()</code> and compare it to the <code>X-Signature</code> header. Use <code>hmac.compare_digest()</code> for constant-time comparison (prevents timing attacks).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-fingerprint text-purple" aria-hidden="true"></i> Exercise 3: Idempotent Processing
+      <span class="difficulty-tag medium">Medium</span>
+    </div>
+    <p class="body-text">Extend Exercise 2: add idempotency. Store processed event IDs in a set (or database). If you receive an event you've already processed, log "duplicate detected" and return 200 without re-processing. Test by sending the same event ID twice.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-lightbulb text-yellow icon-gap"></i> Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Use a Python <code>set()</code> or an in-memory dict. Before processing, check <code>if event["id"] in processed_ids</code>. After processing, add it. For production, use a database table with a unique constraint on event ID.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <i class="fa-solid fa-arrows-rotate text-cyan" aria-hidden="true"></i> Exercise 4: Build a Webhook Sender with Retries
+      <span class="difficulty-tag hard">Hard</span>
+    </div>
+    <p class="body-text">Now build the <em>other side</em>: a webhook sender. Write a program that sends a POST to a URL, checks the response code, and retries with exponential backoff (1s, 2s, 4s, 8s, 16s) if it gets anything other than 200. After 5 failures, log "delivery failed — moving to DLQ."</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span><i class="fa-solid fa-lightbulb text-yellow icon-gap"></i> Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Use a <code>for</code> loop with <code>range(5)</code>. On each iteration, <code>time.sleep(2 ** attempt)</code> before retrying. Compute and attach the HMAC signature in the request header. Test by pointing it at a server that randomly returns 500.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — Cheat Cards
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bookmark"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Quick Reference — Cheat Cards</h2>
+    </div>
+  </div>
+
+  <p>Bookmark this section. These six cards cover everything you need to remember about webhooks — during development, in interviews, or when debugging a production issue at 3 AM.</p>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title">Webhook in One Sentence</div>
+      <div class="cheat-card-body"><pre>An HTTP POST sent by a provider
+to YOUR URL when an event occurs.
+Direction: Provider → You
+Trigger: Event-driven (not timer)
+Protocol: HTTPS + JSON body</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">The 5-Step Handler</div>
+      <div class="cheat-card-body"><pre>1. Receive POST
+2. Verify HMAC signature
+3. Check idempotency (seen ID?)
+4. Enqueue for async processing
+5. Return 200 OK (&lt; 5 seconds)</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">HMAC Verification</div>
+      <div class="cheat-card-body"><pre>expected = HMAC-SHA256(
+  key   = shared_secret,
+  msg   = raw_request_body
+)
+if expected != header_signature:
+  return 401 Unauthorized</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Retry Strategy</div>
+      <div class="cheat-card-body"><pre>Provider retries if no 200 OK:
+  1st retry: ~1 min
+  2nd retry: ~5 min
+  3rd retry: ~30 min
+  4th retry: ~2 hrs
+  5th retry: ~12 hrs
+After max: → Dead Letter Queue</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Security Checklist</div>
+      <div class="cheat-card-body"><pre>✓ HTTPS only (never HTTP)
+✓ HMAC signature verification
+✓ Timestamp check (&lt; 5 min old)
+✓ IP allowlisting (if available)
+✓ Secret rotation (quarterly)
+✓ Rate limit your own endpoint</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Webhooks vs Polling</div>
+      <div class="cheat-card-body"><pre>Polling:   You ask repeatedly
+Webhooks:  They tell you once
+Polling:   Wastes 99% of requests
+Webhooks:  1 request per event
+Polling:   Avg half-interval delay
+Webhooks:  Near-instant delivery</pre></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — Connected Topics
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>Webhooks connect to a wide range of system design concepts. Here's how this topic fits into the bigger picture and what to study next.</p>
+
+  <!-- Connected topics SVG -->
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How webhooks connect to other system design topics">
+    <defs>
+      <marker id="whk-conn-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <!-- Center: Webhooks -->
+    <rect x="290" y="90" width="180" height="65" rx="14" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="2.5"/>
+    <text x="380" y="118" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="800" font-size="14">WEBHOOKS</text>
+    <text x="380" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Event-driven HTTP callbacks</text>
+
+    <!-- REST API (top-left) -->
+    <rect x="30" y="15" width="170" height="50" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="115" y="37" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="600" font-size="11">REST API Design</text>
+    <text x="115" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Webhooks extend REST"</text>
+    <line x1="300" y1="95" x2="198" y2="55" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-conn-arr)"/>
+
+    <!-- Message Queues (top-right) -->
+    <rect x="560" y="15" width="170" height="50" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="645" y="37" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="11">Message Queues</text>
+    <text x="645" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Internal event backbone"</text>
+    <line x1="460" y1="95" x2="562" y2="55" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-conn-arr)"/>
+
+    <!-- Real-Time (left) -->
+    <rect x="30" y="95" width="170" height="50" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="115" y="117" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="11">Real-Time Comms</text>
+    <text x="115" y="132" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"SSE, WebSockets, long poll"</text>
+    <line x1="290" y1="122" x2="202" y2="122" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-conn-arr)"/>
+
+    <!-- Idempotency (right) -->
+    <rect x="560" y="95" width="170" height="50" rx="10" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="645" y="117" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="11">Idempotency</text>
+    <text x="645" y="132" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Critical for duplicate safety"</text>
+    <line x1="470" y1="122" x2="558" y2="122" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-conn-arr)"/>
+
+    <!-- Event-Driven Architecture (bottom-left) -->
+    <rect x="30" y="185" width="170" height="50" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="115" y="207" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="11">Event-Driven Arch</text>
+    <text x="115" y="222" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Webhooks are the HTTP flavor"</text>
+    <line x1="300" y1="150" x2="198" y2="190" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-conn-arr)"/>
+
+    <!-- API Security (bottom-right) -->
+    <rect x="560" y="185" width="170" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="645" y="207" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="11">API Security</text>
+    <text x="645" y="222" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"HMAC, TLS, replay prevention"</text>
+    <line x1="460" y1="150" x2="562" y2="190" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-conn-arr)"/>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="../rest-api/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-plug"></i></div>
+      <div class="related-card-text">
+        <h4>REST API Design</h4>
+        <p>Webhooks are built on top of REST — understand the HTTP foundation first</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../real-time/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+      <div class="related-card-text">
+        <h4>Real-Time Communication</h4>
+        <p>SSE, WebSockets, long polling — the browser-facing alternatives to webhooks</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-envelope"></i></div>
+      <div class="related-card-text">
+        <h4>Message Queues</h4>
+        <p>The internal version of event-driven communication — Kafka, RabbitMQ, SQS</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-fingerprint"></i></div>
+      <div class="related-card-text">
+        <h4>Idempotency Patterns</h4>
+        <p>How to safely handle duplicate events across distributed systems</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="related-card-text">
+        <h4>API Security</h4>
+        <p>HMAC, OAuth, TLS, rate limiting — the full security toolkit for APIs</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="related-card-text">
+        <h4>Event-Driven Architecture</h4>
+        <p>The broader pattern — CQRS, event sourcing, pub/sub, and beyond</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
