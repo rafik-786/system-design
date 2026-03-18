@@ -31,9 +31,10 @@
     <p class="hero-subtitle">Things will break. Hardware fails, networks split, software crashes. The question isn't "will it happen?" — it's "will your system survive when it does?"</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
-      <span><i class="fa-solid fa-diagram-project"></i> 16 SVG Diagrams</span>
-      <span><i class="fa-solid fa-layer-group"></i> 8 Sections</span>
-      <span><i class="fa-solid fa-circle-info"></i> 14 Tooltips</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 20 SVG Diagrams</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 28 Tooltips</span>
     </div>
   </div>
 </div>
@@ -208,7 +209,7 @@
   <div class="think-first-box">
     <span class="think-label">Think First</span>
     <p>You have one database server and it just died. You have a backup from 6 hours ago. <strong>What are you losing, and what could you have done differently?</strong></p>
-    <span class="think-hint">Think about two things: the data created in those 6 hours (RPO — recovery point objective), and the time it takes you to restore that backup (RTO — recovery time objective). How could you minimize both?</span>
+    <span class="think-hint">Think about two things: the data created in those 6 hours that you can never get back (engineers call this gap the RPO &#x2014; recovery point objective &#x2014; the maximum data you're willing to lose), and the time it takes you to restore that backup and get running again (the RTO &#x2014; recovery time objective &#x2014; the maximum acceptable downtime). How could you shrink both?</span>
   </div>
 
   <div class="think-first-box">
@@ -233,7 +234,7 @@
 
   <p>When something breaks in production, the universal instinct is: <strong>just restart it</strong>. Server crashed? Reboot it. Process hung? Kill and restart. Database unresponsive? Restart the service. And honestly, restarting works surprisingly often. Most software problems are transient — a memory leak, a deadlock, a corrupted connection pool — and a fresh start clears the slate.</p>
 
-  <p>So you build a simple playbook: when something breaks, an engineer SSHs into the server, diagnoses the problem, and restarts whatever needs restarting. You might even write a little script that automates the restart. Problem solved, right?</p>
+  <p>So you build a simple playbook: when something breaks, an engineer remotely connects to the server (using a tool called <span class="tooltip-trigger">SSH<span class="tooltip-content">Secure Shell &#x2014; a way to securely log into a remote server from your own computer and run commands on it, as if you were sitting right in front of it.</span></span>), diagnoses the problem, and restarts whatever needs restarting. You might even write a little script that automates the restart. Problem solved, right?</p>
 
   <p>Not quite. Let's look at the math of manual recovery.</p>
 
@@ -969,7 +970,7 @@
     </div>
   </div>
 
-  <p>The toolkit in Section 6 gives you the "what." This section gives you the "how much" &#x2014; the numbers, formulas, and patterns that turn reliability from a vague goal into a measurable engineering target. This is the math that shows up in system design interviews and capacity planning meetings.</p>
+  <p>You know the tools now &#x2014; redundancy, replication, failover, circuit breakers. But how do you know if you're reliable <em>enough</em>? How do you put a number on it? This section is where reliability goes from "we added a backup server and hope for the best" to a measurable engineering target. And yes, this is the math that shows up in system design interviews.</p>
 
   <!-- Deep Dive 1: MTBF & MTTR -->
   <div class="collapsible">
@@ -979,9 +980,9 @@
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p>Reliability engineers live and die by two metrics. The first is <span class="tooltip-trigger">MTBF<span class="tooltip-content">Mean Time Between Failures &#x2014; the average time a system runs before something breaks. A higher MTBF means fewer failures. Example: MTBF of 720 hours means you can expect a failure roughly once a month.</span></span> &#x2014; <strong>Mean Time Between Failures</strong>. This measures how often things break. If your system fails once a week, your MTBF is 168 hours. If it fails once a month, your MTBF is 720 hours. Higher is better &#x2014; it means more time between problems.</p>
+        <p>Reliability engineers live and die by two metrics. The first one answers the question: <strong>how often does stuff break?</strong> That's measured by something called <span class="tooltip-trigger">MTBF<span class="tooltip-content">Mean Time Between Failures &#x2014; the average time a system runs before something breaks. A higher MTBF means fewer failures. Example: MTBF of 720 hours means you can expect a failure roughly once a month.</span></span> &#x2014; <strong>Mean Time Between Failures</strong>. If your system fails once a week, your MTBF is 168 hours. If it fails once a month, your MTBF is 720 hours. Higher is better &#x2014; it means more time between problems.</p>
 
-        <p>The second is <span class="tooltip-trigger">MTTR<span class="tooltip-content">Mean Time To Recovery &#x2014; the average time it takes to restore a system after a failure. Lower MTTR means less downtime. Automatic failover can reduce MTTR from 30+ minutes to under 5 seconds.</span></span> &#x2014; <strong>Mean Time To Recovery</strong>. This measures how quickly you bounce back after a failure. If it takes you 30 minutes to get back online after a crash, your MTTR is 30 minutes. Lower is better &#x2014; it means less downtime per incident.</p>
+        <p>The second answers: <strong>how fast do you recover?</strong> That's <span class="tooltip-trigger">MTTR<span class="tooltip-content">Mean Time To Recovery &#x2014; the average time it takes to restore a system after a failure. Lower MTTR means less downtime. Automatic failover can reduce MTTR from 30+ minutes to under 5 seconds.</span></span> &#x2014; <strong>Mean Time To Recovery</strong>. If it takes you 30 minutes to get back online after a crash, your MTTR is 30 minutes. Lower is better &#x2014; it means less downtime per incident.</p>
 
         <p>Together, these two numbers determine your availability:</p>
 
@@ -1177,9 +1178,9 @@ Availability = 168 / (168 + 0.001) = <strong>99.9994%</strong></code>
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
-        <p>When a request fails, the natural response is to retry it. But retrying can be dangerous if the request <em>actually succeeded</em> on the server side but the response got lost on the way back. The client thinks it failed, retries, and now the action happens <em>twice</em>. If that action was "charge the customer $50," you just double-charged them.</p>
+        <p>Here's a sneaky problem with retries that catches a lot of teams off guard. You send a request, the server processes it successfully, but the <em>response</em> gets lost on the way back to you. From your side, it looks like the request failed. So you retry it. But the server already did the work &#x2014; now it does it <em>again</em>. If that action was "charge the customer $50," you just double-charged them.</p>
 
-        <p>An operation is <span class="tooltip-trigger">idempotent<span class="tooltip-content">An operation that produces the same result whether you run it once or a hundred times. "Set balance to $100" is idempotent (running it twice still gives $100). "Add $50 to balance" is NOT idempotent (running it twice adds $100).</span></span> if doing it once produces the same result as doing it multiple times. Think of it like pressing an elevator button. Pressing "3rd floor" once or mashing it ten times doesn't change where the elevator goes &#x2014; you still end up on the 3rd floor. That's idempotency.</p>
+        <p>The fix is to make your operations safe to repeat. An operation that gives the same result whether you run it once or a hundred times is called <span class="tooltip-trigger">idempotent<span class="tooltip-content">An operation that produces the same result whether you run it once or a hundred times. "Set balance to $100" is idempotent (running it twice still gives $100). "Add $50 to balance" is NOT idempotent (running it twice adds $100).</span></span>. Think of it like pressing an elevator button. Pressing "3rd floor" once or mashing it ten times doesn't change where the elevator goes &#x2014; you still end up on the 3rd floor. That's idempotency.</p>
 
         <div class="tab-container">
           <div class="tab-header" role="tablist">
@@ -1592,9 +1593,7 @@ ON CONFLICT (idempotency_key) DO NOTHING;
     </div>
   </div>
   <p>
-    Some reliability mistakes aren't technical — they're cultural. These three anti-patterns
-    look like good engineering on the surface, but they actually make systems <em>less</em> reliable.
-    Learning to spot them early will save you from building expensive illusions of safety.
+    Not every reliability mistake is a missing backup or a forgotten health check. Some of the worst ones <em>look</em> like good engineering from the outside. Teams spend months building impressive-sounding systems that, when tested by a real outage, crumble like a sandcastle. These three anti-patterns are traps &#x2014; easy to fall into, expensive to climb out of.
   </p>
 
   <!-- Anti-Lesson 1 -->
@@ -1712,8 +1711,7 @@ ON CONFLICT (idempotency_key) DO NOTHING;
     </div>
   </div>
   <p>
-    These are the six mistakes that show up again and again — in real incidents, in design reviews,
-    and in interviews. If you internalize these, you'll already be ahead of most engineers.
+    If you've read the failure stories in Section 9, you might be thinking "that wouldn't happen to me." But these six mistakes are so common that even experienced teams fall into them &#x2014; in real incidents, in design reviews, and in interviews. Memorize these, and you'll dodge landmines that trip up most engineers.
   </p>
 
   <!-- Mistake 1 -->
@@ -2166,7 +2164,7 @@ ON CONFLICT (idempotency_key) DO NOTHING;
   <div class="section-header">
     <div class="section-icon red"><i class="fa-solid fa-clone"></i></div>
     <div>
-      <div class="section-num">Section ?</div>
+      <div class="section-num">Section 14</div>
       <h2 class="section-title">Cheat Cards</h2>
     </div>
   </div>
@@ -2286,7 +2284,7 @@ Netflix Chaos Monkey = OG
   <div class="section-header">
     <div class="section-icon red"><i class="fa-solid fa-diagram-project"></i></div>
     <div>
-      <div class="section-num">Section ?</div>
+      <div class="section-num">Section 15</div>
       <h2 class="section-title">Connected Topics</h2>
     </div>
   </div>
