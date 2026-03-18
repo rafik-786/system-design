@@ -31,9 +31,10 @@
     <p class="hero-subtitle">Two philosophies of data: one demands perfection (every transaction is bulletproof), the other accepts imperfection (good enough, fast enough, available enough). Knowing when to use each is what separates junior from senior engineers.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
-      <span><i class="fa-solid fa-diagram-project"></i> 14 SVG Diagrams</span>
-      <span><i class="fa-solid fa-layer-group"></i> 8 Sections</span>
-      <span><i class="fa-solid fa-circle-info"></i> 14 Tooltips</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 18 SVG Diagrams</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 24 Tooltips</span>
     </div>
   </div>
 </div>
@@ -1273,10 +1274,11 @@
   </svg>
 
   <!-- Myth 1 -->
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-xmark icon-gap" style="color:#f87171;"></i>Myth: "NoSQL Means No Transactions"</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-xmark icon-gap" style="color:#f87171;"></i>Myth: "NoSQL Means No Transactions"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
   <div class="collapsible-content">
     <div class="collapsible-body">
       <p><strong>Why people believe it:</strong> Early NoSQL databases (Cassandra, Riak, early MongoDB) genuinely did not support multi-document transactions. The "NoSQL movement" of 2009-2012 marketed itself as a departure from relational databases — and transactions were part of what got left behind.</p>
@@ -1284,12 +1286,14 @@
       <p><strong>The reality:</strong> "NoSQL" describes the <em>data model</em> (document, key-value, graph), not the <em>consistency model</em>. You can absolutely have a NoSQL database with ACID guarantees — and many production systems rely on exactly that.</p>
     </div>
   </div>
+  </div>
 
   <!-- Myth 2 -->
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-xmark icon-gap" style="color:#f87171;"></i>Myth: "Eventual Consistency = Data Loss"</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-xmark icon-gap" style="color:#f87171;"></i>Myth: "Eventual Consistency = Data Loss"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
   <div class="collapsible-content">
     <div class="collapsible-body">
       <p><strong>Why people believe it:</strong> The word "eventual" sounds scary — like your data might never arrive. If a system is "eventually consistent," surely some writes get lost along the way?</p>
@@ -1297,12 +1301,14 @@
       <p><strong>Analogy:</strong> Imagine you update your profile photo on social media. Your friend in another country might see the old photo for a few seconds. That doesn't mean the new photo was lost — it just hasn't reached their nearest server yet. That's eventual consistency: the data is safe, the view is temporarily stale.</p>
     </div>
   </div>
+  </div>
 
   <!-- Myth 3 -->
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-xmark icon-gap" style="color:#f87171;"></i>Myth: "ACID Is Always the Better Choice"</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-xmark icon-gap" style="color:#f87171;"></i>Myth: "ACID Is Always the Better Choice"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
   <div class="collapsible-content">
     <div class="collapsible-body">
       <p><strong>Why people believe it:</strong> ACID sounds objectively better — "I want my data consistent, isolated, and durable. Who wouldn't?" It feels like choosing safety.</p>
@@ -1310,6 +1316,7 @@
       <p><strong>Real example:</strong> Discord handles billions of messages daily. If they used strict ACID for every message insert, they'd need expensive cross-datacenter coordination for each "lol" sent in a chat. Instead, they use Cassandra (BASE) — because a chat message arriving 100ms late on one server is far better than the whole messaging system slowing to a crawl.</p>
       <p><strong>The right framing:</strong> It's not "ACID vs. BASE — which is better?" It's "For <em>this specific piece of data</em>, what are the consequences of temporary inconsistency?" If the answer is "financial loss or safety risk," use ACID. If the answer is "a user sees a stale like-count for a second," BASE is fine.</p>
     </div>
+  </div>
   </div>
 </div>
 
@@ -1327,69 +1334,81 @@
 
   <p>These are the mistakes engineers actually make in production — not theoretical edge cases, but real bugs that cause real outages.</p>
 
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-bomb icon-gap"></i>Mistake 1: Treating eventual consistency as "close enough to consistent"</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
-  <div class="collapsible-content">
-    <div class="collapsible-body">
-      <p><strong>What happens:</strong> A developer builds a checkout flow on an eventually consistent store. User clicks "buy," the order is written, then the code immediately reads back the order to show a confirmation page — but the read hits a replica that hasn't received the write yet. The user sees "no orders found" and clicks buy again, creating a duplicate order.</p>
-      <p><strong>Fix:</strong> Use <strong>read-your-own-writes consistency</strong>. After a write, route subsequent reads for that user to the same node or use a session token that guarantees the read reflects the latest write. Most managed databases (DynamoDB, Cosmos DB) support this as a configurable consistency level.</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb icon-gap"></i>Mistake 1: Treating eventual consistency as "close enough to consistent"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What happens:</strong> A developer builds a checkout flow on an eventually consistent store. User clicks "buy," the order is written, then the code immediately reads back the order to show a confirmation page — but the read hits a replica that hasn't received the write yet. The user sees "no orders found" and clicks buy again, creating a duplicate order.</p>
+        <p><strong>Fix:</strong> Use <strong>read-your-own-writes consistency</strong>. After a write, route subsequent reads for that user to the same node or use a session token that guarantees the read reflects the latest write. Most managed databases (DynamoDB, Cosmos DB) support this as a configurable consistency level.</p>
+      </div>
     </div>
   </div>
 
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-bomb icon-gap"></i>Mistake 2: Using long-running transactions</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
-  <div class="collapsible-content">
-    <div class="collapsible-body">
-      <p><strong>What happens:</strong> A transaction opens, calls an external API (payment gateway, email service), waits for the response, then commits. The transaction holds locks for 2-5 seconds. Under load, other transactions queue up waiting for those locks, creating a cascading slowdown that brings down the database.</p>
-      <p><strong>Fix:</strong> Keep transactions short. Do external calls <em>outside</em> the transaction. Use the pattern: (1) gather all data, (2) call external services, (3) open transaction, write results, commit. If you need atomicity across the external call, use the <span class="tooltip-trigger">Saga pattern<span class="tooltip-content">A sequence of local transactions where each step has a compensating action — if step 3 fails, you undo steps 1 and 2 instead of rolling back a single giant transaction</span></span> or <span class="tooltip-trigger">outbox pattern<span class="tooltip-content">Write the event to an 'outbox' table in the same transaction as the data change, then a separate process reads the outbox and sends the actual message</span></span> instead.</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb icon-gap"></i>Mistake 2: Using long-running transactions</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What happens:</strong> A transaction opens, calls an external API (payment gateway, email service), waits for the response, then commits. The transaction holds locks for 2-5 seconds. Under load, other transactions queue up waiting for those locks, creating a cascading slowdown that brings down the database.</p>
+        <p><strong>Fix:</strong> Keep transactions short. Do external calls <em>outside</em> the transaction. Use the pattern: (1) gather all data, (2) call external services, (3) open transaction, write results, commit. If you need atomicity across the external call, use the <span class="tooltip-trigger">Saga pattern<span class="tooltip-content">A sequence of local transactions where each step has a compensating action — if step 3 fails, you undo steps 1 and 2 instead of rolling back a single giant transaction</span></span> or <span class="tooltip-trigger">outbox pattern<span class="tooltip-content">Write the event to an 'outbox' table in the same transaction as the data change, then a separate process reads the outbox and sends the actual message</span></span> instead.</p>
+      </div>
     </div>
   </div>
 
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-bomb icon-gap"></i>Mistake 3: Ignoring conflict resolution in BASE systems</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
-  <div class="collapsible-content">
-    <div class="collapsible-body">
-      <p><strong>What happens:</strong> Two users update the same record on different replicas at the same time. The system uses <span class="tooltip-trigger">last-write-wins<span class="tooltip-content">A conflict resolution strategy where the write with the latest timestamp overwrites all others — simple but can silently discard valid updates</span></span> (LWW) by default, silently discarding one user's changes. Nobody notices until a customer complains their profile update vanished.</p>
-      <p><strong>Fix:</strong> Choose a conflict resolution strategy deliberately. Options include: application-level merge logic, <strong>CRDTs</strong> (conflict-free replicated data types) for counters and sets, or vector clocks to detect conflicts and surface them to the user (like Google Docs does).</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb icon-gap"></i>Mistake 3: Ignoring conflict resolution in BASE systems</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What happens:</strong> Two users update the same record on different replicas at the same time. The system uses <span class="tooltip-trigger">last-write-wins<span class="tooltip-content">A conflict resolution strategy where the write with the latest timestamp overwrites all others — simple but can silently discard valid updates</span></span> (LWW) by default, silently discarding one user's changes. Nobody notices until a customer complains their profile update vanished.</p>
+        <p><strong>Fix:</strong> Choose a conflict resolution strategy deliberately. Options include: application-level merge logic, <strong>CRDTs</strong> (conflict-free replicated data types) for counters and sets, or vector clocks to detect conflicts and surface them to the user (like Google Docs does).</p>
+      </div>
     </div>
   </div>
 
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-bomb icon-gap"></i>Mistake 4: Not handling idempotency in retry logic</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
-  <div class="collapsible-content">
-    <div class="collapsible-body">
-      <p><strong>What happens:</strong> A BASE system times out on a write. The client retries. But the original write actually succeeded — now the same record is inserted twice, or a counter is incremented twice.</p>
-      <p><strong>Fix:</strong> Make all writes <span class="tooltip-trigger">idempotent<span class="tooltip-content">An operation that produces the same result whether you execute it once or multiple times — safe to retry without side effects</span></span>. Use unique request IDs (idempotency keys). Before processing, check if this request ID was already handled. Payment systems like Stripe require an idempotency key on every API call for exactly this reason.</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb icon-gap"></i>Mistake 4: Not handling idempotency in retry logic</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What happens:</strong> A BASE system times out on a write. The client retries. But the original write actually succeeded — now the same record is inserted twice, or a counter is incremented twice.</p>
+        <p><strong>Fix:</strong> Make all writes <span class="tooltip-trigger">idempotent<span class="tooltip-content">An operation that produces the same result whether you execute it once or multiple times — safe to retry without side effects</span></span>. Use unique request IDs (idempotency keys). Before processing, check if this request ID was already handled. Payment systems like Stripe require an idempotency key on every API call for exactly this reason.</p>
+      </div>
     </div>
   </div>
 
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-bomb icon-gap"></i>Mistake 5: Choosing consistency model per-database instead of per-operation</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
-  <div class="collapsible-content">
-    <div class="collapsible-body">
-      <p><strong>What happens:</strong> A team picks DynamoDB (BASE) for their entire service because "we need scale." But some operations — like updating account balances — genuinely need strong consistency. They end up building fragile workarounds on top of an eventually consistent store.</p>
-      <p><strong>Fix:</strong> Many databases let you choose consistency <em>per-query</em>. DynamoDB supports <code>ConsistentRead: true</code>. Cosmos DB has five consistency levels selectable per request. Use strong consistency for critical reads and eventual consistency for everything else — on the same database.</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb icon-gap"></i>Mistake 5: Choosing consistency model per-database instead of per-operation</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What happens:</strong> A team picks DynamoDB (BASE) for their entire service because "we need scale." But some operations — like updating account balances — genuinely need strong consistency. They end up building fragile workarounds on top of an eventually consistent store.</p>
+        <p><strong>Fix:</strong> Many databases let you choose consistency <em>per-query</em>. DynamoDB supports <code>ConsistentRead: true</code>. Cosmos DB has five consistency levels selectable per request. Use strong consistency for critical reads and eventual consistency for everything else — on the same database.</p>
+      </div>
     </div>
   </div>
 
-  <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-    <span class="collapsible-header"><i class="fa-solid fa-bomb icon-gap"></i>Mistake 6: Assuming distributed transactions are free</span>
-    <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-  </div>
-  <div class="collapsible-content">
-    <div class="collapsible-body">
-      <p><strong>What happens:</strong> A team introduces cross-service ACID transactions using two-phase commit. During normal operation, everything is fine. During a network partition, the coordinator can't reach a participant — and the entire transaction blocks indefinitely, taking down both services.</p>
-      <p><strong>Fix:</strong> Avoid distributed transactions across service boundaries. Use the Saga pattern with compensating actions instead. If you must use 2PC, add aggressive timeouts and a "presumed abort" policy so blocked participants don't hold locks forever.</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb icon-gap"></i>Mistake 6: Assuming distributed transactions are free</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What happens:</strong> A team introduces cross-service ACID transactions using two-phase commit. During normal operation, everything is fine. During a network partition, the coordinator can't reach a participant — and the entire transaction blocks indefinitely, taking down both services.</p>
+        <p><strong>Fix:</strong> Avoid distributed transactions across service boundaries. Use the Saga pattern with compensating actions instead. If you must use 2PC, add aggressive timeouts and a "presumed abort" policy so blocked participants don't hold locks forever.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -1513,28 +1532,32 @@
       <li>Trip history (past rides shown in the app)</li>
       <li>Surge pricing calculations</li>
     </ol>
-    <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-      <span class="collapsible-header">Hint</span>
-      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-    </div>
-    <div class="collapsible-content">
-      <div class="collapsible-body">
-        <p>Ask yourself: "If this data is wrong for 5 seconds, what's the worst that happens?" If the answer involves money or safety, lean ACID. If the answer is "mild inconvenience," BASE is fine.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Ask yourself: "If this data is wrong for 5 seconds, what's the worst that happens?" If the answer involves money or safety, lean ACID. If the answer is "mild inconvenience," BASE is fine.</p>
+        </div>
       </div>
     </div>
-    <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-      <span class="collapsible-header">Solution</span>
-      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-    </div>
-    <div class="collapsible-content">
-      <div class="collapsible-body">
-        <ol>
-          <li><strong>Driver locations → BASE.</strong> GPS pings are high-frequency, write-heavy, and a 3-second-old location is perfectly usable.</li>
-          <li><strong>Payments → ACID.</strong> Charging the wrong amount or double-charging is unacceptable.</li>
-          <li><strong>Ride matching → BASE (with caveats).</strong> Matching uses approximate driver locations. A slightly stale position is fine; the driver confirms anyway.</li>
-          <li><strong>Trip history → BASE.</strong> Showing a trip 10 seconds late in the history tab causes no harm.</li>
-          <li><strong>Surge pricing → BASE.</strong> Pricing is recalculated frequently. A brief lag in surge multiplier is acceptable; the locked-in price at booking time uses a consistent snapshot.</li>
-        </ol>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ol>
+            <li><strong>Driver locations → BASE.</strong> GPS pings are high-frequency, write-heavy, and a 3-second-old location is perfectly usable.</li>
+            <li><strong>Payments → ACID.</strong> Charging the wrong amount or double-charging is unacceptable.</li>
+            <li><strong>Ride matching → BASE (with caveats).</strong> Matching uses approximate driver locations. A slightly stale position is fine; the driver confirms anyway.</li>
+            <li><strong>Trip history → BASE.</strong> Showing a trip 10 seconds late in the history tab causes no harm.</li>
+            <li><strong>Surge pricing → BASE.</strong> Pricing is recalculated frequently. A brief lag in surge multiplier is acceptable; the locked-in price at booking time uses a consistent snapshot.</li>
+          </ol>
+        </div>
       </div>
     </div>
   </div>
@@ -1553,18 +1576,20 @@ if available > 0:
     charge_payment(user_id, amount)
     return "Booking confirmed!"</code></pre>
     <p>Identify at least three problems with this approach.</p>
-    <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-      <span class="collapsible-header">Solution</span>
-      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-    </div>
-    <div class="collapsible-content">
-      <div class="collapsible-body">
-        <ol>
-          <li><strong>Race condition:</strong> Two users read <code>available = 1</code> at the same time. Both proceed, both book — but only one ticket exists. The eventual read doesn't reflect concurrent decrements.</li>
-          <li><strong>No atomicity:</strong> If <code>charge_payment</code> fails after <code>decrement_ticket_count</code>, the ticket count is wrong but no payment was made. These operations need to be atomic (all succeed or all roll back).</li>
-          <li><strong>No idempotency:</strong> If the response times out and the client retries, the user could be charged twice and get two bookings.</li>
-        </ol>
-        <p><strong>Fix:</strong> Use a strongly consistent read + atomic transaction for the critical path (check → decrement → book → charge). Add an idempotency key to prevent duplicate bookings on retry.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ol>
+            <li><strong>Race condition:</strong> Two users read <code>available = 1</code> at the same time. Both proceed, both book — but only one ticket exists. The eventual read doesn't reflect concurrent decrements.</li>
+            <li><strong>No atomicity:</strong> If <code>charge_payment</code> fails after <code>decrement_ticket_count</code>, the ticket count is wrong but no payment was made. These operations need to be atomic (all succeed or all roll back).</li>
+            <li><strong>No idempotency:</strong> If the response times out and the client retries, the user could be charged twice and get two bookings.</li>
+          </ol>
+          <p><strong>Fix:</strong> Use a strongly consistent read + atomic transaction for the critical path (check → decrement → book → charge). Add an idempotency key to prevent duplicate bookings on retry.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1581,13 +1606,15 @@ if available > 0:
       <li>What database technology you'd consider</li>
       <li>What happens during a network partition</li>
     </ol>
-    <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-      <span class="collapsible-header">Hint</span>
-      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-    </div>
-    <div class="collapsible-content">
-      <div class="collapsible-body">
-        <p>Think about what users would complain about most. "My $50 tip disappeared" is a support nightmare. "My post took 2 extra seconds to appear in my friend's feed" — nobody notices.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Think about what users would complain about most. "My $50 tip disappeared" is a support nightmare. "My post took 2 extra seconds to appear in my friend's feed" — nobody notices.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1604,15 +1631,17 @@ if available > 0:
       <li>What a reader would see if they read from Replica C at T=50ms, T=150ms, and T=500ms</li>
       <li>At what point the system becomes "consistent"</li>
     </ol>
-    <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-      <span class="collapsible-header">Solution</span>
-      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-    </div>
-    <div class="collapsible-content">
-      <div class="collapsible-body">
-        <p><strong>Timeline:</strong> T=0 → A has <code>100</code>. T=200ms → B gets <code>100</code>. T=400ms → C gets <code>100</code> (assuming chain replication A→B→C).</p>
-        <p><strong>Reads from C:</strong> T=50ms → old value (stale). T=150ms → old value (still stale). T=500ms → <code>100</code> (consistent).</p>
-        <p><strong>Fully consistent:</strong> At T=400ms when all three replicas have the same value. The "eventual" window was 400ms.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Timeline:</strong> T=0 → A has <code>100</code>. T=200ms → B gets <code>100</code>. T=400ms → C gets <code>100</code> (assuming chain replication A→B→C).</p>
+          <p><strong>Reads from C:</strong> T=50ms → old value (stale). T=150ms → old value (still stale). T=500ms → <code>100</code> (consistent).</p>
+          <p><strong>Fully consistent:</strong> At T=400ms when all three replicas have the same value. The "eventual" window was 400ms.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1629,13 +1658,15 @@ if available > 0:
       <li><strong>Saga with compensating transactions:</strong> Define the saga steps and the compensating action for each. What happens if the car rental fails after flight and hotel are booked?</li>
       <li>Compare: latency, failure handling, complexity, and which you'd recommend for this scenario.</li>
     </ol>
-    <div class="collapsible" role="button" tabindex="0" aria-expanded="false">
-      <span class="collapsible-header">Hint</span>
-      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
-    </div>
-    <div class="collapsible-content">
-      <div class="collapsible-body">
-        <p>For the Saga approach, the compensating actions are: cancel flight booking, cancel hotel reservation. The key insight is that compensating actions must be idempotent — you might need to cancel the same booking twice if a retry happens.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>For the Saga approach, the compensating actions are: cancel flight booking, cancel hotel reservation. The key insight is that compensating actions must be idempotent — you might need to cancel the same booking twice if a retry happens.</p>
+        </div>
       </div>
     </div>
   </div>
