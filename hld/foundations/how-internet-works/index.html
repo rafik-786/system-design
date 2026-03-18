@@ -1257,8 +1257,9 @@ traceroute maps.google.com
 
   <!-- Collapsible 1: DNS Resolution Chain -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Deep Dive: DNS Resolution Chain</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Deep Dive: DNS Resolution Chain</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>DNS has a hierarchy, and every lookup walks that hierarchy until it finds the answer. Here is the full chain for <code>maps.google.com</code>, with real server names and locations:</p>
 
       <p><strong>Step 1 — Browser cache:</strong> Chrome checks its internal DNS cache. You can see it at <code>chrome://net-internals/#dns</code>. If you visited maps.google.com in the last 5 minutes (the TTL), the IP is already cached. Cost: <strong>0ms</strong>.</p>
@@ -1274,13 +1275,15 @@ traceroute maps.google.com
       <div class="callout callout-info">
         <strong>The math:</strong> Google's DNS TTL is 300 seconds (5 minutes). ACT Fibernet has ~10 million customers in India. The probability that nobody in all of ACT Fibernet asked for google.com in the last 5 minutes is essentially zero. ISP cache hit rate for popular domains: <strong>99%+</strong>. This is why most DNS lookups are 5-10ms, not 50-100ms.
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 2: TLS 1.3 Handshake -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Deep Dive: TLS 1.3 Handshake — How Encryption Gets Set Up</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Deep Dive: TLS 1.3 Handshake — How Encryption Gets Set Up</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>After TCP connects, your browser and Google's server need to set up encryption. This is the <span class="tooltip-trigger">TLS handshake<span class="tooltip-content">Transport Layer Security handshake — the process where client and server agree on encryption algorithms and exchange keys. TLS 1.3 does this in 1 round trip (1-RTT), down from TLS 1.2's 2 round trips. If you have connected recently, 0-RTT resumption skips the handshake entirely.</span></span>. TLS 1.3 does it in a single round trip:</p>
 
       <p><strong>Your browser sends ClientHello:</strong> "I support these cipher suites: TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256. Here is my key share (a public key for key exchange). I want to talk using TLS 1.3."</p>
@@ -1304,13 +1307,15 @@ curl -v https://maps.google.com 2>&1 | grep -E "SSL|TLS"
 # to see the same information for any website.</code></pre>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 3: BGP and Routing -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Deep Dive: BGP — How Your ISP Knows Where Google Is</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Deep Dive: BGP — How Your ISP Knows Where Google Is</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>When your packet leaves ACT Fibernet heading for Google, how does ACT's router know which direction to send it? The answer is <span class="tooltip-trigger">BGP<span class="tooltip-content">Border Gateway Protocol — the internet's routing protocol. Every ISP, cloud provider, and large network is an "Autonomous System" (AS) with a unique number. BGP is how these ASes tell each other "I can reach these IP ranges." Google is AS15169. ACT Fibernet is AS45609. There are 70,000+ ASes worldwide.</span></span> — the Border Gateway Protocol. It is the internet's GPS system.</p>
 
       <p>The internet is made up of over 70,000 <strong>Autonomous Systems</strong> (ASes) — each one is a network run by a single organization. ACT Fibernet is AS45609. Google is AS15169. Jio is AS55836. Each AS announces to its neighbors: "I can reach these IP ranges." Those announcements propagate across the entire internet, so eventually every AS knows a path to every other AS.</p>
@@ -1318,13 +1323,15 @@ curl -v https://maps.google.com 2>&1 | grep -E "SSL|TLS"
       <p>You can look this up yourself. Go to <a href="https://bgp.he.net/AS15169" target="_blank">bgp.he.net/AS15169</a> (Google's AS) and you will see every IP prefix Google announces, every AS they peer with, and the paths traffic takes to reach them. On the same site, check <a href="https://bgp.he.net/AS45609" target="_blank">bgp.he.net/AS45609</a> for ACT Fibernet.</p>
 
       <p>BGP is powerful but fragile. In 2008, Pakistan Telecom accidentally announced that it owned YouTube's IP range (208.65.153.0/24). Routers around the world believed it and started sending YouTube traffic to Pakistan, causing a global outage that lasted hours. In 2021, Facebook's engineers withdrew their own BGP routes during a maintenance error — Facebook, Instagram, and WhatsApp went offline for <strong>6 hours</strong>, and because Facebook's own internal tools ran on the same infrastructure, their engineers could not even log in to fix it. They had to physically drive to the data center.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 4: Inside Google's DC -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Deep Dive: What Happens Inside Google's Data Center</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Deep Dive: What Happens Inside Google's Data Center</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Your request arrives at Google's edge server in Mumbai. But what happens <em>inside</em>?</p>
 
       <p><strong>Step 1 — Maglev load balancer:</strong> Google's custom Layer 4 load balancer, running on commodity Linux servers (not expensive hardware LBs). Maglev uses <strong>consistent hashing</strong> to route your request to a specific backend server. It can handle 10+ million packets per second per machine. It picks a backend based on a hash of your connection's 5-tuple (src IP, src port, dst IP, dst port, protocol), ensuring all packets from the same connection hit the same server.</p>
@@ -1336,6 +1343,7 @@ curl -v https://maps.google.com 2>&1 | grep -E "SSL|TLS"
       <p><strong>Step 4 — Response assembly and compression:</strong> The application server assembles the HTML, JavaScript, CSS, and map tile URLs. It compresses everything with <strong>Brotli</strong> (Google's compression algorithm, 15-25% smaller than gzip). The 143 KB response compresses to roughly 40 KB. It gets split into ~28 TCP segments and starts flowing back to you.</p>
 
       <p>Total processing time inside Google's DC: approximately <strong>50ms</strong>. Most of that is network latency between internal services, not computation. The actual CPU time is probably under 5ms.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -1632,19 +1640,22 @@ curl -o /dev/null -s -w "Time to connect: %{time_connect}s\n" https://cloudflare
   <p>Every topic has myths that sound reasonable but fall apart under scrutiny. Here are three about the internet that trip up even experienced engineers.</p>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> "You need to understand every layer to be a good developer"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> "You need to understand every layer to be a good developer"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>This is wrong.</strong> Most web developers never think below HTTP. If you are building a React frontend, a REST API, or a CRUD application, your world starts at Layer 4 (HTTP) and ends at your framework. You do not need to understand TCP congestion windows or IP routing tables to build a great web app.</p>
 
       <p>The layers exist so you <em>do not</em> have to think about them. That is the entire point of layered architecture — each layer abstracts away the complexity below it. Your OS handles TCP. Your cloud provider handles routing. Submarine cable operators handle the physical layer. You handle HTTP.</p>
 
       <p><strong>When layer knowledge DOES matter:</strong> debugging latency problems ("why is this API call taking 300ms?"), designing globally distributed systems ("should we put servers in Mumbai or Singapore?"), handling partial failures ("what happens when a cable gets cut?"), and acing system design interviews. Know the layers exist. Know what each one does. But do not try to optimize what you are not responsible for.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> "The internet is decentralized and resilient"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> "The internet is decentralized and resilient"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>This is partially wrong.</strong> In theory, the internet was designed with no single point of failure — packets can route around damage, and the network is a mesh. In practice, the internet is shockingly concentrated.</p>
 
       <p>Three companies — Google, Meta, and Amazon — own or lease capacity on the majority of submarine cables. <strong>Cloudflare, AWS, and Google Cloud</strong> together handle DNS for a massive percentage of websites. Ashburn, Virginia, is a single town where roughly 70% of the world's internet traffic passes through. Cut 15 specific submarine cables and you could take most of the internet offline.</p>
@@ -1652,12 +1663,14 @@ curl -o /dev/null -s -w "Time to connect: %{time_connect}s\n" https://cloudflare
       <p>The internet is resilient to <em>random</em> failures (a router crashing, a single cable getting cut). It is remarkably fragile to <em>targeted</em> failures. In 2008, two cable cuts near Egypt disrupted internet for dozens of countries. In 2021, a single BGP mistake took Facebook offline globally for 6 hours. In 2016, attacking one DNS provider (Dyn) took out Twitter, Netflix, and Reddit simultaneously.</p>
 
       <p><strong>The system design takeaway:</strong> Never assume the internet is reliable. Always design for failure. Use multiple DNS providers. Use multiple CDNs. Deploy in multiple regions. The internet is robust in aggregate, but any individual path through it is fragile.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> "Faster internet = lower latency"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> "Faster internet = lower latency"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>This is wrong, and it is one of the most common misconceptions.</strong> Bandwidth (how many bytes per second) and latency (how long for one byte to make the round trip) are completely different things. Upgrading from 100 Mbps to 1 Gbps does <strong>not</strong> make your ping to Google faster. Not even a little bit.</p>
 
       <p>Here is a concrete example. Say you have a 100 Mbps connection with 20ms latency to Google. You upgrade to 1 Gbps. Your latency to Google is still 20ms. It has not changed at all. What changed is that you can now download a 1 GB file in ~8 seconds instead of ~80 seconds. Bandwidth is the width of the pipe. Latency is the length of the pipe. Making the pipe wider does not make it shorter.</p>
@@ -1672,6 +1685,7 @@ curl -o /dev/null -s -w "Time to connect: %{time_connect}s\n" https://cloudflare
       </div>
 
       <p>This is why CDNs exist. You cannot make light faster. But you can put the server closer. A CDN edge server 10ms away will always beat a powerful origin server 130ms away, no matter how much bandwidth you have.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -1691,8 +1705,9 @@ curl -o /dev/null -s -w "Time to connect: %{time_connect}s\n" https://cloudflare
   <p>These are not "gotcha" trivia questions. These are real misconceptions that lead to bad debugging, wrong capacity planning, and embarrassing interview answers. Each one below includes a terminal command so you can prove it to yourself.</p>
 
   <div class="collapsible open">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Mistake #1: "HTTP and HTTPS are the same except for the lock icon"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Mistake #1: "HTTP and HTTPS are the same except for the lock icon"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>This is dangerously wrong.</strong> The lock icon is the <em>visible symptom</em> of a massive difference underneath. HTTPS wraps every byte of your conversation in a <span class="tooltip-trigger">TLS<span class="tooltip-content">Transport Layer Security — the cryptographic protocol that encrypts data between your browser and the server. TLS 1.3 (current version) requires just 1 round trip to establish encryption, down from 2 in TLS 1.2. It negotiates a cipher suite, verifies the server's certificate, and generates session keys — all before a single byte of your data is sent.</span></span> tunnel. That tunnel does not come free — it costs time and CPU.</p>
 
       <p>Run both commands and compare the output:</p>
@@ -1752,12 +1767,14 @@ curl -o /dev/null -s -w "Time to connect: %{time_connect}s\n" https://cloudflare
       <div class="callout callout-info">
         <strong>Performance note:</strong> TLS 1.3 reduced the handshake from 2 RTTs (TLS 1.2) to just 1 RTT. And with <span class="tooltip-trigger">0-RTT resumption<span class="tooltip-content">If you have visited the site before, TLS 1.3 can send encrypted data in the very first packet — zero round trips of handshake overhead. The browser caches a session ticket from the previous connection and uses it to skip negotiation. The tradeoff: 0-RTT data is vulnerable to replay attacks, so it is only used for safe (GET) requests.</span></span>, repeat visits can start sending encrypted data <em>immediately</em>. The performance gap between HTTP and HTTPS has shrunk to almost nothing.
       </div>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Mistake #2: "Ping measures internet speed"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Mistake #2: "Ping measures internet speed"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>Ping measures latency, not speed.</strong> These are two completely different things. Latency is how long one tiny packet takes to make the round trip. Speed (bandwidth) is how many bytes per second you can push through the connection. One is the <em>length</em> of the pipe, the other is the <em>width</em>.</p>
 
       <div class="macos-window">
@@ -1784,12 +1801,14 @@ speedtest-cli --simple
       </div>
 
       <p>When someone complains "my internet is slow," they usually mean one of two things: either pages are taking forever to <em>start loading</em> (that is latency — too many round trips before the first byte arrives) or downloads are crawling (that is bandwidth — the pipe is not wide enough). Ping only diagnoses the first one. For the second, you need <code>speedtest-cli</code> or <code>fast.com</code>.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Mistake #3: "My ISP gives me a static IP"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Mistake #3: "My ISP gives me a static IP"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>Almost certainly not.</strong> Most home internet connections use <span class="tooltip-trigger">DHCP<span class="tooltip-content">Dynamic Host Configuration Protocol — your router asks the ISP's DHCP server for an IP address, and gets one on a temporary lease (usually 24-72 hours). When the lease expires, you might get a different IP. This is why hosting a website from your home connection is unreliable — your address keeps changing.</span></span>, which hands out IP addresses on a temporary lease. Your public IP today might not be your public IP tomorrow.</p>
 
       <div class="macos-window">
@@ -1812,12 +1831,14 @@ ipconfig /all | findstr "Lease"
       </div>
 
       <p><strong>Why this matters for system design:</strong> If you are building a system that identifies users by IP address (rate limiting, geolocation, fraud detection), remember that IPs change. Multiple people behind the same office <span class="tooltip-trigger">NAT<span class="tooltip-content">Network Address Translation — your home router maps many private IPs (192.168.1.x) to a single public IP. Every device in your house shares one public address. This is why IPv4 still works despite there being more devices than available addresses — NAT lets thousands of devices hide behind one IP.</span></span> share a single public IP. A single user on mobile can change IPs every few minutes as they move between cell towers. IP-based identification is unreliable.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Mistake #4: "The internet is a cloud"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Mistake #4: "The internet is a cloud"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>The internet is as physical as a highway system.</strong> When someone says "the cloud," they mean someone else's computer, sitting in a specific building, in a specific city, connected by physical cables buried under the ocean floor.</p>
 
       <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The physical internet: cables, buildings, and real infrastructure">
@@ -1866,12 +1887,14 @@ ipconfig /all | findstr "Lease"
       </svg>
 
       <p>Next time someone says "it's in the cloud," ask them: <em>which building?</em> If it is on AWS us-east-1, the answer is "a data center in Ashburn, Virginia, about 40 km west of Washington DC." That is not a metaphor. That is a physical building with security guards, diesel generators, and cooling towers burning through megawatts of power.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Mistake #5: "IPv6 will replace IPv4 soon"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Mistake #5: "IPv6 will replace IPv4 soon"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>We have been saying "soon" since 1998.</strong> IPv6 was standardized in RFC 2460 in December 1998 — nearly three decades ago. As of 2026, Google's own statistics show IPv6 adoption at roughly <strong>45% globally</strong>. That sounds high, but it means 55% of the internet still runs on IPv4.</p>
 
       <p>The reason IPv4 refuses to die is <span class="tooltip-trigger">NAT<span class="tooltip-content">Network Address Translation — the technology that lets your entire household share one public IPv4 address. Your router translates between private addresses (192.168.1.x) and your single public IP. NAT was meant to be a temporary hack in the 1990s. Three decades later, it is a permanent fixture because it works well enough that nobody feels the urgency to switch to IPv6.</span></span>. In the early 1990s, engineers realized IPv4's 4.3 billion addresses would not be enough. NAT was invented as a temporary hack — let many devices share one public IP. But NAT worked so well that it killed the urgency to migrate. Your home right now probably has 10-30 devices (phones, laptops, TVs, smart speakers) all sharing one public IPv4 address via NAT. It just works.</p>
@@ -1894,12 +1917,14 @@ dig google.com AAAA   # IPv6: 2404:6800:4009:826::200e
       </div>
 
       <p><strong>The system design takeaway:</strong> Design your systems to support <em>both</em> IPv4 and IPv6 (called dual-stack). Do not assume IPv6 is available everywhere. Mobile networks are the furthest ahead (T-Mobile US is almost 100% IPv6). Enterprise networks and legacy ISPs are the furthest behind. IPv4 and IPv6 will coexist for at least another decade.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Mistake #6: "More bandwidth always means faster page loads"</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Mistake #6: "More bandwidth always means faster page loads"</span></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>After about 25 Mbps, adding more bandwidth barely helps for normal web browsing.</strong> This surprises everyone, but the math proves it. A typical webpage is about 2-3 MB. On a 25 Mbps connection, that is about 1 second of download time. On a 1 Gbps connection, it is 0.025 seconds. But the page <em>still</em> takes 1-3 seconds to load. Why? Because the bottleneck is not bandwidth — it is <strong>round trips</strong>.</p>
 
       <div class="macos-window">
@@ -1921,6 +1946,7 @@ curl -w "\n  DNS:      %{time_namelookup}s\n  Connect:  %{time_connect}s\n  TLS:
       </div>
 
       <p>Loading a modern webpage requires: a DNS lookup (1 RTT), a TCP handshake (1 RTT), a TLS handshake (1-2 RTTs), the HTTP request/response (1 RTT), then fetching CSS, JavaScript, fonts, and images (many more RTTs). That is 5+ round trips minimum before the page is usable. If each round trip is 30ms, that is 150ms of unavoidable latency that no amount of bandwidth can fix. This is exactly why <span class="tooltip-trigger">HTTP/2<span class="tooltip-content">The second major version of HTTP, standardized in 2015. Its key innovation is multiplexing — sending multiple requests and responses over a single TCP connection simultaneously. In HTTP/1.1, the browser had to wait for each response before sending the next request (or open 6+ parallel connections). HTTP/2 eliminated this bottleneck.</span></span> (multiplexing) and <span class="tooltip-trigger">HTTP/3<span class="tooltip-content">The third major version of HTTP, based on QUIC instead of TCP. QUIC combines the TCP handshake and TLS handshake into a single round trip, and eliminates head-of-line blocking. Google developed QUIC and it is now used by Chrome, YouTube, and many CDNs.</span></span> (0-RTT QUIC) exist — they reduce <em>round trips</em>, not bandwidth.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -2124,9 +2150,11 @@ traceroute netflix.com
     </div>
 
     <div class="collapsible">
-      <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> What to look for</div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> What to look for</span></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>Map each IP to a city using a free geolocation tool like <code>ipinfo.io</code>. Run <code>curl ipinfo.io/72.14.194.226</code> for each hop. You will see your data cross city boundaries (Bangalore to Chennai to Mumbai). Notice how Google traffic stays short — Google has edge servers in most major cities. Now trace <code>traceroute bbc.co.uk</code> and watch your data cross undersea cables to London. The hop with the biggest latency jump is where the submarine cable is.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2137,8 +2165,9 @@ traceroute netflix.com
     <p>You have read about the three-way handshake (SYN, SYN-ACK, ACK). Now you are going to see it happen in real time, with real timestamps, on your own machine.</p>
 
     <div class="collapsible">
-      <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Step-by-step instructions</div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Step-by-step instructions</span></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p><strong>1.</strong> Install Wireshark from <code>wireshark.org</code> (free, open-source).</p>
         <p><strong>2.</strong> Start a capture on your active network interface (usually Wi-Fi or Ethernet).</p>
         <p><strong>3.</strong> Open a new browser tab and visit <code>https://example.com</code>.</p>
@@ -2150,6 +2179,7 @@ traceroute netflix.com
 
         <div class="callout callout-info">
           <strong>Expected result:</strong> If example.com's server is in the US and you are in India, the RTT should be ~150-200ms. If you are in the US, it should be ~10-30ms. This number is the speed of light through fiber plus router processing time — and it is the number that matters most for web performance.
+        </div>
         </div>
       </div>
     </div>
@@ -2181,9 +2211,11 @@ dig gov.uk        # TTL: often 3600+ (1 hour — government sites change slowly)
     </div>
 
     <div class="collapsible">
-      <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Why TTL matters</div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Why TTL matters</span></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>The TTL (Time To Live) on a DNS record tells every cache in the chain how long to remember the answer. Google sets theirs to 300 seconds (5 minutes) because they frequently shift traffic between data centers for load balancing. A government site might set 3600 seconds (1 hour) because their IP rarely changes. If you are doing a DNS migration (moving your site to a new server), you should lower the TTL to 60 seconds <em>days before</em> the migration, so that when you change the IP, caches worldwide update within a minute instead of an hour.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2194,14 +2226,17 @@ dig gov.uk        # TTL: often 3600+ (1 hour — government sites change slowly)
     <p>The best way to understand HTTP is to sit in the middle and watch it flow past you. In this exercise, you will write a tiny proxy server — about 20 lines of Python — that forwards requests and logs every single one.</p>
 
     <div class="collapsible">
-      <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Hints</div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Hints</span></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>Use Python's built-in <code>http.server</code> module. Your proxy needs to: (1) listen on a local port like 8080, (2) read the incoming HTTP request, (3) forward it to the actual destination, (4) return the response to the client, and (5) log the method, URL, and status code to the console.</p>
+        </div>
       </div>
     </div>
     <div class="collapsible">
-      <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> Solution</div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> Solution</span></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <div class="macos-window">
           <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">proxy.py</span></div>
           <div class="macos-body">
@@ -2238,6 +2273,7 @@ HTTPServer(("", 8080), ProxyHandler).serve_forever()</code></pre>
           </div>
         </div>
         <p>Run it with <code>python proxy.py</code>, then in another terminal: <code>curl http://localhost:8080/http://example.com</code>. You will see the proxy fetch example.com, log the request, and return the HTML to your curl. Every web proxy (Nginx, HAProxy, Envoy) does exactly this — just at a much larger scale.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2270,9 +2306,11 @@ mtr --report --report-cycles 100 amazon.com.br       # South America
     </div>
 
     <div class="collapsible">
-      <div class="collapsible-header"><i class="fa-solid fa-chevron-right"></i> What the results teach you</div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-chevron-down collapsible-chevron"></i> What the results teach you</span></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>The biggest latency jumps happen at undersea cable crossings. If you are in India, the jump from your ISP to London will be ~100ms — that is the cable crossing the Arabian Sea and Mediterranean. The jump from India to the US east coast will be ~180ms (across the Pacific or through Europe). These numbers are dictated by physics: light travels through fiber at about 200,000 km/s, and the cable paths are not straight lines — they follow ocean floor geography, avoiding deep trenches and earthquake zones. No software optimization can make these numbers smaller. The only solution is to put servers closer to users — which is exactly what CDNs do.</p>
+        </div>
       </div>
     </div>
   </div>
