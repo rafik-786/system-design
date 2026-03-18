@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAP Theorem &amp; PACELC — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="blue" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-scale-balanced"></i> Distributed Systems</div>
+    <h1>CAP Theorem &amp; PACELC</h1>
+    <p class="hero-subtitle">Network breaks. Choose: wrong answers or no answers? The most misunderstood theorem in system design — and why "pick 2 of 3" is a lie.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 20 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 20 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> CAP = when the network breaks (and it <em>will</em>), you must choose: give wrong answers (sacrifice <span class="tooltip-trigger">Consistency<span class="tooltip-content">Every read returns the most recent write. All nodes see the same data at the same time — no stale copies.</span></span>) or give no answers (sacrifice <span class="tooltip-trigger">Availability<span class="tooltip-content">Every request gets a response, even if it might be slightly outdated. The system never says "sorry, come back later."</span></span>). You can't have both during a <span class="tooltip-trigger">partition<span class="tooltip-content">A network partition is when two parts of your system can't talk to each other — like a broken phone line between two offices.</span></span>. PACELC extends this: even when everything's fine, you still trade latency for consistency.
+  </div>
+
+  <p>Here's the idea in everyday terms. You have copies of your data on multiple servers (because one server dying shouldn't kill your whole app). Those servers talk to each other to stay in sync. But sometimes the network between them breaks — a cable gets cut, a router fails, a cloud region goes dark. When that happens, you're stuck with an impossible choice: do you keep serving requests even though the servers can't sync up (which means some users might see old data)? Or do you refuse to answer until the network heals (which means the system is "down" for those users)?</p>
+
+  <!-- TL;DR mental model SVG -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CAP Theorem mental model: when a partition happens, choose consistency or availability">
+    <defs>
+      <marker id="cap-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The CAP Choice — When the Network Breaks</text>
+
+    <!-- Normal state -->
+    <rect x="20" y="50" width="200" height="100" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="120" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">NORMAL</text>
+    <text x="120" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Servers are in sync</text>
+    <text x="120" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">C ✓  A ✓  P (no partition)</text>
+    <text x="120" y="138" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Life is good 😊</text>
+
+    <!-- Arrow to partition -->
+    <line x1="225" y1="100" x2="275" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#cap-tldr-arr)"/>
+    <text x="250" y="88" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">PARTITION!</text>
+
+    <!-- Partition state -->
+    <rect x="280" y="50" width="200" height="100" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="380" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">NETWORK BREAKS</text>
+    <text x="380" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Servers can't talk</text>
+    <text x="380" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Now you must choose...</text>
+    <text x="380" y="138" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10" font-weight="600">⚠️ You CANNOT have both C and A</text>
+
+    <!-- Arrow to Choice A -->
+    <line x1="420" y1="155" x2="540" y2="190" stroke="#3b82f6" stroke-width="2" marker-end="url(#cap-tldr-arr)"/>
+    <!-- Arrow to Choice B -->
+    <line x1="340" y1="155" x2="140" y2="190" stroke="#a855f7" stroke-width="2" marker-end="url(#cap-tldr-arr)"/>
+
+    <!-- Choice: Availability -->
+    <rect x="490" y="185" width="250" height="80" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="615" y="210" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">CHOOSE AVAILABILITY (AP)</text>
+    <text x="615" y="228" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Keep serving responses</text>
+    <text x="615" y="244" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10">⚠️ Some answers may be stale</text>
+    <text x="615" y="258" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Cassandra, DynamoDB, CouchDB</text>
+
+    <!-- Choice: Consistency -->
+    <rect x="20" y="185" width="250" height="80" rx="12" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="145" y="210" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">CHOOSE CONSISTENCY (CP)</text>
+    <text x="145" y="228" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Refuse until servers sync</text>
+    <text x="145" y="244" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10">⚠️ Some requests get errors</text>
+    <text x="145" y="258" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">HBase, MongoDB, ZooKeeper</text>
+  </svg>
+
+  <p>That's <span class="tooltip-trigger">CAP<span class="tooltip-content">CAP Theorem (Brewer's Theorem): In a distributed system, when a network partition occurs, you can only guarantee Consistency OR Availability — not both.</span></span> in a nutshell. But here's the twist most people miss: partitions are <em>rare</em>. Your network is fine 99.9% of the time. So what do you optimize for during that 99.9%? That's where <span class="tooltip-trigger">PACELC<span class="tooltip-content">An extension of CAP: if there's a Partition, choose A or C. Else (when things are normal), choose Latency or Consistency. Pronounced "pass-elk."</span></span> comes in — it says even when nothing is broken, you still have to choose between fast responses and perfectly consistent data.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> CAP isn't about what you "pick." It's about what you sacrifice when disaster strikes — and PACELC says you're making trade-offs even on sunny days.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario — Two Servers, One Nightmare</h2>
+    </div>
+  </div>
+
+  <p>Imagine you run a small online store. Business is good, so you set up two database servers — one in New York and one in London. They replicate data to each other constantly, so if New York goes down, London can handle everything. This is a common setup. Companies do this all the time.</p>
+
+  <p>Every time a customer places an order, both servers update their records. Every time someone checks their order status, either server can answer. Fast, reliable, beautiful.</p>
+
+  <p>Then one Tuesday afternoon, the undersea cable connecting New York and London develops a fault. The two servers can no longer talk to each other.</p>
+
+  <!-- Scenario SVG: Two servers, cable breaks -->
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two database servers in New York and London with a broken network between them">
+    <defs>
+      <marker id="cap-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Tuesday, 2:47 PM — The Cable Breaks</text>
+
+    <!-- New York server -->
+    <rect x="40" y="60" width="180" height="120" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="130" y="85" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">🗽 NEW YORK</text>
+    <text x="130" y="108" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Server A</text>
+    <text x="130" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Balance: $500</text>
+    <text x="130" y="148" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Online, accepting writes</text>
+    <text x="130" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">User deposits $200 here →</text>
+
+    <!-- London server -->
+    <rect x="540" y="60" width="180" height="120" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="630" y="85" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">🇬🇧 LONDON</text>
+    <text x="630" y="108" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Server B</text>
+    <text x="630" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Balance: $500</text>
+    <text x="630" y="148" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10">⚠️ Doesn't know about $200</text>
+    <text x="630" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">← User reads balance here</text>
+
+    <!-- Broken connection -->
+    <line x1="225" y1="120" x2="340" y2="120" stroke="#64748b" stroke-width="2" stroke-dasharray="6,4"/>
+    <line x1="420" y1="120" x2="535" y2="120" stroke="#64748b" stroke-width="2" stroke-dasharray="6,4"/>
+    <!-- X mark in middle -->
+    <circle cx="380" cy="120" r="22" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="380" y="126" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="16">✗</text>
+    <text x="380" y="96" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">PARTITION</text>
+
+    <!-- The dilemma -->
+    <rect x="100" y="210" width="560" height="95" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="380" y="235" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">THE DILEMMA</text>
+    <text x="380" y="258" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">A user in London checks their balance. New York has $700, London still shows $500.</text>
+    <text x="380" y="278" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-size="11">Option A: London says "$500" (wrong but responsive) → Available, not Consistent</text>
+    <text x="380" y="295" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="11">Option B: London says "Try later" (correct but refusing) → Consistent, not Available</text>
+  </svg>
+
+  <p>A customer in New York deposits $200 into their account. Server A updates the balance from $500 to $700. Normally, it would instantly tell Server B. But the cable is broken. Server B still thinks the balance is $500.</p>
+
+  <p>Now a different customer (or even the same one, routed through London) checks their balance on Server B. What should Server B do?</p>
+
+  <div class="think-first-box">
+    <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>You're the engineer on call. Server B just received a read request for this account. It has a balance of $500 in its local database, but it knows it hasn't heard from Server A in 3 minutes (normally they sync every 100ms). What do you tell the user?</p>
+    <div class="think-hint">
+      <strong>Hint:</strong> There's no "correct" answer — that's the whole point. Each option has real consequences. What matters is understanding <em>what you're sacrificing</em> with each choice.
+    </div>
+  </div>
+
+  <p>There's no magic third option. You either serve the stale data (available but inconsistent) or refuse to answer until you can verify (consistent but unavailable). This isn't a limitation of any specific database — it's a <em>mathematical impossibility</em> proven by Eric Brewer in 2000 and formally proven by Gilbert and Lynch in 2002.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — "Just Use a Database That Does Everything"</h2>
+    </div>
+  </div>
+
+  <p>The most common reaction when people first hear about CAP is: "OK, but surely modern databases have solved this?" Or: "I'll just pick a system that has all three — Consistency, Availability, AND Partition Tolerance." This sounds reasonable. After all, technology improves every year. Shouldn't someone have figured this out by now?</p>
+
+  <p>The short answer: <strong>no</strong>. And here's why the popular "pick 2 of 3" explanation makes things worse.</p>
+
+  <div class="think-first-box">
+    <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>People often draw CAP as a triangle where you pick two sides: CA, CP, or AP. If that were true, what would a "CA system" look like — one that has Consistency and Availability but NOT Partition Tolerance? What would happen to it when the network breaks?</p>
+    <div class="think-hint">
+      <strong>Hint:</strong> Think about what "not tolerating partitions" actually means in practice. Can you just... opt out of network failures?
+    </div>
+  </div>
+
+  <!-- "Pick 2" myth SVG -->
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The misleading 'pick 2 of 3' triangle vs. the real CAP trade-off">
+    <defs>
+      <marker id="cap-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <!-- Left: The Myth -->
+    <text x="190" y="25" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">❌ THE MYTH: "Pick 2 of 3"</text>
+
+    <!-- Triangle -->
+    <polygon points="190,55 50,260 330,260" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="6,4"/>
+    <circle cx="190" cy="55" r="22" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="190" y="60" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">C</text>
+    <circle cx="50" cy="260" r="22" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="50" y="265" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">A</text>
+    <circle cx="330" cy="260" r="22" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="330" y="265" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">P</text>
+
+    <!-- Labels on edges -->
+    <text x="100" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" transform="rotate(-55, 100, 148)">CA?</text>
+    <text x="280" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" transform="rotate(55, 280, 148)">CP</text>
+    <text x="190" y="280" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">AP</text>
+
+    <!-- X over CA -->
+    <line x1="75" y1="130" x2="125" y2="170" stroke="#ef4444" stroke-width="3"/>
+    <line x1="125" y1="130" x2="75" y2="170" stroke="#ef4444" stroke-width="3"/>
+
+    <!-- Right: The Truth -->
+    <text x="575" y="25" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">✓ THE TRUTH: "When P, pick C or A"</text>
+
+    <!-- Normal box -->
+    <rect x="440" y="50" width="270" height="70" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="575" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">99.9% of the time: No partition</text>
+    <text x="575" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">You have C + A. Life is great.</text>
+    <text x="575" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">CAP doesn't apply when the network is fine!</text>
+
+    <!-- Arrow down -->
+    <line x1="575" y1="125" x2="575" y2="155" stroke="#ef4444" stroke-width="2" marker-end="url(#cap-s3-arr)"/>
+    <text x="615" y="145" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">partition!</text>
+
+    <!-- Partition box -->
+    <rect x="440" y="160" width="270" height="55" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="575" y="183" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">0.1%: Partition happens</text>
+    <text x="575" y="203" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">NOW you must choose...</text>
+
+    <!-- Two choice boxes -->
+    <line x1="520" y1="220" x2="490" y2="245" stroke="#a855f7" stroke-width="2" marker-end="url(#cap-s3-arr)"/>
+    <line x1="630" y1="220" x2="660" y2="245" stroke="#3b82f6" stroke-width="2" marker-end="url(#cap-s3-arr)"/>
+
+    <rect x="420" y="250" width="120" height="60" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="480" y="275" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="11">CP</text>
+    <text x="480" y="295" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Correct but slow</text>
+
+    <rect x="590" y="250" width="120" height="60" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="650" y="275" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">AP</text>
+    <text x="650" y="295" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Fast but maybe stale</text>
+
+    <text x="575" y="335" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">There is no "CA" for distributed systems — partitions are not optional.</text>
+  </svg>
+
+  <p>The "pick 2 of 3" framing is misleading because it suggests you have a choice about <span class="tooltip-trigger">Partition Tolerance<span class="tooltip-content">The system continues to work even when messages between nodes are dropped or delayed. Since networks WILL fail, you can't opt out of this in any distributed system.</span></span>. You don't. In any distributed system (meaning data lives on more than one machine), network failures <strong>will</strong> happen. You can't opt out of physics. Cables get cut. Routers crash. Cloud regions go dark. Partitions are a fact of life, not a feature you select.</p>
+
+  <p>So the "CA" corner of the triangle — a system that's consistent and available but doesn't tolerate partitions — only exists on a single machine. A single PostgreSQL instance is "CA" in the sense that it can never have a <span class="tooltip-trigger">network partition<span class="tooltip-content">When two groups of nodes in a distributed system can't communicate with each other, usually due to network failure. Each side keeps running but can't sync data.</span></span> with itself. But a single machine isn't distributed, so CAP doesn't even apply to it.</p>
+
+  <div class="callout callout-warning">
+    <strong>The real question isn't "which 2 do I pick?"</strong> — it's "when a partition happens (and it will), do I sacrifice Consistency or Availability?" That's it. That's the whole theorem.
+  </div>
+
+  <p>This reframing is important because it changes how you think about database choices. You're not shopping for a "CP database" or an "AP database" like picking items off a menu. You're deciding what your system does during the (hopefully rare) moments when the network fails. And many modern databases let you tune this on a per-query basis — so the same database can be CP for some operations and AP for others.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — Real Stories of CAP in Action</h2>
+    </div>
+  </div>
+
+  <p>CAP isn't an academic exercise. Real companies deal with this trade-off every single day, and the consequences of getting it wrong range from annoyed users to lost money. Let's walk through three very different systems and see how each one chooses its side.</p>
+
+  <div class="think-first-box">
+    <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>For each of these three systems — a bank, a social media feed, and DNS (the internet's phone book) — which would you sacrifice during a network partition: consistency or availability? Why?</p>
+    <div class="think-hint">
+      <strong>Hint:</strong> Think about what happens if a bank shows you a wrong balance vs. what happens if Instagram is down for 5 minutes. The consequences are wildly different.
+    </div>
+  </div>
+
+  <!-- Real examples SVG -->
+  <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three real-world CAP trade-off examples: banking chooses CP, social media chooses AP, DNS chooses AP">
+    <defs>
+      <marker id="cap-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Three Systems, Three Choices</text>
+
+    <!-- Banking: CP -->
+    <rect x="20" y="50" width="225" height="300" rx="12" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="132" y="78" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="13">🏦 BANKING</text>
+    <text x="132" y="98" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-size="11">Chooses: CP (Consistency)</text>
+    <line x1="40" y1="110" x2="225" y2="110" stroke="#334155" stroke-width="1"/>
+    <text x="132" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">During partition:</text>
+    <text x="132" y="152" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ "Cannot process right now"</text>
+    <text x="132" y="170" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Never shows wrong balance</text>
+    <line x1="40" y1="185" x2="225" y2="185" stroke="#334155" stroke-width="1"/>
+    <text x="132" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Why? A wrong balance could</text>
+    <text x="132" y="220" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">mean double-spending, fraud,</text>
+    <text x="132" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">or legal liability. Downtime is</text>
+    <text x="132" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">annoying. Wrong money is illegal.</text>
+    <line x1="40" y1="265" x2="225" y2="265" stroke="#334155" stroke-width="1"/>
+    <text x="132" y="285" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Examples:</text>
+    <text x="132" y="302" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">HBase, Spanner, ZooKeeper</text>
+    <text x="132" y="320" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">MongoDB (default config)</text>
+    <text x="132" y="340" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Cost: temporary unavailability</text>
+
+    <!-- Social Media: AP -->
+    <rect x="267" y="50" width="225" height="300" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="380" y="78" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">📱 SOCIAL MEDIA</text>
+    <text x="380" y="98" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="11">Chooses: AP (Availability)</text>
+    <line x1="287" y1="110" x2="472" y2="110" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">During partition:</text>
+    <text x="380" y="152" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Feed keeps loading</text>
+    <text x="380" y="170" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Might miss latest posts</text>
+    <line x1="287" y1="185" x2="472" y2="185" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Why? Nobody gets hurt if</text>
+    <text x="380" y="220" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">a "like" count is off by 3</text>
+    <text x="380" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">for 10 seconds. But if the</text>
+    <text x="380" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">app is DOWN? Users leave.</text>
+    <line x1="287" y1="265" x2="472" y2="265" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="285" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Examples:</text>
+    <text x="380" y="302" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Cassandra, DynamoDB</text>
+    <text x="380" y="320" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">CouchDB, Riak</text>
+    <text x="380" y="340" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Cost: brief stale data</text>
+
+    <!-- DNS: AP -->
+    <rect x="515" y="50" width="225" height="300" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="627" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">🌐 DNS</text>
+    <text x="627" y="98" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">Chooses: AP (Availability)</text>
+    <line x1="535" y1="110" x2="720" y2="110" stroke="#334155" stroke-width="1"/>
+    <text x="627" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">During partition:</text>
+    <text x="627" y="152" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Returns cached IP address</text>
+    <text x="627" y="170" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ IP might be slightly outdated</text>
+    <line x1="535" y1="185" x2="720" y2="185" stroke="#334155" stroke-width="1"/>
+    <text x="627" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Why? A slightly old IP still</text>
+    <text x="627" y="220" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">works 99% of the time.</text>
+    <text x="627" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">But if DNS stops answering?</text>
+    <text x="627" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">The entire internet breaks.</text>
+    <line x1="535" y1="265" x2="720" y2="265" stroke="#334155" stroke-width="1"/>
+    <text x="627" y="285" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Details:</text>
+    <text x="627" y="302" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">TTL-based caching (hours/days)</text>
+    <text x="627" y="320" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Eventually consistent by design</text>
+    <text x="627" y="340" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">Cost: propagation delay</text>
+  </svg>
+
+  <p>Notice the pattern? The "right" choice depends entirely on your business requirements. A bank can't afford to show a wrong balance — regulators, lawsuits, fraud. So it sacrifices availability: "Sorry, try again later" is better than "Your balance is $5,000" when it's actually $50. Social media is the opposite — nobody sues Instagram because their like count was 3 behind for 10 seconds. But if the app says "Service Unavailable," users open TikTok instead.</p>
+
+  <p>DNS is the most extreme example. The Domain Name System is literally the phone book of the internet — it translates "google.com" into an IP address. If DNS goes down, nothing works. So DNS chooses availability above all else. It aggressively caches results (sometimes for 24+ hours) and serves those cached results even if they might be slightly outdated. A stale IP address that still works is infinitely better than no IP address at all.</p>
+
+  <div class="callout callout-info">
+    <strong>Key insight:</strong> There is no universally "correct" side of CAP. The choice depends on your domain. Ask: "What's worse — a wrong answer or no answer?" That question tells you whether you need CP or AP.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-lightbulb"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — It's Not "Pick 2" and PACELC Changes Everything</h2>
+    </div>
+  </div>
+
+  <p>So far we've been talking about what happens when the network breaks. But here's the thing most articles miss: <strong>the network is usually fine</strong>. Google reports that their internal network has partitions only about 7.6 times per year across their entire infrastructure. For most systems, partitions happen maybe a few times per year — or never.</p>
+
+  <p>So if CAP only matters during partitions, and partitions are rare... what matters the <em>rest</em> of the time?</p>
+
+  <div class="think-first-box">
+    <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>Your system has 3 database replicas. When a user writes data, you have two options: (1) wait for ALL 3 replicas to confirm the write before responding (slow but guaranteed consistent), or (2) respond as soon as 1 replica confirms and let the others catch up (fast but briefly inconsistent). The network is perfectly healthy — no partitions at all. Is this a CAP trade-off? What IS this trade-off?</p>
+    <div class="think-hint">
+      <strong>Hint:</strong> CAP only applies during partitions. This is a DIFFERENT trade-off that happens every single day, on every single request. Think about what you're trading speed for.
+    </div>
+  </div>
+
+  <p>This is exactly the gap that <span class="tooltip-trigger">PACELC<span class="tooltip-content">Partition → choose Availability or Consistency. Else (no partition) → choose Latency or Consistency. Extends CAP to cover the 99.9% of the time when things are fine.</span></span> fills. Proposed by Daniel Abadi in 2010, PACELC (pronounced "pass-elk") extends CAP with a crucial second half:</p>
+
+  <!-- PACELC SVG -->
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PACELC framework: if Partition then A or C, Else Latency or Consistency">
+    <defs>
+      <marker id="cap-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">PACELC — The Complete Picture</text>
+
+    <!-- Starting node -->
+    <rect x="280" y="45" width="200" height="45" rx="10" fill="#1e293b" stroke="#f1f5f9" stroke-width="2"/>
+    <text x="380" y="73" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Is there a partition?</text>
+
+    <!-- Yes branch (left) -->
+    <line x1="330" y1="95" x2="190" y2="130" stroke="#ef4444" stroke-width="2" marker-end="url(#cap-s5-arr)"/>
+    <text x="240" y="108" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">YES (rare)</text>
+
+    <rect x="60" y="130" width="260" height="45" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="190" y="148" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">P → Choose A or C</text>
+    <text x="190" y="166" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">(This is classic CAP)</text>
+
+    <!-- PA and PC -->
+    <line x1="130" y1="180" x2="100" y2="210" stroke="#3b82f6" stroke-width="2" marker-end="url(#cap-s5-arr)"/>
+    <line x1="250" y1="180" x2="280" y2="210" stroke="#a855f7" stroke-width="2" marker-end="url(#cap-s5-arr)"/>
+
+    <rect x="20" y="210" width="160" height="40" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="100" y="235" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">PA — Availability</text>
+
+    <rect x="200" y="210" width="160" height="40" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="280" y="235" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">PC — Consistency</text>
+
+    <!-- No branch (right) -->
+    <line x1="430" y1="95" x2="570" y2="130" stroke="#10b981" stroke-width="2" marker-end="url(#cap-s5-arr)"/>
+    <text x="520" y="108" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">NO (99.9%)</text>
+
+    <rect x="440" y="130" width="260" height="45" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="570" y="148" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">E → Choose L or C</text>
+    <text x="570" y="166" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">(This is PACELC's addition)</text>
+
+    <!-- EL and EC -->
+    <line x1="510" y1="180" x2="480" y2="210" stroke="#f97316" stroke-width="2" marker-end="url(#cap-s5-arr)"/>
+    <line x1="630" y1="180" x2="660" y2="210" stroke="#a855f7" stroke-width="2" marker-end="url(#cap-s5-arr)"/>
+
+    <rect x="400" y="210" width="160" height="40" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="480" y="235" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">EL — Low Latency</text>
+
+    <rect x="580" y="210" width="160" height="40" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="660" y="235" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">EC — Consistency</text>
+
+    <!-- Bottom summary -->
+    <rect x="80" y="265" width="600" height="30" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="380" y="285" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">Example: Cassandra = PA/EL (always fast) · MongoDB = PC/EC (always consistent) · DynamoDB = PA/EL (tunable)</text>
+  </svg>
+
+  <p>In plain English, PACELC says: <strong>If</strong> there's a <strong>P</strong>artition, choose <strong>A</strong>vailability or <strong>C</strong>onsistency. <strong>E</strong>lse (no partition), choose <strong>L</strong>atency or <strong>C</strong>onsistency.</p>
+
+  <p>This second half — the "ELC" part — is actually <em>more important</em> in practice. Think about it: partitions are rare. But every single read and write request forces you to decide: do you wait for all replicas to agree (consistent but slower), or do you respond from the nearest replica immediately (fast but maybe stale)? You make this <span class="tooltip-trigger">trade-off<span class="tooltip-content">A trade-off is when getting more of one thing means getting less of another. In system design, you're constantly trading consistency for speed, or simplicity for scalability.</span></span> on literally every request, not just during rare partition events.</p>
+
+  <div class="callout callout-success">
+    <strong>Why PACELC matters more than CAP:</strong> CAP tells you about the 0.1% disaster scenario. PACELC tells you about the 99.9% everyday experience. When you pick a database, the ELC trade-off affects every single request your users make.
+  </div>
+
+  <!-- Everyday trade-off SVG -->
+  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Everyday latency vs consistency trade-off: respond from nearest replica (fast) or wait for all replicas (consistent)">
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Everyday Trade-Off (No Partition Needed)</text>
+
+    <!-- Option 1: Fast -->
+    <rect x="20" y="50" width="340" height="150" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="190" y="78" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">EL — Favor Low Latency</text>
+    <text x="190" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">"Read from the nearest replica immediately"</text>
+    <text x="190" y="125" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Response in 2ms</text>
+    <text x="190" y="143" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Always responds, never blocks</text>
+    <text x="190" y="163" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Might return data that's 50ms behind</text>
+    <text x="190" y="188" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Cassandra, DynamoDB (default), CouchDB</text>
+
+    <!-- Option 2: Consistent -->
+    <rect x="400" y="50" width="340" height="150" rx="12" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="570" y="78" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="13">EC — Favor Consistency</text>
+    <text x="570" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">"Wait for majority to confirm before reading"</text>
+    <text x="570" y="125" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Always returns latest data</text>
+    <text x="570" y="143" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ No stale reads ever</text>
+    <text x="570" y="163" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">✗ Response takes 15-50ms (waiting for replicas)</text>
+    <text x="570" y="188" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">MongoDB (default), HBase, Google Spanner</text>
+  </svg>
+
+  <p>Here's a real-world way to think about it. Cassandra is classified as <strong>PA/EL</strong> — during partitions it favors availability, and during normal times it favors low latency. It's optimized for speed. MongoDB with default settings is <strong>PC/EC</strong> — during partitions it favors consistency, and during normal times it <em>still</em> favors consistency over speed. It's optimized for correctness. Neither is "better." They're built for different jobs.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (THE TOOLKIT)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The CAP Toolkit</h2>
+    </div>
+  </div>
+
+  <p>Now that you understand the big picture, let's get precise about each piece. This section breaks down the three letters of CAP and then shows the two families of systems that result from choosing between them.</p>
+
+  <!-- Overview SVG -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Overview of C, A, P components and how they combine into CP and AP systems">
+    <defs>
+      <marker id="cap-s6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Three Guarantees</text>
+
+    <!-- C -->
+    <rect x="30" y="45" width="210" height="65" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="135" y="68" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="13">C — Consistency</text>
+    <text x="135" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Every read returns the latest write</text>
+    <text x="135" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"One version of truth, always"</text>
+
+    <!-- A -->
+    <rect x="275" y="45" width="210" height="65" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="380" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">A — Availability</text>
+    <text x="380" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Every request gets a response</text>
+    <text x="380" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"Always answers, maybe stale"</text>
+
+    <!-- P -->
+    <rect x="520" y="45" width="210" height="65" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="625" y="68" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">P — Partition Tolerance</text>
+    <text x="625" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">System works despite network splits</text>
+    <text x="625" y="103" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"Survives cable cuts"</text>
+
+    <!-- Arrow down to results -->
+    <line x1="135" y1="115" x2="250" y2="150" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <line x1="380" y1="115" x2="380" y2="145" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <line x1="625" y1="115" x2="510" y2="150" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+    <!-- CP result -->
+    <rect x="140" y="150" width="180" height="40" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+    <text x="230" y="175" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">CP = C + P (sacrifice A)</text>
+
+    <!-- AP result -->
+    <rect x="440" y="150" width="180" height="40" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="530" y="175" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">AP = A + P (sacrifice C)</text>
+  </svg>
+
+  <!-- Card 1: Consistency -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-check-double icon-gap"></i> Consistency (C) — Everyone Sees the Same Data</span></h3>
+    <div class="card-body">
+      <p>Imagine a shared Google Doc. When you type a word, your co-worker sees it instantly. That's consistency — every reader gets the most recent version of the data, no matter which server they connect to.</p>
+
+      <p>In database terms, this is called <span class="tooltip-trigger">linearizability<span class="tooltip-content">The strongest form of consistency: once a write completes, ALL subsequent reads (from any client, on any server) will see that write. As if there's only one copy of the data.</span></span> — the gold standard of consistency. It means the system behaves as if there's only one copy of the data, even though there are actually multiple copies on multiple servers. Once a write completes, every subsequent read — from any client, on any server — returns that write's value.</p>
+
+      <p>This is hard to achieve because data travels at the speed of light, not instantly. If Server A in New York accepts a write, it takes about 40ms for that information to reach Server B in London. During those 40ms, a reader on Server B would see stale data. Consistency means the system either waits for B to confirm (slower) or blocks reads on B until it's updated (also slower).</p>
+
+      <div class="callout callout-warning">
+        <strong>CAP's "C" is NOT the same as ACID's "C."</strong> In databases, ACID consistency means "transactions follow the rules" (constraints, triggers, etc.). CAP consistency means "all nodes see the same data." They're completely different concepts that unfortunately share the same word.
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Availability -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-signal icon-gap"></i> Availability (A) — Always Responds</span></h3>
+    <div class="card-body">
+      <p>Availability means every request to a non-failing node gets a response. Not just "eventually" — it gets a response in a reasonable time. No timeouts, no error messages, no "please try again later." If you ask, you get an answer.</p>
+
+      <p>The catch? That answer might be <em>stale</em>. An available system promises to respond, but it doesn't promise the response is up-to-date. If you just deposited $200 and the available node hasn't received that update yet, it'll happily tell you your old balance. It's not lying — it's telling you the last thing it knows. It just doesn't know the latest thing yet.</p>
+
+      <p>Think of it like calling a friend for the score of a cricket match. They might tell you "India is at 230" — which was true 10 minutes ago. The actual score might be 245 now. Your friend is <em>available</em> (they answered the phone) but not perfectly <em>consistent</em> (their info is a bit behind).</p>
+    </div>
+  </div>
+
+  <!-- Card 3: Partition Tolerance -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-network-wired icon-gap"></i> Partition Tolerance (P) — Survives Network Splits</span></h3>
+    <div class="card-body">
+      <p>A <span class="tooltip-trigger">network partition<span class="tooltip-content">When two groups of nodes in a distributed system can't communicate with each other, usually due to network failure. Each side keeps running but can't sync data.</span></span> happens when part of your system can't talk to another part. Maybe a switch fails. Maybe a data center loses its internet connection. Maybe a cloud provider's internal network has a hiccup. The servers are all running fine — they just can't reach each other.</p>
+
+      <p>Partition tolerance means the system keeps functioning even when this happens. It doesn't crash, it doesn't lose data permanently, it handles the split gracefully and heals itself when the connection comes back.</p>
+
+      <p>Here's the critical insight: <strong>you don't get to choose whether partitions happen.</strong> They just do. Google, Amazon, Microsoft — they all experience partitions regularly. If your data lives on more than one machine, you MUST tolerate partitions. The only way to avoid partitions entirely is to have a single server — but then you have no redundancy, no fault tolerance, and a single point of failure.</p>
+
+      <div class="callout callout-danger">
+        <strong>This is why "CA" doesn't exist for distributed systems.</strong> You can't say "I choose not to tolerate partitions." That's like saying "I choose not to tolerate earthquakes." They happen whether you like it or not. The only question is how you respond.
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: CP Systems -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-lock icon-gap"></i> CP Systems — Correctness Over Speed</span></h3>
+    <div class="card-body">
+      <p>A CP system guarantees that during a network partition, every response is correct — even if that means some requests get no response at all. When a CP system detects that it can't communicate with enough other nodes to be sure of the latest data, it <em>refuses to answer</em> rather than risk giving stale information.</p>
+
+      <!-- CP behavior SVG -->
+      <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CP system behavior during partition: one side serves, other side refuses">
+        <rect x="20" y="10" width="300" height="160" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="170" y="35" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">MAJORITY SIDE (2 of 3 nodes)</text>
+        <text x="170" y="58" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Has quorum — can verify latest data</text>
+        <text x="170" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">✓ Accepts reads and writes</text>
+        <text x="170" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">✓ All responses are correct</text>
+        <rect x="60" y="115" width="220" height="30" rx="6" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
+        <text x="170" y="135" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">User → "Balance: $700" ✓</text>
+        <text x="170" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Leader/primary is here</text>
+
+        <!-- Partition line -->
+        <line x1="350" y1="30" x2="350" y2="160" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+        <text x="380" y="95" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600" transform="rotate(90,380,95)">PARTITION</text>
+
+        <rect x="420" y="10" width="320" height="160" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="580" y="35" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">MINORITY SIDE (1 of 3 nodes)</text>
+        <text x="580" y="58" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">No quorum — can't verify data is latest</text>
+        <text x="580" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11">✗ Refuses reads and writes</text>
+        <text x="580" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11">✗ Returns error / timeout</text>
+        <rect x="460" y="115" width="240" height="30" rx="6" fill="#0f172a" stroke="#ef4444" stroke-width="1"/>
+        <text x="580" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">User → "Service Unavailable" ✗</text>
+        <text x="580" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">This node steps down from serving</text>
+      </svg>
+
+      <p><strong>Real-world CP systems:</strong></p>
+      <ul>
+        <li><strong>HBase</strong> — built on top of HDFS and ZooKeeper. If a region server loses contact with ZooKeeper, it stops serving. Correctness above all.</li>
+        <li><strong>MongoDB</strong> (default settings) — uses a primary/secondary model. If the primary becomes unreachable, secondaries hold elections, and during that election window, writes are refused.</li>
+        <li><strong>ZooKeeper</strong> — the coordination service used by Kafka, HBase, and others. If it can't reach a <span class="tooltip-trigger">quorum<span class="tooltip-content">A quorum is the minimum number of nodes that must agree for an operation to proceed. Usually a majority (e.g., 2 out of 3, or 3 out of 5). Ensures no two groups can independently make decisions.</span></span> (majority of nodes), it stops processing requests entirely.</li>
+        <li><strong>Google Spanner</strong> — uses GPS clocks and atomic clocks to provide global consistency. During partitions, it waits rather than serving stale data.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Card 5: AP Systems -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-bolt icon-gap"></i> AP Systems — Speed Over Correctness</span></h3>
+    <div class="card-body">
+      <p>An AP system guarantees that during a partition, every non-failing node will still respond to requests — even if the response might be outdated. It prioritizes keeping the lights on over perfect accuracy.</p>
+
+      <!-- AP behavior SVG -->
+      <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AP system behavior during partition: both sides keep serving, possibly with different data">
+        <rect x="20" y="10" width="300" height="160" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="170" y="35" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">SIDE A (nodes 1 &amp; 2)</text>
+        <text x="170" y="58" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Has user's latest write ($700)</text>
+        <text x="170" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">✓ Keeps serving normally</text>
+        <text x="170" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="11">✓ Accepts reads and writes</text>
+        <rect x="60" y="115" width="220" height="30" rx="6" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
+        <text x="170" y="135" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">User → "Balance: $700" ✓</text>
+        <text x="170" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Up-to-date data</text>
+
+        <!-- Partition line -->
+        <line x1="350" y1="30" x2="350" y2="160" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,4"/>
+        <text x="380" y="95" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600" transform="rotate(90,380,95)">PARTITION</text>
+
+        <rect x="420" y="10" width="320" height="160" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+        <text x="580" y="35" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">SIDE B (node 3)</text>
+        <text x="580" y="58" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Hasn't received the $200 deposit yet</text>
+        <text x="580" y="78" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11">✓ Also keeps serving</text>
+        <text x="580" y="100" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11">✓ Also accepts reads and writes</text>
+        <rect x="460" y="115" width="240" height="30" rx="6" fill="#0f172a" stroke="#f97316" stroke-width="1"/>
+        <text x="580" y="135" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10">User → "Balance: $500" ⚠️ stale!</text>
+        <text x="580" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Data is behind — will sync later</text>
+      </svg>
+
+      <p>When the partition heals, AP systems need to reconcile the differences. This is where concepts like <span class="tooltip-trigger">eventual consistency<span class="tooltip-content">A consistency model where, given enough time without new writes, all replicas will eventually converge to the same value. "Eventually" usually means milliseconds to seconds, not hours.</span></span> come in — the system promises that <em>eventually</em> all nodes will have the same data, but there's a window where they might disagree.</p>
+
+      <p><strong>Real-world AP systems:</strong></p>
+      <ul>
+        <li><strong>Cassandra</strong> — every node is equal (no leader). During a partition, all nodes keep serving. Uses "last write wins" or custom resolution to merge conflicts later.</li>
+        <li><strong>DynamoDB</strong> — Amazon's flagship NoSQL database. Designed for availability first (Amazon's lesson: downtime = lost revenue). Tunable consistency per request.</li>
+        <li><strong>CouchDB</strong> — stores revision history for every document. During partition, both sides accept writes. When reconnected, it presents conflicts for resolution.</li>
+        <li><strong>Riak</strong> — uses vector clocks to track data versions across nodes. When conflicts arise, the application decides which version wins.</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <strong>AP systems don't lose data.</strong> A common misconception is that AP systems accept data loss. They don't. They accept <em>temporary inconsistency</em>. Once the partition heals, the system reconciles and all nodes converge to the same state. The question is just how you handle the gap in between.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — Under the Hood</h2>
+    </div>
+  </div>
+
+  <p>The basics are clear: partition forces a choice between C and A. But the real engineering happens in the details. How exactly does PACELC work? What does "consistency" even mean when there are multiple levels? How do databases actually decide if they have enough agreement? And is anything truly "CP" or "AP," or is it more nuanced? Let's dig in.</p>
+
+  <!-- Collapsible 1: PACELC Explained -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-diagram-project icon-gap"></i> PACELC Explained — The Full Framework</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>PACELC stands for: <strong>P</strong>artition → <strong>A</strong>vailability or <strong>C</strong>onsistency, <strong>E</strong>lse → <strong>L</strong>atency or <strong>C</strong>onsistency. It's a 2×2 classification that captures both the disaster scenario (partition) and the everyday scenario (normal operations).</p>
+
+        <p>Every distributed database falls into one of four quadrants:</p>
+
+        <!-- PACELC 2x2 matrix SVG -->
+        <svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PACELC 2x2 matrix showing PA/EL, PA/EC, PC/EL, PC/EC quadrants with real database examples">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">PACELC Classification Matrix</text>
+
+          <!-- Column headers -->
+          <text x="290" y="52" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">Else: Favor Latency (EL)</text>
+          <text x="570" y="52" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">Else: Favor Consistency (EC)</text>
+
+          <!-- Row headers -->
+          <text x="95" y="118" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">Partition:</text>
+          <text x="95" y="135" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">Favor A (PA)</text>
+
+          <text x="95" y="228" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">Partition:</text>
+          <text x="95" y="245" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">Favor C (PC)</text>
+
+          <!-- Grid lines -->
+          <line x1="170" y1="65" x2="170" y2="300" stroke="#334155" stroke-width="1.5"/>
+          <line x1="430" y1="65" x2="430" y2="300" stroke="#334155" stroke-width="1.5"/>
+          <line x1="170" y1="175" x2="740" y2="175" stroke="#334155" stroke-width="1.5"/>
+          <line x1="170" y1="65" x2="740" y2="65" stroke="#334155" stroke-width="1.5"/>
+          <line x1="170" y1="300" x2="740" y2="300" stroke="#334155" stroke-width="1.5"/>
+          <line x1="740" y1="65" x2="740" y2="300" stroke="#334155" stroke-width="1.5"/>
+
+          <!-- PA/EL (top-left) — most common AP -->
+          <rect x="185" y="80" width="230" height="80" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+          <text x="300" y="102" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">PA / EL</text>
+          <text x="300" y="120" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">"Always fast, always available"</text>
+          <text x="300" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Cassandra, DynamoDB, CouchDB</text>
+          <text x="300" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Riak, Voldemort</text>
+
+          <!-- PA/EC (top-right) — rare combo -->
+          <rect x="445" y="80" width="280" height="80" rx="8" fill="#0f172a" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="585" y="102" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">PA / EC</text>
+          <text x="585" y="120" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">"Available during P, consistent otherwise"</text>
+          <text x="585" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">MongoDB (w:1, r:majority)</text>
+          <text x="585" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">(rare — unusual combination)</text>
+
+          <!-- PC/EL (bottom-left) — rare -->
+          <rect x="185" y="190" width="230" height="95" rx="8" fill="#0f172a" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+          <text x="300" y="212" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">PC / EL</text>
+          <text x="300" y="230" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">"Consistent during P, fast otherwise"</text>
+          <text x="300" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Yahoo! PNUTS, Cosmos DB</text>
+          <text x="300" y="265" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">(with session consistency)</text>
+          <text x="300" y="280" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">(interesting middle ground)</text>
+
+          <!-- PC/EC (bottom-right) — strongest consistency -->
+          <rect x="445" y="190" width="280" height="95" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+          <text x="585" y="212" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">PC / EC</text>
+          <text x="585" y="230" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">"Always consistent, always correct"</text>
+          <text x="585" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">HBase, ZooKeeper, etcd</text>
+          <text x="585" y="265" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Google Spanner, VoltDB</text>
+          <text x="585" y="280" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">(highest correctness, highest latency)</text>
+        </svg>
+
+        <p>Most databases cluster in two corners: <strong>PA/EL</strong> (always fast — Cassandra, DynamoDB) and <strong>PC/EC</strong> (always correct — HBase, Spanner). The diagonal corners are rarer and represent interesting engineering trade-offs where the system behaves differently during partitions vs. normal operations.</p>
+
+        <p>The key insight is that PACELC is <em>more useful</em> than CAP for choosing a database because it tells you about everyday behavior, not just disaster behavior. A database that's PC/EC (like Spanner) and one that's PC/EL (like Cosmos DB with session consistency) both choose consistency during partitions — but they feel completely different to use day-to-day because of the latency difference.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2: Consistency Spectrum -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-sliders icon-gap"></i> The Consistency Spectrum — It's Not Binary</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>When we say "consistency," we're actually talking about a whole spectrum of guarantees — from the strictest (everyone sees exactly the same thing, always) to the loosest (everyone will <em>eventually</em> see the same thing... probably).</p>
+
+        <!-- Consistency spectrum SVG -->
+        <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Consistency spectrum from strong (linearizability) to weak (eventual consistency)">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Consistency Spectrum</text>
+
+          <!-- Spectrum bar -->
+          <defs>
+            <linearGradient id="cap-spec-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#a855f7"/>
+              <stop offset="100%" style="stop-color:#3b82f6"/>
+            </linearGradient>
+          </defs>
+          <rect x="60" y="48" width="640" height="12" rx="6" fill="url(#cap-spec-grad)"/>
+          <text x="60" y="80" fill="#a855f7" font-family="Inter, sans-serif" font-size="10" font-weight="600">STRONGEST</text>
+          <text x="700" y="80" text-anchor="end" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">WEAKEST</text>
+
+          <!-- Level 1: Linearizability -->
+          <line x1="100" y1="48" x2="100" y2="95" stroke="#a855f7" stroke-width="1.5"/>
+          <rect x="20" y="95" width="160" height="75" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+          <text x="100" y="115" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="11">Linearizability</text>
+          <text x="100" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Reads always return the</text>
+          <text x="100" y="145" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">latest write. Period.</text>
+          <text x="100" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Spanner, etcd, ZooKeeper</text>
+
+          <!-- Level 2: Sequential -->
+          <line x1="260" y1="48" x2="260" y2="95" stroke="#8b5cf6" stroke-width="1.5"/>
+          <rect x="180" y="95" width="160" height="75" rx="8" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5"/>
+          <text x="260" y="115" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-weight="700" font-size="11">Sequential</text>
+          <text x="260" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">All clients see the same</text>
+          <text x="260" y="145" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">ORDER of operations.</text>
+          <text x="260" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">ZooKeeper (for writes)</text>
+
+          <!-- Level 3: Causal -->
+          <line x1="420" y1="48" x2="420" y2="95" stroke="#6366f1" stroke-width="1.5"/>
+          <rect x="340" y="95" width="160" height="75" rx="8" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+          <text x="420" y="115" text-anchor="middle" fill="#6366f1" font-family="Inter, sans-serif" font-weight="700" font-size="11">Causal</text>
+          <text x="420" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">If A caused B, everyone</text>
+          <text x="420" y="145" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">sees A before B.</text>
+          <text x="420" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">MongoDB (causal sessions)</text>
+
+          <!-- Level 4: Eventual -->
+          <line x1="580" y1="48" x2="580" y2="95" stroke="#3b82f6" stroke-width="1.5"/>
+          <rect x="500" y="95" width="160" height="75" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="580" y="115" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">Eventual</text>
+          <text x="580" y="132" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Given enough time, all</text>
+          <text x="580" y="145" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">replicas converge. "Soon."</text>
+          <text x="580" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Cassandra, DynamoDB, DNS</text>
+
+          <!-- Trade-off arrows -->
+          <text x="380" y="200" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11" font-weight="600">← More Correct, Slower · · · Faster, Less Correct →</text>
+
+          <!-- Annotations -->
+          <rect x="60" y="220" width="300" height="50" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="210" y="240" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Use for: money, inventory, locks</text>
+          <text x="210" y="258" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Where being wrong has consequences</text>
+
+          <rect x="400" y="220" width="300" height="50" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="550" y="240" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">✓ Use for: feeds, likes, analytics</text>
+          <text x="550" y="258" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Where "close enough" is fine</text>
+        </svg>
+
+        <p><strong>Linearizability</strong> is the gold standard — it's as if there's only one copy of the data. After a write completes, every single read from any client, anywhere in the world, returns that write. This is expensive because it requires coordination across all replicas.</p>
+
+        <p><strong>Causal consistency</strong> is a clever middle ground. It says: "If event A caused event B (like a post and its reply), then everyone sees A before B. But independent events can appear in any order." This is much cheaper than linearizability and good enough for most social applications.</p>
+
+        <p><strong>Eventual consistency</strong> is the loosest guarantee. It simply says: "If you stop writing, eventually all replicas will agree." In practice, "eventually" usually means milliseconds to a few seconds — not hours. But during that window, different clients might see different values.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3: Quorum Reads/Writes -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-people-group icon-gap"></i> Quorum Reads &amp; Writes — The Voting Trick</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Here's a practical technique databases use to balance consistency and speed: <span class="tooltip-trigger">quorum<span class="tooltip-content">A quorum is the minimum number of nodes that must agree for an operation to succeed. With N replicas, requiring W writes and R reads where W + R > N guarantees you'll always read the latest write.</span></span> reads and writes. The idea is simple: if you write to enough nodes and read from enough nodes, the two groups must overlap — guaranteeing you'll see the latest data.</p>
+
+        <div class="think-first-box">
+          <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+          <p>You have 3 replicas. You write to 2 of them. Later, you read from 2 of them. Is it possible that NONE of the 2 you read from have the latest write?</p>
+          <div class="think-hint">
+            <strong>Hint:</strong> Think pigeonhole principle. 2 + 2 = 4, but there are only 3 replicas. At least one replica must be in BOTH groups.
+          </div>
+        </div>
+
+        <!-- Quorum SVG -->
+        <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Quorum example with 3 nodes: write to 2, read from 2, guaranteed overlap">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Quorum: W + R &gt; N Guarantees Freshness</text>
+
+          <!-- Three nodes -->
+          <circle cx="200" cy="100" r="40" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+          <text x="200" y="95" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">Node 1</text>
+          <text x="200" y="115" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">v2 ✓</text>
+
+          <circle cx="380" cy="100" r="40" fill="#1e293b" stroke="#f97316" stroke-width="3"/>
+          <text x="380" y="95" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">Node 2</text>
+          <text x="380" y="115" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9">v2 ✓ OVERLAP</text>
+
+          <circle cx="560" cy="100" r="40" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+          <text x="560" y="95" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="13">Node 3</text>
+          <text x="560" y="115" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">v1 (stale)</text>
+
+          <!-- Write bracket -->
+          <line x1="180" y1="150" x2="180" y2="170" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="180" y1="170" x2="400" y2="170" stroke="#10b981" stroke-width="1.5"/>
+          <line x1="400" y1="150" x2="400" y2="170" stroke="#10b981" stroke-width="1.5"/>
+          <text x="290" y="188" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">W = 2 (write to 2 nodes)</text>
+
+          <!-- Read bracket -->
+          <line x1="360" y1="50" x2="360" y2="35" stroke="#3b82f6" stroke-width="1.5"/>
+          <line x1="360" y1="35" x2="580" y2="35" stroke="#3b82f6" stroke-width="1.5"/>
+          <line x1="580" y1="50" x2="580" y2="35" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="470" y="28" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="11">R = 2 (read from 2 nodes)</text>
+
+          <!-- Formula -->
+          <rect x="200" y="205" width="360" height="35" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+          <text x="380" y="227" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">W(2) + R(2) = 4 &gt; N(3) → ✓ Overlap guaranteed</text>
+        </svg>
+
+        <p>The formula is: <strong>W + R &gt; N</strong>, where W = number of nodes you write to, R = number of nodes you read from, and N = total number of replicas. As long as this holds, at least one node in your read set will have the latest write.</p>
+
+        <p>This gives you a tuning knob:</p>
+        <ul>
+          <li><strong>W=3, R=1</strong> (write to all, read from one) — writes are slow, reads are fast. Good for read-heavy workloads.</li>
+          <li><strong>W=1, R=3</strong> (write to one, read from all) — writes are fast, reads are slow. Good for write-heavy workloads.</li>
+          <li><strong>W=2, R=2</strong> (balanced) — both moderately fast. The default for most systems.</li>
+          <li><strong>W=1, R=1</strong> — fastest possible, but W+R=2 is NOT greater than N=3, so you might read stale data. This is eventual consistency.</li>
+        </ul>
+
+        <div class="callout callout-info">
+          <strong>DynamoDB and Cassandra both support tunable quorums.</strong> You can choose your W and R values per request. Want strong consistency for payment? Use W=quorum, R=quorum. Want fast reads for a social feed? Use W=1, R=1. Same database, different guarantees, different speeds.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 4: Tunable Consistency -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-sliders icon-gap"></i> Real-World: Most Systems Are Tunable</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Here's the dirty secret of CAP: almost no production system is purely CP or purely AP. Modern databases give you knobs to tune the trade-off on a per-operation basis. This makes the "CP vs AP" label more of a <em>default behavior</em> than a hard rule.</p>
+
+        <!-- Tunability SVG -->
+        <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tunable consistency dial showing databases at different positions on the CP-to-AP spectrum">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Tunability Spectrum</text>
+
+          <!-- Dial bar -->
+          <defs>
+            <linearGradient id="cap-tune-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#a855f7"/>
+              <stop offset="50%" style="stop-color:#f97316"/>
+              <stop offset="100%" style="stop-color:#3b82f6"/>
+            </linearGradient>
+          </defs>
+          <rect x="80" y="50" width="600" height="14" rx="7" fill="url(#cap-tune-grad)"/>
+          <text x="80" y="82" fill="#a855f7" font-family="Inter, sans-serif" font-size="10" font-weight="600">STRONG CP</text>
+          <text x="680" y="82" text-anchor="end" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">STRONG AP</text>
+
+          <!-- Database markers -->
+          <circle cx="120" cy="57" r="6" fill="#a855f7"/>
+          <text x="120" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Spanner</text>
+          <text x="120" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Always consistent</text>
+
+          <circle cx="230" cy="57" r="6" fill="#8b5cf6"/>
+          <text x="230" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">MongoDB</text>
+          <text x="230" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">CP by default</text>
+
+          <rect x="340" y="40" width="80" height="34" rx="6" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+          <text x="380" y="55" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="9">TUNABLE</text>
+          <text x="380" y="68" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8">DynamoDB</text>
+          <text x="380" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">DynamoDB</text>
+          <text x="380" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Choose per request</text>
+
+          <circle cx="530" cy="57" r="6" fill="#6366f1"/>
+          <text x="530" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Cosmos DB</text>
+          <text x="530" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">5 consistency levels</text>
+
+          <circle cx="640" cy="57" r="6" fill="#3b82f6"/>
+          <text x="640" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Cassandra</text>
+          <text x="640" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">AP by default</text>
+
+          <!-- Bottom note -->
+          <rect x="140" y="140" width="480" height="45" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="380" y="160" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Azure Cosmos DB offers 5 levels: Strong → Bounded Staleness → Session</text>
+          <text x="380" y="176" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">→ Consistent Prefix → Eventual. You pick per-request.</text>
+        </svg>
+
+        <p><strong>Cassandra</strong> (AP by default) can do strongly consistent reads if you set consistency level to ALL or QUORUM. It's AP by nature but you can make individual queries behave like CP.</p>
+
+        <p><strong>DynamoDB</strong> offers "eventually consistent reads" (fast, default) and "strongly consistent reads" (slower, costs 2x throughput). You choose per API call. Your social feed reads use eventual consistency. Your payment validation uses strong consistency. Same table, same database.</p>
+
+        <p><strong>Cosmos DB</strong> goes even further with five consistency levels, from "Strong" (linearizable) to "Eventual," with three useful middle grounds (Bounded Staleness, Session, Consistent Prefix). This is the most granular consistency tuning in any major cloud database.</p>
+
+        <div class="callout callout-success">
+          <strong>The takeaway:</strong> In practice, "CP vs AP" is a spectrum, not a binary. Modern databases let you dial in exactly how much consistency you need for each operation. Use strong consistency where correctness matters (money, inventory) and eventual consistency where speed matters (feeds, analytics, counters).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — VARIATIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-shuffle"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations — How Real Systems Choose Their Side</h2>
+    </div>
+  </div>
+
+  <p>Theory is clean. Reality is messy. Let's look at four real domains and see exactly how they navigate the CAP/PACELC trade-off — because most real systems don't pick "pure CP" or "pure AP." They use different strategies for different parts of the same system.</p>
+
+  <!-- Variation 1: Banking/Finance -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-building-columns icon-gap"></i> Banking &amp; Finance — Correctness Over Everything (CP)</span></h3>
+    <div class="card-body">
+      <p>Banks are the poster child for CP systems. When you transfer $1,000 from your savings to your checking account, both accounts must update atomically. If the network between the savings server and the checking server breaks mid-transfer, the bank doesn't say "we'll figure it out later." It stops the transaction and returns an error.</p>
+
+      <p>Why? Because the consequences of inconsistency are catastrophic. If both sides of a partition process the same withdrawal, you've created money out of thin air. If the savings account gets debited but the checking account doesn't get credited (or vice versa), someone loses money. Regulators will shut you down. Customers will sue.</p>
+
+      <!-- Banking decision SVG -->
+      <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Banking trade-off: temporary errors are acceptable, incorrect balances are not">
+        <rect x="20" y="15" width="345" height="130" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="192" y="40" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">✓ ACCEPTABLE</text>
+        <text x="192" y="62" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">"Transaction failed. Please try again."</text>
+        <text x="192" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">User retries in 30 seconds. Annoying.</text>
+        <text x="192" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">But no money is lost or created.</text>
+        <text x="192" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">CP behavior: refuse until partition heals</text>
+
+        <rect x="395" y="15" width="345" height="130" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="567" y="40" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">✗ CATASTROPHIC</text>
+        <text x="567" y="62" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">"Balance: $5,000" (actually $500)</text>
+        <text x="567" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">User withdraws money they don't have.</text>
+        <text x="567" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Fraud, lawsuits, regulatory action.</text>
+        <text x="567" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">AP behavior: serve stale data = disaster here</text>
+      </svg>
+
+      <p><strong>Technologies used:</strong> Google Spanner (global consistency with GPS clocks), traditional RDBMS with synchronous replication, distributed transactions with two-phase commit. Banks accept higher latency and occasional unavailability as the cost of never being wrong.</p>
+    </div>
+  </div>
+
+  <!-- Variation 2: Social Media -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-hashtag icon-gap"></i> Social Media — Availability Over Everything (AP)</span></h3>
+    <div class="card-body">
+      <p>Social media is the opposite extreme. When you scroll through Instagram and a post shows "1,247 likes" instead of the actual 1,250, nobody notices. Nobody cares. But if Instagram shows you an error page? You open TikTok. The user is gone — possibly forever.</p>
+
+      <p>Facebook processes over 10 million writes per second. Making every single write globally consistent across all data centers would be impossibly slow. Instead, they use <span class="tooltip-trigger">eventual consistency<span class="tooltip-content">A consistency model where, given enough time without new writes, all replicas will eventually converge to the same value. "Eventually" usually means milliseconds to seconds, not hours.</span></span> — your like count might be a few seconds behind in some regions, but the feed always loads.</p>
+
+      <p>Even within social media, not everything is equal. The feed is AP (stale is fine). But direct messages? Those are more CP-leaning — seeing messages out of order or missing recent messages would be confusing and harmful. This is why most real systems aren't purely one thing.</p>
+
+      <div class="callout callout-info">
+        <strong>Facebook's approach:</strong> They use TAO (The Associations and Objects cache) for social graph reads — heavily cached, eventually consistent, blazing fast. For things that need ordering (Messenger, notifications), they use stricter consistency models with leader-based replication.
+      </div>
+    </div>
+  </div>
+
+  <!-- Variation 3: E-Commerce -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-cart-shopping icon-gap"></i> E-Commerce — The Mixed Strategy</span></h3>
+    <div class="card-body">
+      <p>E-commerce is the most interesting case because <em>different parts of the same system need different trade-offs</em>. This is the real lesson of CAP: you don't choose once for your whole system. You choose per component.</p>
+
+      <div class="think-first-box">
+        <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+        <p>An e-commerce platform has four components: product catalog, shopping cart, inventory, and payment processing. Which should be AP and which should be CP? Why?</p>
+        <div class="think-hint">
+          <strong>Hint:</strong> Think about the consequences of stale data in each. What's the worst that happens if the product description is 5 minutes old? What about inventory count? What about a payment?
+        </div>
+      </div>
+
+      <!-- E-commerce mixed strategy SVG -->
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="E-commerce: product catalog and cart are AP, inventory and payment are CP">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">E-Commerce: Mixed CP + AP in One System</text>
+
+        <!-- AP components -->
+        <rect x="20" y="45" width="350" height="160" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+        <text x="195" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="12">AP COMPONENTS — "Stale is fine"</text>
+
+        <rect x="35" y="82" width="155" height="55" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="112" y="102" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">Product Catalog</text>
+        <text x="112" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Old description? No harm.</text>
+        <text x="112" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Cached aggressively.</text>
+
+        <rect x="200" y="82" width="155" height="55" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="277" y="102" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="10">Shopping Cart</text>
+        <text x="277" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Item count off by 1? OK.</text>
+        <text x="277" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Cart empty = user leaves.</text>
+
+        <text x="195" y="172" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">User experience &gt; perfect accuracy.</text>
+        <text x="195" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">DynamoDB, Cassandra, Redis</text>
+
+        <!-- CP components -->
+        <rect x="390" y="45" width="350" height="160" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+        <text x="565" y="68" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="12">CP COMPONENTS — "Must be correct"</text>
+
+        <rect x="405" y="82" width="155" height="55" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+        <text x="482" y="102" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">Inventory</text>
+        <text x="482" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Selling item that's gone?</text>
+        <text x="482" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Overselling is expensive.</text>
+
+        <rect x="570" y="82" width="155" height="55" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+        <text x="647" y="102" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">Payment</text>
+        <text x="647" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Double charge? Lawsuit.</text>
+        <text x="647" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Must be exactly-once.</text>
+
+        <text x="565" y="172" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Correctness &gt; speed. Errors &gt; wrong data.</text>
+        <text x="565" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">PostgreSQL, Spanner, Stripe API</text>
+      </svg>
+
+      <p>Amazon literally pioneered this approach. Their shopping cart is famously AP — they'd rather add an item back into your cart (a minor annoyance that actually <em>increases</em> sales) than lose your cart entirely. But their payment system is absolutely CP — charging someone twice or not at all are both unacceptable.</p>
+    </div>
+  </div>
+
+  <!-- Variation 4: DNS -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-globe icon-gap"></i> DNS — The Ultimate AP System</span></h3>
+    <div class="card-body">
+      <p>The Domain Name System is perhaps the most important AP system on the planet. When you type "google.com" into your browser, DNS translates that into an IP address (like 142.250.80.46). This lookup happens before <em>anything</em> else on the internet works. If DNS is down, the internet is down.</p>
+
+      <p>That's why DNS is aggressively available. Every DNS server caches results with a <span class="tooltip-trigger">TTL<span class="tooltip-content">Time To Live — a timer attached to cached data. When the TTL expires, the cache asks for a fresh copy. DNS TTLs range from 60 seconds to 86,400 seconds (24 hours).</span></span> (Time To Live) — typically 300 seconds to 86,400 seconds (24 hours). Even if the authoritative DNS server is unreachable, your local DNS resolver keeps serving cached results. Are they perfectly up-to-date? Maybe not. But "google.com resolves to an IP that's 6 hours old" is infinitely better than "google.com resolves to nothing."</p>
+
+      <p>DNS propagation delay is a direct consequence of this design. When you change your website's IP address, it can take up to 48 hours for the change to propagate worldwide — because DNS servers everywhere are serving their cached copies until the TTL expires. This is eventual consistency at its most visible: you literally watch it converge, one cache at a time.</p>
+
+      <div class="callout callout-warning">
+        <strong>The 2021 Facebook outage</strong> was a DNS-related incident. A misconfiguration withdrew Facebook's BGP routes, which made their DNS servers unreachable. Because DNS caches expired, eventually nobody could resolve facebook.com. The internet's phone book forgot Facebook's number. $60 million lost in 6 hours.
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>The real lesson from these variations:</strong> Stop thinking "my system is CP" or "my system is AP." Instead, think component by component. Your authentication service might be CP while your feed service is AP. Your payment pipeline might be CP while your analytics pipeline is AP. The best architectures mix both strategies thoughtfully.
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S9  AT SCALE — REAL-WORLD STORIES
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — Real-World Stories</h2>
+    </div>
+  </div>
+
+  <p>Theory is one thing — but how do the biggest companies on Earth actually deal with CAP trade-offs? Let's walk through four real systems and see what choices they made, why they made them, and what they gained (and gave up).</p>
+
+  <!-- SVG: Real-world systems spectrum -->
+  <svg id="cap-scale-spectrum" viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spectrum of real-world systems from CP to AP">
+    <defs>
+      <marker id="cap-sc-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#64748b"/></marker>
+    </defs>
+    <rect x="60" y="40" width="640" height="12" rx="6" fill="#e2e8f0"/>
+    <text x="60" y="30" font-size="12" fill="#1e40af" font-weight="600">Strong Consistency (CP)</text>
+    <text x="560" y="30" font-size="12" fill="#059669" font-weight="600">High Availability (AP)</text>
+    <line x1="60" y1="46" x2="700" y2="46" stroke="none"/>
+    <!-- Spanner -->
+    <circle cx="130" cy="46" r="8" fill="#1e40af"/>
+    <line x1="130" y1="58" x2="130" y2="90" stroke="#1e40af" stroke-width="1.5"/>
+    <rect x="60" y="90" width="140" height="60" rx="8" fill="#eff6ff" stroke="#1e40af" stroke-width="1.5"/>
+    <text x="130" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#1e40af">Google Spanner</text>
+    <text x="130" y="128" text-anchor="middle" font-size="10" fill="#475569">CP with TrueTime</text>
+    <text x="130" y="142" text-anchor="middle" font-size="10" fill="#475569">GPS + atomic clocks</text>
+    <!-- CockroachDB -->
+    <circle cx="280" cy="46" r="8" fill="#7c3aed"/>
+    <line x1="280" y1="58" x2="280" y2="90" stroke="#7c3aed" stroke-width="1.5"/>
+    <rect x="210" y="90" width="140" height="60" rx="8" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="280" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">CockroachDB</text>
+    <text x="280" y="128" text-anchor="middle" font-size="10" fill="#475569">CP distributed SQL</text>
+    <text x="280" y="142" text-anchor="middle" font-size="10" fill="#475569">Raft consensus</text>
+    <!-- MongoDB -->
+    <circle cx="480" cy="46" r="8" fill="#d97706"/>
+    <line x1="480" y1="58" x2="480" y2="90" stroke="#d97706" stroke-width="1.5"/>
+    <rect x="410" y="90" width="140" height="60" rx="8" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+    <text x="480" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#d97706">MongoDB</text>
+    <text x="480" y="128" text-anchor="middle" font-size="10" fill="#475569">Tunable consistency</text>
+    <text x="480" y="142" text-anchor="middle" font-size="10" fill="#475569">Read/write concerns</text>
+    <!-- DynamoDB -->
+    <circle cx="640" cy="46" r="8" fill="#059669"/>
+    <line x1="640" y1="58" x2="640" y2="90" stroke="#059669" stroke-width="1.5"/>
+    <rect x="570" y="90" width="140" height="60" rx="8" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+    <text x="640" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#059669">DynamoDB</text>
+    <text x="640" y="128" text-anchor="middle" font-size="10" fill="#475569">AP by default</text>
+    <text x="640" y="142" text-anchor="middle" font-size="10" fill="#475569">Eventually consistent</text>
+    <!-- Arrow -->
+    <line x1="60" y1="175" x2="700" y2="175" stroke="#64748b" stroke-width="1.5" marker-end="url(#cap-sc-arr)"/>
+    <text x="380" y="200" text-anchor="middle" font-size="11" fill="#64748b">Increasing availability, decreasing consistency guarantees →</text>
+  </svg>
+
+  <!-- DynamoDB -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-database icon-gap"></i>Amazon DynamoDB — Choosing AP</span></h3>
+    <div class="card-body">
+      <p>Amazon built DynamoDB because during holiday sales, even a few seconds of downtime meant millions in lost revenue. Their choice was clear: <strong>availability above all else</strong>. If a network partition happens, DynamoDB keeps accepting writes on every node — it doesn't pause and wait for agreement.</p>
+      <p>The trade-off? Two customers might update the same item at roughly the same time on different nodes, and both writes succeed. DynamoDB handles this with <span class="tooltip-trigger">last-writer-wins<span class="tooltip-content">A conflict resolution strategy where the most recent write (by timestamp) overwrites any earlier conflicting write.</span></span> or application-level conflict resolution. For a shopping cart — the original use case — this is perfectly fine. You'd rather show a slightly stale cart than show an error page.</p>
+      <div class="callout callout-info">DynamoDB does offer a <strong>strongly consistent read</strong> option, but it costs more and has higher latency. The default is eventually consistent — and for most use cases, that's the right call.</div>
+    </div>
+  </div>
+
+  <!-- Spanner -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-satellite icon-gap"></i>Google Spanner — "Effectively CP" with TrueTime</span></h3>
+    <div class="card-body">
+      <p>Google Spanner is often called the system that "breaks" the CAP theorem. It doesn't really — but it bends the rules in a clever way. Spanner is a <span class="tooltip-trigger">CP system<span class="tooltip-content">A system that prioritizes Consistency and Partition tolerance, potentially sacrificing availability during network partitions.</span></span> that achieves extremely high availability (Google quotes 99.999% — about 5 minutes of downtime per year).</p>
+      <p>The secret? <strong>TrueTime</strong> — a globally synchronized clock system using GPS receivers and atomic clocks in every Google data center. Because every server agrees on what time it is (within a few milliseconds), Spanner can order transactions globally without the expensive coordination rounds that other CP systems need. It still sacrifices availability during a real partition, but Google's private network makes partitions so rare that it practically never happens.</p>
+      <div class="callout callout-warning">You can't replicate Spanner's trick at home. TrueTime requires custom hardware in every data center. That's why Spanner is only available as a managed Google Cloud service — nobody else has the infrastructure.</div>
+    </div>
+  </div>
+
+  <!-- CockroachDB -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-bug icon-gap"></i>CockroachDB — Distributed SQL Without Google's Hardware</span></h3>
+    <div class="card-body">
+      <p>CockroachDB asked: "Can we build something like Spanner without GPS clocks?" Their answer is a CP system built on the <span class="tooltip-trigger">Raft consensus protocol<span class="tooltip-content">A consensus algorithm where a leader node coordinates writes and followers replicate them. If the leader fails, a new one is elected.</span></span>. Every write goes through a consensus round — a majority of replicas must agree before the write is confirmed.</p>
+      <p>This means during a partition, if a node can't reach a majority, it stops accepting writes for the affected data range. CockroachDB chose this trade-off because their target users — banks, financial services, SaaS platforms — need strong consistency guarantees. A bank would rather briefly refuse a transaction than accidentally process it twice.</p>
+      <p>To handle the lack of TrueTime, CockroachDB uses <strong>hybrid-logical clocks</strong> (HLC) that combine physical timestamps with logical counters. It's not as tight as Spanner's bounds, but it provides a globally consistent ordering of events that works on commodity hardware.</p>
+    </div>
+  </div>
+
+  <!-- MongoDB -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-leaf icon-gap"></i>MongoDB — The Journey to Tunable Consistency</span></h3>
+    <div class="card-body">
+      <p>MongoDB's story is fascinating because it <em>changed over time</em>. Early MongoDB (pre-3.0) was essentially AP — it used a single primary node for writes, and reads from secondaries could return stale data. If the primary went down, you'd lose recent writes that hadn't replicated yet.</p>
+      <p>Over the years, MongoDB added <span class="tooltip-trigger">tunable consistency<span class="tooltip-content">The ability to configure consistency level per-operation, choosing stronger or weaker guarantees based on what each query needs.</span></span> through <strong>read concerns</strong> and <strong>write concerns</strong>. Today you can say: "For this particular read, I need the latest data" (strong consistency) or "For this analytics query, slightly stale data is fine" (eventual consistency). Different parts of the same application can make different trade-offs.</p>
+      <div class="callout callout-info">MongoDB's journey shows a broader industry trend: modern databases don't pick one side of CAP permanently. They let <em>you</em> choose per-operation, because different data in your app has different consistency needs.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S10  ANTI-LESSONS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lessons">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Anti-Lessons — Things People Get Wrong</h2>
+    </div>
+  </div>
+
+  <p>CAP theorem is probably the most misunderstood concept in distributed systems. These three myths trip up engineers at every level — let's debunk them.</p>
+
+  <!-- SVG: Three myths -->
+  <svg id="cap-myths" viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three common CAP myths">
+    <rect x="20" y="20" width="220" height="120" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="2"/>
+    <text x="130" y="55" text-anchor="middle" font-size="28" fill="#ef4444">&#x2717;</text>
+    <text x="130" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">"Just use CP</text>
+    <text x="130" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">for everything"</text>
+    <text x="130" y="120" text-anchor="middle" font-size="10" fill="#64748b">Kills availability</text>
+
+    <rect x="270" y="20" width="220" height="120" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="2"/>
+    <text x="380" y="55" text-anchor="middle" font-size="28" fill="#ef4444">&#x2717;</text>
+    <text x="380" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">"Eventual = broken</text>
+    <text x="380" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">consistency"</text>
+    <text x="380" y="120" text-anchor="middle" font-size="10" fill="#64748b">Temporarily inconsistent</text>
+
+    <rect x="520" y="20" width="220" height="120" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="2"/>
+    <text x="630" y="55" text-anchor="middle" font-size="28" fill="#ef4444">&#x2717;</text>
+    <text x="630" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">"CAP = pick 2</text>
+    <text x="630" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">out of 3"</text>
+    <text x="630" y="120" text-anchor="middle" font-size="10" fill="#64748b">Oversimplification</text>
+  </svg>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-ban icon-gap"></i>"Just Use CP for Everything"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The myth:</strong> "Consistency is always more important, so every system should be CP. We'll just accept a bit of downtime during partitions."</p>
+        <p><strong>Why it's wrong:</strong> "A bit of downtime" might be fine for an internal admin tool. But imagine telling millions of users they can't access their email, their shopping cart, or their social feed because two data centers temporarily lost contact. For many applications, showing slightly stale data is infinitely better than showing an error page.</p>
+        <p><strong>The real lesson:</strong> The right choice depends on what your users are doing. A banking transfer? Yes, consistency matters — you don't want to double-spend. A social media "like" count? Nobody cares if it's off by one for a few seconds. Match the guarantee to the operation, not the whole system.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-ban icon-gap"></i>"Eventual Consistency Means Inconsistent"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The myth:</strong> "If a system is eventually consistent, it's broken — users will see wrong data and you can never trust it."</p>
+        <p><strong>Why it's wrong:</strong> "Eventually consistent" means <em>temporarily</em> inconsistent. After a write, all replicas <strong>will</strong> converge to the same value — it just might take a few milliseconds (or in extreme cases, seconds). The word "eventually" sounds scary, but in practice, replication lag on systems like DynamoDB is typically under 100 milliseconds.</p>
+        <p><strong>The real lesson:</strong> Think of it like a text message. When you send a message, there's a tiny delay before the other person sees it. That's "eventual consistency" — and nobody calls texting "broken." The data will get there; it just hasn't arrived yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-ban icon-gap"></i>"CAP Means I Can Only Use 2 Features"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The myth:</strong> "CAP says pick 2 out of 3 — so my system either has C+A, C+P, or A+P. It's a permanent choice."</p>
+        <p><strong>Why it's wrong:</strong> First, you can't drop <span class="tooltip-trigger">Partition tolerance<span class="tooltip-content">The system continues operating despite network partitions (communication breakdowns between nodes).</span></span> in a distributed system — partitions happen whether you like it or not. So it's really a choice between C and A <em>during a partition</em>. Second, the trade-off only kicks in when a partition actually occurs. When the network is healthy (which is most of the time), you get all three.</p>
+        <p><strong>The real lesson:</strong> CAP is not a permanent configuration switch — it's a description of what happens during failure. Modern systems like MongoDB and Cassandra even let you make <em>different</em> trade-offs for different operations. The "pick 2" framing is a useful starting point but a terrible ending point.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S11  COMMON MISTAKES
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-bug"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes</h2>
+    </div>
+  </div>
+
+  <p>These are the pitfalls that catch people in system design interviews and in production. Knowing them saves you from embarrassing moments and bad architectural decisions.</p>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i>Treating CAP as a Database Selection Framework</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> "I need consistency, so I'll pick a CP database like PostgreSQL, and my job is done."</p>
+        <p><strong>Why it's wrong:</strong> CAP describes trade-offs during network partitions in <em>distributed</em> systems. A single-node PostgreSQL isn't making a CAP trade-off at all — it's just a database. CAP only becomes relevant when you replicate data across multiple nodes. Even then, the database label (CP/AP) is just a default — most modern databases let you tune consistency per-query.</p>
+        <p><strong>What to do instead:</strong> Choose databases based on your data model, query patterns, and operational needs first. Then configure the consistency level per-operation based on what each piece of data actually requires.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i>Ignoring That Partitions Are Rare</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Designing your entire architecture around worst-case partition scenarios when partitions happen less than 0.01% of the time.</p>
+        <p><strong>Why it's wrong:</strong> The CAP trade-off only matters <em>during</em> a partition. The other 99.99% of the time, your system has all three properties. If you over-optimize for partition behavior, you're paying a constant performance/complexity tax for something that rarely happens. This is where <span class="tooltip-trigger">PACELC<span class="tooltip-content">An extension of CAP: during Partition choose A or C; Else (normal operation) choose Latency or Consistency.</span></span> helps — it forces you to think about the normal-case trade-off too.</p>
+        <p><strong>What to do instead:</strong> Design for the common case first (low latency vs. strong consistency), then add a partition-handling strategy. Don't let rare failure modes dictate your everyday architecture.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i>Not Understanding Tunable Consistency</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Assuming a database is either "consistent" or "eventually consistent" — no middle ground.</p>
+        <p><strong>Why it's wrong:</strong> Modern distributed databases like Cassandra, DynamoDB, and MongoDB offer a <strong>spectrum</strong> of consistency levels. Cassandra, for example, lets you set consistency per-query: <code>ONE</code> (fast, eventually consistent), <code>QUORUM</code> (majority must agree), or <code>ALL</code> (every replica must respond). You can use <code>QUORUM</code> for writes and <code>ONE</code> for reads in the same application.</p>
+        <p><strong>What to do instead:</strong> Learn the consistency options of whatever database you use. Map each operation in your app to the weakest consistency level it can tolerate — this gives you the best performance without sacrificing correctness where it matters.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i>Confusing Consistency Models</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Mixing up CAP consistency (linearizability) with ACID consistency (database constraints) with cache consistency (staleness).</p>
+        <p><strong>Why it's wrong:</strong> The word "consistency" means different things in different contexts. In CAP, it means every read sees the most recent write (<span class="tooltip-trigger">linearizability<span class="tooltip-content">A consistency guarantee where every operation appears to happen at a single instant in time, and reads always return the latest write.</span></span>). In ACID, it means transactions don't violate database rules (foreign keys, constraints). In caching, it means the cache matches the source. These are three separate concepts that happen to share a name.</p>
+        <p><strong>What to do instead:</strong> When discussing consistency, always specify which kind you mean. In interviews, saying "I want CAP-consistency (linearizable reads)" shows you understand the distinction — and that impresses interviewers.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i>Assuming Your App Needs Strong Consistency Everywhere</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> "Our system handles money, so every single read must be strongly consistent."</p>
+        <p><strong>Why it's wrong:</strong> Even in financial systems, not every read needs the absolute latest data. The account balance shown on a dashboard? Slightly stale is fine (it updates in seconds). The balance checked <em>during a transfer</em>? That needs strong consistency. The transaction history page? Eventually consistent is perfectly acceptable.</p>
+        <p><strong>What to do instead:</strong> Audit each operation in your system and ask: "What's the worst that happens if this data is 1 second stale?" If the answer is "nothing meaningful," use eventual consistency there and save strong consistency for the operations that truly need it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i>Forgetting PACELC</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Discussing only CAP trade-offs and ignoring what happens when the network is healthy.</p>
+        <p><strong>Why it's wrong:</strong> Partitions are rare. What matters day-to-day is the <strong>latency vs. consistency</strong> trade-off that PACELC describes. A system might be AP during partitions (good), but also choose low-latency over consistency during normal operation (which could be bad if you need fresh data). Without PACELC, you're only seeing half the picture.</p>
+        <p><strong>What to do instead:</strong> Always discuss both scenarios: "During a partition, this system favors availability. During normal operation, it favors low latency with eventual consistency." This gives the complete picture and shows maturity in your understanding.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S12  INTERVIEW PLAYBOOK
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-microphone"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook</h2>
+    </div>
+  </div>
+
+  <p>CAP theorem is one of the most frequently asked topics in system design interviews. Here's a structured approach to answering questions at any level.</p>
+
+  <!-- SVG: Interview answer framework -->
+  <svg id="cap-interview-flow" viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview answer framework for CAP questions">
+    <defs>
+      <marker id="cap-iv-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#1e40af"/></marker>
+    </defs>
+    <!-- Step 1 -->
+    <rect x="20" y="40" width="150" height="80" rx="10" fill="#eff6ff" stroke="#1e40af" stroke-width="2"/>
+    <text x="95" y="68" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">1. Define the</text>
+    <text x="95" y="84" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">three properties</text>
+    <text x="95" y="104" text-anchor="middle" font-size="10" fill="#475569">C, A, P in</text>
+    <text x="95" y="118" text-anchor="middle" font-size="10" fill="#475569">plain English</text>
+    <line x1="170" y1="80" x2="200" y2="80" stroke="#1e40af" stroke-width="2" marker-end="url(#cap-iv-arr)"/>
+    <!-- Step 2 -->
+    <rect x="205" y="40" width="150" height="80" rx="10" fill="#eff6ff" stroke="#1e40af" stroke-width="2"/>
+    <text x="280" y="68" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">2. Explain the</text>
+    <text x="280" y="84" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">real trade-off</text>
+    <text x="280" y="104" text-anchor="middle" font-size="10" fill="#475569">CP vs AP during</text>
+    <text x="280" y="118" text-anchor="middle" font-size="10" fill="#475569">partition only</text>
+    <line x1="355" y1="80" x2="385" y2="80" stroke="#1e40af" stroke-width="2" marker-end="url(#cap-iv-arr)"/>
+    <!-- Step 3 -->
+    <rect x="390" y="40" width="150" height="80" rx="10" fill="#eff6ff" stroke="#1e40af" stroke-width="2"/>
+    <text x="465" y="68" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">3. Give real</text>
+    <text x="465" y="84" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">examples</text>
+    <text x="465" y="104" text-anchor="middle" font-size="10" fill="#475569">DynamoDB, Spanner,</text>
+    <text x="465" y="118" text-anchor="middle" font-size="10" fill="#475569">Cassandra</text>
+    <line x1="540" y1="80" x2="570" y2="80" stroke="#1e40af" stroke-width="2" marker-end="url(#cap-iv-arr)"/>
+    <!-- Step 4 -->
+    <rect x="575" y="40" width="160" height="80" rx="10" fill="#dbeafe" stroke="#1e40af" stroke-width="2"/>
+    <text x="655" y="68" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">4. Mention PACELC</text>
+    <text x="655" y="84" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">for bonus points</text>
+    <text x="655" y="104" text-anchor="middle" font-size="10" fill="#475569">Normal-case trade-off:</text>
+    <text x="655" y="118" text-anchor="middle" font-size="10" fill="#475569">Latency vs Consistency</text>
+    <!-- Bottom note -->
+    <rect x="200" y="150" width="360" height="36" rx="8" fill="#f0fdf4" stroke="#059669" stroke-width="1.5"/>
+    <text x="380" y="173" text-anchor="middle" font-size="11" font-weight="600" fill="#059669">&#x2714; Always tie back to the specific system you're designing</text>
+  </svg>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="cap-iv-beginner" role="tab" aria-selected="true">Beginner</button>
+      <button class="tab-btn" data-tab="cap-iv-intermediate" role="tab" aria-selected="false">Intermediate</button>
+      <button class="tab-btn" data-tab="cap-iv-advanced" role="tab" aria-selected="false">Advanced</button>
+    </div>
+
+    <div class="tab-panel active" id="cap-iv-beginner" role="tabpanel">
+      <p><strong>Typical question:</strong> "What is the CAP theorem?"</p>
+      <p><strong>What they're testing:</strong> Can you explain the three properties and the fundamental trade-off?</p>
+      <div class="callout callout-info">
+        <strong>Sample answer:</strong> "CAP theorem says a distributed system can't guarantee all three of these at the same time: Consistency — every read gets the latest write; Availability — every request gets a response; Partition tolerance — the system works even when network links break. Since network partitions are unavoidable in distributed systems, we're really choosing between consistency and availability during a partition. For example, DynamoDB favors availability — it keeps serving requests even if some replicas are behind. Spanner favors consistency — it waits until replicas agree."
+      </div>
+    </div>
+
+    <div class="tab-panel" id="cap-iv-intermediate" role="tabpanel">
+      <p><strong>Typical question:</strong> "You're designing a global e-commerce platform. How do you handle the CAP trade-off?"</p>
+      <p><strong>What they're testing:</strong> Can you apply CAP to a real design, and do you know it's not one-size-fits-all?</p>
+      <div class="callout callout-info">
+        <strong>Sample answer:</strong> "I'd use different consistency levels for different parts of the system. The product catalog and search index can be eventually consistent — it's fine if a price update takes a second to propagate. But the inventory count at checkout needs strong consistency — we can't sell items we don't have. For payments, I'd use a CP approach with distributed transactions. I'd also mention PACELC: even when there's no partition, we're trading latency for consistency. For the catalog, I'd choose low latency; for checkout, I'd accept higher latency for correctness."
+      </div>
+    </div>
+
+    <div class="tab-panel" id="cap-iv-advanced" role="tabpanel">
+      <p><strong>Typical question:</strong> "How does PACELC extend CAP? How would you classify DynamoDB and Spanner under PACELC?"</p>
+      <p><strong>What they're testing:</strong> Deep understanding of consistency trade-offs beyond the basic theorem.</p>
+      <div class="callout callout-info">
+        <strong>Sample answer:</strong> "PACELC adds the normal-case trade-off that CAP ignores. During a Partition, choose Availability or Consistency. Else, choose Latency or Consistency. DynamoDB is PA/EL — during partitions it favors availability, and during normal operation it favors low latency with eventual consistency. Spanner is PC/EC — it favors consistency in both cases, but achieves low latency through TrueTime's tight clock bounds rather than expensive coordination rounds. CockroachDB is also PC/EC but without Spanner's hardware advantage, so it pays a slightly higher latency cost for consistency. The interesting case is Cosmos DB — it's tunable across five consistency levels, so it can be PA/EL or PC/EC depending on configuration."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S13  EXERCISES
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Practice Exercises</h2>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 1 — Classify the System</span>
+      <span class="difficulty-tag difficulty-beginner">Beginner</span>
+    </div>
+    <p>A social media platform shows a "likes" count on posts. The count is replicated across 3 data centers. During a network partition between data centers, users can still like posts, but different data centers may show different counts for a few seconds. After the partition heals, all counts converge.</p>
+    <p><strong>Task:</strong> Is this system CP or AP? Classify it under PACELC as well.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Ask yourself: during the partition, does the system stop accepting writes (CP) or keep accepting them with possibly stale reads (AP)?</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>AP</strong> — the system keeps accepting likes during the partition (availability) at the cost of temporary inconsistency. Under PACELC: <strong>PA/EL</strong> — during partitions it favors availability, and during normal operation it favors low latency (the count may be slightly stale for better performance).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 2 — Design the Trade-off</span>
+      <span class="difficulty-tag difficulty-intermediate">Intermediate</span>
+    </div>
+    <p>You're building an airline booking system. Two users in different regions try to book the last seat on the same flight at the same time. A network partition occurs between the regions.</p>
+    <p><strong>Task:</strong> Should the booking system be CP or AP? What happens to each user during the partition? What happens after it heals?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Think about the consequences of double-booking a seat vs. temporarily refusing a booking. Which is worse for the business?</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>CP</strong> — double-booking means one passenger gets bumped at the gate, which is a terrible experience and may violate regulations. It's better to refuse the booking during a partition ("Sorry, we can't confirm right now") and retry once connectivity is restored. During the partition, one region can complete the booking (whichever has the majority/leader), while the other returns an error asking the user to try again. After healing, the seat is confirmed for exactly one user.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 3 — PACELC Classification</span>
+      <span class="difficulty-tag difficulty-intermediate">Intermediate</span>
+    </div>
+    <p>Given these four systems, classify each under PACELC:</p>
+    <ol>
+      <li>A DNS system that caches records and serves stale data during failures.</li>
+      <li>A banking ledger that blocks operations until all replicas confirm a write.</li>
+      <li>A content delivery network (CDN) that serves cached pages even when the origin is unreachable.</li>
+      <li>A distributed lock service (like ZooKeeper) that refuses requests during partitions.</li>
+    </ol>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ol>
+            <li><strong>DNS → PA/EL</strong> — serves stale during partition (A), caches for speed in normal operation (L)</li>
+            <li><strong>Banking ledger → PC/EC</strong> — blocks during partition (C), waits for all replicas normally (C over L)</li>
+            <li><strong>CDN → PA/EL</strong> — serves cached content during partition (A), uses caching for low latency normally (L)</li>
+            <li><strong>ZooKeeper → PC/EC</strong> — refuses during partition (C), ensures linearizable reads normally (C over L)</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 4 — Mixed Consistency Design</span>
+      <span class="difficulty-tag difficulty-advanced">Advanced</span>
+    </div>
+    <p>You're designing a food delivery app with these features: restaurant menu display, order placement, real-time driver tracking, and payment processing.</p>
+    <p><strong>Task:</strong> For each feature, decide whether it should be CP or AP. Explain your reasoning and what database/consistency level you'd use.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Feature</th><th>CP or AP</th><th>Reasoning</th></tr></thead>
+              <tbody>
+                <tr><td>Menu display</td><td>AP</td><td>Slightly stale prices are fine; showing nothing is not</td></tr>
+                <tr><td>Order placement</td><td>CP</td><td>Double-ordering or losing an order is unacceptable</td></tr>
+                <tr><td>Driver tracking</td><td>AP</td><td>Showing a position from 2 sec ago is fine; no map is terrible</td></tr>
+                <tr><td>Payment</td><td>CP</td><td>Money must be handled with strong consistency; double-charging is a disaster</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 5 — Partition Simulation</span>
+      <span class="difficulty-tag difficulty-advanced">Advanced</span>
+    </div>
+    <p>You have a 3-node database cluster (nodes A, B, C). A network partition splits them into two groups: {A, B} and {C}. A client connected to node C writes <code>balance = 500</code>. A client connected to node A reads <code>balance</code>.</p>
+    <p><strong>Task:</strong> Describe what happens under (a) a CP system and (b) an AP system. Then describe what happens after the partition heals in each case.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>(a) CP system:</strong> Node C cannot reach a majority (it's alone), so the write is <strong>rejected</strong>. The client gets an error. Nodes A and B form a majority and continue serving reads/writes normally. After healing, node C syncs up from A/B — no conflict because C didn't accept the write.</p>
+          <p><strong>(b) AP system:</strong> Node C <strong>accepts</strong> the write locally (<code>balance = 500</code>). Node A serves a read with the old balance value. After healing, the system detects a conflict — node C has <code>500</code>, nodes A/B have the old value. Conflict resolution kicks in (last-writer-wins, vector clocks, or application-level merge) to reconcile the values across all nodes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S14  CHEAT SHEET
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Cheat Sheet</h2>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title">CAP in One Sentence</div>
+      <div class="cheat-card-body">
+<pre>During a network partition,
+a distributed system must
+choose between:
+
+  Consistency → reject requests
+  Availability → serve stale data
+
+You can't have both at once.</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">PACELC Formula</div>
+      <div class="cheat-card-body">
+<pre>IF   partition → A or C
+ELSE            → L or C
+
+DynamoDB:   PA / EL
+Spanner:    PC / EC
+Cassandra:  PA / EL
+MongoDB:    PA / EC (default)
+ZooKeeper:  PC / EC</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">CP vs AP Quick Check</div>
+      <div class="cheat-card-body">
+<pre>Choose CP when:
+ ✓ Money / inventory
+ ✓ Booking / reservations
+ ✓ Distributed locks
+
+Choose AP when:
+ ✓ Social feeds / likes
+ ✓ Product catalogs
+ ✓ Session data / carts</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Consistency ≠ Consistency</div>
+      <div class="cheat-card-body">
+<pre>CAP  → linearizability
+       (latest write visible)
+
+ACID → constraints satisfied
+       (FK, unique, checks)
+
+Cache → freshness
+       (matches source)</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Tunable Consistency</div>
+      <div class="cheat-card-body">
+<pre>Cassandra levels:
+  ONE     → fastest, weakest
+  QUORUM  → majority agrees
+  ALL     → slowest, strongest
+
+Rule of thumb:
+  W + R > N → strong consistency
+  (write + read > replicas)</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Interview One-Liner</div>
+      <div class="cheat-card-body">
+<pre>"CAP only applies during
+partitions. In normal
+operation, use PACELC to
+reason about latency vs
+consistency trade-offs."
+
+This one sentence sets you
+apart from 90% of candidates.</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S15  CONNECTED TOPICS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon blue"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics</h2>
+    </div>
+  </div>
+
+  <p>CAP theorem doesn't exist in isolation — it connects to many other distributed systems concepts. Here's where to go next to deepen your understanding.</p>
+
+  <!-- SVG: Connected topics web -->
+  <svg id="cap-connected" viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Connected topics web showing CAP theorem relationships">
+    <!-- Center node -->
+    <circle cx="380" cy="140" r="45" fill="#1e40af" stroke="#1e3a8a" stroke-width="2"/>
+    <text x="380" y="134" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">CAP Theorem</text>
+    <text x="380" y="150" text-anchor="middle" font-size="11" fill="#bfdbfe">& PACELC</text>
+    <!-- Lines -->
+    <line x1="335" y1="130" x2="170" y2="70" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="335" y1="150" x2="170" y2="210" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="425" y1="130" x2="590" y2="70" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="425" y1="150" x2="590" y2="210" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="380" y1="95" x2="380" y2="40" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="380" y1="185" x2="380" y2="240" stroke="#94a3b8" stroke-width="1.5"/>
+    <!-- Nodes -->
+    <rect x="70" y="45" width="140" height="50" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="140" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Consensus</text>
+    <text x="140" y="84" text-anchor="middle" font-size="10" fill="#64748b">Raft, Paxos</text>
+
+    <rect x="70" y="185" width="140" height="50" rx="10" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+    <text x="140" y="208" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Replication</text>
+    <text x="140" y="224" text-anchor="middle" font-size="10" fill="#64748b">Leader-follower, Quorum</text>
+
+    <rect x="550" y="45" width="140" height="50" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="620" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Consistency</text>
+    <text x="620" y="84" text-anchor="middle" font-size="10" fill="#64748b">Strong, Eventual, Causal</text>
+
+    <rect x="550" y="185" width="140" height="50" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="620" y="208" text-anchor="middle" font-size="11" font-weight="600" fill="#991b1b">Distributed DBs</text>
+    <text x="620" y="224" text-anchor="middle" font-size="10" fill="#64748b">Spanner, Dynamo, Cassandra</text>
+
+    <rect x="310" y="10" width="140" height="50" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="380" y="33" text-anchor="middle" font-size="11" font-weight="600" fill="#6d28d9">Partitioning</text>
+    <text x="380" y="49" text-anchor="middle" font-size="10" fill="#64748b">Sharding, Hashing</text>
+
+    <rect x="310" y="230" width="140" height="50" rx="10" fill="#fff1f2" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="380" y="253" text-anchor="middle" font-size="11" font-weight="600" fill="#be123c">Transactions</text>
+    <text x="380" y="269" text-anchor="middle" font-size="10" fill="#64748b">ACID, Saga, 2PC</text>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-handshake"></i></div>
+      <div class="related-card-text">
+        <h4>Consensus Algorithms</h4>
+        <p>Raft and Paxos — how CP systems get nodes to agree on a single value, even when some nodes fail.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-clone"></i></div>
+      <div class="related-card-text">
+        <h4>Data Replication</h4>
+        <p>Leader-follower, multi-leader, and leaderless replication — the foundation that makes CAP trade-offs real.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="related-card-text">
+        <h4>Consistency Models</h4>
+        <p>Strong, eventual, causal, and read-your-writes — the spectrum of guarantees beyond just "C" in CAP.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Distributed Databases</h4>
+        <p>Deep dives into DynamoDB, Cassandra, Spanner, and CockroachDB — how each navigates CAP and PACELC.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+      <div class="related-card-text">
+        <h4>Data Partitioning</h4>
+        <p>Sharding and consistent hashing — how to split data across nodes, and why partitions become inevitable at scale.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+      <div class="related-card-text">
+        <h4>Distributed Transactions</h4>
+        <p>Two-phase commit, Saga pattern, and eventual consistency patterns — managing data integrity across services.</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
