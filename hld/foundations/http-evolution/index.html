@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTTP Evolution — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="purple" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-link"></i> Networking</div>
+    <h1>HTTP/1.1, HTTP/2, HTTP/3 &amp; QUIC</h1>
+    <p class="hero-subtitle">The web's delivery truck got faster three times — each upgrade solved a bottleneck the previous version couldn't fix. Here's the full story, from painfully slow page loads to blazing-fast zero-round-trip connections.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 7 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 22 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-circle-info"></i> 18 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> HTTP evolves like highway engineering. HTTP/1.0 was a single-lane dirt road (one car at a time). HTTP/1.1 paved it and let cars queue up. HTTP/2 turned it into a multi-lane highway (many cars at once). HTTP/3 said "forget roads entirely" and built a maglev train that doesn't get stuck when one rail breaks.
+  </div>
+
+  <p>Every time you open a website, your browser talks to a server using <span class="tooltip">HTTP<span class="tooltip-text">HyperText Transfer Protocol — the language browsers and servers use to exchange web pages, images, APIs, and pretty much everything on the internet.</span></span>. The problem? The original version was painfully slow for modern websites. Each new version of HTTP exists because the previous one had a specific bottleneck that made the web feel sluggish. Understanding these bottlenecks — and the clever solutions each version introduced — is essential for any engineer who builds things on the web.</p>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP version timeline showing the evolution from 1.0 to 3">
+    <defs>
+      <marker id="http-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #a78bfa)"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Evolution at a Glance</text>
+
+    <!-- Timeline -->
+    <line x1="60" y1="90" x2="700" y2="90" stroke="var(--border-primary, #334155)" stroke-width="3"/>
+
+    <!-- HTTP/1.0 -->
+    <circle cx="120" cy="90" r="10" fill="#ef4444"/>
+    <text x="120" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">HTTP/1.0</text>
+    <text x="120" y="60" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">1996</text>
+    <text x="120" y="115" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">New connection</text>
+    <text x="120" y="128" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">per request</text>
+
+    <!-- Arrow -->
+    <line x1="145" y1="90" x2="255" y2="90" stroke="var(--accent-primary, #a78bfa)" stroke-width="2" marker-end="url(#http-tldr-arr)"/>
+
+    <!-- HTTP/1.1 -->
+    <circle cx="280" cy="90" r="10" fill="#f59e0b"/>
+    <text x="280" y="75" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="12">HTTP/1.1</text>
+    <text x="280" y="60" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">1997</text>
+    <text x="280" y="115" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Keep-alive</text>
+    <text x="280" y="128" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">+ pipelining</text>
+
+    <!-- Arrow -->
+    <line x1="305" y1="90" x2="415" y2="90" stroke="var(--accent-primary, #a78bfa)" stroke-width="2" marker-end="url(#http-tldr-arr)"/>
+
+    <!-- HTTP/2 -->
+    <circle cx="440" cy="90" r="10" fill="#10b981"/>
+    <text x="440" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">HTTP/2</text>
+    <text x="440" y="60" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">2015</text>
+    <text x="440" y="115" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Multiplexing</text>
+    <text x="440" y="128" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">+ binary frames</text>
+
+    <!-- Arrow -->
+    <line x1="465" y1="90" x2="575" y2="90" stroke="var(--accent-primary, #a78bfa)" stroke-width="2" marker-end="url(#http-tldr-arr)"/>
+
+    <!-- HTTP/3 -->
+    <circle cx="600" cy="90" r="10" fill="var(--accent-primary, #a78bfa)"/>
+    <text x="600" y="75" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="12">HTTP/3</text>
+    <text x="600" y="60" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">2022</text>
+    <text x="600" y="115" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">QUIC over UDP</text>
+    <text x="600" y="128" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">+ 0-RTT</text>
+
+    <!-- Bottom summary -->
+    <rect x="100" y="150" width="560" height="35" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="380" y="172" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-size="11" font-weight="600">Each version solves the previous version's biggest bottleneck</text>
+  </svg>
+
+  <p>Here's the pattern: <strong>HTTP/1.0</strong> opened a brand-new connection for every single file — brutally wasteful. <strong>HTTP/1.1</strong> fixed that by reusing connections, but requests still had to wait in line one after another. <strong>HTTP/2</strong> let multiple requests fly over a single connection simultaneously — a massive leap. But it ran on <span class="tooltip">TCP<span class="tooltip-text">Transmission Control Protocol — a reliable transport layer that guarantees data arrives in order and without errors, at the cost of some overhead.</span></span>, and when one packet got lost, everything froze. <strong>HTTP/3</strong> ditched TCP entirely, switching to a new transport called <span class="tooltip">QUIC<span class="tooltip-text">Quick UDP Internet Connections — a transport protocol built on UDP that provides reliable delivery, encryption, and multiplexing without TCP's head-of-line blocking problem.</span></span> that doesn't have this freezing problem.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> HTTP/1.1 reuses connections. HTTP/2 multiplexes streams. HTTP/3 eliminates TCP's blocking with QUIC. Each version makes the web measurably faster.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario — Why Does My Website Load So Slowly?</h2>
+    </div>
+  </div>
+
+  <p>Imagine you've built a beautiful e-commerce website. The homepage has 1 HTML file, 3 CSS files, 5 JavaScript files, 40 product images, 2 font files, and a few API calls — roughly <strong>55 individual resources</strong>. You deploy it, open it on your phone over a decent connection, and... it takes <strong>8 seconds</strong> to fully load. Your competitor's site, with similar content, loads in 1.5 seconds. What's going on?</p>
+
+  <p>The bottleneck isn't your server speed. It isn't your internet bandwidth. The problem is <em>how your browser fetches those 55 files</em>. The protocol — the set of rules your browser and server use to talk to each other — is forcing your browser to be painfully polite, asking for one thing at a time and waiting patiently for each response before asking for the next.</p>
+
+  <div class="callout callout-warning">
+    <strong>The core pain:</strong> A modern web page needs 50-100 separate resources. If the protocol forces you to fetch them one by one, no amount of server optimization can save you. The protocol itself is the bottleneck.
+  </div>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A modern webpage requiring 55 separate resources loaded one by one">
+    <defs>
+      <marker id="http-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #a78bfa)"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="24" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="14">A Single Web Page = Dozens of Requests</text>
+
+    <!-- Browser box -->
+    <rect x="30" y="50" width="140" height="260" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1.5"/>
+    <text x="100" y="75" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="12">BROWSER</text>
+    <text x="100" y="100" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Needs to fetch:</text>
+    <text x="55" y="120" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="9">1 × HTML</text>
+    <text x="55" y="137" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="9">3 × CSS</text>
+    <text x="55" y="154" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="9">5 × JS</text>
+    <text x="55" y="171" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="9">40 × Images</text>
+    <text x="55" y="188" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="9">2 × Fonts</text>
+    <text x="55" y="205" fill="var(--text-secondary, #94a3b8)" font-family="JetBrains Mono, monospace" font-size="9">4 × API calls</text>
+    <rect x="45" y="220" width="110" height="24" rx="5" fill="var(--accent-primary, #a78bfa)" opacity="0.15"/>
+    <text x="100" y="237" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="11">55 requests!</text>
+
+    <!-- Server box -->
+    <rect x="590" y="50" width="140" height="260" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="660" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">SERVER</text>
+    <text x="660" y="100" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Ready to serve</text>
+    <text x="660" y="118" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">all 55 instantly</text>
+    <text x="660" y="160" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="28">⚡</text>
+    <text x="660" y="200" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Response time:</text>
+    <text x="660" y="218" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">~5ms each</text>
+
+    <!-- Slow serial arrows -->
+    <line x1="175" y1="100" x2="585" y2="100" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#http-s2-arr)"/>
+    <text x="380" y="95" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Request 1 → wait → response</text>
+
+    <line x1="175" y1="140" x2="585" y2="140" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#http-s2-arr)"/>
+    <text x="380" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Request 2 → wait → response</text>
+
+    <line x1="175" y1="180" x2="585" y2="180" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#http-s2-arr)"/>
+    <text x="380" y="175" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Request 3 → wait → response</text>
+
+    <text x="380" y="210" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="11">. . . 52 more waiting . . .</text>
+
+    <line x1="175" y1="240" x2="585" y2="240" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#http-s2-arr)"/>
+    <text x="380" y="235" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Request 55 → wait → response</text>
+
+    <!-- Time label -->
+    <rect x="270" y="265" width="220" height="35" rx="8" fill="#ef4444" opacity="0.12"/>
+    <text x="380" y="288" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Total: ~8 seconds of waiting</text>
+  </svg>
+
+  <p>The server can respond in 5 milliseconds. But the browser spends most of its time <em>waiting</em> — waiting for the connection to be established, waiting for the previous response to finish before sending the next request, waiting because the protocol says you must wait. The actual data transfer is lightning fast. The <strong>protocol overhead</strong> is what kills you.</p>
+
+  <div class="callout callout-purple">
+    <strong>🧠 Think First:</strong> If you had 55 files to download and each takes 5ms to serve, but creating a connection takes 100ms (a TCP handshake), how long would it take if you needed a brand-new connection for <em>every single file</em>? Do the math before reading on.
+  </div>
+
+  <p>If you did the math: 55 files × (100ms handshake + 5ms transfer) = <strong>5,775ms</strong> — nearly 6 seconds spent mostly on handshakes, not actual data. That's the world of HTTP/1.0, and it's where our story begins.</p>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT (HTTP/1.0)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-door-open"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — HTTP/1.0: One Request, One Connection</h2>
+    </div>
+  </div>
+
+  <p>When the web was born in the early 1990s, web pages were simple — a single HTML file with maybe a handful of images. The protocol designed for this world, <strong>HTTP/1.0</strong> (standardized in 1996), had a very straightforward rule: every time you need a file, you open a brand-new connection, download the file, and then close the connection. Done. Next file? Open a brand-new connection again.</p>
+
+  <p>Think of it like a phone call to a restaurant. You call to order a burger. They take your order, hang up. Now you want fries. You call again. They take your order, hang up. Want a drink? Call again. Every single item requires a completely new phone call — with all the dialing, ringing, and "hello, how can I help you?" overhead each time.</p>
+
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP/1.0 connection lifecycle: open, request, response, close, repeat">
+    <defs>
+      <marker id="http-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #a78bfa)"/>
+      </marker>
+      <marker id="http-s3-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+      <marker id="http-s3-arr-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="24" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="14">HTTP/1.0 — Every Request Opens a New Connection</text>
+
+    <!-- Browser / Server labels -->
+    <text x="80" y="52" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="12">BROWSER</text>
+    <text x="680" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">SERVER</text>
+    <line x1="80" y1="60" x2="80" y2="310" stroke="var(--accent-primary, #a78bfa)" stroke-width="2"/>
+    <line x1="680" y1="60" x2="680" y2="310" stroke="#10b981" stroke-width="2"/>
+
+    <!-- Request 1 -->
+    <text x="60" y="78" text-anchor="end" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Req 1</text>
+    <line x1="85" y1="75" x2="675" y2="85" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#http-s3-arr)"/>
+    <text x="380" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">TCP handshake (SYN → SYN-ACK → ACK) ~100ms</text>
+    <line x1="675" y1="95" x2="85" y2="105" stroke="#10b981" stroke-width="1.5" marker-end="url(#http-s3-arr-grn)"/>
+    <text x="380" y="95" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">GET /index.html → 200 OK (~5ms)</text>
+    <line x1="85" y1="110" x2="675" y2="110" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+    <text x="380" y="122" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Connection CLOSED ✗</text>
+
+    <!-- Request 2 -->
+    <text x="60" y="148" text-anchor="end" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Req 2</text>
+    <line x1="85" y1="145" x2="675" y2="155" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#http-s3-arr)"/>
+    <text x="380" y="142" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">NEW TCP handshake ~100ms (again!)</text>
+    <line x1="675" y1="165" x2="85" y2="175" stroke="#10b981" stroke-width="1.5" marker-end="url(#http-s3-arr-grn)"/>
+    <text x="380" y="165" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">GET /style.css → 200 OK (~5ms)</text>
+    <line x1="85" y1="180" x2="675" y2="180" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+    <text x="380" y="192" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Connection CLOSED ✗</text>
+
+    <!-- Request 3 dots -->
+    <text x="380" y="218" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="12">⋮  53 more connections opened and closed  ⋮</text>
+
+    <!-- Request 55 -->
+    <text x="60" y="248" text-anchor="end" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Req 55</text>
+    <line x1="85" y1="245" x2="675" y2="255" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#http-s3-arr)"/>
+    <text x="380" y="242" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">ANOTHER new TCP handshake ~100ms</text>
+    <line x1="675" y1="265" x2="85" y2="275" stroke="#10b981" stroke-width="1.5" marker-end="url(#http-s3-arr-grn)"/>
+    <text x="380" y="265" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">GET /product-40.jpg → 200 OK (~5ms)</text>
+    <line x1="85" y1="280" x2="675" y2="280" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+
+    <!-- Total waste -->
+    <rect x="230" y="290" width="300" height="26" rx="6" fill="#ef4444" opacity="0.12"/>
+    <text x="380" y="308" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">55 handshakes × 100ms = 5,500ms wasted on setup</text>
+  </svg>
+
+  <p>This was fine when a web page had 3 files. But by the mid-2000s, pages had 50-100 resources. Each one needed its own <span class="tooltip">TCP handshake<span class="tooltip-text">A three-step process (SYN → SYN-ACK → ACK) that two computers use to establish a reliable connection. Takes one round trip — typically 50-150ms depending on distance.</span></span> — a back-and-forth greeting that takes one full round trip. On a connection with 100ms latency (common for cross-continent requests), that's <strong>100ms of pure overhead per file</strong>, before a single byte of actual data transfers.</p>
+
+  <div class="callout callout-info">
+    <strong>Did HTTP/1.1 fix this?</strong> Partially. It introduced <strong>keep-alive</strong> — reusing the same connection for multiple requests. But it had its own problem, which we'll see in the next section. The connection stayed open, but requests still had to wait in line.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — Head-of-Line Blocking &amp; Connection Limits</h2>
+    </div>
+  </div>
+
+  <p>HTTP/1.1 (1997) made a crucial improvement: <strong>persistent connections</strong>. Instead of opening and closing a connection for every file, the browser keeps the connection open and sends multiple requests over it. Great! But here's the catch — requests must still go one after another on a single connection. You send request 1, wait for the response, then send request 2, wait for the response, and so on.</p>
+
+  <p>This is like being in a single-file checkout line at a grocery store. The person at the front is paying with a complicated coupon that takes 30 seconds to process. Everyone behind them — even people with a single item — has to wait. That slow request at the front <strong>blocks everything behind it</strong>. Engineers call this <span class="tooltip">head-of-line blocking<span class="tooltip-text">When the first item in a queue prevents all subsequent items from being processed, even if they could be handled immediately. The "head" (front) of the "line" (queue) blocks everyone behind it.</span></span>.</p>
+
+  <div class="callout callout-purple">
+    <strong>🧠 Think First:</strong> HTTP/1.1 allows persistent connections but processes requests sequentially. Browsers work around this by opening <em>multiple</em> connections in parallel (typically 6 per domain). If a page needs 55 resources and each connection handles requests one at a time, how many "batches" does the browser need with 6 connections? What if one resource is a slow 2-second API call?
+  </div>
+
+  <svg viewBox="0 0 760 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Head-of-line blocking in HTTP/1.1: slow request blocks everything behind it">
+    <defs>
+      <marker id="http-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="var(--accent-primary, #a78bfa)"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="24" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="14">Head-of-Line Blocking in HTTP/1.1</text>
+
+    <!-- Connection lane -->
+    <rect x="30" y="45" width="700" height="120" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="50" y="65" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="11">Connection 1 (persistent)</text>
+
+    <!-- Request 1 - fast -->
+    <rect x="50" y="78" width="80" height="30" rx="5" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1"/>
+    <text x="90" y="97" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">style.css</text>
+    <text x="90" y="76" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">20ms</text>
+
+    <!-- Request 2 - SLOW (blocking) -->
+    <rect x="140" y="78" width="260" height="30" rx="5" fill="#ef4444" opacity="0.2" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="270" y="97" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="700">🐢 api/products (SLOW — 2 seconds)</text>
+    <text x="270" y="76" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">2,000ms</text>
+
+    <!-- Request 3 - waiting! -->
+    <rect x="410" y="78" width="80" height="30" rx="5" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="1"/>
+    <text x="450" y="97" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9" font-weight="600">app.js</text>
+    <text x="450" y="76" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="8">WAITED 2s!</text>
+
+    <!-- Blocked indicator -->
+    <line x1="400" y1="93" x2="410" y2="93" stroke="#ef4444" stroke-width="2" stroke-dasharray="3,2"/>
+    <text x="500" y="97" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">← stuck waiting</text>
+
+    <!-- Bottom: What browsers do about it -->
+    <text x="380" y="195" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">The Workaround: Open 6 Connections in Parallel</text>
+
+    <!-- 6 Connection lanes -->
+    <rect x="30" y="210" width="700" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="45" y="225" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Conn 1: style.css ✓</text>
+    <text x="200" y="225" fill="#10b981" font-family="Inter, sans-serif" font-size="9">logo.png ✓</text>
+    <text x="340" y="225" fill="#10b981" font-family="Inter, sans-serif" font-size="9">hero.jpg ✓</text>
+
+    <rect x="30" y="235" width="700" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="45" y="250" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Conn 2: app.js ✓</text>
+    <text x="200" y="250" fill="#10b981" font-family="Inter, sans-serif" font-size="9">vendor.js ✓</text>
+
+    <rect x="30" y="260" width="700" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="45" y="275" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Conn 3: 🐢 api/products (still blocking this lane)</text>
+
+    <rect x="30" y="285" width="700" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="45" y="300" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Conn 4: font-1.woff2 ✓</text>
+    <text x="200" y="300" fill="#10b981" font-family="Inter, sans-serif" font-size="9">font-2.woff2 ✓</text>
+
+    <rect x="30" y="310" width="170" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="45" y="325" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Conn 5: img-1.png ✓</text>
+
+    <rect x="210" y="310" width="170" height="22" rx="4" fill="var(--bg-secondary, #1e293b)" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="225" y="325" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Conn 6: img-2.png ✓</text>
+
+    <!-- Problem callout -->
+    <rect x="430" y="308" width="290" height="28" rx="6" fill="#ef4444" opacity="0.12"/>
+    <text x="575" y="326" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">6 connections × overhead = expensive hack</text>
+  </svg>
+
+  <p>Browsers worked around head-of-line blocking by opening <strong>up to 6 parallel connections</strong> per domain. This helped — instead of fetching 55 files sequentially, you fetch them 6 at a time. But it's a hack, not a solution:</p>
+
+  <ul>
+    <li><strong>Each connection has its own TCP handshake</strong> — 6 handshakes × 100ms = 600ms wasted before any data flows</li>
+    <li><strong>Each connection has its own <span class="tooltip">TLS handshake<span class="tooltip-text">Transport Layer Security handshake — an additional negotiation (1-2 round trips) on top of TCP where browser and server agree on encryption keys. Required for HTTPS.</span></span></strong> — for HTTPS sites, that's another 1-2 round trips per connection</li>
+    <li><strong>6 connections still isn't enough</strong> for 55+ resources — you need ~10 sequential batches</li>
+    <li><strong>The server must maintain 6 open sockets per client</strong> — at scale, this means millions of open connections doing nothing most of the time</li>
+  </ul>
+
+  <p>Web developers got creative with hacks: <span class="tooltip">CSS sprites<span class="tooltip-text">Combining many small images into one big image, then using CSS to show only the relevant portion. Reduces HTTP requests at the cost of complexity.</span></span> (cramming 30 icons into one image), concatenating all JavaScript into a single massive file, inlining CSS directly into HTML, and even spreading assets across multiple domains (domain sharding) to bypass the 6-connection limit. These were clever workarounds for a broken protocol.</p>
+
+  <div class="callout callout-danger">
+    <strong>The fundamental problem:</strong> HTTP/1.1 is text-based, sequential, and has no way to interleave responses on a single connection. No matter how many connections you open, each individual connection processes one request at a time. The protocol needs a fundamentally different design — not more workarounds.
+  </div>
+
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Summary of HTTP/1.1 problems: HOL blocking, header bloat, no prioritization">
+    <text x="380" y="24" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Three Problems HTTP/1.1 Can't Fix</text>
+
+    <!-- Problem 1 -->
+    <rect x="25" y="45" width="225" height="120" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="137" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Head-of-Line Blocking</text>
+    <text x="137" y="90" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">One slow response blocks</text>
+    <text x="137" y="105" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">everything behind it on</text>
+    <text x="137" y="120" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">the same connection.</text>
+    <text x="137" y="148" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="22">🚧</text>
+
+    <!-- Problem 2 -->
+    <rect x="268" y="45" width="225" height="120" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="380" y="70" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="12">Redundant Headers</text>
+    <text x="380" y="90" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Every request sends the same</text>
+    <text x="380" y="105" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">cookies, user-agent, and</text>
+    <text x="380" y="120" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">accept headers. ~800 bytes × 55.</text>
+    <text x="380" y="148" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="22">📋</text>
+
+    <!-- Problem 3 -->
+    <rect x="510" y="45" width="225" height="120" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1.5"/>
+    <text x="622" y="70" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="12">No Prioritization</text>
+    <text x="622" y="90" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Critical CSS and a decorative</text>
+    <text x="622" y="105" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">footer image get the same</text>
+    <text x="622" y="120" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">treatment. No way to say "this first!"</text>
+    <text x="622" y="148" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-size="22">⚖️</text>
+  </svg>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH (Multiplexing)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-lightbulb"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Multiplexing: Many Requests, One Connection</h2>
+    </div>
+  </div>
+
+  <p>What if instead of sending requests one after another (like a single-file checkout line), you could send them <em>all at once</em> and have the server respond with pieces of different files interleaved together? That's <strong>multiplexing</strong> — and it's the core idea behind HTTP/2.</p>
+
+  <p>Think of it like a restaurant kitchen with multiple chefs. You hand the waiter your entire order at once — burger, fries, drink, dessert. The kitchen doesn't finish the burger before starting the fries. All four items are being prepared <em>simultaneously</em>. As each one is ready, the waiter brings it to your table. The fries arrive first because they're quick. The burger takes longer. But nothing is waiting in line.</p>
+
+  <div class="callout callout-purple">
+    <strong>🧠 Think First:</strong> If multiplexing lets you send all 55 requests at once over a single connection, what's the theoretical minimum load time? Assume 100ms for the TCP handshake, and the largest file takes 200ms to transfer. Compare this to HTTP/1.1's sequential approach.
+  </div>
+
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Comparison of HTTP/1.1 sequential vs HTTP/2 multiplexed requests">
+    <text x="380" y="24" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="14">Sequential (HTTP/1.1) vs. Multiplexed (HTTP/2)</text>
+
+    <!-- LEFT: HTTP/1.1 -->
+    <rect x="20" y="40" width="350" height="260" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="195" y="63" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">HTTP/1.1 — Sequential</text>
+
+    <!-- Sequential bars -->
+    <rect x="40" y="80" width="60" height="22" rx="4" fill="#3b82f6" opacity="0.3" stroke="#3b82f6" stroke-width="1"/>
+    <text x="70" y="95" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">CSS</text>
+
+    <rect x="110" y="80" width="80" height="22" rx="4" fill="#10b981" opacity="0.3" stroke="#10b981" stroke-width="1"/>
+    <text x="150" y="95" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">JS</text>
+
+    <rect x="200" y="80" width="50" height="22" rx="4" fill="#f59e0b" opacity="0.3" stroke="#f59e0b" stroke-width="1"/>
+    <text x="225" y="95" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="8">img1</text>
+
+    <rect x="260" y="80" width="50" height="22" rx="4" fill="#ec4899" opacity="0.3" stroke="#ec4899" stroke-width="1"/>
+    <text x="285" y="95" text-anchor="middle" fill="#ec4899" font-family="Inter, sans-serif" font-size="8">img2</text>
+
+    <rect x="40" y="110" width="50" height="22" rx="4" fill="#8b5cf6" opacity="0.3" stroke="#8b5cf6" stroke-width="1"/>
+    <text x="65" y="125" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-size="8">img3</text>
+
+    <rect x="100" y="110" width="50" height="22" rx="4" fill="#06b6d4" opacity="0.3" stroke="#06b6d4" stroke-width="1"/>
+    <text x="125" y="125" text-anchor="middle" fill="#06b6d4" font-family="Inter, sans-serif" font-size="8">font</text>
+
+    <text x="170" y="125" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">... wait for each to finish ...</text>
+
+    <!-- Time axis -->
+    <line x1="40" y1="150" x2="340" y2="150" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="40" y="165" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">0ms</text>
+    <text x="340" y="165" text-anchor="end" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="9">~3,000ms</text>
+
+    <!-- Note about 6-conn limit -->
+    <text x="195" y="195" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Max 6 concurrent connections</text>
+    <text x="195" y="210" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Each with its own handshake</text>
+    <text x="195" y="230" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Slow request blocks its lane</text>
+
+    <rect x="100" y="255" width="190" height="30" rx="6" fill="#ef4444" opacity="0.12"/>
+    <text x="195" y="275" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Total: ~3 seconds</text>
+
+    <!-- RIGHT: HTTP/2 -->
+    <rect x="390" y="40" width="350" height="260" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="565" y="63" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">HTTP/2 — Multiplexed</text>
+
+    <!-- All bars stacked simultaneously -->
+    <rect x="410" y="80" width="120" height="16" rx="3" fill="#3b82f6" opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+    <text x="470" y="92" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">CSS (stream 1)</text>
+
+    <rect x="410" y="100" width="180" height="16" rx="3" fill="#10b981" opacity="0.4" stroke="#10b981" stroke-width="1"/>
+    <text x="500" y="112" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">JS (stream 3)</text>
+
+    <rect x="410" y="120" width="90" height="16" rx="3" fill="#f59e0b" opacity="0.4" stroke="#f59e0b" stroke-width="1"/>
+    <text x="455" y="132" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="8">img1 (stream 5)</text>
+
+    <rect x="410" y="140" width="90" height="16" rx="3" fill="#ec4899" opacity="0.4" stroke="#ec4899" stroke-width="1"/>
+    <text x="455" y="152" text-anchor="middle" fill="#ec4899" font-family="Inter, sans-serif" font-size="8">img2 (stream 7)</text>
+
+    <rect x="410" y="160" width="70" height="16" rx="3" fill="#8b5cf6" opacity="0.4" stroke="#8b5cf6" stroke-width="1"/>
+    <text x="445" y="172" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-size="8">img3 (stream 9)</text>
+
+    <rect x="410" y="180" width="60" height="16" rx="3" fill="#06b6d4" opacity="0.4" stroke="#06b6d4" stroke-width="1"/>
+    <text x="440" y="192" text-anchor="middle" fill="#06b6d4" font-family="Inter, sans-serif" font-size="8">font (stream 11)</text>
+
+    <!-- All happen at the same time indicator -->
+    <line x1="405" y1="80" x2="405" y2="196" stroke="#10b981" stroke-width="2" stroke-dasharray="4,3"/>
+    <text x="400" y="210" text-anchor="end" fill="#10b981" font-family="Inter, sans-serif" font-size="9" transform="rotate(-90, 400, 210)">simultaneous</text>
+
+    <!-- Time axis -->
+    <line x1="410" y1="220" x2="600" y2="220" stroke="var(--border-primary, #334155)" stroke-width="1"/>
+    <text x="410" y="235" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">0ms</text>
+    <text x="600" y="235" text-anchor="end" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="9">~300ms</text>
+
+    <text x="565" y="252" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Single connection, all streams in parallel</text>
+    <text x="565" y="268" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">No blocking — slow streams don't delay fast ones</text>
+
+    <rect x="470" y="278" width="190" height="30" rx="6" fill="#10b981" opacity="0.12"/>
+    <text x="565" y="298" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Total: ~300ms (10× faster)</text>
+  </svg>
+
+  <p>With HTTP/2 multiplexing, all 55 requests fly out immediately on a single connection. The server sends back pieces of different files interleaved — a chunk of CSS, then a chunk of JavaScript, then a chunk of an image — all mixed together on the same connection. The browser reassembles each file from its chunks. The total time is determined by the <em>slowest individual file</em>, not by the sum of all files.</p>
+
+  <p>This is the fundamental breakthrough of HTTP/2, and it came from Google's experimental <span class="tooltip">SPDY<span class="tooltip-text">An experimental protocol created by Google in 2009 that introduced multiplexing, header compression, and server push. It was so successful that it became the basis for HTTP/2.</span></span> protocol. Google tested it across Chrome and their own servers, saw 40-60% improvement in page load times, and it eventually became the HTTP/2 standard in 2015.</p>
+
+  <div class="callout callout-success">
+    <strong>Key insight:</strong> HTTP/2 didn't change what HTTP does (request a resource, get a response). It changed <em>how</em> — by replacing the text-based, sequential wire format with a binary, multiplexed one. Your existing websites, APIs, and servers work with zero code changes.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (4 accordion cards)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — Version by Version</h2>
+    </div>
+  </div>
+
+  <p>Let's walk through each version's mechanics in detail. Each card below covers one HTTP version — what it introduced, how it works under the hood, and what problem it specifically solved.</p>
+
+  <!-- Card 1: HTTP/1.1 Keep-Alive -->
+  <div class="card open">
+    <h3 class="card-title">
+      <span>HTTP/1.1 — Persistent Connections &amp; Keep-Alive</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p>HTTP/1.1 made one critical change: instead of closing the connection after each request, it defaults to <strong>keeping it open</strong>. This is the <code>Connection: keep-alive</code> header. The browser opens one TCP connection, sends a request, gets a response, and then sends the next request on the <em>same</em> connection — no new handshake needed.</p>
+
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP/1.1 keep-alive: single connection reused for multiple sequential requests">
+        <defs>
+          <marker id="http-s6a-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">HTTP/1.1 Keep-Alive — One Connection, Sequential Requests</text>
+
+        <!-- Connection pipe -->
+        <rect x="40" y="55" width="680" height="50" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="380" y="48" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Single TCP Connection (kept alive)</text>
+
+        <!-- Sequential request blocks -->
+        <rect x="55" y="63" width="90" height="34" rx="5" fill="#3b82f6" opacity="0.3" stroke="#3b82f6" stroke-width="1"/>
+        <text x="100" y="84" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">GET /page.html</text>
+
+        <text x="155" y="84" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">→</text>
+
+        <rect x="170" y="63" width="90" height="34" rx="5" fill="#f59e0b" opacity="0.3" stroke="#f59e0b" stroke-width="1"/>
+        <text x="215" y="84" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">GET /style.css</text>
+
+        <text x="270" y="84" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">→</text>
+
+        <rect x="285" y="63" width="90" height="34" rx="5" fill="#ec4899" opacity="0.3" stroke="#ec4899" stroke-width="1"/>
+        <text x="330" y="84" text-anchor="middle" fill="#ec4899" font-family="Inter, sans-serif" font-size="9">GET /app.js</text>
+
+        <text x="385" y="84" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">→</text>
+
+        <rect x="400" y="63" width="90" height="34" rx="5" fill="#8b5cf6" opacity="0.3" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="445" y="84" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-size="9">GET /logo.png</text>
+
+        <text x="500" y="84" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">→</text>
+        <text x="540" y="84" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">. . .</text>
+
+        <!-- Benefits -->
+        <text x="50" y="135" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">✓ No repeated TCP handshakes — save ~100ms per request</text>
+        <text x="50" y="155" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">✓ TLS session reuse — encryption negotiated once</text>
+        <text x="50" y="175" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">✗ Still sequential — must wait for response before next request</text>
+        <text x="50" y="195" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">✗ Text-based headers sent in full every time (~800 bytes each)</text>
+      </svg>
+
+      <p>HTTP/1.1 also introduced <span class="tooltip">pipelining<span class="tooltip-text">A technique where the browser sends multiple requests without waiting for responses. Sounds great in theory, but responses must arrive in order, so a slow response still blocks everything. Most browsers disabled it.</span></span> — sending multiple requests without waiting for responses. In theory, this could have solved head-of-line blocking. In practice, responses still had to arrive in order, so it didn't actually help. Most browsers disabled pipelining because it caused more problems than it solved.</p>
+
+      <p>Other features HTTP/1.1 brought: <code>Host</code> header (allowing multiple websites on one IP address), <span class="tooltip">chunked transfer encoding<span class="tooltip-text">A way to send a response in pieces without knowing the total size upfront. The server sends chunks as they're ready, each prefixed with its size, ending with a zero-length chunk.</span></span> (streaming responses before the full size is known), and better caching with <code>Cache-Control</code>, <code>ETag</code>, and conditional requests.</p>
+    </div>
+  </div>
+
+  <!-- Card 2: HTTP/2 Streams, Frames, HPACK -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>HTTP/2 — Streams, Binary Frames &amp; HPACK Compression</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p>HTTP/2 (2015) reimagined the entire wire format. Instead of plain text, it uses a <strong>binary framing layer</strong>. Every message — request or response — is split into small <span class="tooltip">frames<span class="tooltip-text">The smallest unit of communication in HTTP/2. Each frame has a fixed header (9 bytes) that says its length, type, stream ID, and flags. Types include HEADERS, DATA, SETTINGS, PUSH_PROMISE, and more.</span></span>, and each frame is tagged with a <strong>stream ID</strong>. Frames from different streams can be interleaved on a single connection — that's multiplexing.</p>
+
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP/2 binary framing: requests split into frames with stream IDs, interleaved on one connection">
+        <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">HTTP/2 Binary Framing — Multiple Streams, One Connection</text>
+
+        <!-- Connection pipe -->
+        <rect x="30" y="45" width="700" height="80" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1.5"/>
+        <text x="380" y="40" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="600" font-size="10">Single TCP Connection — Interleaved Frames</text>
+
+        <!-- Interleaved frames -->
+        <rect x="45" y="58" width="55" height="28" rx="4" fill="#3b82f6" opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+        <text x="72" y="76" text-anchor="middle" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-size="8">S1:HDR</text>
+
+        <rect x="108" y="58" width="55" height="28" rx="4" fill="#10b981" opacity="0.4" stroke="#10b981" stroke-width="1"/>
+        <text x="135" y="76" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono, monospace" font-size="8">S3:HDR</text>
+
+        <rect x="171" y="58" width="65" height="28" rx="4" fill="#3b82f6" opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+        <text x="203" y="76" text-anchor="middle" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-size="8">S1:DATA</text>
+
+        <rect x="244" y="58" width="55" height="28" rx="4" fill="#f59e0b" opacity="0.4" stroke="#f59e0b" stroke-width="1"/>
+        <text x="271" y="76" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-size="8">S5:HDR</text>
+
+        <rect x="307" y="58" width="65" height="28" rx="4" fill="#10b981" opacity="0.4" stroke="#10b981" stroke-width="1"/>
+        <text x="339" y="76" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono, monospace" font-size="8">S3:DATA</text>
+
+        <rect x="380" y="58" width="65" height="28" rx="4" fill="#3b82f6" opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+        <text x="412" y="76" text-anchor="middle" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-size="8">S1:DATA</text>
+
+        <rect x="453" y="58" width="65" height="28" rx="4" fill="#f59e0b" opacity="0.4" stroke="#f59e0b" stroke-width="1"/>
+        <text x="485" y="76" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-size="8">S5:DATA</text>
+
+        <rect x="526" y="58" width="65" height="28" rx="4" fill="#10b981" opacity="0.4" stroke="#10b981" stroke-width="1"/>
+        <text x="558" y="76" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono, monospace" font-size="8">S3:DATA</text>
+
+        <rect x="599" y="58" width="55" height="28" rx="4" fill="#ec4899" opacity="0.4" stroke="#ec4899" stroke-width="1"/>
+        <text x="626" y="76" text-anchor="middle" fill="#ec4899" font-family="JetBrains Mono, monospace" font-size="8">S7:HDR</text>
+
+        <rect x="662" y="58" width="55" height="28" rx="4" fill="#ec4899" opacity="0.4" stroke="#ec4899" stroke-width="1"/>
+        <text x="689" y="76" text-anchor="middle" fill="#ec4899" font-family="JetBrains Mono, monospace" font-size="8">S7:DATA</text>
+
+        <!-- Legend -->
+        <text x="50" y="108" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="600">● Stream 1: style.css</text>
+        <text x="210" y="108" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">● Stream 3: app.js</text>
+        <text x="370" y="108" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9" font-weight="600">● Stream 5: logo.png</text>
+        <text x="530" y="108" fill="#ec4899" font-family="Inter, sans-serif" font-size="9" font-weight="600">● Stream 7: hero.jpg</text>
+
+        <!-- Reassembly -->
+        <text x="380" y="145" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="12">Browser Reassembles Each Stream</text>
+
+        <rect x="45" y="160" width="155" height="30" rx="5" fill="#3b82f6" opacity="0.15" stroke="#3b82f6" stroke-width="1"/>
+        <text x="122" y="179" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">S1:HDR + S1:DATA + S1:DATA = style.css ✓</text>
+
+        <rect x="220" y="160" width="155" height="30" rx="5" fill="#10b981" opacity="0.15" stroke="#10b981" stroke-width="1"/>
+        <text x="297" y="179" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">S3:HDR + S3:DATA + S3:DATA = app.js ✓</text>
+
+        <rect x="395" y="160" width="155" height="30" rx="5" fill="#f59e0b" opacity="0.15" stroke="#f59e0b" stroke-width="1"/>
+        <text x="472" y="179" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">S5:HDR + S5:DATA = logo.png ✓</text>
+
+        <rect x="570" y="160" width="155" height="30" rx="5" fill="#ec4899" opacity="0.15" stroke="#ec4899" stroke-width="1"/>
+        <text x="647" y="179" text-anchor="middle" fill="#ec4899" font-family="Inter, sans-serif" font-size="9">S7:HDR + S7:DATA = hero.jpg ✓</text>
+
+        <!-- HPACK -->
+        <rect x="45" y="210" width="680" height="55" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="380" y="232" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="11">HPACK Header Compression</text>
+        <text x="380" y="250" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Both sides maintain a header table. Repeated headers (cookies, user-agent) sent as tiny index numbers instead of full text.</text>
+        <text x="380" y="262" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Result: ~800 bytes → ~20 bytes per request (97% smaller headers)</text>
+      </svg>
+
+      <p>The key concepts in HTTP/2:</p>
+      <ul>
+        <li><strong>Stream:</strong> A logical channel within the connection. Each request-response pair gets its own stream ID. Streams are independent — a slow response on stream 5 doesn't block stream 7.</li>
+        <li><strong>Frame:</strong> The smallest unit of data. Each frame has a 9-byte header that tells the receiver its length, type, which stream it belongs to, and any flags. Think of frames as labeled envelopes on a shared conveyor belt.</li>
+        <li><strong>HPACK:</strong> A compression algorithm specifically designed for HTTP headers. Both client and server maintain a synchronized table of previously-seen headers. When a header repeats (which happens constantly — cookies, user-agent, accept), it's sent as a tiny index number instead of the full text.</li>
+      </ul>
+
+      <p>HTTP/2 also introduced <strong>server push</strong> — the server can proactively send resources the client hasn't asked for yet. If a client requests <code>index.html</code>, the server knows it will also need <code>style.css</code>, so it pushes the CSS immediately without waiting for the browser to discover and request it. (In practice, server push was tricky to get right, and Chrome eventually removed support for it in 2022.)</p>
+    </div>
+  </div>
+
+  <!-- Card 3: HTTP/3 QUIC + 0-RTT -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>HTTP/3 — QUIC over UDP &amp; Zero Round-Trip Connections</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p>HTTP/2 solved the application-level head-of-line blocking problem — no more waiting for slow responses. But it still ran on <strong>TCP</strong>, and TCP has its own head-of-line blocking at the transport level. Here's the problem: TCP guarantees that all data arrives in order. If one packet gets lost, TCP stops delivering <em>everything</em> on that connection until the lost packet is retransmitted — even data for completely unrelated HTTP/2 streams.</p>
+
+      <div class="callout callout-purple">
+        <strong>🧠 Think First:</strong> HTTP/2 multiplexes 10 streams on one TCP connection. One packet carrying data for stream 3 gets lost. What happens to streams 1, 2, 4, 5, 6, 7, 8, 9, and 10? Think about TCP's ordering guarantee.
+      </div>
+
+      <p>The answer: <em>all 10 streams freeze</em>. TCP doesn't know about HTTP/2 streams — it just sees one byte stream and insists on delivering it in order. A single lost packet belonging to stream 3 blocks the delivery of data for all other streams. This is <strong>TCP-level head-of-line blocking</strong>, and it's especially painful on lossy networks (mobile, Wi-Fi).</p>
+
+      <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TCP head-of-line blocking: one lost packet freezes all HTTP/2 streams">
+        <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">TCP-Level HOL Blocking (HTTP/2's Hidden Problem)</text>
+
+        <!-- TCP pipe -->
+        <rect x="30" y="45" width="700" height="70" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="380" y="40" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Single TCP Connection — Ordered Byte Stream</text>
+
+        <!-- Packets flowing -->
+        <rect x="45" y="58" width="60" height="26" rx="4" fill="#3b82f6" opacity="0.3" stroke="#3b82f6" stroke-width="1"/>
+        <text x="75" y="75" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">Pkt 1 (S1)</text>
+
+        <rect x="115" y="58" width="60" height="26" rx="4" fill="#10b981" opacity="0.3" stroke="#10b981" stroke-width="1"/>
+        <text x="145" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Pkt 2 (S3)</text>
+
+        <!-- Lost packet! -->
+        <rect x="185" y="55" width="70" height="32" rx="4" fill="#ef4444" opacity="0.25" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,2"/>
+        <text x="220" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="700">Pkt 3 LOST!</text>
+        <text x="220" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="18">✗</text>
+
+        <!-- Waiting packets -->
+        <rect x="265" y="58" width="60" height="26" rx="4" fill="#f59e0b" opacity="0.15" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="295" y="75" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="8" opacity="0.5">Pkt 4 (S5)</text>
+
+        <rect x="335" y="58" width="60" height="26" rx="4" fill="#8b5cf6" opacity="0.15" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="365" y="75" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-size="8" opacity="0.5">Pkt 5 (S7)</text>
+
+        <rect x="405" y="58" width="60" height="26" rx="4" fill="#06b6d4" opacity="0.15" stroke="#06b6d4" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="435" y="75" text-anchor="middle" fill="#06b6d4" font-family="Inter, sans-serif" font-size="8" opacity="0.5">Pkt 6 (S1)</text>
+
+        <text x="530" y="75" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">← ALL FROZEN waiting for Pkt 3</text>
+
+        <!-- QUIC solution below -->
+        <rect x="30" y="130" width="700" height="70" rx="10" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="380" y="125" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">QUIC — Independent Streams (No Cross-Stream Blocking)</text>
+
+        <rect x="45" y="143" width="60" height="26" rx="4" fill="#3b82f6" opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+        <text x="75" y="160" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">S1: ✓</text>
+
+        <rect x="115" y="143" width="60" height="26" rx="4" fill="#10b981" opacity="0.4" stroke="#10b981" stroke-width="1"/>
+        <text x="145" y="160" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">S3: waiting</text>
+
+        <rect x="185" y="143" width="60" height="26" rx="4" fill="#f59e0b" opacity="0.4" stroke="#f59e0b" stroke-width="1"/>
+        <text x="215" y="160" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="8">S5: ✓</text>
+
+        <rect x="255" y="143" width="60" height="26" rx="4" fill="#8b5cf6" opacity="0.4" stroke="#8b5cf6" stroke-width="1"/>
+        <text x="285" y="160" text-anchor="middle" fill="#8b5cf6" font-family="Inter, sans-serif" font-size="8">S7: ✓</text>
+
+        <rect x="325" y="143" width="60" height="26" rx="4" fill="#3b82f6" opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+        <text x="355" y="160" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">S1: ✓</text>
+
+        <text x="430" y="160" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Only S3 waits — everyone else continues!</text>
+
+        <!-- 0-RTT box -->
+        <rect x="30" y="215" width="700" height="40" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="380" y="235" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="11">0-RTT Connection Resumption</text>
+        <text x="380" y="250" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">If you've connected to this server before, QUIC can send data in the FIRST packet — zero round-trips of setup.</text>
+      </svg>
+
+      <p>HTTP/3's solution was radical: <strong>replace TCP entirely</strong>. QUIC is a brand-new transport protocol built on top of <span class="tooltip">UDP<span class="tooltip-text">User Datagram Protocol — a simple transport that sends packets without guarantees. No ordering, no retransmission, no handshakes. Fast and lightweight, but unreliable on its own. QUIC adds reliability on top of UDP.</span></span>. But unlike raw UDP, QUIC provides everything TCP does — reliable delivery, congestion control, encryption — plus native multiplexing at the transport layer. Each <span class="tooltip">QUIC stream<span class="tooltip-text">An independent, ordered sequence of data within a QUIC connection. Unlike TCP, streams are first-class citizens — loss on one stream doesn't affect others.</span></span> is independent, so a lost packet on stream 3 only affects stream 3. Streams 1, 5, and 7 keep flowing.</p>
+
+      <p>Two more game-changers in HTTP/3:</p>
+      <ul>
+        <li><strong>0-RTT connection resumption:</strong> If you've visited a server before, QUIC remembers the encryption keys. On your next visit, it sends data <em>in the very first packet</em> — zero round trips of handshaking. TCP + TLS needs 2-3 round trips before any data flows.</li>
+        <li><strong>Built-in encryption:</strong> QUIC mandates TLS 1.3. There's no unencrypted HTTP/3. The TLS handshake is combined with the QUIC handshake, saving a round trip compared to TCP + TLS.</li>
+        <li><strong>Connection migration:</strong> If your phone switches from Wi-Fi to cellular, the IP address changes. TCP connections break (they're identified by IP + port). QUIC connections survive because they're identified by a <strong>connection ID</strong>, not by IP. The same request continues seamlessly on the new network.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Card 4: Comparison Table -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>Side-by-Side Comparison — HTTP/1.1 vs HTTP/2 vs HTTP/3</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>HTTP/1.1</th>
+              <th>HTTP/2</th>
+              <th>HTTP/3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Transport</strong></td>
+              <td>TCP</td>
+              <td>TCP</td>
+              <td>QUIC (over UDP)</td>
+            </tr>
+            <tr>
+              <td><strong>Wire format</strong></td>
+              <td>Plain text</td>
+              <td>Binary frames</td>
+              <td>Binary frames</td>
+            </tr>
+            <tr>
+              <td><strong>Multiplexing</strong></td>
+              <td>None (sequential)</td>
+              <td>Yes (stream-based)</td>
+              <td>Yes (native in QUIC)</td>
+            </tr>
+            <tr>
+              <td><strong>HOL blocking</strong></td>
+              <td>Application + transport</td>
+              <td>Transport only (TCP)</td>
+              <td>None</td>
+            </tr>
+            <tr>
+              <td><strong>Header compression</strong></td>
+              <td>None</td>
+              <td>HPACK</td>
+              <td>QPACK</td>
+            </tr>
+            <tr>
+              <td><strong>Server push</strong></td>
+              <td>No</td>
+              <td>Yes (rarely used)</td>
+              <td>Yes (rarely used)</td>
+            </tr>
+            <tr>
+              <td><strong>Connection setup</strong></td>
+              <td>1 RTT (TCP) + 1-2 RTT (TLS)</td>
+              <td>1 RTT (TCP) + 1 RTT (TLS 1.3)</td>
+              <td>1 RTT (combined) or 0-RTT</td>
+            </tr>
+            <tr>
+              <td><strong>Encryption</strong></td>
+              <td>Optional (HTTP or HTTPS)</td>
+              <td>Practically required</td>
+              <td>Mandatory (TLS 1.3)</td>
+            </tr>
+            <tr>
+              <td><strong>Connection migration</strong></td>
+              <td>No</td>
+              <td>No</td>
+              <td>Yes (connection ID)</td>
+            </tr>
+            <tr>
+              <td><strong>Adoption (2025)</strong></td>
+              <td>~25% of top sites</td>
+              <td>~65% of top sites</td>
+              <td>~30% of top sites</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-info">
+        <strong>Key takeaway:</strong> Each version solves a specific bottleneck. HTTP/1.1 eliminated redundant handshakes. HTTP/2 eliminated head-of-line blocking at the application layer. HTTP/3 eliminated it at the transport layer too — and added zero-cost connection resumption for returning visitors.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — Under the Hood</h2>
+    </div>
+  </div>
+
+  <p>Now that you understand the big ideas, let's look at the internals that make each version tick. This is the stuff that separates "I know HTTP/2 uses multiplexing" from "I can explain <em>exactly</em> how multiplexing works at the byte level."</p>
+
+  <!-- Binary Framing Deep Dive -->
+  <h3>Binary Framing Layer (HTTP/2)</h3>
+
+  <p>In HTTP/1.1, a request looks like this — plain ASCII text you could read with your eyes:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">HTTP/1.1 Request (plain text)</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-http">GET /api/products HTTP/1.1
+Host: shop.example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+Accept: application/json
+Cookie: session=abc123def456; tracking=xyz789
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive</code></pre>
+    </div>
+  </div>
+
+  <p>That's ~350 bytes of plain text. Now imagine sending 55 requests — many with identical headers. That's about <strong>19KB of repeated header text</strong> that says the same thing over and over: same browser, same cookies, same encoding preferences.</p>
+
+  <p>HTTP/2 replaces this with a <strong>binary frame</strong>. Here's what the same request looks like:</p>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP/2 frame anatomy: 9-byte header followed by payload">
+    <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">Anatomy of an HTTP/2 Frame</text>
+
+    <!-- Frame header (9 bytes) -->
+    <rect x="40" y="45" width="300" height="60" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="2"/>
+    <text x="190" y="40" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="10">FRAME HEADER (9 bytes — always fixed)</text>
+
+    <rect x="50" y="55" width="80" height="20" rx="3" fill="#3b82f6" opacity="0.3"/>
+    <text x="90" y="69" text-anchor="middle" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-size="8">Length (3B)</text>
+    <rect x="135" y="55" width="50" height="20" rx="3" fill="#10b981" opacity="0.3"/>
+    <text x="160" y="69" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono, monospace" font-size="8">Type (1B)</text>
+    <rect x="190" y="55" width="50" height="20" rx="3" fill="#f59e0b" opacity="0.3"/>
+    <text x="215" y="69" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-size="8">Flags (1B)</text>
+    <rect x="245" y="55" width="85" height="20" rx="3" fill="#ec4899" opacity="0.3"/>
+    <text x="287" y="69" text-anchor="middle" fill="#ec4899" font-family="JetBrains Mono, monospace" font-size="8">Stream ID (4B)</text>
+
+    <text x="90" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">How big is</text>
+    <text x="90" y="102" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">the payload?</text>
+    <text x="160" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">HEADERS?</text>
+    <text x="160" y="102" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">DATA?</text>
+    <text x="215" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">END_STREAM?</text>
+    <text x="215" y="102" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">END_HEADERS?</text>
+    <text x="287" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">Which request</text>
+    <text x="287" y="102" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="8">does this belong to?</text>
+
+    <!-- Frame payload -->
+    <rect x="360" y="45" width="370" height="60" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="2"/>
+    <text x="545" y="40" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">FRAME PAYLOAD (variable length)</text>
+    <text x="545" y="70" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">HPACK-compressed headers OR actual response data</text>
+    <text x="545" y="85" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">(up to 16,384 bytes per frame by default)</text>
+
+    <!-- Frame types list -->
+    <text x="50" y="140" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="600" font-size="11">Common Frame Types:</text>
+    <text x="50" y="158" fill="#3b82f6" font-family="JetBrains Mono, monospace" font-size="10">HEADERS (0x1)</text>
+    <text x="210" y="158" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">— request/response headers</text>
+    <text x="50" y="175" fill="#10b981" font-family="JetBrains Mono, monospace" font-size="10">DATA (0x0)</text>
+    <text x="210" y="175" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">— actual body content</text>
+    <text x="50" y="192" fill="#f59e0b" font-family="JetBrains Mono, monospace" font-size="10">SETTINGS (0x4)</text>
+    <text x="210" y="192" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">— connection config (max streams, window size)</text>
+    <text x="430" y="158" fill="#ec4899" font-family="JetBrains Mono, monospace" font-size="10">PRIORITY (0x2)</text>
+    <text x="590" y="158" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">— stream dependencies</text>
+    <text x="430" y="175" fill="#8b5cf6" font-family="JetBrains Mono, monospace" font-size="10">PUSH_PROMISE (0x5)</text>
+    <text x="620" y="175" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">— server push</text>
+    <text x="430" y="192" fill="#06b6d4" font-family="JetBrains Mono, monospace" font-size="10">RST_STREAM (0x3)</text>
+    <text x="610" y="192" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">— cancel a stream</text>
+  </svg>
+
+  <!-- Stream Priorities -->
+  <h3>Stream Priorities &amp; Dependencies</h3>
+
+  <p>Not all resources are equally important. The CSS file that controls your page layout is more critical than a decorative footer image. HTTP/2 lets the client assign <strong>priorities</strong> to streams and create <strong>dependency trees</strong>. For example: "stream 1 (CSS) has weight 256, stream 3 (hero image) depends on stream 1 and has weight 220, stream 5 (footer image) has weight 16."</p>
+
+  <p>In practice, browser implementations of priority have been inconsistent. Chrome, Firefox, and Safari all used different prioritization schemes, making it hard for servers to optimize. HTTP/3 simplified this with the <strong>Extensible Priority Scheme</strong> (RFC 9218) — a cleaner urgency + incremental model.</p>
+
+  <!-- HPACK vs QPACK -->
+  <h3>Header Compression: HPACK vs QPACK</h3>
+
+  <p>Both HTTP/2 and HTTP/3 compress headers, but they use different algorithms because of how their underlying transports work.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="http-hpack" role="tab" aria-selected="true">HPACK (HTTP/2)</button>
+      <button class="tab-btn" data-tab="http-qpack" role="tab" aria-selected="false">QPACK (HTTP/3)</button>
+    </div>
+    <div class="tab-panel active" id="http-hpack" role="tabpanel">
+      <p><strong>HPACK</strong> maintains a <span class="tooltip">dynamic table<span class="tooltip-text">A key-value lookup table that both client and server maintain in sync. Previously sent headers get added to this table and can be referenced by index number in future requests — dramatically reducing header size.</span></span> — a synchronized lookup table on both client and server. When you send <code>User-Agent: Mozilla/5.0...</code> for the first time, it gets added to the table at index 62. The next request refers to it as just the number <code>62</code> — a single byte instead of 80 bytes.</p>
+      <p>HPACK also uses <strong>Huffman encoding</strong> for header values that aren't in the table yet, squeezing them to about 70% of their original size. The static table includes 61 pre-defined entries for common headers like <code>:method: GET</code>, <code>:status: 200</code>, and <code>content-type: text/html</code>.</p>
+      <p><strong>The catch:</strong> HPACK requires both sides to process headers in <em>exact order</em>. If header frame X arrives before header frame Y, they must be decoded in that order. This works fine on TCP (which guarantees order) but is a problem for QUIC (where packets can arrive out of order).</p>
+    </div>
+    <div class="tab-panel" id="http-qpack" role="tabpanel">
+      <p><strong>QPACK</strong> solves HPACK's ordering problem. It uses two separate QUIC streams for the dynamic table: an <strong>encoder stream</strong> (client → server, sending table updates) and a <strong>decoder stream</strong> (server → client, acknowledging updates). Request headers reference the table but can be decoded independently — even if they arrive out of order.</p>
+      <p>The trade-off: QPACK is slightly less efficient than HPACK at compression because it can't always reference the most recent table state (the update might not have been acknowledged yet). In practice, the difference is tiny — both achieve 85-95% header compression.</p>
+    </div>
+  </div>
+
+  <!-- Connection Setup Comparison -->
+  <h3>Connection Setup: The Round-Trip Tax</h3>
+
+  <p>Every millisecond of connection setup is a tax your users pay before seeing any content. Here's how the three versions compare:</p>
+
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Connection setup comparison: TCP+TLS handshakes for HTTP/1.1, HTTP/2, and QUIC 0-RTT">
+    <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">Connection Setup Time Comparison</text>
+
+    <!-- HTTP/1.1 + TLS 1.2 -->
+    <rect x="20" y="40" width="230" height="250" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="135" y="60" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">HTTP/1.1 + TLS 1.2</text>
+
+    <rect x="35" y="75" width="200" height="25" rx="4" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="1"/>
+    <text x="135" y="92" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">TCP SYN → SYN-ACK → ACK (1 RTT)</text>
+
+    <rect x="35" y="108" width="200" height="25" rx="4" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+    <text x="135" y="125" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">TLS ClientHello → ServerHello (1 RTT)</text>
+
+    <rect x="35" y="141" width="200" height="25" rx="4" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+    <text x="135" y="158" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">TLS Key Exchange (1 RTT)</text>
+
+    <rect x="35" y="174" width="200" height="25" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1"/>
+    <text x="135" y="191" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">First HTTP request!</text>
+
+    <rect x="60" y="215" width="150" height="28" rx="6" fill="#ef4444" opacity="0.12"/>
+    <text x="135" y="234" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">3 RTTs before data</text>
+    <text x="135" y="264" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">~300ms on 100ms latency</text>
+
+    <!-- HTTP/2 + TLS 1.3 -->
+    <rect x="265" y="40" width="230" height="250" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="380" y="60" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">HTTP/2 + TLS 1.3</text>
+
+    <rect x="280" y="75" width="200" height="25" rx="4" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="1"/>
+    <text x="380" y="92" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">TCP SYN → SYN-ACK → ACK (1 RTT)</text>
+
+    <rect x="280" y="108" width="200" height="25" rx="4" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+    <text x="380" y="125" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9">TLS 1.3 handshake (1 RTT)</text>
+
+    <rect x="280" y="141" width="200" height="25" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="158" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">First HTTP request!</text>
+
+    <rect x="305" y="215" width="150" height="28" rx="6" fill="#f59e0b" opacity="0.12"/>
+    <text x="380" y="234" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">2 RTTs before data</text>
+    <text x="380" y="264" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">~200ms on 100ms latency</text>
+
+    <!-- HTTP/3 QUIC -->
+    <rect x="510" y="40" width="230" height="250" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="625" y="60" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">HTTP/3 (QUIC)</text>
+
+    <rect x="525" y="75" width="200" height="25" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1"/>
+    <text x="625" y="92" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">QUIC + TLS combined (1 RTT)</text>
+
+    <rect x="525" y="108" width="200" height="25" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1"/>
+    <text x="625" y="125" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">First HTTP request!</text>
+
+    <text x="625" y="155" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-size="10" font-weight="600">— OR for returning visitors —</text>
+
+    <rect x="525" y="168" width="200" height="25" rx="4" fill="var(--accent-primary, #a78bfa)" opacity="0.2" stroke="var(--accent-primary, #a78bfa)" stroke-width="1"/>
+    <text x="625" y="185" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-size="9">0-RTT: Data in FIRST packet!</text>
+
+    <rect x="550" y="215" width="150" height="28" rx="6" fill="#10b981" opacity="0.12"/>
+    <text x="625" y="234" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">1 RTT or 0 RTT</text>
+    <text x="625" y="264" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">~100ms or ~0ms (!)</text>
+  </svg>
+
+  <div class="callout callout-purple">
+    <strong>🧠 Think First:</strong> 0-RTT sounds like magic, but it has a security trade-off. If someone captures the first packet and replays it later, the server might process the same request twice. What kinds of requests would be dangerous to replay? (Hint: think about <code>POST /transfer-money</code> vs <code>GET /homepage</code>.)
+  </div>
+
+  <p>That's exactly right — 0-RTT data is vulnerable to <span class="tooltip">replay attacks<span class="tooltip-text">An attacker captures a valid 0-RTT packet and sends it again to the server. If the request is a GET, no harm done (same page is returned). If it's a POST that transfers money, the server might process the transfer twice.</span></span>. That's why servers should only accept 0-RTT for <strong>idempotent requests</strong> (like GET) — requests that are safe to process more than once. Non-idempotent operations (POST, PUT, DELETE) should require a full handshake.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — VARIATIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-code-branch"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations — Protocols Built on Top of HTTP</h2>
+    </div>
+  </div>
+
+  <p>HTTP isn't just for loading web pages. It's the foundation for many other protocols and patterns. Understanding how these build on HTTP versions helps you make better architectural choices.</p>
+
+  <!-- gRPC over HTTP/2 -->
+  <div class="card open">
+    <h3 class="card-title">
+      <span>gRPC — High-Performance RPCs over HTTP/2</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p><span class="tooltip">gRPC<span class="tooltip-text">Google Remote Procedure Call — a framework for calling functions on remote servers as if they were local. Uses Protocol Buffers for serialization and HTTP/2 for transport, enabling efficient bidirectional streaming.</span></span> is Google's framework for service-to-service communication. It runs exclusively on HTTP/2 because it needs multiplexing for its four communication patterns:</p>
+
+      <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four gRPC communication patterns: unary, server streaming, client streaming, bidirectional">
+        <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">gRPC Communication Patterns (all need HTTP/2 streams)</text>
+
+        <!-- Unary -->
+        <rect x="20" y="40" width="170" height="65" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="105" y="60" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="10">Unary</text>
+        <text x="105" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Client → 1 request</text>
+        <text x="105" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Server → 1 response</text>
+
+        <!-- Server streaming -->
+        <rect x="205" y="40" width="170" height="65" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="290" y="60" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">Server Streaming</text>
+        <text x="290" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Client → 1 request</text>
+        <text x="290" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Server → many responses</text>
+
+        <!-- Client streaming -->
+        <rect x="390" y="40" width="170" height="65" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="475" y="60" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="10">Client Streaming</text>
+        <text x="475" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Client → many requests</text>
+        <text x="475" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Server → 1 response</text>
+
+        <!-- Bidirectional -->
+        <rect x="575" y="40" width="170" height="65" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1.5"/>
+        <text x="660" y="60" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="10">Bidirectional</text>
+        <text x="660" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Client → many requests</text>
+        <text x="660" y="93" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Server → many responses</text>
+
+        <!-- Why HTTP/2 -->
+        <rect x="120" y="125" width="520" height="40" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="380" y="145" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="600" font-size="10">All four patterns use HTTP/2 streams — each RPC call is one stream.</text>
+        <text x="380" y="160" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">100s of simultaneous RPCs on a single TCP connection.</text>
+      </svg>
+
+      <p>Without HTTP/2's multiplexing, gRPC couldn't efficiently support streaming or handle hundreds of concurrent RPCs between microservices. This is why gRPC doesn't work on HTTP/1.1 (though gRPC-web provides a limited compatibility layer).</p>
+    </div>
+  </div>
+
+  <!-- WebSocket Upgrade -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>WebSocket — From HTTP to Full-Duplex</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p><span class="tooltip">WebSocket<span class="tooltip-text">A protocol that provides full-duplex (two-way) communication over a single TCP connection. Starts as an HTTP/1.1 request with an Upgrade header, then switches to a completely different protocol for real-time messaging.</span></span> starts its life as a regular HTTP/1.1 request with a special <code>Upgrade: websocket</code> header. The server agrees, and the connection "upgrades" from HTTP to the WebSocket protocol. After that, HTTP is completely gone — it's a raw bidirectional data pipe.</p>
+
+      <p>With HTTP/2 and HTTP/3, WebSocket works differently. HTTP/2 introduced WebSocket over a single stream (RFC 8441) — the upgrade happens within one stream while other streams continue normal HTTP traffic. This is more efficient than HTTP/1.1 WebSocket, which took over the entire TCP connection.</p>
+
+      <div class="callout callout-info">
+        <strong>When to use what:</strong> Need real-time bidirectional messaging (chat, gaming, live feeds)? WebSocket. Need efficient API calls between services? gRPC over HTTP/2. Need one-way server updates? <span class="tooltip">Server-Sent Events<span class="tooltip-text">A simple standard for one-way real-time updates from server to client over a regular HTTP connection. Simpler than WebSocket but only server → client, not bidirectional.</span></span> (SSE) over any HTTP version.
+      </div>
+    </div>
+  </div>
+
+  <!-- REST & HTTP Methods -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>REST APIs — Same Semantics, Better Transport</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p>The beautiful thing about HTTP/2 and HTTP/3 is that your existing REST APIs work without any changes. The HTTP methods (GET, POST, PUT, DELETE), status codes (200, 404, 500), and headers all stay exactly the same. The difference is entirely at the transport level.</p>
+
+      <p>This means upgrading from HTTP/1.1 to HTTP/2 is often as simple as updating your web server or load balancer configuration — your application code doesn't change at all. For HTTP/3, you need a QUIC-capable server (like Nginx with the QUIC module, Caddy, or Cloudflare's edge), and clients need to support it (all modern browsers do).</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="http-nginx-h2" role="tab" aria-selected="true">Nginx (HTTP/2)</button>
+          <button class="tab-btn" data-tab="http-caddy-h3" role="tab" aria-selected="false">Caddy (HTTP/3)</button>
+        </div>
+        <div class="tab-panel active" id="http-nginx-h2" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">nginx.conf — Enable HTTP/2</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-nginx">server {
+    listen 443 ssl http2;       # ← just add "http2"
+    server_name shop.example.com;
+    ssl_certificate /etc/ssl/cert.pem;
+    ssl_certificate_key /etc/ssl/key.pem;
+
+    # Everything else stays the same
+    location /api/ {
+        proxy_pass http://backend:3000;
+    }
+}</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="http-caddy-h3" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">Caddyfile — HTTP/3 automatically enabled</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-text">shop.example.com {
+    # Caddy enables HTTP/3 by default!
+    # Auto HTTPS, auto HTTP/2, auto HTTP/3
+    reverse_proxy backend:3000
+}
+
+# To explicitly control:
+shop.example.com {
+    servers {
+        protocol {
+            experimental_http3  # if needed explicitly
+        }
+    }
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — AT SCALE
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How the Giants Adopted HTTP/2 &amp; HTTP/3</h2>
+    </div>
+  </div>
+
+  <p>The HTTP evolution wasn't just an academic exercise. Real companies saw massive improvements by upgrading their protocols. Here are the stories and numbers.</p>
+
+  <!-- Google / SPDY → HTTP/2 -->
+  <div class="card open">
+    <h3 class="card-title">
+      <span>Google — From SPDY to HTTP/2 (The Origin Story)</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p>In 2009, Google's Mike Belshe published research showing that on typical web pages, <strong>increasing bandwidth beyond 5 Mbps didn't improve load times</strong>. The bottleneck wasn't bandwidth — it was <span class="tooltip">latency<span class="tooltip-text">The time it takes for a single packet to travel from client to server and back (the round-trip time). Unlike bandwidth (how many packets per second), latency is limited by the speed of light and network hops.</span></span>. All those TCP handshakes, sequential requests, and head-of-line blocking were the real problem.</p>
+
+      <p>Google built SPDY (pronounced "speedy") as an experiment. They deployed it between Chrome and Google's servers and measured: <strong>page load times dropped 40-60%</strong> on news sites, ~27-60% on complex web apps. The improvement was so dramatic that the IETF used SPDY as the starting point for HTTP/2.</p>
+
+      <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline: SPDY 2009 to HTTP/2 standard 2015">
+        <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">From Experiment to Standard</text>
+
+        <line x1="80" y1="70" x2="680" y2="70" stroke="var(--border-primary, #334155)" stroke-width="3"/>
+
+        <circle cx="120" cy="70" r="8" fill="#3b82f6"/>
+        <text x="120" y="55" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="10">2009</text>
+        <text x="120" y="95" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Google publishes</text>
+        <text x="120" y="107" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">latency research</text>
+
+        <circle cx="260" cy="70" r="8" fill="#10b981"/>
+        <text x="260" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">2010</text>
+        <text x="260" y="95" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">SPDY deployed</text>
+        <text x="260" y="107" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">in Chrome</text>
+
+        <circle cx="400" cy="70" r="8" fill="#f59e0b"/>
+        <text x="400" y="55" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="10">2012</text>
+        <text x="400" y="95" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">IETF starts</text>
+        <text x="400" y="107" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">HTTP/2 spec</text>
+
+        <circle cx="540" cy="70" r="8" fill="var(--accent-primary, #a78bfa)"/>
+        <text x="540" y="55" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="10">2015</text>
+        <text x="540" y="95" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">HTTP/2 published</text>
+        <text x="540" y="107" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">as RFC 7540</text>
+
+        <circle cx="640" cy="70" r="8" fill="#ef4444"/>
+        <text x="640" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="10">2016</text>
+        <text x="640" y="95" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">SPDY deprecated</text>
+        <text x="640" y="107" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">(mission complete)</text>
+
+        <rect x="180" y="125" width="400" height="25" rx="6" fill="#10b981" opacity="0.12"/>
+        <text x="380" y="142" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Result: Google measured 40-60% faster page loads across their properties</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Cloudflare HTTP/3 -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>Cloudflare — Early HTTP/3 Adoption at Massive Scale</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <p>Cloudflare enabled HTTP/3 for all their customers in 2019 — one toggle and suddenly millions of websites supported the newest protocol. Their measurements showed:</p>
+      <ul>
+        <li><strong>15% faster Time to First Byte</strong> compared to HTTP/2 on mobile networks</li>
+        <li><strong>Connection migration works</strong> — users switching from Wi-Fi to cellular in a subway didn't experience connection resets</li>
+        <li><strong>0-RTT resumption saved 100-300ms</strong> for returning visitors, depending on geographic distance to the nearest edge server</li>
+      </ul>
+      <p>The biggest impact was on <strong>lossy networks</strong> — mobile connections, congested Wi-Fi, high-latency satellite links. On clean, fast connections, the difference between HTTP/2 and HTTP/3 was minimal. But on a 3% packet loss mobile connection, HTTP/3 was up to <strong>3x faster</strong> than HTTP/2.</p>
+    </div>
+  </div>
+
+  <!-- Akamai Stats -->
+  <div class="card">
+    <h3 class="card-title">
+      <span>Industry-Wide Numbers — The Real Impact</span>
+      <i class="fa-solid fa-chevron-down icon-gap"></i>
+    </h3>
+    <div class="card-body">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>HTTP/1.1 → HTTP/2</th>
+              <th>HTTP/2 → HTTP/3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Page load time (desktop)</td>
+              <td>30-50% faster</td>
+              <td>5-10% faster</td>
+            </tr>
+            <tr>
+              <td>Page load time (mobile)</td>
+              <td>40-60% faster</td>
+              <td>15-30% faster</td>
+            </tr>
+            <tr>
+              <td>Page load time (lossy network)</td>
+              <td>20-40% faster</td>
+              <td>50-200% faster</td>
+            </tr>
+            <tr>
+              <td>Connections per page</td>
+              <td>6 → 1</td>
+              <td>1 → 1</td>
+            </tr>
+            <tr>
+              <td>Header overhead</td>
+              <td>~85% reduction</td>
+              <td>Similar to HTTP/2</td>
+            </tr>
+            <tr>
+              <td>Time to first byte (repeat visit)</td>
+              <td>1 RTT saved (TLS 1.3)</td>
+              <td>1-2 RTT saved (0-RTT)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout-info">
+        <strong>Notice the pattern:</strong> HTTP/2 was a bigger improvement on desktop (fixing application-layer HOL blocking). HTTP/3 is a bigger improvement on mobile (fixing transport-layer HOL blocking + connection migration). This makes sense — mobile networks are where packet loss and network changes happen most.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — THE ANTI-LESSON
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-ban"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">The Anti-Lesson — When Upgrading HTTP Versions Hurts</h2>
+    </div>
+  </div>
+
+  <p>Newer isn't always better. Here are real scenarios where upgrading the HTTP version caused problems or was completely pointless.</p>
+
+  <div class="callout callout-danger">
+    <strong>"We switched to HTTP/2 and our site got slower."</strong> — This actually happened to multiple companies. How? They had spent years optimizing for HTTP/1.1's limitations: concatenating files, using CSS sprites, domain sharding across 4 CDN domains. These HTTP/1.1 workarounds <em>hurt</em> HTTP/2 performance.
+  </div>
+
+  <p><strong>Why?</strong> Domain sharding forces HTTP/2 to open multiple connections (one per domain) instead of multiplexing everything on one. File concatenation means one huge JavaScript bundle instead of many small files — you can't cache individual components, and a one-line change invalidates the entire bundle. CSS sprites prevent HTTP/2 from prioritizing critical above-the-fold images.</p>
+
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP/1.1 optimizations that become anti-patterns in HTTP/2">
+    <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">HTTP/1.1 Optimizations That Hurt HTTP/2</text>
+
+    <rect x="20" y="40" width="230" height="55" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="135" y="60" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">Domain Sharding</text>
+    <text x="135" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">Forces multiple connections</text>
+    <text x="135" y="90" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">→ defeats multiplexing</text>
+
+    <rect x="265" y="40" width="230" height="55" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="380" y="60" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">File Concatenation</text>
+    <text x="380" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">One huge file → no granular caching</text>
+    <text x="380" y="90" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">→ defeats stream prioritization</text>
+
+    <rect x="510" y="40" width="230" height="55" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="var(--accent-primary, #a78bfa)" stroke-width="1.5"/>
+    <text x="625" y="60" text-anchor="middle" fill="var(--accent-primary, #a78bfa)" font-family="Inter, sans-serif" font-weight="700" font-size="11">CSS Sprites</text>
+    <text x="625" y="78" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">One big image for 30 icons</text>
+    <text x="625" y="90" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">→ loads all even if you need 2</text>
+
+    <rect x="100" y="115" width="560" height="50" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="380" y="137" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">The Fix: Undo these workarounds when upgrading to HTTP/2</text>
+    <text x="380" y="155" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">Use many small files, single domain, individual images — let multiplexing do its job.</text>
+  </svg>
+
+  <p>Other anti-lessons:</p>
+  <ul>
+    <li><strong>"HTTP/3 will fix our slow API."</strong> If your API endpoint takes 2 seconds because of a slow database query, HTTP/3 won't help. Protocol improvements only help with <em>transport overhead</em>, not server-side processing time.</li>
+    <li><strong>Corporate firewalls blocking QUIC.</strong> Many corporate networks block UDP traffic (since traditional web traffic only used TCP). HTTP/3 runs on UDP, so it gets blocked. Browsers fall back to HTTP/2, but the fallback detection itself adds latency. Some companies explicitly disable HTTP/3 to avoid this.</li>
+    <li><strong>0-RTT false security.</strong> Some developers see "0-RTT" and assume it's free speed with no downsides. But 0-RTT data can be replayed by attackers, so it must only be used for safe, idempotent requests.</li>
+  </ul>
+
+  <div class="callout callout-warning">
+    <strong>The rule:</strong> Before upgrading HTTP versions, audit your existing optimizations. Remove HTTP/1.1 workarounds that conflict with HTTP/2. Test on your actual network conditions — the benefits of HTTP/3 are dramatic on lossy mobile networks but negligible on fast corporate LANs.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — COMMON MISTAKES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-circle-xmark"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — What Engineers Get Wrong</h2>
+    </div>
+  </div>
+
+  <p>These are the mistakes engineers and interview candidates make most often when discussing HTTP evolution.</p>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span>Mistake #1: "HTTP/2 is always faster than HTTP/1.1"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Why it's wrong:</strong> On a page with very few resources (1-3 files), HTTP/2 can actually be <em>slightly slower</em> due to the overhead of the binary framing layer and connection setup negotiation. HTTP/2's multiplexing advantage only kicks in when there are many concurrent requests.</p>
+        <p><strong>The truth:</strong> HTTP/2 is faster for typical web pages (20+ resources). For simple APIs returning one JSON response, the difference is negligible. The real win is at the margin — the 95th percentile load time, not the median.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #2: "HTTP/3 replaces TCP with UDP, so it's unreliable"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Why it's wrong:</strong> QUIC <em>uses</em> UDP as a transport, but builds reliability on top of it. QUIC has its own retransmission, congestion control, and ordering guarantees — just like TCP. It's not "raw UDP."</p>
+        <p><strong>The truth:</strong> QUIC is essentially "TCP 2.0" implemented in userspace on top of UDP. It's just as reliable as TCP. The reason it uses UDP is practical: operating systems ship with TCP and UDP. Creating a brand-new transport protocol would require OS kernel changes that would take decades to deploy. UDP was the only available "blank canvas."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #3: "Server push makes websites faster automatically"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Why it's wrong:</strong> Server push sounds great in theory — send resources before the client asks! But in practice, the server doesn't know what's already in the browser's cache. If the browser already has <code>style.css</code> cached, pushing it again wastes bandwidth. Chrome removed server push support in 2022 because the cache invalidation problem made it counterproductive more often than helpful.</p>
+        <p><strong>What replaced it:</strong> The <code>103 Early Hints</code> status code. Instead of pushing the actual file, the server sends a hint: "you're going to need style.css soon." The browser can then decide whether to fetch it (if not cached) or ignore the hint (if cached). Same benefit, no wasted bandwidth.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #4: "HTTP/2 eliminates the need for CDNs"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Why it's wrong:</strong> HTTP/2 reduces the <em>number of round trips</em>, but doesn't reduce the <em>speed of light</em>. If your server is in Virginia and your user is in Mumbai, each round trip still takes ~200ms. HTTP/2 reduces the number of round trips, but you still want to serve from a location close to the user.</p>
+        <p><strong>The truth:</strong> CDNs and HTTP/2 solve different problems. CDNs reduce latency by moving content closer to users. HTTP/2 reduces the number of round trips needed. Use both for the best results.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake #5: "QUIC can't be inspected by firewalls, so it's a security risk"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The nuance:</strong> This is partially true and is a real concern in enterprise environments. QUIC encrypts almost everything — including the handshake metadata that firewalls traditionally inspect. Network middleboxes that do deep packet inspection on TCP/TLS traffic can't easily inspect QUIC.</p>
+        <p><strong>The trade-off:</strong> This is by design — QUIC was built to prevent middlebox interference, which historically caused bugs when middleboxes corrupted TCP options or TLS extensions. But enterprises that need to inspect all traffic for compliance have a legitimate concern. The solution is usually: terminate QUIC at the edge (load balancer / reverse proxy) and use plain HTTP/2 or TCP internally.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — INTERVIEW PLAYBOOK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-user-tie"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — How to Talk About HTTP Evolution</h2>
+    </div>
+  </div>
+
+  <p>HTTP versions come up in system design interviews more often than you'd think — usually when discussing API design, performance optimization, or real-time systems. Here's how to bring it up naturally and what to say at each level.</p>
+
+  <div class="callout callout-purple">
+    <strong>🧠 Think First:</strong> You're designing a real-time sports score system. The interviewer asks "how will the client get updates?" Before reading the playbook below, think: which HTTP version features would you mention, and why?
+  </div>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="http-int-junior" role="tab" aria-selected="true">Junior Level</button>
+      <button class="tab-btn" data-tab="http-int-mid" role="tab" aria-selected="false">Mid Level</button>
+      <button class="tab-btn" data-tab="http-int-senior" role="tab" aria-selected="false">Senior Level</button>
+    </div>
+    <div class="tab-panel active" id="http-int-junior" role="tabpanel">
+      <h4>What they expect you to know:</h4>
+      <ul>
+        <li>HTTP/1.1 has persistent connections (keep-alive) but processes requests sequentially</li>
+        <li>HTTP/2 supports multiplexing — many requests over one connection</li>
+        <li>HTTP/3 uses QUIC instead of TCP for better mobile performance</li>
+      </ul>
+
+      <h4>Sample answer when asked "Why is HTTP/2 faster?":</h4>
+      <div class="callout callout-info">
+        "HTTP/1.1 sends requests one after another on each connection. Even with 6 parallel connections, a page with 50 resources has to wait in batches. HTTP/2 sends all requests at once on a single connection — the server responds with pieces of different files interleaved together. So the total time equals the slowest single file, not the sum of all files."
+      </div>
+    </div>
+    <div class="tab-panel" id="http-int-mid" role="tabpanel">
+      <h4>What they expect on top of junior:</h4>
+      <ul>
+        <li>Binary framing layer and stream IDs</li>
+        <li>HPACK header compression and why it matters</li>
+        <li>TCP-level head-of-line blocking as HTTP/2's weakness</li>
+        <li>When to use gRPC (HTTP/2) vs REST vs WebSocket</li>
+      </ul>
+
+      <h4>How to bring it up naturally in a design:</h4>
+      <div class="callout callout-info">
+        "For service-to-service communication, I'd use gRPC over HTTP/2. It gives us multiplexing so hundreds of RPCs can share a single connection between each service pair, plus Protocol Buffers for compact serialization. For the client-facing API, standard REST over HTTP/2 — the frontend gets multiplexing for free, and we avoid the complexity of gRPC in the browser."
+      </div>
+    </div>
+    <div class="tab-panel" id="http-int-senior" role="tabpanel">
+      <h4>What sets senior answers apart:</h4>
+      <ul>
+        <li>Understanding trade-offs: 0-RTT replay risk, QUIC's UDP-blocking problem in enterprise networks</li>
+        <li>Knowing that HTTP/1.1 optimizations (domain sharding, sprites) become anti-patterns in HTTP/2</li>
+        <li>Connection migration for mobile-first architectures</li>
+        <li>When HTTP/3 matters (lossy networks) vs when it doesn't (datacenter)</li>
+      </ul>
+
+      <h4>Impressing the interviewer:</h4>
+      <div class="callout callout-info">
+        "For this mobile-first app, I'd serve through Cloudflare with HTTP/3 enabled. Our users are mostly on mobile — lossy networks where TCP-level HOL blocking kills HTTP/2 performance. QUIC's independent streams mean a lost packet on one image download doesn't freeze the API response. And connection migration means users walking through a building switching between Wi-Fi and cellular won't lose their session. We'd still need graceful fallback to HTTP/2 though — some corporate networks block UDP."
+      </div>
+    </div>
+  </div>
+
+  <!-- Common interview questions -->
+  <h3>Frequently Asked Interview Questions</h3>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="true">
+      <span>Q: "What's the difference between HTTP/1.1, HTTP/2, and HTTP/3?"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Framework answer:</strong> Each version solves the previous one's biggest bottleneck. HTTP/1.1 solved connection waste (keep-alive). HTTP/2 solved application-level head-of-line blocking (multiplexing). HTTP/3 solved transport-level head-of-line blocking (QUIC). Then add one concrete detail per version — binary framing for HTTP/2, 0-RTT for HTTP/3.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Q: "Why did HTTP/3 move from TCP to UDP?"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Key points:</strong> TCP's ordering guarantee causes all HTTP/2 streams to freeze when one packet is lost. Building a new transport protocol from scratch would require OS kernel changes — that takes decades. UDP was the only "blank slate" available that could be deployed immediately. QUIC adds reliability, congestion control, and encryption on top of UDP in userspace — it's essentially TCP 2.0 but deployable without OS upgrades.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Q: "Should our API use HTTP/2 or HTTP/3?"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Decision framework:</strong> For server-to-server (datacenter): HTTP/2 is fine — packet loss is minimal, and QUIC's benefits are negligible on low-latency LANs. For client-facing mobile-first: HTTP/3 if your CDN/load balancer supports it — the 0-RTT and connection migration benefits are significant. For internal microservices: gRPC over HTTP/2 — you get multiplexing, streaming, and compact serialization. Always have HTTP/2 as a fallback since not all clients/networks support QUIC.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Q: "What is head-of-line blocking and how does each version handle it?"</span>
+      <i class="fa-solid fa-chevron-down"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Three-layer answer:</strong> (1) HTTP/1.1 has HOL blocking at the application layer — one slow response blocks all requests behind it on the same connection. Workaround: open 6 connections. (2) HTTP/2 eliminates application-layer HOL blocking with multiplexing. But TCP still has HOL blocking — a lost packet blocks all streams. (3) HTTP/3 eliminates both — QUIC treats each stream independently, so loss on one stream doesn't affect others.</p>
+      </div>
+    </div>
+  </div>
+
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview tip: how HOL blocking decreases across HTTP versions">
+    <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">Head-of-Line Blocking Across Versions (Interview Visual)</text>
+
+    <!-- HTTP/1.1 -->
+    <rect x="30" y="45" width="220" height="50" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="140" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">HTTP/1.1</text>
+    <text x="140" y="82" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">App HOL ✗ + Transport HOL ✗</text>
+
+    <!-- HTTP/2 -->
+    <rect x="270" y="45" width="220" height="50" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="380" y="65" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">HTTP/2</text>
+    <text x="380" y="82" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">App HOL ✓ + Transport HOL ✗</text>
+
+    <!-- HTTP/3 -->
+    <rect x="510" y="45" width="220" height="50" rx="8" fill="var(--bg-secondary, #1e293b)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="620" y="65" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">HTTP/3</text>
+    <text x="620" y="82" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="9">App HOL ✓ + Transport HOL ✓</text>
+
+    <!-- Progress bar -->
+    <rect x="30" y="115" width="220" height="12" rx="6" fill="#ef4444" opacity="0.3"/>
+    <rect x="30" y="115" width="50" height="12" rx="6" fill="#ef4444"/>
+    <text x="140" y="145" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Blocking: HIGH</text>
+
+    <rect x="270" y="115" width="220" height="12" rx="6" fill="#f59e0b" opacity="0.3"/>
+    <rect x="270" y="115" width="130" height="12" rx="6" fill="#f59e0b"/>
+    <text x="380" y="145" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9">Blocking: MEDIUM</text>
+
+    <rect x="510" y="115" width="220" height="12" rx="6" fill="#10b981" opacity="0.3"/>
+    <rect x="510" y="115" width="210" height="12" rx="6" fill="#10b981"/>
+    <text x="620" y="145" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Blocking: NONE</text>
+
+    <text x="380" y="172" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10" font-weight="600">Each version removes one layer of blocking</text>
+  </svg>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — EXERCISES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Hands-On Exercises</h2>
+    </div>
+  </div>
+
+  <p>Theory is important, but nothing beats seeing these protocols in action. Here are exercises that go from "open your browser" to "analyze real traffic."</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 1: Inspect HTTP Versions in Your Browser</span>
+      <span class="difficulty-tag difficulty-beginner">Beginner</span>
+    </div>
+    <p>Open Chrome DevTools (F12) → Network tab. Visit a popular website (e.g., google.com). Click the "Protocol" column header (right-click column headers to add it if missing). Notice which resources load over <code>h2</code> (HTTP/2) vs <code>h3</code> (HTTP/3). Try reloading — do more resources switch to h3 on the second load? Why?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>On the first visit, the browser doesn't know the server supports HTTP/3. It connects via HTTP/2 and learns about HTTP/3 from the <code>Alt-Svc</code> response header. On the second visit, it uses HTTP/3 directly. This is called the "discovery" mechanism.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 2: Measure the Multiplexing Difference</span>
+      <span class="difficulty-tag difficulty-intermediate">Intermediate</span>
+    </div>
+    <p>Set up a simple page that loads 50 small images. Serve it with Nginx configured for HTTP/1.1 only, then reconfigure for HTTP/2. Use Chrome DevTools' waterfall view to compare the loading patterns. Calculate the total load time difference and note how the waterfall shape changes (sequential bars vs parallel bars).</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>For HTTP/1.1, you'll see 6 parallel "lanes" of sequential downloads (the browser's 6-connection limit). For HTTP/2, you'll see all 50 images start at roughly the same time. The difference is most dramatic on high-latency connections — try throttling to "Slow 3G" in DevTools for a dramatic effect.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 3: Analyze Header Compression</span>
+      <span class="difficulty-tag difficulty-intermediate">Intermediate</span>
+    </div>
+    <p>Using <code>curl -v</code> or Wireshark, capture the headers of 5 sequential requests to the same server. Calculate the total header bytes in HTTP/1.1 (plain text). Then estimate the HPACK-compressed size (most repeated headers reduce to 1-2 bytes after the first request). What's the compression ratio for your specific case?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Use <code>curl -v --http1.1 https://example.com</code> to see HTTP/1.1 headers, then <code>curl -v --http2 https://example.com</code> for HTTP/2. Count the bytes of common repeating headers (Cookie, User-Agent, Accept, Accept-Encoding). Typical compression: 85-95% for requests after the first one.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 4: Test 0-RTT with QUIC</span>
+      <span class="difficulty-tag difficulty-advanced">Advanced</span>
+    </div>
+    <p>Set up a Caddy server (it enables HTTP/3 by default). Visit it in Chrome, check the protocol in DevTools. Close the tab. Visit again and check if the connection time drops to near-zero (0-RTT). Use <code>chrome://net-internals/#quic</code> to inspect QUIC connection details including 0-RTT status.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>The QUIC session ticket is cached for a limited time (usually a few hours). If you wait too long between visits, 0-RTT won't be available. Check <code>chrome://net-internals/#quic</code> for "zero_rtt_attempted" and "zero_rtt_accepted" fields in the session info.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 5: Simulate Packet Loss — HTTP/2 vs HTTP/3</span>
+      <span class="difficulty-tag difficulty-expert">Expert</span>
+    </div>
+    <p>Using a tool like <code>tc</code> (Linux traffic control) or <code>clumsy</code> (Windows), introduce 2-5% packet loss on your network. Load the same page over HTTP/2 and HTTP/3, measuring Time to First Byte and full page load time. Graph the results at 0%, 1%, 2%, 5%, and 10% loss rates. At what loss rate does HTTP/3 significantly outperform HTTP/2?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>At 0-1% loss, the difference is minimal. At 2-3%, HTTP/3 starts to pull ahead significantly. At 5%+, HTTP/2 performance degrades dramatically (TCP retransmissions block everything) while HTTP/3 degrades gracefully (only affected streams slow down). This matches Cloudflare's real-world data.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — CHEAT CARDS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-cards">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-clone"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Quick Reference — Cheat Cards</h2>
+    </div>
+  </div>
+
+  <p>Everything you need on one screen. Print these, screenshot them, or review them before your interview.</p>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title">HTTP/1.1 Core</div>
+      <div class="cheat-card-body">
+<pre>
+Transport:   TCP
+Format:      Plain text
+Connections: Persistent (keep-alive)
+Requests:    Sequential per connection
+Max parallel: ~6 connections/domain
+Headers:     Uncompressed (~800B each)
+Encryption:  Optional
+HOL Blocking: App + Transport
+</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">HTTP/2 Core</div>
+      <div class="cheat-card-body">
+<pre>
+Transport:   TCP
+Format:      Binary frames
+Connections: Single multiplexed
+Requests:    Parallel (streams)
+Max parallel: ~100+ streams
+Headers:     HPACK compressed
+Encryption:  Required (practical)
+HOL Blocking: Transport only
+Key idea:    Multiplexing
+</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">HTTP/3 Core</div>
+      <div class="cheat-card-body">
+<pre>
+Transport:   QUIC (over UDP)
+Format:      Binary frames
+Connections: Single multiplexed
+Requests:    Independent streams
+Headers:     QPACK compressed
+Encryption:  Mandatory (TLS 1.3)
+HOL Blocking: None
+Key ideas:   0-RTT, connection
+             migration
+</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Connection Setup Cost</div>
+      <div class="cheat-card-body">
+<pre>
+HTTP/1.1 + TLS 1.2:  3 RTTs
+HTTP/2  + TLS 1.3:   2 RTTs
+HTTP/3  (first):     1 RTT
+HTTP/3  (returning):  0 RTTs
+
+At 100ms latency:
+  H1.1 = 300ms before data
+  H2   = 200ms before data
+  H3   = 100ms or 0ms!
+</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">When to Use What</div>
+      <div class="cheat-card-body">
+<pre>
+gRPC (HTTP/2):
+  Service-to-service RPCs
+  Streaming data pipelines
+
+REST + HTTP/2:
+  Client-facing APIs (desktop)
+  Internal microservices
+
+REST + HTTP/3:
+  Mobile-first apps
+  Lossy/high-latency networks
+
+WebSocket:
+  Real-time bidirectional
+  (chat, gaming, live feeds)
+</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Key Terms</div>
+      <div class="cheat-card-body">
+<pre>
+Multiplexing:
+  Many requests, one connection
+
+HOL Blocking:
+  Slow item blocks all behind it
+
+HPACK / QPACK:
+  Header compression algorithms
+
+0-RTT:
+  Send data in first packet
+
+Connection Migration:
+  Survive Wi-Fi → cellular switch
+
+Binary Framing:
+  Replacing text with efficient
+  binary-encoded frames
+</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — CONNECTED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon purple"><i class="fa-solid fa-circle-nodes"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — What to Study Next</h2>
+    </div>
+  </div>
+
+  <p>HTTP is one layer of the networking stack. To build a complete understanding, explore these connected topics.</p>
+
+  <div class="related-grid">
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-globe"></i></div>
+      <div class="related-card-text">
+        <h4>REST API Design</h4>
+        <p>Design clean, versioned APIs on top of the HTTP you now understand deeply</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div class="related-card-text">
+        <h4>TCP/UDP &amp; How the Internet Works</h4>
+        <p>The transport layer that HTTP sits on — understand why QUIC chose UDP</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+      <div class="related-card-text">
+        <h4>Real-Time Communication</h4>
+        <p>WebSockets, SSE, Long Polling — when HTTP request-response isn't enough</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-server"></i></div>
+      <div class="related-card-text">
+        <h4>gRPC &amp; Protocol Buffers</h4>
+        <p>The RPC framework that relies on HTTP/2 multiplexing for high-throughput service communication</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="related-card-text">
+        <h4>TLS, OAuth &amp; API Security</h4>
+        <p>The encryption layer baked into HTTP/3 — and how authentication works on top of HTTP</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div class="related-card-text">
+        <h4>Load Balancers &amp; Reverse Proxies</h4>
+        <p>L4 vs L7 load balancing, HTTP/2 connection coalescing, and QUIC termination at the edge</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
