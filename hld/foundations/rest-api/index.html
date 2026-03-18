@@ -1,0 +1,2009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REST API Design — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="red" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-plug"></i> API Foundations</div>
+    <h1>REST API Design</h1>
+    <p class="hero-subtitle">Everything on the web is a thing you can create, read, update, or delete. REST is the language that makes that simple — and when done right, your API explains itself.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 22 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-circle-info"></i> 18 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> REST means treating everything as a <em>thing</em> (a noun) that you can create, read, update, or delete using standard actions (HTTP verbs). It's like a library catalog — every book has an address, and there are only a few things you can do: check it out, return it, look it up, or remove it.
+  </div>
+
+  <p>Here's REST in plain English. You're building an API — a way for other programs to talk to your system. Instead of inventing a brand-new command for every action (<code>getUser</code>, <code>fetchAllOrders</code>, <code>createNewProduct</code>, <code>removeItemFromCart</code>), you organize everything around <strong>resources</strong> — the "things" in your system. Users, orders, products, carts. Each thing gets a URL. And the <em>action</em> you want to take on that thing? That's just the <span class="tooltip-trigger">HTTP method<span class="tooltip-content">The verb in an HTTP request — GET (read), POST (create), PUT (replace), PATCH (update partially), DELETE (remove). Think of them as the 5 things you can do to any resource.</span></span> — GET to read, POST to create, PUT to replace, PATCH to tweak, DELETE to remove.</p>
+
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="REST mental model: resources as nouns, HTTP methods as verbs">
+    <defs>
+      <marker id="rest-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">REST = Resources (nouns) + HTTP Methods (verbs)</text>
+
+    <!-- Resources column -->
+    <rect x="30" y="50" width="200" height="170" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="130" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">RESOURCES (Nouns)</text>
+    <text x="130" y="105" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">/users</text>
+    <text x="130" y="130" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">/orders</text>
+    <text x="130" y="155" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">/products</text>
+    <text x="130" y="180" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">/carts</text>
+    <text x="130" y="207" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Every "thing" gets a URL</text>
+
+    <!-- Arrow -->
+    <line x1="245" y1="135" x2="290" y2="135" stroke="#ef4444" stroke-width="2" marker-end="url(#rest-tldr-arr)"/>
+    <text x="268" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">+</text>
+
+    <!-- Methods column -->
+    <rect x="300" y="50" width="200" height="170" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="400" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">METHODS (Verbs)</text>
+    <text x="400" y="105" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="12">GET    → Read</text>
+    <text x="400" y="130" text-anchor="middle" fill="#38bdf8" font-family="JetBrains Mono,monospace" font-size="12">POST   → Create</text>
+    <text x="400" y="155" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="12">PUT    → Replace</text>
+    <text x="400" y="180" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="12">DELETE → Remove</text>
+    <text x="400" y="207" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Only 5 standard actions</text>
+
+    <!-- Arrow -->
+    <line x1="515" y1="135" x2="555" y2="135" stroke="#ef4444" stroke-width="2" marker-end="url(#rest-tldr-arr)"/>
+    <text x="535" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">=</text>
+
+    <!-- Result -->
+    <rect x="565" y="70" width="170" height="130" rx="12" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="2"/>
+    <text x="650" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">CLEAN API</text>
+    <text x="650" y="125" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">GET /users/42</text>
+    <text x="650" y="145" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">POST /orders</text>
+    <text x="650" y="165" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">DELETE /carts/7</text>
+    <text x="650" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Predictable &amp; consistent</text>
+  </svg>
+
+  <p>That's it. Every REST API in the world follows this same pattern. Once you learn the pattern, you can use <em>any</em> REST API — Stripe, GitHub, Twilio, Twitter — without reading much documentation, because they all speak the same language. The <span class="tooltip-trigger">URL<span class="tooltip-content">Uniform Resource Locator — the address of a resource. In REST, the URL tells you WHAT thing you're working with. The HTTP method tells you WHAT you're doing to it.</span></span> tells you <em>what</em> you're talking about, and the method tells you <em>what you want to do</em>.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> REST is just a convention: every "thing" in your system gets a URL, and you use standard HTTP methods (GET, POST, PUT, DELETE) to interact with it. No custom verbs, no guessing.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">Why You Need This — The API That Nobody Can Use</h2>
+    </div>
+  </div>
+
+  <p>You've built a bookstore app. It works great. Now your boss says: "We need an API so our mobile app, partner websites, and internal tools can all talk to our system." Great — you open your editor and start writing endpoints. What could go wrong?</p>
+
+  <p>A lot, actually. You create endpoints the way that feels natural — one URL for each action you need. You end up with something like this:</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="rest-s2-bad" role="tab" aria-selected="true">Your First API</button>
+      <button class="tab-btn" data-tab="rest-s2-feedback" role="tab" aria-selected="false">What Developers Say</button>
+    </div>
+    <div class="tab-panel active" id="rest-s2-bad" role="tabpanel">
+<pre><code class="language-http">GET  /getBookById?id=42
+GET  /fetchAllBooks
+POST /createNewBook
+POST /addBookToCart?bookId=42&userId=7
+GET  /getCartItems?userId=7
+POST /removeBookFromCart?bookId=42&userId=7
+POST /submitOrder
+GET  /getOrderStatus?orderId=99
+POST /updateBookPrice?bookId=42&newPrice=29.99
+POST /deleteBook?bookId=42</code></pre>
+    </div>
+    <div class="tab-panel" id="rest-s2-feedback" role="tabpanel">
+      <p><strong>Mobile developer:</strong> "Why is 'remove from cart' a POST? It's deleting something. And 'deleteBook' is also POST? How do I know which POSTs create things and which ones destroy things?"</p>
+      <p><strong>Partner team:</strong> "Is it <code>getBookById</code> or <code>fetchBookById</code> or <code>retrieveBook</code>? Every endpoint uses a different naming convention."</p>
+      <p><strong>New hire:</strong> "There are 47 endpoints. I have to memorize each one? There's no pattern I can learn once and apply everywhere?"</p>
+      <p><strong>QA engineer:</strong> "I cached the response from <code>getBookById</code>. But when I called <code>updateBookPrice</code>, the cached data was stale. How am I supposed to know which GETs are safe to cache?"</p>
+    </div>
+  </div>
+
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The messy API: random endpoint names, inconsistent patterns">
+    <defs>
+      <marker id="rest-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Messy API — Every Endpoint Is a Surprise</text>
+
+    <!-- Client -->
+    <rect x="30" y="60" width="120" height="160" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="90" y="85" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="12">Developer</text>
+    <text x="90" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">confused.jpg</text>
+    <text x="90" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">Which verb?</text>
+    <text x="90" y="152" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">Which URL?</text>
+    <text x="90" y="169" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">GET or POST?</text>
+    <text x="90" y="186" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">Camel or snake?</text>
+    <text x="90" y="203" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">Guess every time</text>
+
+    <!-- Arrows with random endpoints -->
+    <line x1="155" y1="90" x2="310" y2="75" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s2-arr)"/>
+    <line x1="155" y1="115" x2="310" y2="110" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#rest-s2-arr)"/>
+    <line x1="155" y1="140" x2="310" y2="145" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#rest-s2-arr)"/>
+    <line x1="155" y1="165" x2="310" y2="180" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#rest-s2-arr)"/>
+
+    <!-- Server blob of endpoints -->
+    <rect x="320" y="45" width="410" height="180" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="525" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">47 ENDPOINTS — NO PATTERN</text>
+
+    <text x="340" y="95" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="9">POST /createNewBook</text>
+    <text x="340" y="115" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="9">GET  /fetchAllBooks</text>
+    <text x="340" y="135" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="9">POST /removeBookFromCart</text>
+    <text x="340" y="155" fill="#38bdf8" font-family="JetBrains Mono,monospace" font-size="9">POST /submitOrder</text>
+    <text x="340" y="175" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">POST /deleteBook?bookId=42</text>
+    <text x="340" y="195" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">GET  /getOrderStatus?orderId=99</text>
+    <text x="340" y="215" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">POST /updateBookPrice?bookId=42</text>
+
+    <text x="525" y="245" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11" font-weight="600" font-style="italic">Every call is a guessing game</text>
+  </svg>
+
+  <div class="think-first">
+    <div class="think-first-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>Look at the messy API above. Can you spot at least 3 things that are inconsistent? What would you change to make it more predictable? Think about it before scrolling down.</p>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — FIRST ATTEMPT (RPC-style)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-flask"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — "Just Name Each Action"</h2>
+    </div>
+  </div>
+
+  <p>The API in Section 2 isn't random chaos — it's actually following a very common pattern called <span class="tooltip-trigger">RPC-style<span class="tooltip-content">Remote Procedure Call — an API style where each endpoint is a function name (verb + noun), like calling a method on a remote server. Think: /getUser, /createOrder, /deleteItem.</span></span>. The idea behind RPC is simple: every endpoint is a <em>function call</em>. You name the endpoint after what it <em>does</em>, just like you'd name a function in code.</p>
+
+  <p>And honestly? For small projects, this works fine. If you have 5 endpoints, naming them <code>/getUser</code>, <code>/createUser</code>, <code>/deleteUser</code>, <code>/getOrders</code>, <code>/createOrder</code> is easy enough. Everyone on the team knows what each one does.</p>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RPC-style API: function-based naming">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">RPC Style — Every Endpoint Is a Function Name</text>
+
+    <!-- Function boxes -->
+    <rect x="30" y="50" width="160" height="40" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="110" y="75" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="11">getUser(id)</text>
+
+    <rect x="210" y="50" width="160" height="40" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="290" y="75" text-anchor="middle" fill="#38bdf8" font-family="JetBrains Mono,monospace" font-size="11">createUser(data)</text>
+
+    <rect x="390" y="50" width="160" height="40" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="470" y="75" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="11">deleteUser(id)</text>
+
+    <rect x="570" y="50" width="160" height="40" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="650" y="75" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="11">updateUser(data)</text>
+
+    <rect x="30" y="110" width="160" height="40" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="110" y="135" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="11">getOrders(userId)</text>
+
+    <rect x="210" y="110" width="160" height="40" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="290" y="135" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="11">createOrder(data)</text>
+
+    <rect x="390" y="110" width="160" height="40" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="470" y="135" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="11">cancelOrder(id)</text>
+
+    <rect x="570" y="110" width="160" height="40" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="650" y="135" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="11">getOrderStatus(id)</text>
+
+    <text x="380" y="185" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11" font-style="italic">8 endpoints, 8 unique names to memorize. Now imagine 200 of these.</text>
+  </svg>
+
+  <p>The problem isn't that RPC is "wrong." It's that it doesn't <em>scale as a convention</em>. With 5 endpoints, you can memorize them. With 50, you need documentation for every single one. With 200, even the people who <em>built</em> the API can't remember all the names. There's no pattern to learn — every endpoint is a snowflake.</p>
+
+  <div class="callout callout-warning">
+    <strong>The core issue:</strong> RPC-style APIs are <strong>verb-first</strong> — the URL describes what to <em>do</em>. This means every new action requires inventing a new endpoint name. REST flips this: the URL describes the <em>thing</em>, and the HTTP method describes the action. Fewer names to invent, fewer names to memorize.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — Five Real Pain Points</h2>
+    </div>
+  </div>
+
+  <p>Let's be specific. Here are five problems that show up the moment your RPC-style API grows beyond a handful of endpoints. These aren't theoretical — they're the exact frustrations that led the industry to adopt REST.</p>
+
+  <div class="think-first">
+    <div class="think-first-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>Imagine you're a new developer joining a team with a 200-endpoint RPC-style API. What would frustrate you most? Think of at least 2 problems before reading on.</p>
+  </div>
+
+  <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five pain points of RPC-style APIs">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Why RPC-Style APIs Fall Apart at Scale</text>
+
+    <!-- Pain 1 -->
+    <rect x="30" y="50" width="340" height="70" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="50" y="72" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">1. Naming Chaos</text>
+    <text x="50" y="90" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">getUser vs fetchUser vs retrieveUser vs loadUser</text>
+    <text x="50" y="108" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Every developer invents their own naming convention</text>
+
+    <!-- Pain 2 -->
+    <rect x="390" y="50" width="340" height="70" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="410" y="72" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="12">2. Caching Is Impossible</text>
+    <text x="410" y="90" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">POST /getUser — is this safe to cache?</text>
+    <text x="410" y="108" fill="#64748b" font-family="Inter,sans-serif" font-size="10">When everything is POST, proxies can't help you</text>
+
+    <!-- Pain 3 -->
+    <rect x="30" y="140" width="340" height="70" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="50" y="162" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="12">3. No Discoverability</text>
+    <text x="50" y="180" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">200 endpoints — where's the list of what I can do?</text>
+    <text x="50" y="198" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Every capability is hidden behind a unique URL</text>
+
+    <!-- Pain 4 -->
+    <rect x="390" y="140" width="340" height="70" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="410" y="162" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="12">4. Tooling Breaks Down</text>
+    <text x="410" y="180" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">HTTP proxies, CDNs, and browsers understand GET/POST</text>
+    <text x="410" y="198" fill="#64748b" font-family="Inter,sans-serif" font-size="10">They can't optimize custom verbs baked into URLs</text>
+
+    <!-- Pain 5 -->
+    <rect x="170" y="230" width="420" height="70" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="190" y="252" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">5. Every Endpoint Is a Surprise</text>
+    <text x="190" y="270" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">No patterns to learn — you can't guess the next endpoint</text>
+    <text x="190" y="288" fill="#64748b" font-family="Inter,sans-serif" font-size="10">With REST: if /users exists, you KNOW /users/42 does too</text>
+
+    <!-- Bottom callout -->
+    <rect x="130" y="320" width="500" height="45" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="380" y="348" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">The real cost: developer time wasted reading docs instead of building</text>
+  </svg>
+
+  <p>The naming chaos alone is a massive time sink. One study at a large company found that developers spent <strong>30% of their API integration time</strong> just figuring out endpoint names, parameter formats, and which HTTP method to use. With a well-designed REST API, most of that guessing disappears — because there's a <em>pattern</em> you learn once and apply everywhere.</p>
+
+  <p>And here's the kicker: <span class="tooltip-trigger">HTTP infrastructure<span class="tooltip-content">All the stuff between the client and your server — browsers, CDNs, proxies, load balancers, caching layers. They all understand HTTP methods natively. GET means safe to cache. POST means don't cache. PUT means idempotent. This knowledge is baked into the entire internet.</span></span> — browsers, CDNs, proxies, caches — already understands the difference between GET and POST. A GET request can be cached automatically. A POST request won't be. But if you use POST for everything (like many RPC APIs do), you've thrown away all that free infrastructure. You're fighting the web instead of working with it.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-breakthrough">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-lightbulb"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Think in Resources, Not Actions</h2>
+    </div>
+  </div>
+
+  <p>Here's the shift that changes everything. Instead of thinking "what <em>actions</em> can my API perform?" — think "what <em>things</em> does my system have?"</p>
+
+  <p>Your bookstore has books, users, orders, carts, and reviews. Those are your <strong>resources</strong>. Each resource gets one URL. And the actions? You don't invent new ones — you reuse the same five <span class="tooltip-trigger">HTTP methods<span class="tooltip-content">GET (read), POST (create), PUT (replace entirely), PATCH (update partially), DELETE (remove). These five verbs handle virtually every operation you'll ever need.</span></span> that already exist. It's like a library: there are thousands of books, but only a few things you can do with any of them — borrow, return, request, reserve.</p>
+
+  <div class="think-first">
+    <div class="think-first-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>Take the messy API from Section 2. Try to reorganize those 10 endpoints using only these resources: <code>/books</code>, <code>/carts</code>, <code>/orders</code>. Use GET, POST, PUT, DELETE as your verbs. How many endpoints do you need now?</p>
+  </div>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Before vs After: RPC-style to REST-style transformation">
+    <defs>
+      <marker id="rest-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Transformation: RPC → REST</text>
+
+    <!-- Left: Before -->
+    <rect x="20" y="45" width="340" height="260" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="190" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">BEFORE (RPC-Style)</text>
+
+    <text x="40" y="100" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">GET  /getBookById?id=42</text>
+    <text x="40" y="120" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">GET  /fetchAllBooks</text>
+    <text x="40" y="140" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /createNewBook</text>
+    <text x="40" y="160" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /updateBookPrice?bookId=42</text>
+    <text x="40" y="180" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /deleteBook?bookId=42</text>
+    <text x="40" y="200" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /addBookToCart?bookId=42</text>
+    <text x="40" y="220" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /removeBookFromCart</text>
+    <text x="40" y="240" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">GET  /getCartItems?userId=7</text>
+    <text x="40" y="260" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /submitOrder</text>
+    <text x="40" y="280" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">GET  /getOrderStatus?orderId=99</text>
+
+    <text x="190" y="300" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">10 unique names. No pattern.</text>
+
+    <!-- Arrow -->
+    <line x1="375" y1="170" x2="410" y2="170" stroke="#10b981" stroke-width="2.5" marker-end="url(#rest-s5-arr)"/>
+
+    <!-- Right: After -->
+    <rect x="420" y="45" width="320" height="260" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="580" y="70" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">AFTER (REST-Style)</text>
+
+    <text x="440" y="98" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">/books</text>
+    <text x="440" y="116" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">GET    /books         (list all)</text>
+    <text x="440" y="134" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">GET    /books/42      (get one)</text>
+    <text x="440" y="152" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">POST   /books         (create)</text>
+    <text x="440" y="170" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">PATCH  /books/42      (update)</text>
+    <text x="440" y="188" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">DELETE /books/42      (remove)</text>
+
+    <text x="440" y="212" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">/carts/{userId}/items</text>
+    <text x="440" y="230" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">GET    /carts/7/items (list)</text>
+    <text x="440" y="248" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">POST   /carts/7/items (add)</text>
+    <text x="440" y="266" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">DELETE /carts/7/items/42</text>
+
+    <text x="580" y="300" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">3 resources. Same 5 verbs. Predictable.</text>
+  </svg>
+
+  <p>Look what happened. Ten unique endpoint names collapsed into <strong>three resources</strong> with the same five verbs. A developer who's never seen your API can <em>guess</em> the endpoints. "I bet there's a <code>GET /orders</code> and a <code>GET /orders/99</code>." And they'd be right. That's the power of a <em>convention</em> — you learn the pattern once and apply it everywhere.</p>
+
+  <p>This is <span class="tooltip-trigger">REST<span class="tooltip-content">REpresentational State Transfer — an architectural style for APIs created by Roy Fielding in his 2000 PhD dissertation. The key idea: organize your API around resources (nouns) and use standard HTTP methods (verbs) to manipulate them.</span></span> — <strong>RE</strong>presentational <strong>S</strong>tate <strong>T</strong>ransfer. Don't memorize that name. Just remember: <em>resources as nouns, HTTP methods as verbs</em>. That's the entire philosophy.</p>
+
+  <div class="callout callout-success">
+    <strong>The aha moment:</strong> REST doesn't add any new technology. It's just a <em>convention</em> for organizing URLs and HTTP methods in a way that's consistent, predictable, and works with the web's existing infrastructure. The same HTTP that loads web pages in your browser can power your API — you just need to use it properly.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The Six Building Blocks</h2>
+    </div>
+  </div>
+
+  <p>REST is built on six core concepts. You already understand the main idea — resources as nouns, HTTP methods as verbs. Now let's go deeper into each building block so you can design APIs that are clean, consistent, and production-ready.</p>
+
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six building blocks of REST: Resources, Methods, Status Codes, Request/Response, Headers, Content Negotiation">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Six Building Blocks of REST</text>
+    <!-- Block 1 -->
+    <rect x="15" y="45" width="115" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="72" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Resources</text>
+    <text x="72" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">The nouns</text>
+    <!-- Block 2 -->
+    <rect x="140" y="45" width="115" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="197" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Methods</text>
+    <text x="197" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">The verbs</text>
+    <!-- Block 3 -->
+    <rect x="265" y="45" width="115" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="322" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Status Codes</text>
+    <text x="322" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">The outcomes</text>
+    <!-- Block 4 -->
+    <rect x="390" y="45" width="115" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="447" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Req / Resp</text>
+    <text x="447" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">The conversation</text>
+    <!-- Block 5 -->
+    <rect x="515" y="45" width="115" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="572" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Headers</text>
+    <text x="572" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">The metadata</text>
+    <!-- Block 6 -->
+    <rect x="640" y="45" width="115" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="697" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Content Neg.</text>
+    <text x="697" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">The format</text>
+
+    <!-- Connecting line -->
+    <line x1="72" y1="115" x2="697" y2="115" stroke="#334155" stroke-width="2"/>
+    <circle cx="72" cy="115" r="4" fill="#ef4444"/>
+    <circle cx="197" cy="115" r="4" fill="#ef4444"/>
+    <circle cx="322" cy="115" r="4" fill="#ef4444"/>
+    <circle cx="447" cy="115" r="4" fill="#ef4444"/>
+    <circle cx="572" cy="115" r="4" fill="#ef4444"/>
+    <circle cx="697" cy="115" r="4" fill="#ef4444"/>
+
+    <text x="380" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11" font-style="italic">Master these six, and you can design any REST API.</text>
+    <text x="380" y="170" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Click each card below to explore.</text>
+  </svg>
+
+  <!-- ── Card 1: Resources & URLs ── -->
+  <div class="card open">
+    <h3 class="card-title">1. Resources &amp; URLs — Naming the Things in Your System</h3>
+    <div class="card-body">
+      <p>A <span class="tooltip-trigger">resource<span class="tooltip-content">Any "thing" in your system that has identity and can be addressed by a URL. Users, orders, products, comments, payments — all resources. Even abstract concepts like "search results" can be resources.</span></span> is any "thing" your API deals with. Users, books, orders, payments, reviews. Each resource gets a URL — its address on the web. The URL tells the client <em>what</em> they're talking about.</p>
+
+      <p>Here are the rules that every good REST API follows for naming resources:</p>
+
+      <ul>
+        <li><strong>Use nouns, never verbs</strong> — <code>/books</code> not <code>/getBooks</code>. The HTTP method IS the verb.</li>
+        <li><strong>Use plurals</strong> — <code>/users</code> not <code>/user</code>. The collection is plural; a single item is <code>/users/42</code>.</li>
+        <li><strong>Use lowercase with hyphens</strong> — <code>/order-items</code> not <code>/orderItems</code> or <code>/OrderItems</code>.</li>
+        <li><strong>Nest for relationships</strong> — <code>/users/7/orders</code> means "orders belonging to user 7".</li>
+        <li><strong>Keep it shallow</strong> — max 2-3 levels deep. <code>/users/7/orders/99/items</code> is okay. Going deeper is a smell.</li>
+      </ul>
+
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="URL anatomy: collection, item, nested resources">
+        <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">URL Anatomy</text>
+
+        <!-- Collection -->
+        <rect x="30" y="45" width="220" height="60" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="140" y="67" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="11">Collection</text>
+        <text x="140" y="90" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">GET /books</text>
+
+        <!-- Single item -->
+        <rect x="270" y="45" width="220" height="60" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="380" y="67" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="11">Single Item</text>
+        <text x="380" y="90" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">GET /books/42</text>
+
+        <!-- Nested -->
+        <rect x="510" y="45" width="230" height="60" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="625" y="67" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="11">Nested Resource</text>
+        <text x="625" y="90" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="12">GET /books/42/reviews</text>
+
+        <!-- Explanation row -->
+        <text x="140" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"All the books"</text>
+        <text x="380" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"The book with ID 42"</text>
+        <text x="625" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Reviews of book 42"</text>
+
+        <!-- Bad examples -->
+        <text x="380" y="168" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">Common mistakes:</text>
+        <text x="380" y="188" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">/getBooks ✗   /book ✗   /BooksList ✗   /api/v1/get-all-books ✗</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── Card 2: HTTP Methods ── -->
+  <div class="card">
+    <h3 class="card-title">2. HTTP Methods — The Five Things You Can Do</h3>
+    <div class="card-body">
+      <p>HTTP gives you five standard methods. Think of them as the five actions you can perform on any resource — like a universal remote control that works with every TV.</p>
+
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP methods: GET, POST, PUT, PATCH, DELETE with safety and idempotency">
+        <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">The Five HTTP Methods</text>
+
+        <!-- Header row -->
+        <text x="80" y="55" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="10">METHOD</text>
+        <text x="210" y="55" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="10">MEANING</text>
+        <text x="410" y="55" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="10">EXAMPLE</text>
+        <text x="580" y="55" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="10">SAFE?</text>
+        <text x="680" y="55" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-weight="600" font-size="10">IDEMPOTENT?</text>
+
+        <line x1="20" y1="65" x2="740" y2="65" stroke="#334155" stroke-width="1"/>
+
+        <!-- GET -->
+        <rect x="30" y="75" width="100" height="35" rx="6" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="80" y="97" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="700" font-size="12">GET</text>
+        <text x="210" y="97" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Read / Fetch</text>
+        <text x="410" y="97" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">GET /books/42</text>
+        <text x="580" y="97" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11">Yes</text>
+        <text x="680" y="97" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11">Yes</text>
+
+        <!-- POST -->
+        <rect x="30" y="120" width="100" height="35" rx="6" fill="rgba(56,189,248,0.15)" stroke="#38bdf8" stroke-width="1.5"/>
+        <text x="80" y="142" text-anchor="middle" fill="#38bdf8" font-family="JetBrains Mono,monospace" font-weight="700" font-size="12">POST</text>
+        <text x="210" y="142" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Create new</text>
+        <text x="410" y="142" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">POST /books</text>
+        <text x="580" y="142" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">No</text>
+        <text x="680" y="142" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">No</text>
+
+        <!-- PUT -->
+        <rect x="30" y="165" width="100" height="35" rx="6" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="80" y="187" text-anchor="middle" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-weight="700" font-size="12">PUT</text>
+        <text x="210" y="187" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Replace entirely</text>
+        <text x="410" y="187" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">PUT /books/42</text>
+        <text x="580" y="187" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">No</text>
+        <text x="680" y="187" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11">Yes</text>
+
+        <!-- PATCH -->
+        <rect x="30" y="210" width="100" height="35" rx="6" fill="rgba(167,139,250,0.15)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="80" y="232" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-weight="700" font-size="12">PATCH</text>
+        <text x="210" y="232" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Update partially</text>
+        <text x="410" y="232" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">PATCH /books/42</text>
+        <text x="580" y="232" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">No</text>
+        <text x="680" y="232" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="11">Sometimes</text>
+
+        <!-- DELETE -->
+        <rect x="30" y="255" width="100" height="35" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="80" y="277" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-weight="700" font-size="12">DELETE</text>
+        <text x="210" y="277" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Remove</text>
+        <text x="410" y="277" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">DELETE /books/42</text>
+        <text x="580" y="277" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">No</text>
+        <text x="680" y="277" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11">Yes</text>
+
+        <text x="380" y="312" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Safe = doesn't change data.  Idempotent = calling it 10 times has the same effect as calling it once.</text>
+      </svg>
+
+      <p>Two words worth knowing here. <span class="tooltip-trigger">Safe<span class="tooltip-content">A "safe" HTTP method doesn't modify anything on the server. GET is safe — it just reads. POST, PUT, PATCH, DELETE are not safe — they change state. Browsers and proxies use this to decide what's safe to retry or cache.</span></span> means the method doesn't change anything — GET just reads, like looking through a shop window. <span class="tooltip-trigger">Idempotent<span class="tooltip-content">An operation is idempotent if doing it once or doing it ten times gives the same result. PUT and DELETE are idempotent — deleting the same resource twice doesn't delete it "more." POST is NOT — posting the same order twice creates two orders.</span></span> means doing it once or ten times gives the same result. DELETE is idempotent — deleting a book that's already deleted doesn't delete it "more." POST is NOT idempotent — posting the same order twice creates two orders. This matters hugely for retries and error handling, which we'll cover in Section 7.</p>
+
+      <div class="callout callout-info">
+        <strong>PUT vs PATCH — the difference that trips everyone up:</strong> PUT means "here's the complete replacement" — if you PUT a book with just <code>{ "title": "New Title" }</code>, the price, author, and every other field gets erased. PATCH means "here are just the changes" — you can send <code>{ "price": 29.99 }</code> and only the price updates. Most real APIs use PATCH for updates.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Card 3: Status Codes ── -->
+  <div class="card">
+    <h3 class="card-title">3. Status Codes — How the Server Says "Here You Go" or "Nope"</h3>
+    <div class="card-body">
+      <p>Every HTTP response comes with a three-digit number that tells the client what happened. You don't need to memorize all 70+ status codes — just these categories and the 10-12 most common ones.</p>
+
+      <svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP status code families: 2xx success, 3xx redirect, 4xx client error, 5xx server error">
+        <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Status Code Families</text>
+
+        <!-- 2xx -->
+        <rect x="30" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="115" y="68" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="800" font-size="16">2xx</text>
+        <text x="115" y="86" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">SUCCESS</text>
+        <text x="40" y="108" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">200 OK</text>
+        <text x="40" y="124" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">201 Created</text>
+        <text x="40" y="140" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">204 No Content</text>
+        <text x="40" y="156" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"It worked!"</text>
+
+        <!-- 3xx -->
+        <rect x="215" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+        <text x="300" y="68" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="800" font-size="16">3xx</text>
+        <text x="300" y="86" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">REDIRECT</text>
+        <text x="225" y="108" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">301 Moved Perm.</text>
+        <text x="225" y="124" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">304 Not Modified</text>
+        <text x="225" y="140" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">307 Temp. Redirect</text>
+        <text x="225" y="156" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Look elsewhere"</text>
+
+        <!-- 4xx -->
+        <rect x="400" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="485" y="68" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="800" font-size="16">4xx</text>
+        <text x="485" y="86" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">CLIENT ERROR</text>
+        <text x="410" y="108" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">400 Bad Request</text>
+        <text x="410" y="124" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">401 Unauthorized</text>
+        <text x="410" y="140" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">404 Not Found</text>
+        <text x="410" y="156" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"You messed up"</text>
+
+        <!-- 5xx -->
+        <rect x="585" y="45" width="155" height="120" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="662" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="800" font-size="16">5xx</text>
+        <text x="662" y="86" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="10">SERVER ERROR</text>
+        <text x="595" y="108" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">500 Internal Error</text>
+        <text x="595" y="124" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">502 Bad Gateway</text>
+        <text x="595" y="140" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">503 Unavailable</text>
+        <text x="595" y="156" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"We messed up"</text>
+
+        <!-- Which code when -->
+        <rect x="30" y="185" width="710" height="110" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+        <text x="380" y="208" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="11">Which Code for Which Situation?</text>
+        <text x="50" y="230" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="9">GET  /books/42     → 200 (found it!)    or 404 (no such book)</text>
+        <text x="50" y="248" fill="#38bdf8" font-family="JetBrains Mono,monospace" font-size="9">POST /books        → 201 (created!)     or 400 (invalid data)</text>
+        <text x="50" y="266" fill="#f59e0b" font-family="JetBrains Mono,monospace" font-size="9">PUT  /books/42     → 200 (updated!)     or 404 (no such book)</text>
+        <text x="50" y="284" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">DELETE /books/42   → 204 (deleted!)     or 404 (already gone)</text>
+      </svg>
+
+      <p>A quick rule of thumb: <strong>2xx means everything's fine</strong>, <strong>4xx means the client did something wrong</strong> (bad data, wrong URL, no permissions), and <strong>5xx means the server broke</strong>. The most common mistake is returning 200 for everything and hiding the error in the response body — don't do that. Clients, monitoring tools, and <span class="tooltip-trigger">load balancers<span class="tooltip-content">A server that distributes incoming traffic across multiple backend servers. Load balancers use status codes to decide if a backend is healthy — too many 5xx responses means "stop sending traffic there."</span></span> all rely on status codes to behave correctly.</p>
+    </div>
+  </div>
+
+  <!-- ── Card 4: Request & Response ── -->
+  <div class="card">
+    <h3 class="card-title">4. Request &amp; Response — The Conversation Format</h3>
+    <div class="card-body">
+      <p>Every API call is a conversation: the client asks, the server answers. Let's look at what a real exchange looks like.</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="rest-s6-req" role="tab" aria-selected="true">Request (Client → Server)</button>
+          <button class="tab-btn" data-tab="rest-s6-resp" role="tab" aria-selected="false">Response (Server → Client)</button>
+        </div>
+        <div class="tab-panel active" id="rest-s6-req" role="tabpanel">
+<pre><code class="language-http">POST /books HTTP/1.1
+Host: api.bookstore.com
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOi...
+
+{
+  "title": "Designing Data-Intensive Applications",
+  "author": "Martin Kleppmann",
+  "price": 45.99,
+  "isbn": "978-1449373320"
+}</code></pre>
+          <p><strong>Line 1:</strong> Method + URL + HTTP version. "I want to CREATE a new book."</p>
+          <p><strong>Headers:</strong> Metadata — what format the body is in, who I am (auth token).</p>
+          <p><strong>Body:</strong> The actual data — the book I want to create.</p>
+        </div>
+        <div class="tab-panel" id="rest-s6-resp" role="tabpanel">
+<pre><code class="language-http">HTTP/1.1 201 Created
+Content-Type: application/json
+Location: /books/143
+
+{
+  "id": 143,
+  "title": "Designing Data-Intensive Applications",
+  "author": "Martin Kleppmann",
+  "price": 45.99,
+  "isbn": "978-1449373320",
+  "created_at": "2026-03-18T10:30:00Z"
+}</code></pre>
+          <p><strong>Status line:</strong> 201 Created — "I made the book for you."</p>
+          <p><strong>Location header:</strong> "Here's where you can find it: <code>/books/143</code>"</p>
+          <p><strong>Body:</strong> The created resource, now with an ID and timestamp the server added.</p>
+        </div>
+      </div>
+
+      <p>Notice how the response echoes back the full resource, not just "ok." This lets the client update its local state without making a second GET request. The <code>Location</code> header tells the client the URL of the newly created resource — a small courtesy that saves a round trip.</p>
+    </div>
+  </div>
+
+  <!-- ── Card 5: Headers ── -->
+  <div class="card">
+    <h3 class="card-title">5. Headers — The Envelope, Not the Letter</h3>
+    <div class="card-body">
+      <p>If the URL and body are the "letter" you're sending, headers are the "envelope" — they carry information <em>about</em> the message without being the message itself. Think of headers like the labels on a package: who sent it, how fragile it is, when it expires.</p>
+
+      <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Common HTTP headers grouped by purpose">
+        <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Headers You'll Use Every Day</text>
+
+        <!-- Auth -->
+        <rect x="20" y="45" width="235" height="80" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="137" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">AUTHENTICATION</text>
+        <text x="30" y="85" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Authorization: Bearer &lt;token&gt;</text>
+        <text x="30" y="100" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Who I am" — JWT or API key</text>
+        <text x="30" y="115" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">X-API-Key: sk_live_abc123</text>
+
+        <!-- Content -->
+        <rect x="265" y="45" width="235" height="80" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+        <text x="382" y="65" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="10">CONTENT</text>
+        <text x="275" y="85" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Content-Type: application/json</text>
+        <text x="275" y="100" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"The body is JSON"</text>
+        <text x="275" y="115" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Accept: application/json</text>
+
+        <!-- Caching -->
+        <rect x="510" y="45" width="235" height="80" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="627" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">CACHING</text>
+        <text x="520" y="85" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Cache-Control: max-age=3600</text>
+        <text x="520" y="100" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Cache this for 1 hour"</text>
+        <text x="520" y="115" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">ETag: "v2-abc123"</text>
+
+        <!-- Rate limit -->
+        <rect x="20" y="140" width="235" height="80" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="137" y="160" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="10">RATE LIMITING</text>
+        <text x="30" y="180" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">X-RateLimit-Limit: 1000</text>
+        <text x="30" y="195" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">X-RateLimit-Remaining: 847</text>
+        <text x="30" y="210" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"You have 847 calls left"</text>
+
+        <!-- Pagination -->
+        <rect x="265" y="140" width="235" height="80" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="382" y="160" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="10">PAGINATION</text>
+        <text x="275" y="180" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Link: &lt;/books?page=3&gt;; rel="next"</text>
+        <text x="275" y="195" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Next page is at /books?page=3"</text>
+        <text x="275" y="210" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">X-Total-Count: 1472</text>
+
+        <!-- Request ID -->
+        <rect x="510" y="140" width="235" height="80" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="627" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="700" font-size="10">DEBUGGING</text>
+        <text x="520" y="180" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">X-Request-Id: req_abc123</text>
+        <text x="520" y="195" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Trace this call in logs"</text>
+        <text x="520" y="210" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">X-Response-Time: 47ms</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ── Card 6: Content Negotiation ── -->
+  <div class="card">
+    <h3 class="card-title">6. Content Negotiation — "Send Me JSON, Please"</h3>
+    <div class="card-body">
+      <p>Content negotiation is a fancy term for a simple idea: the client tells the server what format it wants the data in, and the server tries to comply. It's like walking into a restaurant and saying "I'd like the menu in English, please" — the food is the same, but the presentation matches your preference.</p>
+
+      <p>The client sends an <code>Accept</code> header saying what format it can handle:</p>
+
+<pre><code class="language-http">GET /books/42 HTTP/1.1
+Accept: application/json</code></pre>
+
+      <p>The server responds with the data in that format, and tells you what it sent via <code>Content-Type</code>:</p>
+
+<pre><code class="language-http">HTTP/1.1 200 OK
+Content-Type: application/json
+
+{ "id": 42, "title": "DDIA", "price": 45.99 }</code></pre>
+
+      <p>In practice, <strong>99% of modern REST APIs use JSON exclusively</strong>. You'll occasionally see XML in legacy enterprise systems, or CSV for data export endpoints. But JSON won the format war years ago, so content negotiation is mostly a formality — your API will almost certainly speak JSON and nothing else.</p>
+
+      <div class="callout callout-info">
+        <strong>Quick tip:</strong> Always set <code>Content-Type: application/json</code> on your responses, even if you think it's obvious. Some HTTP clients behave differently when the content type is missing — they might try to parse the response as HTML or plain text instead of JSON.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — The Details That Separate Good APIs from Great Ones</h2>
+    </div>
+  </div>
+
+  <p>You now know the fundamentals — resources, methods, status codes, headers. That's enough to build a working REST API. But a <em>great</em> API handles the hard stuff too: How do you change your API without breaking everyone? How do you return 10 million records? How do clients retry safely? Let's dig in.</p>
+
+  <!-- ── Versioning ── -->
+  <h3>Versioning — Changing Your API Without Breaking the World</h3>
+
+  <p>Your API is live. Thousands of apps depend on it. Now you need to change the response format — maybe rename a field, or restructure the data. If you just change it, every client breaks. That's why APIs need <span class="tooltip-trigger">versioning<span class="tooltip-content">A strategy for evolving your API over time while maintaining backward compatibility. Old clients keep using v1, new clients use v2. You support both until everyone migrates.</span></span> — a way to evolve without breaking existing users.</p>
+
+  <div class="think-first">
+    <div class="think-first-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>You have an API with 500 active clients. You need to rename <code>user_name</code> to <code>username</code> in the response. How would you roll this out safely? Think of at least 2 approaches.</p>
+  </div>
+
+  <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three versioning strategies: URL path, header, query parameter">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Three Versioning Strategies</text>
+
+    <!-- Strategy 1: URL path -->
+    <rect x="20" y="45" width="230" height="170" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="135" y="70" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">URL Path (Most Common)</text>
+    <text x="40" y="98" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">/v1/books</text>
+    <text x="40" y="116" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">/v2/books</text>
+    <text x="40" y="142" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Simple to understand</text>
+    <text x="40" y="158" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Easy to route in load balancers</text>
+    <text x="40" y="174" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Visible in browser/docs</text>
+    <text x="40" y="194" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Pollutes the URL namespace</text>
+    <text x="135" y="212" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">Used by: Stripe, GitHub, Twilio</text>
+
+    <!-- Strategy 2: Header -->
+    <rect x="265" y="45" width="230" height="170" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+    <text x="380" y="70" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="12">Custom Header</text>
+    <text x="285" y="98" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">GET /books</text>
+    <text x="285" y="116" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">API-Version: 2</text>
+    <text x="285" y="142" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Clean URLs</text>
+    <text x="285" y="158" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Separates concerns</text>
+    <text x="285" y="174" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Hidden from casual browsing</text>
+    <text x="285" y="194" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Harder to test in browser</text>
+    <text x="380" y="212" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">Used by: Azure, some Microsoft APIs</text>
+
+    <!-- Strategy 3: Query param -->
+    <rect x="510" y="45" width="230" height="170" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="625" y="70" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="12">Query Parameter</text>
+    <text x="530" y="98" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">/books?version=2</text>
+    <text x="530" y="116" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">/books?api-version=2</text>
+    <text x="530" y="142" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Easy to test</text>
+    <text x="530" y="158" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Optional (default to latest)</text>
+    <text x="530" y="174" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Mixes versioning with data</text>
+    <text x="530" y="194" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Can break caching</text>
+    <text x="625" y="212" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">Used by: Google, Amazon</text>
+  </svg>
+
+  <p><strong>The industry favorite is URL path versioning</strong> — <code>/v1/books</code>, <code>/v2/books</code>. It's the simplest to understand, the easiest to route, and the most visible. Stripe, GitHub, and Twilio all use it. For most teams, this is the right choice. Don't overthink it.</p>
+
+  <!-- ── Pagination ── -->
+  <h3>Pagination — Returning a Million Records Without Crashing</h3>
+
+  <p>Your bookstore has 2 million books. A client calls <code>GET /books</code>. Do you return all 2 million in one response? Of course not — that would be a 500MB JSON blob that takes 30 seconds to download and crashes the client's browser. You need <span class="tooltip-trigger">pagination<span class="tooltip-content">Breaking a large collection into smaller chunks ("pages") that clients can request one at a time. Like reading a book one chapter at a time instead of the whole thing at once.</span></span> — breaking the results into pages.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="rest-s7-offset" role="tab" aria-selected="true">Offset Pagination</button>
+      <button class="tab-btn" data-tab="rest-s7-cursor" role="tab" aria-selected="false">Cursor Pagination</button>
+    </div>
+    <div class="tab-panel active" id="rest-s7-offset" role="tabpanel">
+      <p><strong>The simple approach:</strong> tell the server "give me page 3, with 20 items per page."</p>
+<pre><code class="language-http">GET /books?page=3&amp;limit=20
+
+Response:
+{
+  "data": [ ... 20 books ... ],
+  "pagination": {
+    "page": 3,
+    "limit": 20,
+    "total": 1847,
+    "total_pages": 93
+  }
+}</code></pre>
+      <p><strong>Pros:</strong> Easy to implement. Clients can jump to any page. Great for UI with page numbers.</p>
+      <p><strong>Cons:</strong> If someone inserts a new book while you're paginating, you might see duplicates or skip items. At high offsets (<code>page=50000</code>), the database has to scan and skip millions of rows — very slow.</p>
+    </div>
+    <div class="tab-panel" id="rest-s7-cursor" role="tabpanel">
+      <p><strong>The scalable approach:</strong> instead of a page number, use a "bookmark" — a pointer to where you left off.</p>
+<pre><code class="language-http">GET /books?limit=20&amp;after=eyJpZCI6MTAwfQ==
+
+Response:
+{
+  "data": [ ... 20 books ... ],
+  "pagination": {
+    "next_cursor": "eyJpZCI6MTIwfQ==",
+    "has_more": true
+  }
+}</code></pre>
+      <p><strong>Pros:</strong> Consistent even when data changes. Fast at any depth — the database uses an index seek, not a scan. Perfect for infinite scroll.</p>
+      <p><strong>Cons:</strong> Can't jump to "page 500." Clients must follow the chain: page 1 → page 2 → page 3. The cursor is opaque — clients shouldn't try to decode or construct it.</p>
+    </div>
+  </div>
+
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Offset vs cursor pagination: offset skips rows, cursor seeks to position">
+    <defs>
+      <marker id="rest-s7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Offset vs Cursor — Performance at Scale</text>
+
+    <!-- Offset side -->
+    <rect x="20" y="45" width="350" height="140" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="195" y="68" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">OFFSET: page=5000, limit=20</text>
+    <!-- Rows being skipped -->
+    <rect x="40" y="82" width="310" height="15" rx="3" fill="#334155"/>
+    <text x="195" y="93" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8">⟵ scan &amp; skip 99,980 rows ⟶</text>
+    <rect x="300" y="102" width="50" height="15" rx="3" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="1"/>
+    <text x="325" y="113" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="7">20 rows</text>
+    <text x="195" y="140" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">Slow! DB reads 100K rows, returns 20.</text>
+    <text x="195" y="158" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">O(offset + limit) — gets worse with depth</text>
+    <text x="195" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Page 1: 2ms | Page 5000: 3,400ms</text>
+
+    <!-- Cursor side -->
+    <rect x="390" y="45" width="350" height="140" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="565" y="68" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">CURSOR: after=id_99980, limit=20</text>
+    <!-- Index seek -->
+    <rect x="410" y="82" width="310" height="15" rx="3" fill="#334155"/>
+    <line x1="600" y1="78" x2="600" y2="100" stroke="#10b981" stroke-width="2"/>
+    <text x="600" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8">↓ seek directly</text>
+    <rect x="600" y="102" width="50" height="15" rx="3" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1"/>
+    <text x="625" y="113" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="7">20 rows</text>
+    <text x="565" y="140" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Fast! DB seeks to cursor, reads 20.</text>
+    <text x="565" y="158" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">O(limit) — constant regardless of depth</text>
+    <text x="565" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Page 1: 2ms | Page 5000: 2ms</text>
+  </svg>
+
+  <div class="callout callout-warning">
+    <strong>Rule of thumb:</strong> Use <strong>offset pagination</strong> for admin dashboards and small datasets where users need "page 5 of 10." Use <strong>cursor pagination</strong> for feeds, timelines, search results, and any dataset that might grow large. When in doubt, cursor is the safer bet.
+  </div>
+
+  <!-- ── Filtering & Sorting ── -->
+  <h3>Filtering &amp; Sorting — Finding the Needle in the Haystack</h3>
+
+  <p>Pagination gives you pages. But clients rarely want <em>all</em> books — they want science fiction books under $20, sorted by rating. That's <span class="tooltip-trigger">filtering<span class="tooltip-content">Narrowing down results based on criteria. In REST, filters are typically query parameters: /books?genre=sci-fi&max_price=20. The server applies these as WHERE clauses in the database query.</span></span> and <span class="tooltip-trigger">sorting<span class="tooltip-content">Ordering results by a specific field. In REST: /books?sort=price (ascending) or /books?sort=-price (descending, with a minus prefix). Can sort by multiple fields: ?sort=-rating,price.</span></span>.</p>
+
+<pre><code class="language-http"># Filter by genre AND price, sort by rating (descending)
+GET /books?genre=sci-fi&amp;max_price=20&amp;sort=-rating&amp;limit=20
+
+# Filter by author, sort by publication date (newest first)
+GET /books?author=kleppmann&amp;sort=-published_at
+
+# Search with a query string
+GET /books?q=distributed+systems&amp;in_stock=true</code></pre>
+
+  <p>The conventions: use query parameters for filters, prefix with <code>-</code> for descending sort, use <code>q</code> for full-text search. Keep filter names consistent with your response field names — if the JSON says <code>"genre": "sci-fi"</code>, the filter should be <code>?genre=sci-fi</code>, not <code>?book_genre=sci-fi</code>.</p>
+
+  <!-- ── Idempotency ── -->
+  <h3>Idempotency Keys — Making Retries Safe</h3>
+
+  <p>Here's a scary scenario. A client sends <code>POST /orders</code> to place an order. The server creates the order and charges the credit card. But the response never arrives — the network drops it. The client doesn't know if the order went through, so it retries. Without protection, the customer gets charged twice.</p>
+
+  <div class="think-first">
+    <div class="think-first-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>How would you prevent duplicate orders when clients retry? The server already processed the first request — how can it recognize the second request as a duplicate? Think about it before reading on.</p>
+  </div>
+
+  <p>The solution is <span class="tooltip-trigger">idempotency keys<span class="tooltip-content">A unique ID that the client generates and sends with each request. If the server receives the same key twice, it returns the original response instead of processing the request again. Stripe popularized this pattern — every payment API uses it now.</span></span>. The client generates a unique ID and sends it with the request. The server stores this ID alongside the result. If the same ID shows up again, the server returns the original response instead of processing the request a second time.</p>
+
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Idempotency key flow: first request processes, retry returns cached response">
+    <defs>
+      <marker id="rest-s7b-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+      <marker id="rest-s7b-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Idempotency Keys — Safe Retries</text>
+
+    <!-- Client -->
+    <rect x="30" y="50" width="120" height="50" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="90" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="600" font-size="11">Client</text>
+
+    <!-- Server -->
+    <rect x="340" y="50" width="120" height="50" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="400" y="80" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="11">Server</text>
+
+    <!-- DB -->
+    <rect x="590" y="50" width="140" height="50" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="660" y="73" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">Idempotency</text>
+    <text x="660" y="88" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="10">Store</text>
+
+    <!-- First request -->
+    <text x="30" y="130" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="10">1st Request:</text>
+    <line x1="150" y1="135" x2="335" y2="135" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#rest-s7b-arr)"/>
+    <text x="240" y="128" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="8">Idempotency-Key: abc-123</text>
+
+    <!-- Server checks store -->
+    <line x1="460" y1="135" x2="585" y2="135" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="520" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Not found → process</text>
+
+    <!-- Server stores result -->
+    <line x1="460" y1="150" x2="585" y2="150" stroke="#10b981" stroke-width="1"/>
+    <text x="520" y="165" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8">Store: abc-123 → 201 Created</text>
+
+    <!-- Response 1 -->
+    <line x1="335" y1="175" x2="150" y2="175" stroke="#10b981" stroke-width="1.5" marker-end="url(#rest-s7b-arr-g)"/>
+    <text x="240" y="170" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">201 Created (order #99)</text>
+    <text x="240" y="192" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9" font-weight="600">✗ Response lost! Network failure.</text>
+
+    <!-- Retry -->
+    <text x="30" y="218" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">Retry (same key):</text>
+    <line x1="150" y1="222" x2="335" y2="222" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s7b-arr)"/>
+    <text x="240" y="215" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="8">Idempotency-Key: abc-123</text>
+
+    <!-- Server finds in store -->
+    <line x1="460" y1="222" x2="585" y2="222" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="520" y="215" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="8">Found! Return cached.</text>
+
+    <!-- Response 2 -->
+    <line x1="335" y1="245" x2="150" y2="245" stroke="#10b981" stroke-width="1.5" marker-end="url(#rest-s7b-arr-g)"/>
+    <text x="240" y="255" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">201 Created (order #99) — same response, no duplicate!</text>
+  </svg>
+
+  <p>Stripe uses this for every payment. You send an <code>Idempotency-Key</code> header, and Stripe stores the result for 24 hours. If the same key appears again, Stripe returns the original result without charging the card again. This is such a critical pattern that it should be built into every API that processes money, creates resources, or triggers side effects.</p>
+
+  <!-- ── Rate Limiting ── -->
+  <h3>Rate Limiting Headers — "You're Calling Too Much"</h3>
+
+  <p>APIs need to protect themselves from clients that call too often — whether it's a bug in someone's code, a DDoS attack, or a script gone wild. <span class="tooltip-trigger">Rate limiting<span class="tooltip-content">Restricting how many requests a client can make in a given time window. E.g., "1000 requests per hour." When the limit is exceeded, the server returns 429 Too Many Requests.</span></span> caps the number of requests per time window, and good APIs tell you exactly where you stand via headers.</p>
+
+<pre><code class="language-http">HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000        # Max requests per hour
+X-RateLimit-Remaining: 847     # Requests left in this window
+X-RateLimit-Reset: 1710761400  # When the window resets (Unix timestamp)
+
+# When you hit the limit:
+HTTP/1.1 429 Too Many Requests
+Retry-After: 342               # Wait 342 seconds before retrying</code></pre>
+
+  <p>Good clients check <code>X-RateLimit-Remaining</code> proactively and slow down before hitting the limit. The <code>Retry-After</code> header on a 429 response tells the client exactly when it's safe to try again — so it doesn't have to guess.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — VARIATIONS (REST vs RPC vs GraphQL)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-code-compare"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">The Variations — REST vs RPC vs GraphQL</h2>
+    </div>
+  </div>
+
+  <p>REST isn't the only way to build APIs. It's the most popular, but two other styles are widely used — and each one exists because REST can't solve every problem perfectly. Let's compare them honestly, without fanboyism.</p>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="REST vs RPC vs GraphQL comparison: three API styles with different strengths">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Three API Styles — Pick the Right Tool</text>
+
+    <!-- REST -->
+    <rect x="20" y="45" width="230" height="270" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="135" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="800" font-size="14">REST</text>
+    <text x="135" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Resources + HTTP methods"</text>
+    <text x="40" y="115" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">GET /users/42</text>
+    <text x="40" y="132" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">POST /orders</text>
+    <text x="40" y="155" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Cacheable (GET)</text>
+    <text x="40" y="170" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Universal convention</text>
+    <text x="40" y="185" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Works with HTTP infra</text>
+    <text x="40" y="200" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Easy to understand</text>
+    <text x="40" y="220" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Over-fetching (get all fields)</text>
+    <text x="40" y="235" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- N+1 calls for related data</text>
+    <text x="40" y="255" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-weight="600">Best for:</text>
+    <text x="40" y="270" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Public APIs, CRUD apps,</text>
+    <text x="40" y="285" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">microservices, mobile backends</text>
+    <text x="135" y="308" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8" font-style="italic">Stripe, GitHub, Twilio</text>
+
+    <!-- RPC / gRPC -->
+    <rect x="265" y="45" width="230" height="270" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+    <text x="380" y="72" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="800" font-size="14">RPC / gRPC</text>
+    <text x="380" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Call remote functions"</text>
+    <text x="285" y="115" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">userService.GetUser(42)</text>
+    <text x="285" y="132" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">orderService.Create(data)</text>
+    <text x="285" y="155" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Very fast (binary protocol)</text>
+    <text x="285" y="170" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Strongly typed contracts</text>
+    <text x="285" y="185" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Bi-directional streaming</text>
+    <text x="285" y="200" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Code generation</text>
+    <text x="285" y="220" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Not browser-friendly</text>
+    <text x="285" y="235" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Harder to debug (binary)</text>
+    <text x="285" y="255" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-weight="600">Best for:</text>
+    <text x="285" y="270" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Internal service-to-service,</text>
+    <text x="285" y="285" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">high-perf microservices</text>
+    <text x="380" y="308" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8" font-style="italic">Google, Netflix, Uber</text>
+
+    <!-- GraphQL -->
+    <rect x="510" y="45" width="230" height="270" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="625" y="72" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="800" font-size="14">GraphQL</text>
+    <text x="625" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Ask for exactly what you need"</text>
+    <text x="530" y="115" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">{ user(id:42) {</text>
+    <text x="530" y="132" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">  name, orders { total } }}</text>
+    <text x="530" y="155" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ No over-fetching</text>
+    <text x="530" y="170" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ One request for nested data</text>
+    <text x="530" y="185" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Self-documenting schema</text>
+    <text x="530" y="200" fill="#10b981" font-family="Inter,sans-serif" font-size="9">+ Great developer tools</text>
+    <text x="530" y="220" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Hard to cache (POST only)</text>
+    <text x="530" y="235" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">- Complex server implementation</text>
+    <text x="530" y="255" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-weight="600">Best for:</text>
+    <text x="530" y="270" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Frontend-driven apps, mobile</text>
+    <text x="530" y="285" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">with varied data needs</text>
+    <text x="625" y="308" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8" font-style="italic">Facebook, Shopify, GitHub (v4)</text>
+  </svg>
+
+  <p>Here's the practical truth: <strong>most companies use REST for public APIs and gRPC for internal service-to-service communication</strong>. GraphQL thrives when you have many different clients (mobile, web, third-party) that each need different slices of the same data. GitHub actually offers <em>both</em> — their REST API (v3) and GraphQL API (v4) coexist, and you pick whichever fits your use case.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="rest-s8-over" role="tab" aria-selected="true">Over-Fetching Problem</button>
+      <button class="tab-btn" data-tab="rest-s8-n1" role="tab" aria-selected="false">N+1 Problem</button>
+    </div>
+    <div class="tab-panel active" id="rest-s8-over" role="tabpanel">
+      <p><strong>REST's weakness #1:</strong> You always get the <em>entire</em> resource, even if you only need one field.</p>
+<pre><code class="language-http"># You just want the user's name. REST returns EVERYTHING:
+GET /users/42
+
+{
+  "id": 42,
+  "name": "Alice",           ← you wanted this
+  "email": "alice@...",      ← didn't need this
+  "avatar_url": "...",       ← or this
+  "address": { ... },        ← definitely not this (1KB of data)
+  "preferences": { ... }     ← or this
+}
+
+# GraphQL lets you ask for just what you need:
+# { user(id: 42) { name } }  →  { "name": "Alice" }</code></pre>
+      <p>For desktop apps on fast connections, over-fetching barely matters. For mobile apps on 3G? Sending 10KB when you need 50 bytes adds up fast across hundreds of API calls.</p>
+    </div>
+    <div class="tab-panel" id="rest-s8-n1" role="tabpanel">
+      <p><strong>REST's weakness #2:</strong> To get a user and their 5 most recent orders, you need multiple calls.</p>
+<pre><code class="language-http"># Step 1: Get the user
+GET /users/42           → { "id": 42, "name": "Alice" }
+
+# Step 2: Get their orders (separate call!)
+GET /users/42/orders    → [ { "id": 1, ... }, { "id": 2, ... } ]
+
+# Step 3: Get items for each order (5 MORE calls!)
+GET /orders/1/items     → [ ... ]
+GET /orders/2/items     → [ ... ]
+...
+
+# That's 7 round trips for one screen of data!
+
+# GraphQL does it in ONE:
+# { user(id:42) { name, orders { id, items { name } } } }</code></pre>
+      <p>This is the <span class="tooltip-trigger">N+1 problem<span class="tooltip-content">When fetching a list of N items requires N additional requests to get related data. 1 request for the list + N requests for details = N+1 total. GraphQL and RPC solve this with nested queries or batching.</span></span>. REST APIs often address it with <code>?include=orders,items</code> or <code>?expand=orders.items</code> query parameters, but it's a bolt-on — not a native feature.</p>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>So should you always use GraphQL?</strong> No. GraphQL adds complexity (schema definitions, resolvers, query cost analysis, N+1 on the server side). REST is simpler to build, simpler to cache, simpler to monitor. Pick GraphQL when you have genuinely different data needs across clients. Pick REST when your API is straightforward CRUD.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — AT SCALE (Real-world APIs)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How Stripe, GitHub, and Twilio Do It</h2>
+    </div>
+  </div>
+
+  <p>Theory is nice, but how do the world's best APIs actually work? Let's look at three APIs that are consistently rated among the best — and what specific choices they made that you can steal for your own designs.</p>
+
+  <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three gold-standard APIs: Stripe, GitHub, Twilio">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Gold Standard — APIs Developers Love</text>
+
+    <rect x="30" y="45" width="220" height="100" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="140" y="72" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="800" font-size="14">Stripe</text>
+    <text x="140" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Payments</text>
+    <text x="140" y="110" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Billions of $ processed/year</text>
+    <text x="140" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">"The API that every API aspires to be"</text>
+
+    <rect x="270" y="45" width="220" height="100" rx="12" fill="#1e293b" stroke="#f1f5f9" stroke-width="2"/>
+    <text x="380" y="72" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="800" font-size="14">GitHub</text>
+    <text x="380" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Developer Platform</text>
+    <text x="380" y="110" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">100M+ developers</text>
+    <text x="380" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">"REST v3 + GraphQL v4 coexist"</text>
+
+    <rect x="510" y="45" width="220" height="100" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="620" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="800" font-size="14">Twilio</text>
+    <text x="620" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Communications</text>
+    <text x="620" y="110" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">SMS, Voice, Video</text>
+    <text x="620" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9" font-style="italic">"So simple, you can call it from curl"</text>
+  </svg>
+
+  <!-- Stripe -->
+  <h3>Stripe — The API Every API Aspires to Be</h3>
+
+  <p>Stripe processes billions of dollars in payments. Their API is so well-designed that it's become the gold standard for how REST APIs should work. Here's what they do right:</p>
+
+  <ul>
+    <li><strong>Idempotency keys on every POST</strong> — send <code>Idempotency-Key: abc-123</code> and Stripe stores the result for 24 hours. Retries are always safe. This is critical when you're moving money.</li>
+    <li><strong>Expand parameter</strong> — instead of making 3 API calls, use <code>?expand[]=customer&expand[]=invoice</code> to include related objects inline. Solves the N+1 problem elegantly.</li>
+    <li><strong>Versioned via date</strong> — Stripe uses <code>Stripe-Version: 2024-06-20</code> instead of <code>/v1/</code>. Each account is pinned to the version it was created with. You can upgrade at your own pace.</li>
+    <li><strong>Consistent error format</strong> — every error has <code>type</code>, <code>code</code>, <code>message</code>, and <code>param</code> (the field that caused it). Machine-readable AND human-readable.</li>
+  </ul>
+
+<pre><code class="language-json">// Stripe error response — clear, actionable, consistent
+{
+  "error": {
+    "type": "card_error",
+    "code": "card_declined",
+    "message": "Your card was declined.",
+    "param": "source",
+    "decline_code": "insufficient_funds"
+  }
+}</code></pre>
+
+  <!-- GitHub -->
+  <h3>GitHub — REST and GraphQL Living Together</h3>
+
+  <p>GitHub is interesting because they offer <em>both</em> API styles. Their REST API (v3) has been around for years and is battle-tested. Their GraphQL API (v4) launched in 2017 to solve the over-fetching problem that mobile developers complained about.</p>
+
+  <ul>
+    <li><strong>HATEOAS in practice</strong> — every response includes <code>url</code> links to related resources. A repo object contains <code>issues_url</code>, <code>pulls_url</code>, <code>commits_url</code>. You can navigate the entire API by following links.</li>
+    <li><strong>Pagination via Link headers</strong> — <code>Link: &lt;/repos?page=3&gt;; rel="next", &lt;/repos?page=50&gt;; rel="last"</code>. Clients follow the links instead of constructing URLs.</li>
+    <li><strong>Conditional requests</strong> — <code>ETag</code> and <code>If-None-Match</code> for caching. If data hasn't changed, GitHub returns <code>304 Not Modified</code> with zero body. Saves bandwidth and doesn't count against your rate limit.</li>
+  </ul>
+
+  <!-- Twilio -->
+  <h3>Twilio — So Simple You Can Use It From curl</h3>
+
+  <p>Twilio's design philosophy is radical simplicity. Sending an SMS is one API call. Making a phone call is one API call. They optimized for "time to first hello world" — a new developer should be able to send their first text message in under 5 minutes.</p>
+
+  <ul>
+    <li><strong>Subresources for everything</strong> — <code>/Accounts/{sid}/Messages</code>, <code>/Accounts/{sid}/Calls</code>. The URL hierarchy mirrors the business domain.</li>
+    <li><strong>Human-readable SIDs</strong> — resource IDs start with a prefix that tells you what they are: <code>AC</code> for Account, <code>SM</code> for SMS, <code>CA</code> for Call. You can identify a resource type just by looking at its ID.</li>
+    <li><strong>Webhook-first design</strong> — when an SMS is delivered or a call ends, Twilio POSTs to your webhook URL with the status update. You don't have to poll.</li>
+  </ul>
+
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lessons from the best APIs: consistency, errors, discoverability, simplicity">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Steal These Ideas for Your Own APIs</text>
+
+    <rect x="20" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="105" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Consistency</text>
+    <text x="30" y="88" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Same naming, same patterns,</text>
+    <text x="30" y="103" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">same error format on every</text>
+    <text x="30" y="118" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">endpoint. Learn once, use</text>
+    <text x="30" y="133" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">everywhere.</text>
+    <text x="105" y="158" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8" font-style="italic">All three do this</text>
+
+    <rect x="205" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="290" y="68" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">Great Errors</text>
+    <text x="215" y="88" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Machine-readable codes +</text>
+    <text x="215" y="103" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">human-readable messages +</text>
+    <text x="215" y="118" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">which field caused it.</text>
+    <text x="215" y="133" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Developers can fix fast.</text>
+    <text x="290" y="158" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8" font-style="italic">Stripe is the gold standard</text>
+
+    <rect x="390" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="475" y="68" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">Discoverability</text>
+    <text x="400" y="88" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Links to related resources</text>
+    <text x="400" y="103" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">in every response. Clients</text>
+    <text x="400" y="118" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">navigate via links, not</text>
+    <text x="400" y="133" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">hard-coded URLs.</text>
+    <text x="475" y="158" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8" font-style="italic">GitHub does this best</text>
+
+    <rect x="575" y="45" width="170" height="120" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="660" y="68" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="11">Time to Hello</text>
+    <text x="585" y="88" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">How fast can a new developer</text>
+    <text x="585" y="103" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">make their first API call?</text>
+    <text x="585" y="118" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Twilio: under 5 minutes.</text>
+    <text x="585" y="133" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">That's the target.</text>
+    <text x="660" y="158" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8" font-style="italic">Twilio leads here</text>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — THE ANTI-LESSON
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-ban"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">The Anti-Lesson — When REST Is the Wrong Choice</h2>
+    </div>
+  </div>
+
+  <p>REST is wonderful for most APIs. But it's not the answer to everything. Forcing REST onto problems it wasn't designed for leads to ugly, inefficient APIs. Here are the situations where you should reach for something else.</p>
+
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="When NOT to use REST: real-time, file uploads, RPC-heavy, complex queries">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">When REST Is the Wrong Tool</text>
+
+    <!-- Case 1 -->
+    <rect x="20" y="50" width="350" height="95" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="40" y="72" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Real-Time Data (chat, live scores, stock tickers)</text>
+    <text x="40" y="92" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">REST is request-response. Client asks, server answers.</text>
+    <text x="40" y="107" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">But for chat, the server needs to PUSH to the client.</text>
+    <text x="40" y="127" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Use instead: WebSockets, Server-Sent Events, gRPC streaming</text>
+
+    <!-- Case 2 -->
+    <rect x="390" y="50" width="350" height="95" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="410" y="72" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">Complex Queries (analytics, dashboards)</text>
+    <text x="410" y="92" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Get me sales by region, grouped by month, filtered</text>
+    <text x="410" y="107" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">by product category, compared to last year."</text>
+    <text x="410" y="127" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Use instead: GraphQL or a dedicated query API</text>
+
+    <!-- Case 3 -->
+    <rect x="20" y="160" width="350" height="95" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="40" y="182" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="11">High-Performance Internal Services</text>
+    <text x="40" y="202" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Service A calls Service B 50,000 times per second.</text>
+    <text x="40" y="217" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">JSON parsing overhead matters at this scale.</text>
+    <text x="40" y="237" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Use instead: gRPC (binary protocol, 10x faster)</text>
+
+    <!-- Case 4 -->
+    <rect x="390" y="160" width="350" height="95" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="410" y="182" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="700" font-size="11">Actions That Don't Map to CRUD</text>
+    <text x="410" y="202" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Merge these two accounts." "Recalculate all prices."</text>
+    <text x="410" y="217" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Run this report." These are verbs, not nouns.</text>
+    <text x="410" y="237" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Pragmatic fix: POST /accounts/42/merge (action endpoint)</text>
+
+    <text x="380" y="275" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="11" font-weight="600" font-style="italic">Forcing REST onto non-CRUD operations creates awkward, confusing APIs.</text>
+  </svg>
+
+  <p>The last point is worth emphasizing. Purists insist that everything must be a noun. But <code>POST /accounts/42/actions/merge</code> is genuinely worse than <code>POST /accounts/42/merge</code>. The best APIs are pragmatic — they follow REST conventions where they fit and deviate where they don't. Stripe uses <code>POST /charges/{id}/capture</code> for capturing a payment. That's a verb, and it's fine.</p>
+
+  <div class="callout callout-warning">
+    <strong>The #1 REST mistake in interviews:</strong> Using REST for everything, then struggling to explain how to model "transfer money from account A to account B" as a resource. Just say: "This is an action, so I'd use <code>POST /transfers</code> with a body containing source and destination. Not everything has to be pure REST."
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — COMMON MISTAKES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-circle-xmark"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — What Engineers Get Wrong</h2>
+    </div>
+  </div>
+
+  <p>These are the mistakes I see in code reviews, interviews, and production APIs. Each one seems minor, but at scale they compound into APIs that are painful to use.</p>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake 1: Verbs in URLs</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people do:</strong> <code>GET /getUsers</code>, <code>POST /createOrder</code>, <code>DELETE /deleteBook/42</code></p>
+        <p><strong>Why it's wrong:</strong> The HTTP method IS the verb. Adding a verb to the URL is redundant — like saying "I want to GET the getUsers." It also breaks the REST convention, making your API harder to learn.</p>
+        <p><strong>The fix:</strong> <code>GET /users</code>, <code>POST /orders</code>, <code>DELETE /books/42</code>. Let the method do its job.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake 2: Using 200 for everything</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people do:</strong> Return <code>200 OK</code> with <code>{ "success": false, "error": "Not found" }</code></p>
+        <p><strong>Why it's wrong:</strong> Monitoring tools count 4xx/5xx errors to trigger alerts. Load balancers use status codes to route traffic. Returning 200 for errors means your infrastructure thinks everything is fine when it's not. Your error rate dashboard shows 0% while users are getting errors.</p>
+        <p><strong>The fix:</strong> Use the correct status code: 404 for not found, 400 for bad input, 401 for unauthorized, 500 for server errors. Save 200 for actual success.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake 3: Inconsistent naming conventions</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people do:</strong> Mix <code>camelCase</code>, <code>snake_case</code>, and <code>kebab-case</code> in the same API. URLs use <code>/orderItems</code>, JSON uses <code>order_items</code>, headers use <code>X-Order-Items</code>.</p>
+        <p><strong>Why it's wrong:</strong> Inconsistency forces developers to memorize exceptions. "Was it <code>userId</code> or <code>user_id</code>?" Every moment spent on this is a moment NOT spent building features.</p>
+        <p><strong>The fix:</strong> Pick one convention and stick with it. The most common: <code>snake_case</code> in JSON (Stripe, GitHub), <code>kebab-case</code> in URLs (<code>/order-items</code>). Whatever you choose, document it and enforce it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake 4: Exposing database IDs and internal structure</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people do:</strong> <code>/users/1</code>, <code>/users/2</code>, <code>/users/3</code> — sequential auto-increment IDs from the database.</p>
+        <p><strong>Why it's wrong:</strong> Attackers can iterate through all users. Competitors can estimate your growth ("they have 50,000 users"). Internal structure leaks into the public API.</p>
+        <p><strong>The fix:</strong> Use UUIDs (<code>/users/f47ac10b-58cc</code>) or opaque identifiers. Stripe uses prefixed IDs like <code>cus_abc123</code> — you can't guess the next one, and the prefix tells you it's a customer.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Mistake 5: No error body on 4xx/5xx responses</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>What people do:</strong> Return <code>400 Bad Request</code> with no body, or a generic <code>{ "error": "Invalid request" }</code>.</p>
+        <p><strong>Why it's wrong:</strong> The developer debugging this has no idea WHAT was invalid. Was it a missing field? A wrong type? A value out of range? They end up guessing or reading source code.</p>
+        <p><strong>The fix:</strong> Return a structured error body with a machine-readable code, a human-readable message, and — critically — which field caused the error:</p>
+<pre><code class="language-json">{
+  "error": {
+    "code": "validation_error",
+    "message": "Price must be a positive number",
+    "field": "price",
+    "value": -5.99
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — INTERVIEW PLAYBOOK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-chalkboard-user"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — How REST Shows Up in Interviews</h2>
+    </div>
+  </div>
+
+  <p>REST API design comes up in two contexts: dedicated API design rounds ("Design an API for X") and as part of system design rounds ("Here's the architecture — now design the API layer"). Here's how to handle both.</p>
+
+  <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview flow: identify resources, define endpoints, add pagination, discuss trade-offs">
+    <defs>
+      <marker id="rest-s12-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">The 4-Step API Design Process for Interviews</text>
+
+    <rect x="20" y="50" width="160" height="80" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="100" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Step 1</text>
+    <text x="100" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Identify resources</text>
+    <text x="100" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"What are the nouns?"</text>
+    <text x="100" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">users, posts, comments</text>
+
+    <line x1="185" y1="90" x2="215" y2="90" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s12-arr)"/>
+
+    <rect x="220" y="50" width="160" height="80" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="300" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Step 2</text>
+    <text x="300" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Define endpoints</text>
+    <text x="300" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">CRUD for each resource</text>
+    <text x="300" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">+ relationships</text>
+
+    <line x1="385" y1="90" x2="415" y2="90" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s12-arr)"/>
+
+    <rect x="420" y="50" width="160" height="80" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="500" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Step 3</text>
+    <text x="500" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Add pagination</text>
+    <text x="500" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">filtering, sorting,</text>
+    <text x="500" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">error format</text>
+
+    <line x1="585" y1="90" x2="615" y2="90" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s12-arr)"/>
+
+    <rect x="620" y="50" width="120" height="80" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="680" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">Step 4</text>
+    <text x="680" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Trade-offs</text>
+    <text x="680" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">versioning, auth,</text>
+    <text x="680" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">rate limiting</text>
+
+    <text x="380" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Say each step out loud. Interviewers love seeing a structured approach.</text>
+  </svg>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="rest-s12-basic" role="tab" aria-selected="true">Beginner Level</button>
+      <button class="tab-btn" data-tab="rest-s12-mid" role="tab" aria-selected="false">Intermediate</button>
+      <button class="tab-btn" data-tab="rest-s12-adv" role="tab" aria-selected="false">Advanced</button>
+    </div>
+    <div class="tab-panel active" id="rest-s12-basic" role="tabpanel">
+      <h4>Beginner: Show You Know the Basics</h4>
+      <ul>
+        <li><strong>Name resources as nouns</strong> — "I'd have <code>/users</code>, <code>/posts</code>, and <code>/comments</code> as my three main resources."</li>
+        <li><strong>Use correct HTTP methods</strong> — "Creating a post is <code>POST /posts</code>. Reading one is <code>GET /posts/{id}</code>. Deleting is <code>DELETE /posts/{id}</code>."</li>
+        <li><strong>Use correct status codes</strong> — "201 for creation, 404 when not found, 400 for validation errors."</li>
+        <li><strong>Return the resource</strong> — "After creating, I return the full resource with its new ID so the client doesn't need a second call."</li>
+      </ul>
+    </div>
+    <div class="tab-panel" id="rest-s12-mid" role="tabpanel">
+      <h4>Intermediate: Show You Think About Edge Cases</h4>
+      <ul>
+        <li><strong>Pagination</strong> — "For lists, I'd use cursor-based pagination with <code>?limit=20&after=cursor</code>. Offset pagination has performance issues at depth."</li>
+        <li><strong>Filtering</strong> — "Clients can filter with <code>?status=published&author=alice&sort=-created_at</code>."</li>
+        <li><strong>Error format</strong> — "Every error returns a JSON body with <code>code</code>, <code>message</code>, and <code>field</code>. Machine-readable and human-readable."</li>
+        <li><strong>Versioning</strong> — "I'd version the API via URL path: <code>/v1/posts</code>. It's the simplest and most common approach."</li>
+      </ul>
+    </div>
+    <div class="tab-panel" id="rest-s12-adv" role="tabpanel">
+      <h4>Advanced: Show You've Built Production APIs</h4>
+      <ul>
+        <li><strong>Idempotency</strong> — "For POST endpoints that create resources or trigger payments, I'd require an <code>Idempotency-Key</code> header. Retries are safe."</li>
+        <li><strong>Rate limiting</strong> — "I'd return <code>X-RateLimit-Remaining</code> headers and 429 with <code>Retry-After</code> when exceeded."</li>
+        <li><strong>HATEOAS</strong> — "Each response includes links to related resources and next actions. The client doesn't need to hard-code URLs."</li>
+        <li><strong>Trade-offs</strong> — "For this particular use case, I'd consider GraphQL instead of REST because the clients have very different data needs — mobile wants minimal fields, web wants everything."</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>The biggest interview trap:</strong> Designing a beautiful REST API without asking what the client actually needs. Always start with: "Who are the consumers? Mobile app? Web? Third-party integrations?" The answer changes your design decisions — mobile needs sparse responses, third-party needs stability and versioning.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — HANDS-ON CHALLENGES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="challenges">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Hands-On Challenges — Design APIs Yourself</h2>
+    </div>
+  </div>
+
+  <p>The best way to learn REST API design is to practice it. These five challenges progress from beginner to expert. For each one, write down your endpoints before opening the solution. In interviews, you won't have answers to peek at — build that muscle now.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 1: Blog API <span class="difficulty-tag difficulty-beginner">Beginner</span></div>
+    <p>Design a REST API for a blog platform. Users can create posts, comment on posts, and like posts. List all the resources, endpoints, and the HTTP methods for each.</p>
+    <p><em>Time target: 5 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Start by listing the nouns: posts, comments, likes, users. Then think about relationships — comments belong to posts, likes belong to posts. Should likes be a sub-resource of posts, or their own top-level resource?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<pre><code class="language-http"># Posts
+GET    /posts              # List all posts (paginated)
+GET    /posts/{id}         # Get single post
+POST   /posts              # Create a post
+PATCH  /posts/{id}         # Update a post
+DELETE /posts/{id}         # Delete a post
+
+# Comments (nested under posts)
+GET    /posts/{id}/comments       # List comments on a post
+POST   /posts/{id}/comments       # Add a comment
+DELETE /posts/{id}/comments/{cid} # Delete a comment
+
+# Likes (sub-resource of posts)
+POST   /posts/{id}/likes          # Like a post
+DELETE /posts/{id}/likes          # Unlike a post (your own)
+GET    /posts/{id}/likes          # List who liked it
+
+# Users
+GET    /users/{id}         # Get user profile
+GET    /users/{id}/posts   # Get a user's posts</code></pre>
+          <p><strong>Key decisions:</strong> Likes are a sub-resource because they only make sense in context of a post. Comments are nested because they belong to a specific post. Users are top-level because they exist independently.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 2: E-Commerce API with Pagination <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>Design the product search and cart API for an e-commerce site. Products have categories, prices, ratings, and stock status. The catalog has <strong>2 million products</strong>. Include pagination, filtering, and sorting in your design.</p>
+    <p><em>Time target: 7 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>With 2M products, offset pagination will be slow for deep pages. Think about cursor-based pagination. For filtering, think about which fields users would commonly filter by. For the cart, should cart items be a sub-resource?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<pre><code class="language-http"># Product catalog (cursor pagination for 2M products)
+GET /products?category=electronics&amp;min_price=10&amp;max_price=500
+    &amp;in_stock=true&amp;sort=-rating&amp;limit=20&amp;after=eyJpZCI6MTAwfQ
+
+# Response includes:
+# { "data": [...], "pagination": { "next_cursor": "...", "has_more": true } }
+
+GET /products/{id}          # Single product with full details
+GET /products/{id}/reviews  # Reviews for a product
+
+# Cart
+GET    /carts/me            # Current user's cart
+POST   /carts/me/items      # Add item: { "product_id": 42, "quantity": 2 }
+PATCH  /carts/me/items/{id} # Update quantity: { "quantity": 5 }
+DELETE /carts/me/items/{id} # Remove item from cart
+
+# Checkout
+POST /orders                # Convert cart to order: { "cart_id": "...", "payment_method": "..." }</code></pre>
+          <p><strong>Key decisions:</strong> Cursor pagination because 2M products makes offset slow. <code>/carts/me</code> uses the authenticated user's ID (no need to pass it). Checkout is a POST to /orders (creating a new order), not a verb endpoint.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 3: Error Response Design <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>Design a consistent error response format for a payment API. Cover these scenarios: invalid card number, expired card, insufficient funds, rate limit exceeded, internal server error, and authentication failure. Show the exact JSON response for each.</p>
+    <p><em>Time target: 5 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Think about what a developer needs to programmatically handle each error. A machine-readable code is essential (you can't parse English messages). Also think about which HTTP status code matches each scenario — not everything is 400.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<pre><code class="language-json">// 422 Unprocessable Entity — invalid card
+{ "error": { "type": "card_error", "code": "invalid_card_number",
+  "message": "The card number is not a valid credit card number.",
+  "param": "card_number" } }
+
+// 402 Payment Required — insufficient funds
+{ "error": { "type": "card_error", "code": "insufficient_funds",
+  "message": "The card has insufficient funds.",
+  "decline_code": "insufficient_funds" } }
+
+// 429 Too Many Requests — rate limited
+{ "error": { "type": "rate_limit_error", "code": "rate_limit_exceeded",
+  "message": "Too many requests. Retry after 60 seconds." } }
+// + Retry-After: 60 header
+
+// 401 Unauthorized — bad API key
+{ "error": { "type": "authentication_error", "code": "invalid_api_key",
+  "message": "The API key provided is invalid." } }
+
+// 500 Internal Server Error — our fault
+{ "error": { "type": "api_error", "code": "internal_error",
+  "message": "An unexpected error occurred. Please retry.",
+  "request_id": "req_abc123" } }</code></pre>
+          <p><strong>Pattern:</strong> Every error has the same shape: <code>type</code> (category), <code>code</code> (machine-readable), <code>message</code> (human-readable), and optional <code>param</code>/<code>request_id</code>. Clients switch on <code>type</code> and <code>code</code>, never parse the message string.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 4: API Versioning Strategy <span class="difficulty-tag difficulty-advanced">Advanced</span></div>
+    <p>Your API has 200 active clients. You need to rename <code>user_name</code> to <code>username</code> in all user-related responses, and also change the date format from <code>"March 18, 2026"</code> to <code>"2026-03-18T00:00:00Z"</code> (ISO 8601). Design the migration strategy. How do you roll this out without breaking anyone?</p>
+    <p><em>Time target: 8 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Think about whether you need a full version bump (v1 → v2) or if you can do this more gradually. Consider: can you return BOTH field names temporarily? How would you communicate the change? What's your timeline?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ol>
+            <li><strong>Phase 1 — Dual-write (Week 1):</strong> Return BOTH <code>user_name</code> AND <code>username</code> in responses. Both have the same value. Old clients keep working; new clients can start using the new field. Same for dates — return both formats.</li>
+            <li><strong>Phase 2 — Deprecation notice (Week 2):</strong> Add a <code>Deprecation: true</code> header and a <code>Sunset: 2026-05-18</code> header on responses that use the old field names. Email all 200 clients. Add a deprecation warning to docs.</li>
+            <li><strong>Phase 3 — Monitor usage (Weeks 3-8):</strong> Track which clients still use the old field name (check request bodies for <code>user_name</code>). Reach out to the holdouts directly.</li>
+            <li><strong>Phase 4 — Remove old fields (Week 9):</strong> Stop returning <code>user_name</code>. Old date format goes away. Monitor error rates for 24 hours.</li>
+          </ol>
+          <p><strong>Alternative:</strong> If the changes are too risky for gradual migration, bump to v2: <code>/v2/users</code> with new field names. Keep <code>/v1/users</code> alive for 6 months. This is cleaner but more work to maintain two versions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Challenge 5: Design Stripe's Payment Intent API <span class="difficulty-tag difficulty-expert">Expert</span></div>
+    <p>Design the API for a payment system that supports: creating payments, confirming payments, capturing authorized payments, refunding, and handling 3D Secure authentication redirects. Include <span class="tooltip-trigger">idempotency<span class="tooltip-content">The property that performing an operation multiple times has the same effect as performing it once. Critical for payments — you never want to charge a customer twice because of a network retry.</span></span>, proper status codes, and webhook notifications. This is Stripe's actual problem.</p>
+    <p><em>Time target: 12 minutes</em></p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>A payment goes through stages: created → requires_confirmation → requires_action (3DS) → processing → succeeded/failed. Think of the payment as a resource with a state machine. Actions like "confirm" and "capture" are sub-resources or action endpoints. Webhooks handle async status changes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+<pre><code class="language-http"># Create a payment intent (requires Idempotency-Key)
+POST /v1/payment-intents
+Idempotency-Key: pi_unique_123
+{ "amount": 2000, "currency": "usd", "payment_method": "pm_card_visa" }
+→ 201 Created { "id": "pi_abc", "status": "requires_confirmation" }
+
+# Confirm the payment (client-side SDK typically does this)
+POST /v1/payment-intents/pi_abc/confirm
+→ 200 { "status": "requires_action", "next_action": {
+    "type": "redirect_to_url",
+    "redirect_url": "https://bank.com/3ds?token=xyz" } }
+
+# After 3DS, the status updates asynchronously via webhook:
+# POST https://yourapp.com/webhooks/stripe
+# { "type": "payment_intent.succeeded", "data": { "id": "pi_abc" } }
+
+# Capture an authorized payment (for auth-then-capture flow)
+POST /v1/payment-intents/pi_abc/capture
+→ 200 { "status": "succeeded", "amount_captured": 2000 }
+
+# Refund (full or partial)
+POST /v1/refunds
+{ "payment_intent": "pi_abc", "amount": 500 }
+→ 201 { "id": "re_xyz", "status": "pending", "amount": 500 }
+
+# List refunds for a payment
+GET /v1/payment-intents/pi_abc/refunds</code></pre>
+          <p><strong>Key decisions:</strong> <code>/confirm</code> and <code>/capture</code> are action endpoints (verbs) — this is where pure REST breaks down and pragmatism wins. Webhooks handle async state transitions. Every mutating call accepts an idempotency key. Refunds are their own resource because they have lifecycle and metadata.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — QUICK REFERENCE / CHEAT SHEET
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-table-list"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Quick Reference — REST API Cheat Sheet</h2>
+    </div>
+  </div>
+
+  <p>Everything from this page on one screen. Pin this for your next API design session or interview prep.</p>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title">HTTP Methods</div>
+      <div class="cheat-card-body"><pre>GET    → Read (safe, idempotent)
+POST   → Create (NOT idempotent)
+PUT    → Replace (idempotent)
+PATCH  → Partial update
+DELETE → Remove (idempotent)
+
+Safe = doesn't change data
+Idempotent = same result if repeated</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Status Codes</div>
+      <div class="cheat-card-body"><pre>200 OK           → Success
+201 Created      → POST success
+204 No Content   → DELETE success
+400 Bad Request  → Invalid input
+401 Unauthorized → Bad/missing auth
+403 Forbidden    → No permission
+404 Not Found    → Bad URL / no data
+409 Conflict     → Duplicate/state err
+422 Unprocessable→ Validation failed
+429 Too Many Req → Rate limited
+500 Server Error → Our fault</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">URL Conventions</div>
+      <div class="cheat-card-body"><pre>Nouns, not verbs:
+  /users NOT /getUsers
+
+Plurals:
+  /books NOT /book
+
+Lowercase + hyphens:
+  /order-items NOT /orderItems
+
+Nesting for relationships:
+  /users/42/orders
+
+Max 3 levels deep:
+  /users/42/orders/99/items ← OK
+  /.../items/3/details ← too deep</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Pagination</div>
+      <div class="cheat-card-body"><pre>Offset (simple, slow at depth):
+  ?page=3&amp;limit=20
+
+Cursor (fast, no jump-to-page):
+  ?limit=20&amp;after=eyJpZCI6MTAwfQ
+
+Response includes:
+  "next_cursor": "..."
+  "has_more": true
+
+Rule: cursor for feeds/search,
+offset for admin dashboards</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Versioning</div>
+      <div class="cheat-card-body"><pre>URL path (most common):
+  /v1/books  →  /v2/books
+
+Header:
+  API-Version: 2
+
+Query param:
+  /books?version=2
+
+Best practice:
+  URL path (Stripe, GitHub, Twilio)
+  Support old version for 6-12 months
+  Deprecation headers + sunset date</pre></div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Error Format</div>
+      <div class="cheat-card-body"><pre>{
+  "error": {
+    "type": "validation_error",
+    "code": "invalid_email",
+    "message": "Email is invalid",
+    "field": "email"
+  }
+}
+
+Always include:
+  - Machine-readable code
+  - Human-readable message
+  - Which field caused it
+  - Request ID for debugging</pre></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — CONNECTED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>REST API design connects to almost every other system design topic. Here's how what you learned feeds into the rest of your learning journey.</p>
+
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How REST API Design connects to other system design topics">
+    <defs>
+      <marker id="rest-s15-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+    <!-- Center: REST -->
+    <rect x="280" y="110" width="200" height="65" rx="14" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="2.5"/>
+    <text x="380" y="138" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="800" font-size="14">REST API DESIGN</text>
+    <text x="380" y="158" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Resources, Methods, Status Codes</text>
+
+    <!-- Authentication -->
+    <rect x="30" y="15" width="170" height="50" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="115" y="38" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="11">Authentication</text>
+    <text x="115" y="53" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Who can call your API?"</text>
+    <line x1="290" y1="120" x2="197" y2="58" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s15-arr)"/>
+
+    <!-- Rate Limiting -->
+    <rect x="550" y="15" width="170" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="635" y="38" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="11">Rate Limiting</text>
+    <text x="635" y="53" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Protect your API from abuse"</text>
+    <line x1="470" y1="120" x2="553" y2="58" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s15-arr)"/>
+
+    <!-- Load Balancers -->
+    <rect x="560" y="110" width="170" height="50" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="645" y="133" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-weight="600" font-size="11">Load Balancers</text>
+    <text x="645" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Distribute API traffic"</text>
+    <line x1="480" y1="142" x2="558" y2="138" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s15-arr)"/>
+
+    <!-- Caching -->
+    <rect x="550" y="215" width="170" height="50" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="635" y="238" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="11">Caching</text>
+    <text x="635" y="253" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Cache GET responses"</text>
+    <line x1="460" y1="170" x2="553" y2="225" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s15-arr)"/>
+
+    <!-- Webhooks -->
+    <rect x="30" y="215" width="170" height="50" rx="10" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="115" y="238" text-anchor="middle" fill="#f43f5e" font-family="Inter,sans-serif" font-weight="600" font-size="11">Webhooks</text>
+    <text x="115" y="253" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Push events to clients"</text>
+    <line x1="300" y1="170" x2="197" y2="225" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s15-arr)"/>
+
+    <!-- API Gateway -->
+    <rect x="30" y="110" width="170" height="50" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="115" y="133" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-weight="600" font-size="11">API Gateway</text>
+    <text x="115" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Single entry point"</text>
+    <line x1="280" y1="142" x2="202" y2="138" stroke="#ef4444" stroke-width="1.5" marker-end="url(#rest-s15-arr)"/>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="../http-evolution/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-globe"></i></div>
+      <div class="related-card-text">
+        <h4>HTTP Evolution</h4>
+        <p>The protocol underneath REST — HTTP/1.1, HTTP/2, HTTP/3 and how they affect API performance</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../webhooks/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-bell"></i></div>
+      <div class="related-card-text">
+        <h4>Webhooks</h4>
+        <p>When REST's request-response isn't enough — push notifications from server to client</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="related-card-text">
+        <h4>Authentication &amp; Authorization</h4>
+        <p>OAuth, JWT, API keys — securing the API you just designed</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-gauge-high"></i></div>
+      <div class="related-card-text">
+        <h4>Rate Limiting</h4>
+        <p>Token bucket, sliding window — protecting your API from abuse at scale</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-door-open"></i></div>
+      <div class="related-card-text">
+        <h4>API Gateway</h4>
+        <p>Single entry point for all APIs — routing, auth, rate limiting, and monitoring in one place</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../real-time/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+      <div class="related-card-text">
+        <h4>Real-Time Communication</h4>
+        <p>WebSockets, SSE, long polling — when REST's request-response model isn't enough</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
+</content>
+</invoke>
