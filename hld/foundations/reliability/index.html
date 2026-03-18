@@ -1,0 +1,2425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reliability &amp; Fault Tolerance — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="red" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-shield-halved"></i> Core Principles</div>
+    <h1>Reliability &amp; Fault Tolerance</h1>
+    <p class="hero-subtitle">Things will break. Hardware fails, networks split, software crashes. The question isn't "will it happen?" — it's "will your system survive when it does?"</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 16 SVG Diagrams</span>
+      <span><i class="fa-solid fa-layer-group"></i> 8 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 14 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> Reliability means your system keeps working correctly — even when things go wrong. A reliable system is like a car with a spare tire: when one tire blows, you don't abandon the car on the highway. You swap the tire and keep driving.
+  </div>
+
+  <p>Here's the core idea. Every part of your system — servers, databases, networks, even the humans operating them — <em>will</em> eventually fail. Hard drives die. Software has bugs. Someone will accidentally delete a database table at 2 AM. That's not pessimism; it's just statistics. Run enough hardware for enough time, and failures are a mathematical certainty.</p>
+
+  <p>An <strong>unreliable</strong> system treats failure as a catastrophe. When one thing breaks, users see errors, data gets lost, and someone gets paged at 3 AM to manually fix things. A <span class="tooltip-trigger">fault-tolerant<span class="tooltip-content">A system's ability to keep operating correctly even when one or more of its components fail. The system "tolerates" the fault without the user noticing.</span></span> system treats failure as <em>routine</em>. When one thing breaks, a backup takes over automatically, users don't even notice, and the engineer can fix the problem during business hours with a coffee in hand.</p>
+
+  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spectrum from unreliable to fault-tolerant systems">
+    <defs>
+      <marker id="rel-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Reliability Spectrum</text>
+
+    <!-- Spectrum bar -->
+    <defs>
+      <linearGradient id="rel-spec-grad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#ef4444"/>
+        <stop offset="50%" stop-color="#eab308"/>
+        <stop offset="100%" stop-color="#10b981"/>
+      </linearGradient>
+    </defs>
+    <rect x="60" y="55" width="640" height="14" rx="7" fill="url(#rel-spec-grad)" opacity="0.8"/>
+
+    <!-- Left label: Unreliable -->
+    <text x="60" y="50" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">UNRELIABLE</text>
+    <rect x="30" y="85" width="200" height="120" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+    <text x="130" y="108" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="11">One server dies →</text>
+    <text x="130" y="126" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Everyone sees errors</text>
+    <text x="130" y="143" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Data might be lost</text>
+    <text x="130" y="160" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Manual recovery needed</text>
+    <text x="130" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Downtime: 30 min – hours</text>
+    <text x="130" y="197" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">🔥 3 AM scramble</text>
+
+    <!-- Middle label -->
+    <text x="380" y="50" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">PARTIALLY RELIABLE</text>
+    <rect x="280" y="85" width="200" height="120" rx="10" fill="rgba(234,179,8,0.06)" stroke="#eab308" stroke-width="1"/>
+    <text x="380" y="108" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="11">One server dies →</text>
+    <text x="380" y="126" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Some features degrade</text>
+    <text x="380" y="143" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Data is safe (backups)</text>
+    <text x="380" y="160" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Semi-auto recovery</text>
+    <text x="380" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Downtime: 1 – 5 min</text>
+    <text x="380" y="197" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">😐 Alert, but manageable</text>
+
+    <!-- Right label: Fault-tolerant -->
+    <text x="700" y="50" text-anchor="end" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">FAULT-TOLERANT</text>
+    <rect x="530" y="85" width="200" height="120" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="630" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">One server dies →</text>
+    <text x="630" y="126" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Users don't notice</text>
+    <text x="630" y="143" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Zero data loss</text>
+    <text x="630" y="160" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Automatic failover</text>
+    <text x="630" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Downtime: 0 – seconds</text>
+    <text x="630" y="197" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">😴 Fix it Monday morning</text>
+  </svg>
+
+  <p>The difference between these levels isn't magic — it's <strong>engineering choices made before the failure happens</strong>. You add backup servers. You replicate your data. You build automatic detection so your system can heal itself. Every technique in this page is about moving your system to the right side of that spectrum.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> Reliability isn't about preventing failures — it's about making failures <em>boring</em>. The system handles them automatically, and nobody loses sleep.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-bell"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">Why You Need This — The 3 AM Wake-Up Call</h2>
+    </div>
+  </div>
+
+  <p>It's 3:07 AM on a Saturday. Your phone screams with a <span class="tooltip-trigger">PagerDuty<span class="tooltip-content">An incident management tool that alerts on-call engineers when something goes wrong in production — often via phone call, SMS, or push notification. The sound it makes at 3 AM is universally dreaded.</span></span> alert. You stumble out of bed, squint at the screen: <strong>"CRITICAL: Primary database unreachable. 10,247 users receiving HTTP 500 errors."</strong></p>
+
+  <p>Your stomach drops. You open your laptop. The monitoring dashboard is a sea of red. Every request that hits your API tries to talk to the database, gets no response, waits 30 seconds for a timeout, and returns an error. Ten thousand users are staring at a blank screen or a cryptic error page. Your Slack channel is exploding. Your boss is asking "what's the ETA on a fix?"</p>
+
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline of a 3 AM database outage incident">
+    <defs>
+      <marker id="rel-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Anatomy of a 3 AM Outage</text>
+
+    <!-- Timeline -->
+    <line x1="60" y1="80" x2="700" y2="80" stroke="#334155" stroke-width="3"/>
+
+    <!-- 3:00 AM — failure starts -->
+    <circle cx="100" cy="80" r="8" fill="#ef4444"/>
+    <text x="100" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">3:00 AM</text>
+    <text x="100" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">DB disk fails</text>
+    <text x="100" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Nobody knows yet</text>
+    <rect x="45" y="130" width="110" height="25" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+    <text x="100" y="147" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Errors begin</text>
+
+    <!-- 3:07 AM — alert fires -->
+    <circle cx="230" cy="80" r="8" fill="#f97316"/>
+    <text x="230" y="65" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">3:07 AM</text>
+    <text x="230" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Alert fires</text>
+    <text x="230" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Phone rings</text>
+    <text x="230" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Engineer wakes up</text>
+
+    <!-- 3:15 AM — diagnosis -->
+    <circle cx="360" cy="80" r="8" fill="#eab308"/>
+    <text x="360" y="65" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="11">3:15 AM</text>
+    <text x="360" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Opens laptop</text>
+    <text x="360" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Finds the problem</text>
+    <text x="360" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"DB disk is dead"</text>
+
+    <!-- 3:25 AM — recovery starts -->
+    <circle cx="490" cy="80" r="8" fill="#eab308"/>
+    <text x="490" y="65" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="11">3:25 AM</text>
+    <text x="490" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Starts recovery</text>
+    <text x="490" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Restores from backup</text>
+    <text x="490" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Praying it works...</text>
+
+    <!-- 3:42 AM — back online -->
+    <circle cx="630" cy="80" r="8" fill="#10b981"/>
+    <text x="630" y="65" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">3:42 AM</text>
+    <text x="630" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Back online</text>
+    <text x="630" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">42 min total downtime</text>
+    <text x="630" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Some data lost forever</text>
+
+    <!-- Impact bar -->
+    <rect x="60" y="170" width="570" height="8" rx="4" fill="#ef4444" opacity="0.3"/>
+    <rect x="60" y="170" width="570" height="8" rx="4" fill="#ef4444" opacity="0.6"/>
+    <text x="345" y="200" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="700">42 MINUTES OF TOTAL DOWNTIME</text>
+
+    <!-- Impact numbers -->
+    <rect x="80" y="220" width="180" height="60" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+    <text x="170" y="245" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="18">10,247</text>
+    <text x="170" y="265" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">users got errors</text>
+
+    <rect x="290" y="220" width="180" height="60" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+    <text x="380" y="245" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="18">$18,400</text>
+    <text x="380" y="265" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">estimated revenue lost</text>
+
+    <rect x="500" y="220" width="180" height="60" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+    <text x="590" y="245" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="18">47 rows</text>
+    <text x="590" y="265" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">of data lost permanently</text>
+  </svg>
+
+  <p>After 42 minutes of frantic typing, you get the database back online by restoring from a backup. But the backup was 6 hours old, so the 47 orders placed between midnight and 3 AM? Gone. Those customers will never get their confirmations. Your team will spend the next week apologizing and manually reconciling records.</p>
+
+  <p>Now here's the gut punch: <strong>this didn't have to happen</strong>. If your system had a standby database that automatically took over when the primary failed, the outage wouldn't have been 42 minutes — it would have been 3 <em>seconds</em>. No phone call. No lost data. No frantic 3 AM scramble. The system would have healed itself while you slept.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You have one database server and it just died. You have a backup from 6 hours ago. <strong>What are you losing, and what could you have done differently?</strong></p>
+    <span class="think-hint">Think about two things: the data created in those 6 hours (RPO — recovery point objective), and the time it takes you to restore that backup (RTO — recovery time objective). How could you minimize both?</span>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>If this outage happens once a week with 42 minutes of downtime each time, how much total downtime do you have per year? And if each minute of downtime costs your company $438 in lost revenue, <strong>what's the annual cost of not having fault tolerance?</strong></p>
+    <span class="think-hint">42 min × 52 weeks = 2,184 minutes/year. At $438/min, that's roughly $956,000/year. Now ask yourself: how much would it cost to set up a standby database?</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-rotate-right"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — "Just Restart It"</h2>
+    </div>
+  </div>
+
+  <p>When something breaks in production, the universal instinct is: <strong>just restart it</strong>. Server crashed? Reboot it. Process hung? Kill and restart. Database unresponsive? Restart the service. And honestly, restarting works surprisingly often. Most software problems are transient — a memory leak, a deadlock, a corrupted connection pool — and a fresh start clears the slate.</p>
+
+  <p>So you build a simple playbook: when something breaks, an engineer SSHs into the server, diagnoses the problem, and restarts whatever needs restarting. You might even write a little script that automates the restart. Problem solved, right?</p>
+
+  <p>Not quite. Let's look at the math of manual recovery.</p>
+
+  <p>Your system fails about once a week — that's pretty normal for a medium-sized app running on commodity hardware. Each time it fails, here's the timeline: 5 minutes for the monitoring system to detect it, 7 minutes for the alert to reach a human and for that human to wake up and open their laptop, 8 minutes to diagnose the problem, and 10 minutes to fix and verify. That's <strong>30 minutes of downtime per incident</strong>.</p>
+
+  <div class="math-block">
+    <div class="math-label">Monthly downtime from manual recovery</div>
+    <code>30 min/incident × 4 incidents/month = <strong>120 minutes (2 hours) of downtime per month</strong></code>
+    <div class="math-result">That's 99.7% uptime at best — well below the 99.99% most businesses need</div>
+  </div>
+
+  <p>Two hours of downtime per month might sound manageable, but here's the problem: those 2 hours happen at the <em>worst</em> possible times. Servers don't politely fail during business hours. They fail at 3 AM, during Black Friday traffic spikes, during your product launch — exactly when you can least afford it.</p>
+
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Manual recovery vs automatic recovery timelines showing the MTTR difference">
+    <defs>
+      <marker id="rel-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Manual Recovery vs Automatic Recovery</text>
+
+    <!-- Manual Recovery Timeline -->
+    <text x="60" y="60" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">MANUAL (Human-in-the-loop)</text>
+    <rect x="60" y="70" width="640" height="80" rx="10" fill="rgba(239,68,68,0.05)" stroke="#ef4444" stroke-width="1"/>
+
+    <!-- Phases -->
+    <rect x="75" y="85" width="90" height="35" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+    <text x="120" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">DETECT</text>
+    <text x="120" y="113" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~5 min</text>
+
+    <rect x="180" y="85" width="110" height="35" rx="6" fill="#334155" stroke="#f97316" stroke-width="1"/>
+    <text x="235" y="100" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">ALERT HUMAN</text>
+    <text x="235" y="113" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~7 min</text>
+
+    <rect x="305" y="85" width="120" height="35" rx="6" fill="#334155" stroke="#eab308" stroke-width="1"/>
+    <text x="365" y="100" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">DIAGNOSE</text>
+    <text x="365" y="113" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~8 min</text>
+
+    <rect x="440" y="85" width="120" height="35" rx="6" fill="#334155" stroke="#eab308" stroke-width="1"/>
+    <text x="500" y="100" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">FIX &amp; VERIFY</text>
+    <text x="500" y="113" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~10 min</text>
+
+    <rect x="575" y="85" width="110" height="35" rx="6" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="630" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">BACK ONLINE</text>
+    <text x="630" y="113" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">finally!</text>
+
+    <!-- Total time label -->
+    <line x1="75" y1="135" x2="560" y2="135" stroke="#ef4444" stroke-width="2"/>
+    <text x="317" y="150" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">MTTR ≈ 30 MINUTES</text>
+
+    <!-- Auto Recovery Timeline -->
+    <text x="60" y="185" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">AUTOMATIC (System heals itself)</text>
+    <rect x="60" y="195" width="640" height="80" rx="10" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="1"/>
+
+    <rect x="75" y="210" width="55" height="35" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
+    <text x="102" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">DETECT</text>
+    <text x="102" y="238" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~2 sec</text>
+
+    <rect x="145" y="210" width="70" height="35" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
+    <text x="180" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">FAILOVER</text>
+    <text x="180" y="238" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~1 sec</text>
+
+    <rect x="230" y="210" width="110" height="35" rx="6" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="285" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">BACK ONLINE</text>
+    <text x="285" y="238" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">users never noticed</text>
+
+    <!-- Total time label -->
+    <line x1="75" y1="260" x2="215" y2="260" stroke="#10b981" stroke-width="2"/>
+    <text x="145" y="275" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">MTTR ≈ 3 SECONDS</text>
+
+    <!-- Comparison callout -->
+    <rect x="380" y="210" width="300" height="50" rx="10" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="530" y="232" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">600× faster recovery</text>
+    <text x="530" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">No humans needed. No sleep lost.</text>
+
+    <!-- Bottom insight -->
+    <rect x="130" y="285" width="500" height="28" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+    <text x="380" y="304" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="11" font-weight="600">The gap between "reliable enough" and "actually reliable" is automation.</text>
+  </svg>
+
+  <p>The metric we care about here is called <span class="tooltip-trigger">MTTR<span class="tooltip-content">Mean Time To Recovery — the average time it takes to restore a system after a failure. Lower MTTR = less downtime. Automatic failover can reduce MTTR from 30+ minutes to under 5 seconds.</span></span> — Mean Time To Recovery. It measures how long your system is broken after a failure. With manual recovery, your MTTR is measured in <em>minutes</em>. With automatic recovery, it's measured in <em>seconds</em>. That's not a small improvement — it's the difference between losing customers and keeping them.</p>
+
+  <div class="callout callout-warning">
+    <strong>The restart trap:</strong> "Just restart it" works for the first 10 incidents. By the 50th, your team is exhausted, your users have lost trust, and your competitors are eating your lunch. Manual recovery doesn't scale. Automated recovery does.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>If your MTTR is 30 minutes and you have 1 failure per week, that's 99.7% uptime. But your SLA promises 99.99%. <strong>How many minutes of downtime per month does 99.99% allow?</strong></p>
+    <span class="think-hint">A month is roughly 43,200 minutes (30 days × 24 hours × 60 min). 99.99% means only 0.01% can be downtime. That's 43,200 × 0.0001 = 4.32 minutes per month. Your manual recovery blows through that budget in a single incident.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-heart-crack"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — Death by Dominoes</h2>
+    </div>
+  </div>
+
+  <p>The 3 AM scenario we just walked through was bad, but it was simple — one server died, one thing broke. Real-world outages are rarely that clean. The truly terrifying failures happen when one thing breaks, and that <em>causes other things to break</em>, which causes even more things to break, until your entire system collapses like a row of dominoes. Engineers call this a <span class="tooltip-trigger">cascading failure<span class="tooltip-content">When one component's failure overloads another component, causing it to fail too, which overloads the next, and so on — like dominoes falling. A single database timeout can bring down your entire system this way.</span></span>.</p>
+
+  <p>Here's how it happens. Your system has five services: an API gateway, a user service, an order service, a payment service, and a notification service. They all talk to each other. They all share a database. Everything works great — until one day, the payment service starts responding slowly because of a database lock.</p>
+
+  <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cascading failure: one slow service causes a domino effect that brings down everything">
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Cascading Failure — The Domino Effect</text>
+
+    <!-- Step 1 -->
+    <text x="120" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">STEP 1</text>
+    <rect x="50" y="65" width="140" height="55" rx="8" fill="#334155" stroke="#eab308" stroke-width="2"/>
+    <text x="120" y="86" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="11">Payment Service</text>
+    <text x="120" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">responds slowly (5s)</text>
+    <text x="120" y="135" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">DB lock contention</text>
+
+    <!-- Arrow 1→2 -->
+    <line x1="190" y1="92" x2="250" y2="92" stroke="#ef4444" stroke-width="2" marker-end="url(#rel-s3-arr)"/>
+    <text x="220" y="85" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">threads pile up</text>
+
+    <!-- Step 2 -->
+    <text x="330" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">STEP 2</text>
+    <rect x="260" y="65" width="140" height="55" rx="8" fill="#334155" stroke="#f97316" stroke-width="2"/>
+    <text x="330" y="86" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">Order Service</text>
+    <text x="330" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">threads exhausted</text>
+    <text x="330" y="135" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9">waiting on Payment</text>
+
+    <!-- Arrow 2→3 -->
+    <line x1="400" y1="92" x2="460" y2="92" stroke="#ef4444" stroke-width="2" marker-end="url(#rel-s3-arr)"/>
+    <text x="430" y="85" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">requests queue</text>
+
+    <!-- Step 3 -->
+    <text x="540" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" font-weight="600">STEP 3</text>
+    <rect x="470" y="65" width="140" height="55" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+    <text x="540" y="86" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="11">API Gateway</text>
+    <text x="540" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">connection pool full</text>
+    <text x="540" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">waiting on Order</text>
+
+    <!-- Step 4 — all dead -->
+    <text x="380" y="175" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">STEP 4 — TOTAL SYSTEM FAILURE</text>
+
+    <rect x="50" y="190" width="130" height="45" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+    <text x="115" y="210" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">User Service</text>
+    <text x="115" y="225" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">DOWN</text>
+
+    <rect x="200" y="190" width="130" height="45" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+    <text x="265" y="210" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Order Service</text>
+    <text x="265" y="225" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">DOWN</text>
+
+    <rect x="350" y="190" width="130" height="45" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+    <text x="415" y="210" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Payment Service</text>
+    <text x="415" y="225" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">DOWN</text>
+
+    <rect x="500" y="190" width="130" height="45" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+    <text x="565" y="210" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Notification Svc</text>
+    <text x="565" y="225" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">DOWN</text>
+
+    <!-- Dead users -->
+    <rect x="140" y="260" width="480" height="85" rx="12" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="380" y="285" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">EVERY user gets errors — not just payment users</text>
+    <text x="380" y="305" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Can't log in. Can't browse. Can't search. Can't do anything.</text>
+    <text x="380" y="325" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">One slow database query took down the ENTIRE system.</text>
+    <text x="380" y="340" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Root cause: no isolation between services</text>
+  </svg>
+
+  <p>Let's trace the dominoes. The payment service starts responding in 5 seconds instead of 200 milliseconds. The order service calls the payment service on every checkout, and each call now hangs for 5 seconds. The order service has a thread pool of 200 threads. At 40 checkouts per second, all 200 threads are now stuck waiting on payment responses. The order service has no threads left to handle <em>any</em> request — even non-checkout ones like order history.</p>
+
+  <p>Now the API gateway is calling the order service and getting timeouts. <em>Its</em> thread pool fills up. Now even the user service and notification service — which have absolutely nothing to do with payments — can't get a connection through the gateway. <strong>One slow database query in the payment service just took down your entire system.</strong></p>
+
+  <p>This is why the concept of a <span class="tooltip-trigger">single point of failure<span class="tooltip-content">Any component that, if it fails, brings down the entire system. The goal of fault-tolerant design is to eliminate every single point of failure — so no single broken piece can take down the whole.</span></span> is so dangerous. It's not just "one server dying." It's any place where a failure in one part can ripple outward and destroy everything. A shared database is a single point of failure. A shared thread pool is a single point of failure. A single network switch is a single point of failure. The list is longer than most teams realize.</p>
+
+  <div class="callout callout-danger">
+    <strong>The scariest part of cascading failures:</strong> the root cause is often tiny. A single slow SQL query. A misconfigured timeout. A memory leak that takes 3 days to surface. By the time the dominoes finish falling, the root cause is buried under a mountain of secondary failures, and your team spends hours debugging the wrong thing.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>In the domino scenario above, the payment service got slow and eventually everything died. <strong>What could you put between the order service and the payment service to prevent this cascade?</strong></p>
+    <span class="think-hint">Think about what happens when you call a friend and they don't pick up 5 times in a row. Do you keep calling every minute, or do you stop trying and text them instead? That's the idea behind a circuit breaker.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-lightbulb"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Design for Failure, Not Against It</h2>
+    </div>
+  </div>
+
+  <p>For decades, engineers tried to build systems that <em>don't fail</em>. Better hardware. Redundant power supplies. Enterprise-grade storage with 5-year warranties. The philosophy was: if we make each component reliable enough, the system will be reliable. Spend more money, get more reliability.</p>
+
+  <p>Then a company called Netflix blew that idea apart.</p>
+
+  <p>Netflix runs on hundreds of thousands of cloud servers. At that scale, they don't ask "will a server fail today?" — they ask "how many servers will fail today?" With that many machines, failures aren't rare events. They're a <em>constant background noise</em>. Waiting for failures and reacting to them isn't a strategy. So Netflix did something radical: they built a tool called <span class="tooltip-trigger">Chaos Monkey<span class="tooltip-content">A Netflix tool that randomly terminates production servers during business hours to test whether the system can tolerate unexpected failures. If something breaks, the team fixes the weakness before a real outage does the same thing at 3 AM.</span></span> that <strong>randomly kills their own production servers during business hours</strong>.</p>
+
+  <p>Read that again. They intentionally break their own system. Every day. On purpose. While real customers are watching movies.</p>
+
+  <p>Why? Because if your system can survive a random server dying at 2 PM on a Tuesday when your whole team is awake and watching dashboards, then it can <em>definitely</em> survive a server dying at 3 AM on a Saturday when nobody's around. The shift in thinking is profound:</p>
+
+  <svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Traditional approach (prevent failure) vs modern approach (expect and survive failure)">
+    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Two Philosophies of Reliability</text>
+
+    <!-- Left: Traditional -->
+    <rect x="30" y="45" width="330" height="245" rx="12" fill="rgba(239,68,68,0.04)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="195" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">TRADITIONAL</text>
+    <text x="195" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">"Prevent failures from happening"</text>
+
+    <text x="60" y="120" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Buy expensive enterprise hardware</text>
+    <text x="60" y="140" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Use RAID arrays with hot spares</text>
+    <text x="60" y="160" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Run on bare metal (not cloud)</text>
+    <text x="60" y="180" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Change as little as possible</text>
+    <text x="60" y="200" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Hope nothing breaks</text>
+
+    <rect x="55" y="218" width="300" height="55" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+    <text x="205" y="238" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">WHEN (not if) something breaks:</text>
+    <text x="205" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Panic. Scramble. All-hands war room.</text>
+    <text x="205" y="268" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">MTTR: 30 min &#x2013; hours</text>
+
+    <!-- Right: Modern -->
+    <rect x="400" y="45" width="330" height="245" rx="12" fill="rgba(16,185,129,0.04)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="565" y="72" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">MODERN (Design for Failure)</text>
+    <text x="565" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">"Assume failures WILL happen &#x2014; survive them"</text>
+
+    <text x="425" y="120" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Use cheap commodity hardware</text>
+    <text x="425" y="140" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Replicate data across many machines</text>
+    <text x="425" y="160" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Build automatic failover into everything</text>
+    <text x="425" y="180" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; Test failures regularly (Chaos Engineering)</text>
+    <text x="425" y="200" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">&#x2022; KNOW things will break &#x2014; be ready</text>
+
+    <rect x="425" y="218" width="300" height="55" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+    <text x="575" y="238" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">WHEN something breaks:</text>
+    <text x="575" y="255" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">System heals itself. Nobody notices.</text>
+    <text x="575" y="268" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">MTTR: seconds</text>
+  </svg>
+
+  <p>This is the fundamental insight of modern reliability engineering: <strong>you cannot prevent all failures, so you must design systems that tolerate them</strong>. Instead of asking "how do we stop this from breaking?" you ask "when this breaks &#x2014; and it will &#x2014; what happens next?"</p>
+
+  <p>This idea goes by many names. Netflix calls it <span class="tooltip-trigger">chaos engineering<span class="tooltip-content">The practice of intentionally injecting failures into a production system to find weaknesses before real outages do. Beyond Netflix's Chaos Monkey, it includes simulating network partitions, slow disks, and even entire datacenter outages.</span></span>. Google calls it "designing for unreliable components." Amazon calls it "everything fails, all the time." But the core principle is the same: <strong>build your system so that any single component can die at any moment, and the system keeps running</strong>.</p>
+
+  <div class="callout callout-success">
+    <strong>The mindset shift in one sentence:</strong> A reliable system isn't one where nothing fails. It's one where <em>anything can fail</em> and the user never notices.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Netflix intentionally kills production servers every day. <strong>What would have to be true about their architecture for this to be safe?</strong> Think about what properties their system must have.</p>
+    <span class="think-hint">Every service must have multiple copies running. Data must be replicated so nothing is lost when a server dies. Traffic must be automatically rerouted to healthy servers. Health checks must detect failures in seconds. Essentially &#x2014; every technique we're about to learn in the next section.</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (THE TOOLKIT)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-toolbox"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works &#x2014; The Reliability Toolkit</h2>
+    </div>
+  </div>
+
+  <p>Now that we know the philosophy &#x2014; design for failure &#x2014; let's talk about the actual tools that make it work. There are six core techniques that every fault-tolerant system uses in some combination. Think of them as your reliability toolbox: you don't use every tool on every job, but you need to know what each one does so you can pick the right one for each problem.</p>
+
+  <!-- Tool 1: Redundancy -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-clone icon-gap"></i> Tool 1: Redundancy &#x2014; Have Spares Ready</span></h3>
+    <div class="card-body">
+      <p>The simplest way to survive a failure is to have a spare. If you have one server and it dies, you're dead. If you have two servers and one dies, you're fine. That's <span class="tooltip-trigger">redundancy<span class="tooltip-content">Having more copies of a component than you strictly need, so that when one fails, others can take over. N+1 redundancy means one spare. N+2 means two spares. The extra copies sit ready to absorb the load if a primary fails.</span></span> in a nutshell &#x2014; having more copies of something than you strictly need, so that failure of any single copy doesn't take you down.</p>
+
+      <p>Engineers describe redundancy levels with a simple notation. <strong>N+1</strong> means you need N servers to handle your load, and you add 1 spare. So if you need 3 servers for your traffic, you run 4. If one dies, the remaining 3 handle the load just fine. <strong>N+2</strong> adds two spares &#x2014; useful when you want to survive one failure AND still do maintenance on another server without risk.</p>
+
+      <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="N+1 redundancy: 4 servers where 3 handle load and 1 is a spare">
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">N+1 Redundancy &#x2014; Always One Spare</text>
+
+        <!-- Load bar -->
+        <text x="60" y="58" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Your traffic needs 3 servers. You run 4.</text>
+
+        <!-- Server 1 -->
+        <rect x="80" y="75" width="130" height="70" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="145" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">Server 1</text>
+        <text x="145" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">ACTIVE &#x2014; handling traffic</text>
+        <rect x="95" y="130" width="100" height="6" rx="3" fill="#1e293b"/>
+        <rect x="95" y="130" width="70" height="6" rx="3" fill="#10b981"/>
+
+        <!-- Server 2 -->
+        <rect x="230" y="75" width="130" height="70" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="295" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">Server 2</text>
+        <text x="295" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">ACTIVE &#x2014; handling traffic</text>
+        <rect x="245" y="130" width="100" height="6" rx="3" fill="#1e293b"/>
+        <rect x="245" y="130" width="65" height="6" rx="3" fill="#10b981"/>
+
+        <!-- Server 3 -->
+        <rect x="380" y="75" width="130" height="70" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="445" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">Server 3</text>
+        <text x="445" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">ACTIVE &#x2014; handling traffic</text>
+        <rect x="395" y="130" width="100" height="6" rx="3" fill="#1e293b"/>
+        <rect x="395" y="130" width="75" height="6" rx="3" fill="#10b981"/>
+
+        <!-- Server 4 — spare -->
+        <rect x="530" y="75" width="130" height="70" rx="8" fill="#334155" stroke="#eab308" stroke-width="2" stroke-dasharray="6,3"/>
+        <text x="595" y="100" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="11">Server 4</text>
+        <text x="595" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">SPARE &#x2014; ready to go</text>
+        <rect x="545" y="130" width="100" height="6" rx="3" fill="#1e293b"/>
+        <rect x="545" y="130" width="10" height="6" rx="3" fill="#eab308" opacity="0.5"/>
+
+        <!-- Failure scenario -->
+        <text x="380" y="175" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">When Server 2 dies:</text>
+
+        <rect x="80" y="190" width="130" height="35" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="145" y="212" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">Server 1 &#x2713;</text>
+
+        <rect x="230" y="190" width="130" height="35" rx="6" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+        <text x="295" y="212" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">Server 2 &#x2717; DEAD</text>
+
+        <rect x="380" y="190" width="130" height="35" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="445" y="212" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">Server 3 &#x2713;</text>
+
+        <rect x="530" y="190" width="130" height="35" rx="6" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="595" y="212" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Server 4 &#x2713; ACTIVE</text>
+      </svg>
+
+      <p>Redundancy applies to everything, not just servers. You add redundant network paths so one switch dying doesn't cut off a rack. You add redundant power supplies so one PSU failing doesn't take a server offline. You add redundant data centers so one building losing power doesn't affect users. The principle is always the same: <strong>no single thing should be so important that losing it breaks the system</strong>.</p>
+    </div>
+  </div>
+
+  <!-- Tool 2: Replication -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-copy icon-gap"></i> Tool 2: Replication &#x2014; Keep Copies of Your Data</span></h3>
+    <div class="card-body">
+      <p>Redundancy for servers is straightforward &#x2014; just run more copies of the same code. But what about your <em>data</em>? If your database server dies, it's not just the process that's lost &#x2014; it's all the data stored on that disk. That's where <span class="tooltip-trigger">replication<span class="tooltip-content">Keeping identical copies of your data on multiple machines. If one machine's disk dies, the data still exists on the other copies. There are two main approaches: synchronous (wait for all copies to confirm) and asynchronous (copy in the background, slightly behind).</span></span> comes in &#x2014; keeping identical copies of your data on multiple machines so that no single disk failure can cause data loss.</p>
+
+      <p>There are two main flavors of replication, and the choice between them is one of the most important trade-offs in distributed systems:</p>
+
+      <svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Synchronous replication (safe but slow) vs asynchronous replication (fast but risky)">
+        <defs>
+          <marker id="rel-rep-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Sync vs Async Replication</text>
+
+        <!-- Left: Sync -->
+        <rect x="30" y="45" width="340" height="230" rx="12" fill="rgba(16,185,129,0.04)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="200" y="70" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">SYNCHRONOUS</text>
+        <text x="200" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"Write to ALL copies, THEN confirm"</text>
+
+        <!-- Client -->
+        <rect x="55" y="105" width="60" height="30" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="85" y="124" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Client</text>
+
+        <!-- Arrow to primary -->
+        <line x1="115" y1="120" x2="150" y2="120" stroke="#10b981" stroke-width="1.5" marker-end="url(#rel-rep-arr)"/>
+        <text x="132" y="113" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7">WRITE</text>
+
+        <!-- Primary -->
+        <rect x="155" y="105" width="70" height="30" rx="6" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="190" y="124" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Primary</text>
+
+        <!-- Arrow to replica -->
+        <line x1="225" y1="120" x2="260" y2="120" stroke="#10b981" stroke-width="1.5" marker-end="url(#rel-rep-arr)"/>
+        <text x="242" y="113" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7">COPY</text>
+
+        <!-- Replica -->
+        <rect x="265" y="105" width="70" height="30" rx="6" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="300" y="124" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Replica</text>
+
+        <!-- Wait arrow back -->
+        <path d="M300,135 L300,152 L85,152 L85,138" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="190" y="166" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">Both confirmed &#x2192; OK 200</text>
+
+        <text x="55" y="192" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Zero data loss</text>
+        <text x="55" y="209" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Replica always up-to-date</text>
+        <text x="55" y="229" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; Slower writes (2&#xd7; latency)</text>
+        <text x="55" y="246" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; Replica down = writes blocked</text>
+        <text x="55" y="266" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Best for: financial data, inventory counts</text>
+
+        <!-- Right: Async -->
+        <rect x="400" y="45" width="340" height="230" rx="12" fill="rgba(234,179,8,0.04)" stroke="#eab308" stroke-width="1.5"/>
+        <text x="570" y="70" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="13">ASYNCHRONOUS</text>
+        <text x="570" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"Write to primary, copy later in background"</text>
+
+        <!-- Client -->
+        <rect x="425" y="105" width="60" height="30" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="455" y="124" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Client</text>
+
+        <!-- Arrow to primary -->
+        <line x1="485" y1="120" x2="520" y2="120" stroke="#eab308" stroke-width="1.5"/>
+        <text x="502" y="113" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="7">WRITE</text>
+
+        <!-- Primary -->
+        <rect x="525" y="105" width="70" height="30" rx="6" fill="#334155" stroke="#eab308" stroke-width="2"/>
+        <text x="560" y="124" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Primary</text>
+
+        <!-- Instant OK back -->
+        <path d="M525,135 L455,135" fill="none" stroke="#10b981" stroke-width="1.5"/>
+        <text x="490" y="150" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">OK 200 (instant!)</text>
+
+        <!-- Lazy copy to replica -->
+        <line x1="595" y1="120" x2="635" y2="120" stroke="#eab308" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="615" y="113" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="7">LATER</text>
+
+        <!-- Replica -->
+        <rect x="640" y="105" width="70" height="30" rx="6" fill="#334155" stroke="#eab308" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="675" y="124" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Replica</text>
+
+        <text x="425" y="192" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Fast writes (no waiting)</text>
+        <text x="425" y="209" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Primary doesn't depend on replica</text>
+        <text x="425" y="229" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; Replica may be slightly behind</text>
+        <text x="425" y="246" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; Primary dies = recent data lost</text>
+        <text x="425" y="266" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Best for: social feeds, analytics, logs</text>
+      </svg>
+
+      <p><strong>Synchronous replication</strong> waits until every copy has confirmed the write before telling the client "OK, your data is saved." This means zero data loss if the primary dies &#x2014; the replica has everything. But it's slower, because every write has to wait for the network round-trip to the replica. And if the replica goes down, writes are blocked entirely.</p>
+
+      <p><strong>Asynchronous replication</strong> writes to the primary and immediately tells the client "OK." It copies data to the replica in the background, typically a few milliseconds behind. This is much faster for the client, but there's a catch: if the primary dies before the replica catches up, those last few milliseconds of writes are gone forever. This gap is called <em>replication lag</em>.</p>
+
+      <div class="callout callout-info">
+        <strong>The trade-off in one sentence:</strong> Sync replication trades speed for safety. Async replication trades safety for speed. Most real systems use a mix &#x2014; sync for critical data (money, orders) and async for everything else (profiles, notifications).
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 3: Failover -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-right-left icon-gap"></i> Tool 3: Failover &#x2014; Automatic Switchover</span></h3>
+    <div class="card-body">
+      <p>Having redundant servers and replicated data is only half the battle. You also need a way to <strong>automatically switch</strong> from a failed component to a healthy one &#x2014; without a human having to press a button. This automatic switching is called <span class="tooltip-trigger">failover<span class="tooltip-content">The automatic process of switching from a failed primary component to a standby backup. In active-passive mode, the backup sits idle until needed. In active-active mode, all copies handle traffic, so failure just means less capacity, not an outage.</span></span>.</p>
+
+      <p>There are two main patterns for failover, and they make very different trade-offs:</p>
+
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Active-passive failover vs active-active failover">
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Active-Passive vs Active-Active Failover</text>
+
+        <!-- Left: Active-Passive -->
+        <rect x="30" y="45" width="340" height="240" rx="12" fill="rgba(234,179,8,0.04)" stroke="#eab308" stroke-width="1.5"/>
+        <text x="200" y="70" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="13">ACTIVE-PASSIVE</text>
+        <text x="200" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"One works, one waits"</text>
+
+        <!-- Users -->
+        <text x="70" y="112" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">users</text>
+        <circle cx="70" cy="135" r="8" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+        <circle cx="70" cy="155" r="8" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+        <circle cx="70" cy="175" r="8" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+
+        <!-- Arrow to primary -->
+        <line x1="85" y1="155" x2="130" y2="135" stroke="#10b981" stroke-width="2"/>
+
+        <!-- Primary -->
+        <rect x="130" y="110" width="100" height="50" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="180" y="133" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">PRIMARY</text>
+        <text x="180" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">handles ALL traffic</text>
+
+        <!-- Standby -->
+        <rect x="260" y="110" width="100" height="50" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.6"/>
+        <text x="310" y="133" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="10">STANDBY</text>
+        <text x="310" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">idle, waiting...</text>
+
+        <!-- Sync arrow -->
+        <line x1="230" y1="135" x2="260" y2="135" stroke="#eab308" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Failure scenario -->
+        <text x="200" y="185" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Primary dies &#x2192;</text>
+        <rect x="130" y="195" width="100" height="35" rx="6" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+        <text x="180" y="217" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">&#x2717; DEAD</text>
+
+        <rect x="260" y="195" width="100" height="35" rx="6" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="310" y="211" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="9">PROMOTED</text>
+        <text x="310" y="224" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">now primary</text>
+
+        <text x="200" y="252" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">&#x2713; Simple &#x2014; one DB, no conflicts</text>
+        <text x="200" y="268" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">&#x2717; Wasted resources (standby is idle)</text>
+        <text x="200" y="284" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">&#x2717; Brief downtime during switchover</text>
+
+        <!-- Right: Active-Active -->
+        <rect x="400" y="45" width="340" height="240" rx="12" fill="rgba(16,185,129,0.04)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="570" y="70" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">ACTIVE-ACTIVE</text>
+        <text x="570" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"Both work, share the load"</text>
+
+        <!-- Users -->
+        <text x="435" y="112" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">users</text>
+        <circle cx="435" cy="135" r="8" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+        <circle cx="435" cy="155" r="8" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+        <circle cx="435" cy="175" r="8" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+
+        <!-- Load balancer -->
+        <polygon points="480,135 510,120 510,170 480,155" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+        <text x="497" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="7">LB</text>
+
+        <line x1="443" y1="150" x2="480" y2="150" stroke="#10b981" stroke-width="1.5"/>
+        <line x1="510" y1="135" x2="545" y2="125" stroke="#10b981" stroke-width="1.5"/>
+        <line x1="510" y1="155" x2="545" y2="165" stroke="#10b981" stroke-width="1.5"/>
+
+        <!-- Node A -->
+        <rect x="545" y="105" width="100" height="42" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="595" y="124" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">NODE A</text>
+        <text x="595" y="139" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">50% of traffic</text>
+
+        <!-- Node B -->
+        <rect x="545" y="157" width="100" height="42" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="595" y="176" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">NODE B</text>
+        <text x="595" y="191" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">50% of traffic</text>
+
+        <!-- Sync -->
+        <line x1="660" y1="133" x2="660" y2="170" stroke="#eab308" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="685" y="155" fill="#eab308" font-family="Inter, sans-serif" font-size="7">sync</text>
+
+        <text x="570" y="222" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Node A dies &#x2192; Node B gets 100%</text>
+
+        <text x="570" y="252" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">&#x2713; No wasted resources</text>
+        <text x="570" y="268" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">&#x2713; Zero-downtime failover</text>
+        <text x="570" y="284" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">&#x2717; Complex &#x2014; data conflicts possible</text>
+      </svg>
+
+      <p><strong>Active-passive</strong> is simpler. One server (the primary) handles all the traffic. The standby does nothing but replicate data and wait. When the primary fails, the standby takes over. The downside: you're paying for a server that sits idle 99% of the time. The upside: there's no risk of data conflicts because only one node is writing at a time.</p>
+
+      <p><strong>Active-active</strong> is more efficient. Both servers handle traffic simultaneously, splitting the load between them. If one dies, the other absorbs all the traffic. No resources are wasted. But it's harder to build because both nodes are writing data at the same time, which can cause conflicts. (What happens when two users update the same record on different nodes at the same millisecond?)</p>
+    </div>
+  </div>
+
+  <!-- Tool 4: Health Checks -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-heart-pulse icon-gap"></i> Tool 4: Health Checks &#x2014; Detecting Failures Fast</span></h3>
+    <div class="card-body">
+      <p>Redundancy and failover are useless if you don't know something is broken. You can't switch to a backup if nobody realizes the primary is dead. That's where health checks come in &#x2014; a system for automatically and continuously checking whether each component is alive and healthy.</p>
+
+      <p>The simplest form is a <span class="tooltip-trigger">heartbeat<span class="tooltip-content">A periodic "I'm alive" signal sent between servers. If a server misses several consecutive heartbeats (e.g., 3 in a row), the system assumes it's dead and triggers failover. Typically sent every 1-5 seconds.</span></span> &#x2014; a tiny "I'm alive" message that every server sends every few seconds. Think of it like a doctor checking a patient's pulse. If the pulse stops, something is very wrong. In practice, a load balancer or orchestrator pings each server with a simple HTTP request (like <code>GET /health</code>) every 5 seconds. If a server misses 3 heartbeats in a row &#x2014; 15 seconds of silence &#x2014; the system declares it dead and reroutes traffic.</p>
+
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Health check system detecting a dead server">
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Heartbeat Health Checks</text>
+
+        <!-- Health Checker -->
+        <rect x="310" y="45" width="140" height="50" rx="10" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+        <text x="380" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="11">Health Checker</text>
+        <text x="380" y="83" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">pings every 5 seconds</text>
+
+        <!-- Server 1: healthy -->
+        <line x1="330" y1="95" x2="140" y2="130" stroke="#10b981" stroke-width="1.5"/>
+        <rect x="70" y="125" width="140" height="50" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="140" y="148" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Server 1</text>
+        <text x="140" y="165" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">&#x2713; 200 OK (2ms)</text>
+
+        <!-- Server 2: healthy -->
+        <line x1="380" y1="95" x2="380" y2="125" stroke="#10b981" stroke-width="1.5"/>
+        <rect x="310" y="125" width="140" height="50" rx="8" fill="#334155" stroke="#10b981" stroke-width="2"/>
+        <text x="380" y="148" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Server 2</text>
+        <text x="380" y="165" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">&#x2713; 200 OK (3ms)</text>
+
+        <!-- Server 3: DEAD -->
+        <line x1="430" y1="95" x2="620" y2="130" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <rect x="550" y="125" width="140" height="50" rx="8" fill="#334155" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="620" y="148" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Server 3</text>
+        <text x="620" y="165" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">&#x2717; No response (3 misses)</text>
+
+        <!-- Action -->
+        <rect x="520" y="185" width="200" height="28" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+        <text x="620" y="204" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x2192; Remove from rotation</text>
+      </svg>
+
+      <p>But a heartbeat only tells you "the server is up." A smarter health check also verifies that the server can actually do its job. Can it connect to the database? Is the disk not full? Is the CPU not at 100%? These deeper checks are called <em>liveness probes</em> (is it alive?) and <em>readiness probes</em> (is it ready to serve traffic?). Kubernetes uses both &#x2014; a container can be alive but not ready, meaning it's still starting up or temporarily overloaded.</p>
+    </div>
+  </div>
+
+  <!-- Tool 5: Circuit Breakers -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-plug-circle-xmark icon-gap"></i> Tool 5: Circuit Breakers &#x2014; Stop Calling a Dead Service</span></h3>
+    <div class="card-body">
+      <p>Remember the cascading failure from Section 4? The order service kept calling the slow payment service, which ate all its threads, which brought down the API gateway, which killed everything. A <span class="tooltip-trigger">circuit breaker<span class="tooltip-content">A pattern that monitors calls to a remote service and "trips" (stops making calls) when failures exceed a threshold. Like an electrical circuit breaker that cuts power to prevent a fire, it stops cascading failures by failing fast instead of waiting for timeouts.</span></span> prevents exactly this scenario.</p>
+
+      <p>Think about the circuit breaker in your home's electrical panel. When too much current flows through a wire (a short circuit), the breaker trips &#x2014; it cuts off the electricity immediately. It doesn't wait for the wire to melt and start a fire. It fails fast and safe. Software circuit breakers work the same way.</p>
+
+      <p>A circuit breaker has three states:</p>
+
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Circuit breaker 3-state model: Closed, Open, Half-Open">
+        <defs>
+          <marker id="rel-cb-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Circuit Breaker &#x2014; Three States</text>
+
+        <!-- State 1: Closed -->
+        <circle cx="130" cy="120" r="60" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="2.5"/>
+        <text x="130" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="14">CLOSED</text>
+        <text x="130" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Everything normal</text>
+        <text x="130" y="143" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Calls go through</text>
+
+        <!-- Arrow Closed to Open -->
+        <path d="M195,110 Q280,60 355,110" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#rel-cb-arr)"/>
+        <text x="275" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">5 failures in 10s</text>
+        <text x="275" y="83" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">&#x2192; TRIP!</text>
+
+        <!-- State 2: Open -->
+        <circle cx="380" cy="120" r="60" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="380" y="108" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="14">OPEN</text>
+        <text x="380" y="128" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">All calls blocked</text>
+        <text x="380" y="143" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Fail fast (no wait)</text>
+
+        <!-- Arrow Open to Half-Open -->
+        <path d="M445,110 Q530,60 605,110" fill="none" stroke="#eab308" stroke-width="2" marker-end="url(#rel-cb-arr)"/>
+        <text x="525" y="70" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">After 30s timeout</text>
+        <text x="525" y="83" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">&#x2192; try again?</text>
+
+        <!-- State 3: Half-Open -->
+        <circle cx="630" cy="120" r="60" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="2.5"/>
+        <text x="630" y="103" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="13">HALF-</text>
+        <text x="630" y="120" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="13">OPEN</text>
+        <text x="630" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Let 1 call through</text>
+        <text x="630" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">to test the waters</text>
+
+        <!-- Arrow Half-Open back to Closed -->
+        <path d="M580,175 Q380,240 190,175" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#rel-cb-arr)"/>
+        <text x="380" y="230" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Test call succeeds &#x2192; back to normal</text>
+
+        <!-- Arrow Half-Open back to Open -->
+        <path d="M600,180 Q540,220 440,180" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#rel-cb-arr)"/>
+        <text x="530" y="215" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">test fails &#x2192; stay open</text>
+
+        <!-- Bottom summary -->
+        <rect x="100" y="255" width="560" height="24" rx="6" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+        <text x="380" y="272" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">Without circuit breakers, a slow service takes down everything. With them, only the broken part is affected.</text>
+      </svg>
+
+      <p><strong>Closed</strong> (normal): calls flow through normally. The breaker counts failures. <strong>Open</strong> (tripped): when failures exceed a threshold (say, 5 failures in 10 seconds), the breaker trips. Now ALL calls to that service fail immediately &#x2014; no waiting for a 30-second timeout, no consuming threads. The caller gets an instant "service unavailable" and can show a fallback response. <strong>Half-open</strong> (testing): after a cooldown period (say, 30 seconds), the breaker lets ONE test call through. If it succeeds, the breaker closes and traffic resumes. If it fails, the breaker stays open and waits another 30 seconds.</p>
+
+      <p>This is what prevents the domino effect. The order service has a circuit breaker around its calls to the payment service. When payment is slow, the breaker trips. Now the order service fails checkout requests <em>instantly</em> with a friendly "payment temporarily unavailable" message &#x2014; but it can still serve order history, product pages, and everything else. The failure is <em>contained</em>.</p>
+    </div>
+  </div>
+
+  <!-- Tool 6: Graceful Degradation -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-stairs icon-gap"></i> Tool 6: Graceful Degradation &#x2014; Bend, Don't Break</span></h3>
+    <div class="card-body">
+      <p>Here's a question most teams don't think about until it's too late: when something fails, <strong>what should the user see?</strong> The worst answer is a blank page or a cryptic "500 Internal Server Error." The best answer is: as much of the working experience as possible, with just the broken part gracefully hidden.</p>
+
+      <p>This is called <span class="tooltip-trigger">graceful degradation<span class="tooltip-content">When a system continues to operate with reduced functionality when a component fails, rather than failing completely. Like a car that still drives with a broken radio &#x2014; you lose music, but you still get where you're going.</span></span> &#x2014; the idea that a system should <em>bend</em> under failure, not <em>break</em>. If your recommendation engine goes down, users should still see the product page &#x2014; just with generic "popular items" instead of personalized suggestions. If your search service is overloaded, you can still show category pages and best-seller lists. The experience gets worse, but it doesn't disappear.</p>
+
+      <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Graceful degradation: features degrade step-by-step instead of total failure">
+        <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Graceful Degradation &#x2014; Lose Features, Not the Whole App</text>
+
+        <!-- Full experience -->
+        <rect x="40" y="50" width="140" height="185" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="110" y="72" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">100% HEALTHY</text>
+        <rect x="55" y="82" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="110" y="94" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Personalized feed</text>
+        <rect x="55" y="103" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="110" y="115" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Search</text>
+        <rect x="55" y="124" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="110" y="136" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Recommendations</text>
+        <rect x="55" y="145" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="110" y="157" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Reviews</text>
+        <rect x="55" y="166" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="110" y="178" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Checkout</text>
+        <rect x="55" y="187" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="110" y="199" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Notifications</text>
+
+        <!-- Degraded 1 -->
+        <rect x="210" y="50" width="140" height="185" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+        <text x="280" y="72" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="11">RECS DOWN</text>
+        <rect x="225" y="82" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="280" y="94" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Personalized feed</text>
+        <rect x="225" y="103" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="280" y="115" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Search</text>
+        <rect x="225" y="124" width="110" height="16" rx="4" fill="rgba(234,179,8,0.15)"/>
+        <text x="280" y="136" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">&#x26A0; Popular items</text>
+        <rect x="225" y="145" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="280" y="157" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Reviews</text>
+        <rect x="225" y="166" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="280" y="178" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Checkout</text>
+        <rect x="225" y="187" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="280" y="199" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Notifications</text>
+
+        <!-- Degraded 2 -->
+        <rect x="380" y="50" width="140" height="185" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+        <text x="450" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">SEARCH DOWN</text>
+        <rect x="395" y="82" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="450" y="94" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Personalized feed</text>
+        <rect x="395" y="103" width="110" height="16" rx="4" fill="rgba(249,115,22,0.15)"/>
+        <text x="450" y="115" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8">&#x26A0; Browse categories</text>
+        <rect x="395" y="124" width="110" height="16" rx="4" fill="rgba(234,179,8,0.15)"/>
+        <text x="450" y="136" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="8">&#x26A0; Popular items</text>
+        <rect x="395" y="145" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="450" y="157" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Reviews</text>
+        <rect x="395" y="166" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="450" y="178" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Checkout</text>
+        <rect x="395" y="187" width="110" height="16" rx="4" fill="rgba(16,185,129,0.15)"/>
+        <text x="450" y="199" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">&#x2713; Notifications</text>
+
+        <!-- Total failure -->
+        <rect x="550" y="50" width="140" height="185" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2.5"/>
+        <text x="620" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">NO DEGRADATION</text>
+        <rect x="565" y="88" width="110" height="95" rx="8" fill="rgba(239,68,68,0.08)"/>
+        <text x="620" y="122" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="22">500</text>
+        <text x="620" y="142" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">Internal Server</text>
+        <text x="620" y="157" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">Error</text>
+        <text x="620" y="205" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">entire site dead</text>
+        <text x="620" y="222" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">because search was down</text>
+
+        <!-- Bottom insight -->
+        <rect x="100" y="245" width="560" height="24" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+        <text x="380" y="261" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">A 90% experience is infinitely better than a 0% experience.</text>
+      </svg>
+
+      <p>The key insight is that <strong>not all features are equally important</strong>. Checkout is critical &#x2014; if users can't pay, you lose money. Recommendations are nice-to-have &#x2014; showing "popular items" instead of personalized picks is a small quality drop, not a disaster. Graceful degradation means knowing the difference and building your system to shed non-essential features under stress, protecting the critical path at all costs.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper &#x2014; The Math and Mechanics</h2>
+    </div>
+  </div>
+
+  <p>The toolkit in Section 6 gives you the "what." This section gives you the "how much" &#x2014; the numbers, formulas, and patterns that turn reliability from a vague goal into a measurable engineering target. This is the math that shows up in system design interviews and capacity planning meetings.</p>
+
+  <!-- Deep Dive 1: MTBF & MTTR -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-calculator icon-gap"></i> MTBF &amp; MTTR &#x2014; The Two Numbers That Define Reliability</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Reliability engineers live and die by two metrics. The first is <span class="tooltip-trigger">MTBF<span class="tooltip-content">Mean Time Between Failures &#x2014; the average time a system runs before something breaks. A higher MTBF means fewer failures. Example: MTBF of 720 hours means you can expect a failure roughly once a month.</span></span> &#x2014; <strong>Mean Time Between Failures</strong>. This measures how often things break. If your system fails once a week, your MTBF is 168 hours. If it fails once a month, your MTBF is 720 hours. Higher is better &#x2014; it means more time between problems.</p>
+
+        <p>The second is <span class="tooltip-trigger">MTTR<span class="tooltip-content">Mean Time To Recovery &#x2014; the average time it takes to restore a system after a failure. Lower MTTR means less downtime. Automatic failover can reduce MTTR from 30+ minutes to under 5 seconds.</span></span> &#x2014; <strong>Mean Time To Recovery</strong>. This measures how quickly you bounce back after a failure. If it takes you 30 minutes to get back online after a crash, your MTTR is 30 minutes. Lower is better &#x2014; it means less downtime per incident.</p>
+
+        <p>Together, these two numbers determine your availability:</p>
+
+        <div class="math-block">
+          <div class="math-label">Availability Formula</div>
+          <code>Availability = MTBF / (MTBF + MTTR)</code>
+          <div class="math-result">The percentage of time your system is up and running</div>
+        </div>
+
+        <p>Let's plug in some numbers to make this real.</p>
+
+        <div class="math-block">
+          <div class="math-label">Scenario A: Manual recovery</div>
+          <code>MTBF = 168 hours (1 failure/week), MTTR = 0.5 hours (30 min)
+Availability = 168 / (168 + 0.5) = <strong>99.70%</strong></code>
+          <div class="math-result">That's 21.6 hours of downtime per year &#x2014; not great.</div>
+        </div>
+
+        <div class="math-block">
+          <div class="math-label">Scenario B: Auto failover + same failure rate</div>
+          <code>MTBF = 168 hours (1 failure/week), MTTR = 0.001 hours (3.6 sec)
+Availability = 168 / (168 + 0.001) = <strong>99.9994%</strong></code>
+          <div class="math-result">That's 3 minutes of downtime per year. Same failure rate, wildly different outcome.</div>
+        </div>
+
+        <p>The insight here is powerful: <strong>you don't always need to prevent more failures &#x2014; you need to recover from them faster</strong>. Both scenarios have the same MTBF (same failure rate), but the one with automatic failover has 400&#xd7; less downtime because its MTTR is 600&#xd7; lower. In practice, reducing MTTR is often cheaper and faster than reducing MTBF.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deep Dive 2: The Nines -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-percent icon-gap"></i> The Nines of Availability &#x2014; What 99.99% Actually Means</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>When engineers talk about reliability, they speak in "nines." Three nines (99.9%), four nines (99.99%), five nines (99.999%). Each additional nine sounds like a tiny improvement &#x2014; just one more decimal place &#x2014; but it actually represents a <strong>10&#xd7; reduction in allowed downtime</strong>. The jump from three nines to four nines isn't 0.09% better. It's 10 times harder to achieve.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Availability</th>
+              <th>Name</th>
+              <th>Downtime/Year</th>
+              <th>Downtime/Month</th>
+              <th>Typical Use Case</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>99%</td>
+              <td>Two nines</td>
+              <td>3.65 days</td>
+              <td>7.3 hours</td>
+              <td>Internal tools, batch jobs</td>
+            </tr>
+            <tr>
+              <td>99.9%</td>
+              <td>Three nines</td>
+              <td>8.7 hours</td>
+              <td>43.8 min</td>
+              <td>SaaS apps, content sites</td>
+            </tr>
+            <tr>
+              <td>99.95%</td>
+              <td>Three and a half</td>
+              <td>4.4 hours</td>
+              <td>21.9 min</td>
+              <td>E-commerce, APIs</td>
+            </tr>
+            <tr>
+              <td>99.99%</td>
+              <td>Four nines</td>
+              <td>52.6 min</td>
+              <td>4.4 min</td>
+              <td>Payment systems, databases</td>
+            </tr>
+            <tr>
+              <td>99.999%</td>
+              <td>Five nines</td>
+              <td>5.3 min</td>
+              <td>26.3 sec</td>
+              <td>Telecom, emergency systems</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Visual comparison of nines: each additional nine reduces allowed downtime by 10x">
+          <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Each Nine = 10&#xd7; Harder</text>
+
+          <!-- Bars showing downtime per year -->
+          <text x="60" y="55" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Downtime per year:</text>
+
+          <!-- 99% bar -->
+          <rect x="160" y="65" width="500" height="22" rx="4" fill="rgba(239,68,68,0.2)" stroke="#ef4444" stroke-width="1"/>
+          <text x="165" y="80" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">99% &#x2014; 3.65 days</text>
+
+          <!-- 99.9% bar -->
+          <rect x="160" y="95" width="200" height="22" rx="4" fill="rgba(249,115,22,0.2)" stroke="#f97316" stroke-width="1"/>
+          <text x="165" y="110" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">99.9% &#x2014; 8.7 hours</text>
+
+          <!-- 99.99% bar -->
+          <rect x="160" y="125" width="50" height="22" rx="4" fill="rgba(234,179,8,0.2)" stroke="#eab308" stroke-width="1"/>
+          <text x="220" y="140" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="10">99.99% &#x2014; 52 min</text>
+
+          <!-- 99.999% bar -->
+          <rect x="160" y="155" width="8" height="22" rx="3" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1"/>
+          <text x="178" y="170" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">99.999% &#x2014; 5 min</text>
+        </svg>
+
+        <div class="callout callout-warning">
+          <strong>The cost curve is exponential.</strong> Going from 99% to 99.9% might cost you $10K/year (add a standby server). Going from 99.9% to 99.99% might cost $200K (multi-region, auto-failover). Going from 99.99% to 99.999% might cost $2M+ (redundant everything, chaos engineering team, custom tooling). Always ask: <strong>how much is downtime actually costing us?</strong> Don't buy five nines when three nines is enough.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deep Dive 3: Blast Radius & Bulkhead -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-ship icon-gap"></i> Blast Radius &amp; the Bulkhead Pattern</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>When something explodes, the <span class="tooltip-trigger">blast radius<span class="tooltip-content">The scope of impact when a failure occurs. A small blast radius means only one feature or one set of users is affected. A large blast radius means the whole system goes down. Good architecture minimizes blast radius.</span></span> is how far the damage spreads. In systems, it's the same idea: when a component fails, how much of the system does it take down with it? A small blast radius means one feature breaks. A large blast radius means the whole system goes down.</p>
+
+        <p>The <span class="tooltip-trigger">bulkhead<span class="tooltip-content">A pattern borrowed from ship design: ships have watertight compartments (bulkheads) so a hull breach in one section doesn't flood the entire ship. In software, bulkheads isolate failures &#x2014; e.g., separate thread pools for different services, so one slow service can't exhaust threads for everything else.</span></span> pattern is borrowed directly from ship design. Ships are divided into watertight compartments. If the hull is breached and water floods one compartment, the bulkheads (walls) prevent the water from spreading to other compartments. The ship stays afloat even with one section flooded. Without bulkheads, one hole sinks the whole ship.</p>
+
+        <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bulkhead pattern: isolated compartments prevent one failure from sinking everything">
+          <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Bulkhead Pattern &#x2014; Watertight Compartments</text>
+
+          <!-- No bulkheads (ship sinks) -->
+          <text x="190" y="52" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">WITHOUT BULKHEADS</text>
+
+          <!-- Ship hull -->
+          <path d="M40,90 L340,90 L320,170 L60,170 Z" fill="#334155" stroke="#ef4444" stroke-width="2"/>
+          <!-- Water flooding everything -->
+          <path d="M40,130 L340,130 L320,170 L60,170 Z" fill="rgba(59,130,246,0.2)" stroke="#3b82f6" stroke-width="1"/>
+          <text x="190" y="155" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="10" font-weight="600">FLOODED &#x2014; entire ship</text>
+
+          <!-- Breach point -->
+          <circle cx="100" cy="90" r="10" fill="#ef4444"/>
+          <text x="100" y="82" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">BREACH</text>
+
+          <text x="190" y="195" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">One hole &#x2192; whole ship sinks</text>
+          <text x="190" y="210" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Shared thread pool, shared DB connection</text>
+
+          <!-- With bulkheads (ship survives) -->
+          <text x="570" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">WITH BULKHEADS</text>
+
+          <!-- Ship hull -->
+          <path d="M420,90 L720,90 L700,170 L440,170 Z" fill="#334155" stroke="#10b981" stroke-width="2"/>
+
+          <!-- Bulkhead walls -->
+          <line x1="490" y1="90" x2="490" y2="170" stroke="#f1f5f9" stroke-width="2.5"/>
+          <line x1="570" y1="90" x2="570" y2="170" stroke="#f1f5f9" stroke-width="2.5"/>
+          <line x1="650" y1="90" x2="650" y2="170" stroke="#f1f5f9" stroke-width="2.5"/>
+
+          <!-- Only first compartment flooded -->
+          <path d="M420,130 L490,130 L490,170 L440,170 Z" fill="rgba(59,130,246,0.2)" stroke="#3b82f6" stroke-width="1"/>
+
+          <!-- Breach point -->
+          <circle cx="455" cy="90" r="10" fill="#ef4444"/>
+          <text x="455" y="82" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">BREACH</text>
+
+          <!-- Labels -->
+          <text x="455" y="155" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">flooded</text>
+          <text x="530" y="140" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">dry &#x2713;</text>
+          <text x="610" y="140" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">dry &#x2713;</text>
+          <text x="680" y="140" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">dry &#x2713;</text>
+
+          <text x="570" y="195" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">One hole &#x2192; one compartment floods, ship survives</text>
+          <text x="570" y="210" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Separate thread pools, separate DB connections</text>
+
+          <!-- Bottom insight -->
+          <rect x="130" y="230" width="500" height="24" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+          <text x="380" y="246" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">Bulkheads = isolation. Isolation = small blast radius. Small blast radius = survivable failures.</text>
+        </svg>
+
+        <p>In software, bulkheads look like: separate thread pools for each downstream service (so a slow payment service can't eat threads meant for the user service), separate database connection pools, separate process groups, or even separate clusters. The cascading failure in Section 4 happened because everything shared resources. Bulkheads prevent that by putting walls between components.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deep Dive 4: Idempotency -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-rotate icon-gap"></i> Idempotency &#x2014; Safe to Retry</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>When a request fails, the natural response is to retry it. But retrying can be dangerous if the request <em>actually succeeded</em> on the server side but the response got lost on the way back. The client thinks it failed, retries, and now the action happens <em>twice</em>. If that action was "charge the customer $50," you just double-charged them.</p>
+
+        <p>An operation is <span class="tooltip-trigger">idempotent<span class="tooltip-content">An operation that produces the same result whether you run it once or a hundred times. "Set balance to $100" is idempotent (running it twice still gives $100). "Add $50 to balance" is NOT idempotent (running it twice adds $100).</span></span> if doing it once produces the same result as doing it multiple times. Think of it like pressing an elevator button. Pressing "3rd floor" once or mashing it ten times doesn't change where the elevator goes &#x2014; you still end up on the 3rd floor. That's idempotency.</p>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="rel-idemp-bad" role="tab" aria-selected="true">NOT Idempotent (Dangerous)</button>
+            <button class="tab-btn" data-tab="rel-idemp-good" role="tab" aria-selected="false">Idempotent (Safe to Retry)</button>
+          </div>
+          <div class="tab-panel active" id="rel-idemp-bad" role="tabpanel">
+<pre><code class="language-sql">-- Add $50 to balance
+-- If retried, customer gets charged TWICE!
+UPDATE accounts
+SET balance = balance + 50
+WHERE user_id = 123;
+
+-- Run once:  balance goes from $100 → $150  ✓
+-- Run twice: balance goes from $150 → $200  ✗ WRONG!</code></pre>
+          </div>
+          <div class="tab-panel" id="rel-idemp-good" role="tabpanel">
+<pre><code class="language-sql">-- Set balance to $150 (absolute value)
+-- Retrying is safe — same result every time
+UPDATE accounts
+SET balance = 150
+WHERE user_id = 123;
+
+-- Run once:  balance = $150  ✓
+-- Run twice: balance = $150  ✓ Same result!
+
+-- OR: Use an idempotency key
+INSERT INTO payments (idempotency_key, user_id, amount)
+VALUES ('txn-abc-123', 123, 50)
+ON CONFLICT (idempotency_key) DO NOTHING;
+
+-- First call:  inserts the payment  ✓
+-- Retry:       key already exists, skipped  ✓ Safe!</code></pre>
+          </div>
+        </div>
+
+        <p>In reliable systems, retries are <em>everywhere</em>. Load balancers retry failed requests on a different server. Message queues redeliver messages when consumers crash. Clients retry when they get network timeouts. If your operations aren't idempotent, each of these retries is a potential bug. Making critical operations idempotent &#x2014; usually with an idempotency key that deduplicates repeated requests &#x2014; is a fundamental requirement for building fault-tolerant systems.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — VARIATIONS (FAILURE TYPES)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="failure-types">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-burst"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations &#x2014; The Five Types of Failure</h2>
+    </div>
+  </div>
+
+  <p>Not all failures are created equal. A hard drive dying is very different from a developer accidentally deploying broken code, which is very different from a network cable getting unplugged. Each type of failure has different causes, different frequencies, and different defenses. Understanding the landscape helps you prioritize what to protect against first.</p>
+
+  <!-- Type 1: Hardware Failures -->
+  <div class="card open">
+    <h3 class="card-title"><span><i class="fa-solid fa-hard-drive icon-gap"></i> Type 1: Hardware Failures</span></h3>
+    <div class="card-body">
+      <p><strong>What breaks:</strong> Hard drives, RAM sticks, CPUs, power supplies, fans, network cards. Physical components have a finite lifespan and will eventually fail. A typical hard drive has an annual failure rate of 1-4%. If you run 1,000 drives, expect 10-40 drive failures per year &#x2014; that's almost one per week.</p>
+
+      <p><strong>How it manifests:</strong> Sudden and total. The server is working one second and dead the next. There's no warning, no graceful shutdown. Data on the failed drive may be corrupted or unrecoverable.</p>
+
+      <p><strong>Primary defenses:</strong> Redundancy (N+1 servers), replication (data on multiple drives), RAID arrays, hot-swappable components. Cloud providers handle most hardware failures transparently &#x2014; that's one of the biggest reasons to use the cloud.</p>
+
+      <div class="callout callout-info">
+        <strong>Real-world stat:</strong> Google's 2007 study found that 2-4% of hard drives fail per year, with failure rates increasing sharply after 3 years. At Google's scale (millions of drives), that's thousands of drive failures per month &#x2014; and users never notice because everything is replicated.
+      </div>
+    </div>
+  </div>
+
+  <!-- Type 2: Software Bugs -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-bug icon-gap"></i> Type 2: Software Bugs</span></h3>
+    <div class="card-body">
+      <p><strong>What breaks:</strong> Application code, library dependencies, operating system updates, configuration changes. Unlike hardware failures (which are random and independent), software bugs are <em>systematic</em> &#x2014; the same bug will hit every server running that code.</p>
+
+      <p><strong>How it manifests:</strong> Sometimes sudden (a crash on every request), sometimes slow (a memory leak that takes 3 days to cause an OOM kill), sometimes conditional (only fails when a user's name contains an emoji). The sneaky ones are the slow leaks &#x2014; everything looks fine for days until suddenly it's not.</p>
+
+      <p><strong>Why it's different from hardware:</strong> Redundancy doesn't help here. If you have 10 servers running the same buggy code, all 10 will fail the same way. You can't survive a software bug by adding more copies of the broken software.</p>
+
+      <p><strong>Primary defenses:</strong> Canary deployments (roll out to 1% of servers first, watch for errors before rolling out to 100%), feature flags, automated rollback, chaos testing to surface latent bugs, and thorough monitoring that catches memory leaks and error rate spikes early.</p>
+    </div>
+  </div>
+
+  <!-- Type 3: Network Failures -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-network-wired icon-gap"></i> Type 3: Network Failures</span></h3>
+    <div class="card-body">
+      <p><strong>What breaks:</strong> Network links between servers, between data centers, between your system and the internet. Cables get cut (a surprisingly common cause &#x2014; one AWS outage was caused by a construction crew accidentally cutting a fiber cable). Switches fail. DNS servers go down. Routers get misconfigured.</p>
+
+      <p><strong>How it manifests:</strong> This is the trickiest category because network failures are often <em>partial</em>. Server A can talk to Server B, and Server B can talk to Server C, but Server A can't talk to Server C. Or Server A can send messages to Server B, but not receive replies. This partial connectivity creates a nightmare scenario called a <span class="tooltip-trigger">split-brain<span class="tooltip-content">When a network partition causes two parts of a system to believe they're each the "primary." Both accept writes independently, leading to conflicting data. Resolving split-brain after the partition heals is one of the hardest problems in distributed systems.</span></span> &#x2014; where two parts of your system each think they're the primary and both start accepting writes, creating conflicting data.</p>
+
+      <p><strong>Primary defenses:</strong> Redundant network paths, multiple internet providers, timeout policies, retry with backoff, and consensus protocols (like Raft or Paxos) that prevent split-brain by requiring a majority of nodes to agree before accepting writes.</p>
+
+      <div class="callout callout-danger">
+        <strong>The fundamental network truth:</strong> In a distributed system, the network is always unreliable. Packets get lost. Connections drop. Latency spikes happen. Any design that assumes the network is reliable will eventually fail in spectacular ways. This is so fundamental it's called the <em>Fallacies of Distributed Computing</em>, and the first fallacy is: "The network is reliable."
+      </div>
+    </div>
+  </div>
+
+  <!-- Type 4: Human Errors -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-person-circle-exclamation icon-gap"></i> Type 4: Human Errors</span></h3>
+    <div class="card-body">
+      <p><strong>What breaks:</strong> Everything. Humans are the most creative and unpredictable failure mode. Studies show that human errors cause 60-80% of outages &#x2014; far more than hardware or software failures combined. A mistyped command, a bad config change, an accidental deletion, a deploy that wasn't tested, a "quick fix" that makes things worse.</p>
+
+      <p><strong>How it manifests:</strong> "I thought I was running that command on the staging server." "I didn't know that config change would restart all the workers." "I accidentally dropped the production database instead of the test one." These aren't rare horror stories. They happen at every company, including the biggest and best-run ones.</p>
+
+      <p><strong>Famous examples:</strong> In 2017, a single Amazon S3 engineer mistyped a command and took down a huge portion of the internet for 4 hours. GitLab lost 6 hours of production data in 2017 when an engineer accidentally deleted the wrong database during a maintenance operation. These weren't careless people &#x2014; they were experienced engineers making mistakes under pressure.</p>
+
+      <p><strong>Primary defenses:</strong> Make it hard to do the wrong thing. Use infrastructure-as-code (so changes go through code review). Require approval for destructive operations. Keep production access minimal. Build "undo" capabilities everywhere. Test disaster recovery procedures regularly so when humans <em>do</em> make mistakes, recovery is fast and well-practiced.</p>
+    </div>
+  </div>
+
+  <!-- Type 5: Dependent Service Failures -->
+  <div class="card">
+    <h3 class="card-title"><span><i class="fa-solid fa-link-slash icon-gap"></i> Type 5: Dependent Service Failures</span></h3>
+    <div class="card-body">
+      <p><strong>What breaks:</strong> Third-party services your system depends on &#x2014; payment processors (Stripe, PayPal), cloud services (AWS S3, Google Cloud), DNS providers (Cloudflare), email services (SendGrid), CDNs, and any external API your system calls.</p>
+
+      <p><strong>How it manifests:</strong> You wrote perfect code. Your servers are healthy. Your database is fine. But Stripe is having an outage, and suddenly nobody can check out on your e-commerce site. You have zero control over the fix &#x2014; all you can do is wait and hope they fix it soon. Your SLA is now at the mercy of every third-party service you depend on.</p>
+
+      <p><strong>The math is brutal:</strong> If your system depends on 5 services, each with 99.9% availability, the combined availability is 99.9%&#x2075; = <strong>99.5%</strong>. That's 44 hours of downtime per year from external dependencies alone. The more services you depend on, the worse it gets.</p>
+
+      <div class="math-block">
+        <div class="math-label">Combined availability of dependent services</div>
+        <code>5 services &#xd7; 99.9% each = 0.999&#x2075; = 0.995 = <strong>99.5%</strong>
+= 43.8 hours of downtime per year</code>
+        <div class="math-result">Your system can't be more reliable than its least reliable dependency &#x2014; unless you build fallbacks.</div>
+      </div>
+
+      <p><strong>Primary defenses:</strong> Circuit breakers around every external call, fallback behavior (cache the last good response, show a degraded experience), timeout policies (don't let a slow third-party service hang your system for 30 seconds), and multi-provider strategies (use multiple DNS providers, multiple CDNs, or multiple payment processors so one provider's outage doesn't take you down).</p>
+
+      <div class="think-first-box">
+        <span class="think-label">Think First</span>
+        <p>Your e-commerce site depends on Stripe for payments, Cloudflare for CDN, SendGrid for email, and AWS S3 for image storage. Each has 99.9% availability. <strong>What's the probability that at least one of them is down at any given moment?</strong></p>
+        <span class="think-hint">Probability all four are up: 0.999&#x2074; = 0.996. Probability at least one is down: 1 - 0.996 = 0.4%. That means in any given month, there's about a 12-hour window where at least one of your dependencies is unavailable. Plan for it.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S9 · AT SCALE – REAL FAILURE STORIES
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-skull-crossbones"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — Real Failure Stories</h2>
+    </div>
+  </div>
+  <p>
+    Theory is great, but nothing teaches reliability like watching a real system burn.
+    These five incidents changed how the industry thinks about fault tolerance.
+    Every one of them started with something small — a typo, a config change, a forgotten test —
+    and snowballed into a disaster that affected millions.
+  </p>
+
+  <!-- Timeline SVG -->
+  <svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline of major outages">
+    <defs>
+      <marker id="rel-tl-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#e74c3c"/></marker>
+    </defs>
+    <line x1="40" y1="60" x2="720" y2="60" stroke="#e74c3c" stroke-width="3" marker-end="url(#rel-tl-arr)"/>
+    <!-- 2017 S3 -->
+    <circle cx="120" cy="60" r="8" fill="#e74c3c"/>
+    <text x="120" y="40" text-anchor="middle" font-size="11" fill="#e74c3c" font-weight="700">Feb 2017</text>
+    <text x="120" y="90" text-anchor="middle" font-size="10" fill="#ccc">AWS S3</text>
+    <!-- 2017 GitLab -->
+    <circle cx="240" cy="60" r="8" fill="#e67e22"/>
+    <text x="240" y="40" text-anchor="middle" font-size="11" fill="#e67e22" font-weight="700">Jan 2017</text>
+    <text x="240" y="90" text-anchor="middle" font-size="10" fill="#ccc">GitLab DB</text>
+    <!-- 2019 Cloudflare -->
+    <circle cx="400" cy="60" r="8" fill="#f1c40f"/>
+    <text x="400" y="40" text-anchor="middle" font-size="11" fill="#f1c40f" font-weight="700">Jul 2019</text>
+    <text x="400" y="90" text-anchor="middle" font-size="10" fill="#ccc">Cloudflare</text>
+    <!-- 2012 Knight -->
+    <circle cx="540" cy="60" r="8" fill="#9b59b6"/>
+    <text x="540" y="40" text-anchor="middle" font-size="11" fill="#9b59b6" font-weight="700">Aug 2012</text>
+    <text x="540" y="90" text-anchor="middle" font-size="10" fill="#ccc">Knight Capital</text>
+    <!-- 2021 Facebook -->
+    <circle cx="660" cy="60" r="8" fill="#3498db"/>
+    <text x="660" y="40" text-anchor="middle" font-size="11" fill="#3498db" font-weight="700">Oct 2021</text>
+    <text x="660" y="90" text-anchor="middle" font-size="10" fill="#ccc">Facebook</text>
+  </svg>
+
+  <!-- Story 1: AWS S3 -->
+  <div class="card open">
+    <h3 class="card-title">
+      <span><i class="fa-brands fa-aws icon-gap"></i> AWS S3 Outage — A Typo Took Down Half the Internet (2017)</span>
+    </h3>
+    <div class="card-body">
+      <div class="callout callout-danger">
+        <strong>Impact:</strong> Thousands of websites and services — including Slack, Quora, Trello, and the SEC — went dark for nearly 5 hours because of a single mistyped command.
+      </div>
+      <p>
+        An engineer was debugging a billing system issue and ran a command to remove a small number of S3 servers.
+        They accidentally typed a larger number than intended, which removed a critical chunk of the infrastructure
+        that S3 itself depends on. The cascade was immediate: services that store images, host static files,
+        or keep backups on S3 all broke at once.
+      </p>
+      <p>
+        The terrifying part? S3 was considered so reliable that many companies didn't even have a fallback plan.
+        It was the invisible foundation under everything, and when it wobbled, the whole building shook.
+      </p>
+      <h4>Lessons Learned</h4>
+      <ul>
+        <li><strong>Rate-limit dangerous operations</strong> — the tool should have refused to remove that many servers at once</li>
+        <li><strong>Don't treat any service as "too reliable to fail"</strong> — always have a degradation plan</li>
+        <li><strong>Human error is the #1 cause of outages</strong> — build guardrails, not blame</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Story 2: Facebook -->
+  <div class="card">
+    <h3 class="card-title">
+      <span><i class="fa-brands fa-facebook icon-gap"></i> Facebook 6-Hour Outage — BGP Misconfiguration (2021)</span>
+    </h3>
+    <div class="card-body">
+      <div class="callout callout-danger">
+        <strong>Impact:</strong> Facebook, Instagram, WhatsApp, and Messenger were completely unreachable for over 6 hours — affecting 3.5 billion users worldwide.
+      </div>
+      <p>
+        During routine maintenance, a configuration change accidentally withdrew all
+        <span class="tooltip-trigger">BGP<span class="tooltip-content">Border Gateway Protocol — the system that tells the internet how to route traffic between networks. Think of it as the internet's GPS.</span></span>
+        routes for Facebook's servers. In plain English: Facebook told the internet
+        "we don't exist anymore," and the internet believed it.
+      </p>
+      <p>
+        Because their internal tools (including the ones engineers use to fix problems) also ran on
+        Facebook's network, engineers couldn't even log in remotely to fix it.
+        They had to physically go to the data center and manually reconfigure the routers.
+      </p>
+
+      <!-- SVG: BGP route withdrawal -->
+      <svg viewBox="0 0 500 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BGP route withdrawal diagram">
+        <rect x="10" y="60" width="120" height="50" rx="8" fill="#1a1a2e" stroke="#3498db" stroke-width="2"/>
+        <text x="70" y="90" text-anchor="middle" font-size="13" fill="#3498db">Users</text>
+        <rect x="190" y="60" width="120" height="50" rx="8" fill="#1a1a2e" stroke="#e67e22" stroke-width="2"/>
+        <text x="250" y="90" text-anchor="middle" font-size="13" fill="#e67e22">Internet ISPs</text>
+        <rect x="370" y="60" width="120" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+        <text x="430" y="90" text-anchor="middle" font-size="13" fill="#e74c3c">Facebook</text>
+        <line x1="130" y1="85" x2="190" y2="85" stroke="#3498db" stroke-width="2"/>
+        <line x1="310" y1="75" x2="370" y2="75" stroke="#2ecc71" stroke-width="2" stroke-dasharray="6,4"/>
+        <text x="340" y="68" font-size="9" fill="#2ecc71">Before</text>
+        <line x1="310" y1="95" x2="370" y2="95" stroke="#e74c3c" stroke-width="2"/>
+        <text x="340" y="108" font-size="9" fill="#e74c3c">After: route gone</text>
+        <text x="430" y="145" text-anchor="middle" font-size="11" fill="#e74c3c" font-style="italic">"I don't exist"</text>
+      </svg>
+
+      <h4>Lessons Learned</h4>
+      <ul>
+        <li><strong>Out-of-band access is critical</strong> — your fix-it tools can't live on the same network they're supposed to fix</li>
+        <li><strong>Canary your config changes</strong> — roll out network changes gradually, not all at once</li>
+        <li><strong>Physical access plans matter</strong> — sometimes the only fix is walking into a data center</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Story 3: GitLab -->
+  <div class="card">
+    <h3 class="card-title">
+      <span><i class="fa-brands fa-gitlab icon-gap"></i> GitLab Database Deletion — Accidentally rm'd Production (2017)</span>
+    </h3>
+    <div class="card-body">
+      <div class="callout callout-danger">
+        <strong>Impact:</strong> 6 hours of user data permanently lost. 300 GB of live production data deleted by a tired engineer at 11 PM.
+      </div>
+      <p>
+        A GitLab engineer was troubleshooting database replication issues late at night.
+        They needed to wipe a <em>secondary</em> database and re-sync it. But in their fatigue,
+        they ran the delete command on the <em>primary</em> production database instead.
+        By the time they realized the mistake, 300 GB of data was gone.
+      </p>
+      <p>
+        Then came the truly horrifying discovery: of their five backup methods,
+        <strong>none of them actually worked</strong>. LVM snapshots were never configured,
+        pg_dump hadn't run in months, and the Azure disk snapshots were empty.
+        The only thing that saved them was a manual pg_dump someone had taken 6 hours earlier by coincidence.
+      </p>
+      <h4>Lessons Learned</h4>
+      <ul>
+        <li><strong>Test your backups regularly</strong> — a backup you've never restored is not a backup, it's a hope</li>
+        <li><strong>Tired humans make mistakes</strong> — don't do critical operations at 11 PM</li>
+        <li><strong>Multiple backup methods only help if they actually run</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Story 4: Cloudflare -->
+  <div class="card">
+    <h3 class="card-title">
+      <span><i class="fa-solid fa-cloud icon-gap"></i> Cloudflare Outage — A Bad Regex (2019)</span>
+    </h3>
+    <div class="card-body">
+      <div class="callout callout-danger">
+        <strong>Impact:</strong> Cloudflare's entire global network went down for 27 minutes, affecting millions of websites.
+      </div>
+      <p>
+        A developer deployed a new Web Application Firewall (WAF) rule that contained a poorly written
+        regular expression. The regex caused catastrophic backtracking — meaning the CPU got stuck
+        in an endless loop trying to evaluate it. Since the WAF runs on every request,
+        every Cloudflare server worldwide pegged at 100% CPU simultaneously.
+      </p>
+      <p>
+        The irony? The WAF is meant to <em>protect</em> websites. Instead, a bad pattern in the protection layer
+        became the thing that took everything down. One line of regex, global outage.
+      </p>
+      <h4>Lessons Learned</h4>
+      <ul>
+        <li><strong>Regex needs review and testing</strong> — treat it like any other critical code path</li>
+        <li><strong>Canary deployments for rules</strong> — roll to 1% of traffic first, not 100%</li>
+        <li><strong>CPU circuit breakers</strong> — if a process spikes CPU, kill it automatically</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Story 5: Knight Capital -->
+  <div class="card">
+    <h3 class="card-title">
+      <span><i class="fa-solid fa-chart-line icon-gap"></i> Knight Capital — $440 Million Lost in 45 Minutes (2012)</span>
+    </h3>
+    <div class="card-body">
+      <div class="callout callout-danger">
+        <strong>Impact:</strong> A botched software deployment caused Knight Capital to lose $440 million in 45 minutes, bankrupting the firm.
+      </div>
+      <p>
+        Knight Capital was deploying new trading software to 8 servers. A technician forgot to update
+        one of them. That one server still had old test code that was designed to aggressively buy and sell stocks
+        as fast as possible. When the market opened, that server went rogue — executing millions of
+        unintended trades at lightning speed.
+      </p>
+      <p>
+        By the time anyone realized what was happening, 45 minutes had passed.
+        The company had accumulated $7 billion in unwanted positions and lost $440 million.
+        Knight Capital went from a healthy company to bankrupt in under an hour.
+      </p>
+      <h4>Lessons Learned</h4>
+      <ul>
+        <li><strong>Automated deployment or nothing</strong> — manual deploys to 8 servers will always miss one</li>
+        <li><strong>Kill switches are mandatory</strong> — if spending spikes 1000x, auto-halt immediately</li>
+        <li><strong>Dead code is dangerous code</strong> — remove old test logic, don't leave it dormant</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Summary table -->
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Incident</th>
+          <th>Root Cause</th>
+          <th>Duration</th>
+          <th>Key Takeaway</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AWS S3 (2017)</td>
+          <td>Typo in CLI command</td>
+          <td>~5 hours</td>
+          <td>Rate-limit destructive operations</td>
+        </tr>
+        <tr>
+          <td>Facebook (2021)</td>
+          <td>BGP route withdrawal</td>
+          <td>~6 hours</td>
+          <td>Out-of-band access for recovery</td>
+        </tr>
+        <tr>
+          <td>GitLab (2017)</td>
+          <td>Wrong server targeted</td>
+          <td>18 hrs recovery</td>
+          <td>Test your backups</td>
+        </tr>
+        <tr>
+          <td>Cloudflare (2019)</td>
+          <td>Bad regex in WAF</td>
+          <td>27 minutes</td>
+          <td>Canary all deployments</td>
+        </tr>
+        <tr>
+          <td>Knight Capital (2012)</td>
+          <td>Incomplete deployment</td>
+          <td>45 minutes</td>
+          <td>Automate deploys, add kill switches</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S10 · ANTI-LESSON – WHAT NOT TO DO
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-ban"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Anti-Lesson — What Not to Do</h2>
+    </div>
+  </div>
+  <p>
+    Some reliability mistakes aren't technical — they're cultural. These three anti-patterns
+    look like good engineering on the surface, but they actually make systems <em>less</em> reliable.
+    Learning to spot them early will save you from building expensive illusions of safety.
+  </p>
+
+  <!-- Anti-Lesson 1 -->
+  <div class="collapsible open">
+    <div class="collapsible-header" aria-expanded="true" role="button" tabindex="0">
+      <span>Chasing 99.999% When 99.9% Is Enough</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p>
+        Five nines (99.999%) means your system can only be down for about 5 minutes per <em>year</em>.
+        That sounds impressive, but it comes at a staggering cost: redundant everything, multi-region failover,
+        near-zero-downtime deployments, and a team of on-call engineers around the clock.
+      </p>
+      <p>
+        The truth? Most applications are perfectly fine with three nines (99.9%), which allows about 8.7 hours
+        of downtime per year. Your users probably won't even notice a few minutes of downtime at 3 AM.
+        But the cost difference between 99.9% and 99.999% is often <strong>10x or more</strong>.
+      </p>
+
+      <!-- SVG: Cost vs nines -->
+      <svg viewBox="0 0 460 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost escalation as nines increase">
+        <text x="230" y="20" text-anchor="middle" font-size="13" fill="#ccc" font-weight="700">Cost Escalation Per Nine</text>
+        <!-- Bars -->
+        <rect x="60" y="140" width="70" height="30" rx="4" fill="#2ecc71"/>
+        <text x="95" y="160" text-anchor="middle" font-size="11" fill="#fff">99%</text>
+        <text x="95" y="135" text-anchor="middle" font-size="10" fill="#aaa">$</text>
+        <rect x="160" y="110" width="70" height="60" rx="4" fill="#f1c40f"/>
+        <text x="195" y="145" text-anchor="middle" font-size="11" fill="#1a1a2e">99.9%</text>
+        <text x="195" y="105" text-anchor="middle" font-size="10" fill="#aaa">$$</text>
+        <rect x="260" y="65" width="70" height="105" rx="4" fill="#e67e22"/>
+        <text x="295" y="125" text-anchor="middle" font-size="11" fill="#fff">99.99%</text>
+        <text x="295" y="58" text-anchor="middle" font-size="10" fill="#aaa">$$$$$</text>
+        <rect x="360" y="30" width="70" height="140" rx="4" fill="#e74c3c"/>
+        <text x="395" y="110" text-anchor="middle" font-size="11" fill="#fff">99.999%</text>
+        <text x="395" y="25" text-anchor="middle" font-size="10" fill="#aaa">$$$$$$$$</text>
+        <line x1="50" y1="170" x2="440" y2="170" stroke="#555" stroke-width="1"/>
+        <text x="245" y="192" text-anchor="middle" font-size="11" fill="#888">Availability Target</text>
+      </svg>
+
+      <div class="callout callout-warning">
+        <strong>Rule of thumb:</strong> Set your
+        <span class="tooltip-trigger">SLO<span class="tooltip-content">Service Level Objective — the target level of reliability you commit to internally. Example: 'Our API will respond in under 200ms for 99.9% of requests.'</span></span>
+        based on what your <em>users</em> actually need, not what sounds impressive on a slide deck.
+        If your internal dashboard goes down for 10 minutes and nobody notices, you don't need five nines.
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Anti-Lesson 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span>Reliability Theater — Backups Never Tested</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p>
+        This is the GitLab story all over again, but it happens everywhere. Teams set up elaborate
+        backup systems, tick the compliance checkbox, and never actually try restoring from those backups.
+        When disaster strikes, they discover the backups are empty, corrupted, or pointed at the wrong database.
+      </p>
+      <p>
+        Reliability theater is any practice that <em>looks</em> like it improves reliability but has never
+        been validated. Other examples: monitoring dashboards nobody checks, runbooks nobody reads,
+        incident response plans that haven't been rehearsed.
+      </p>
+      <div class="callout callout-danger">
+        <strong>The fix:</strong> Schedule regular "restore drills." Once a month, pick a random backup and
+        actually restore it to a test environment. If it fails, you just found a critical bug
+        <em>before</em> a real disaster. A backup you've never restored is just a file — not a safety net.
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Anti-Lesson 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span>Ignoring the Human Factor</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p>
+        We build redundant servers, automatic failover, and self-healing clusters.
+        But then we let a sleep-deprived engineer run a critical command at midnight
+        with no guardrails and no peer review. The biggest single point of failure in most systems
+        isn't a server — it's a tired human with root access.
+      </p>
+      <p>
+        Studies consistently show that <strong>60-80% of outages are caused by human error</strong> —
+        misconfigurations, bad deployments, wrong commands. Yet most reliability budgets go toward
+        hardware and software redundancy, not toward making human operations safer.
+      </p>
+      <div class="callout callout-info">
+        <strong>Design for humans:</strong> Require two-person approval for production changes.
+        Add confirmation prompts for destructive commands. Ban non-emergency changes after midnight.
+        The best systems assume humans <em>will</em> make mistakes and catch them before they cause harm.
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S11 · COMMON MISTAKES
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes</h2>
+    </div>
+  </div>
+  <p>
+    These are the six mistakes that show up again and again — in real incidents, in design reviews,
+    and in interviews. If you internalize these, you'll already be ahead of most engineers.
+  </p>
+
+  <!-- Mistake 1 -->
+  <div class="collapsible open">
+    <div class="collapsible-header" aria-expanded="true" role="button" tabindex="0">
+      <span><i class="fa-solid fa-xmark" style="color:#e74c3c;"></i> Never Testing Backups</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p><strong>The mistake:</strong> Setting up automated backups and assuming they work.</p>
+      <p><strong>Why it happens:</strong> Backups run silently in the background. Nobody checks them until they're desperately needed. By then, you discover they've been failing for months.</p>
+      <p><strong>The fix:</strong> Schedule monthly restore drills. Automate a "backup validation" job that restores to a scratch database and runs a row-count check. If it fails, page someone immediately.</p>
+    </div>
+    </div>
+  </div>
+
+  <!-- Mistake 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span><i class="fa-solid fa-xmark" style="color:#e74c3c;"></i> Hidden Single Points of Failure</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p><strong>The mistake:</strong> Thinking you've eliminated all SPOFs when one is hiding in plain sight — a shared load balancer, a single DNS provider, one engineer who knows the system.</p>
+      <p><strong>Why it happens:</strong> SPOFs hide in infrastructure layers people don't think about: the one network switch, the one config server, the one CI/CD pipeline.</p>
+      <p><strong>The fix:</strong> Run a "what if this dies?" exercise. Walk through every component in your architecture and ask: "If this single thing disappears right now, what breaks?" Draw a dependency map and look for any node that, if removed, disconnects the graph.</p>
+    </div>
+    </div>
+  </div>
+
+  <!-- Mistake 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span><i class="fa-solid fa-xmark" style="color:#e74c3c;"></i> Confusing Availability with Reliability</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p><strong>The mistake:</strong> Saying "our system is 99.9% reliable" when you actually mean "99.9% available." These are different things.</p>
+      <p><strong>Why it matters:</strong> A system can be <em>available</em> (it responds to requests) but not <em>reliable</em> (it returns wrong data, drops transactions, or silently corrupts state). Availability is "is it up?" Reliability is "does it do the right thing?"</p>
+      <p><strong>The fix:</strong> Track both metrics separately. Availability = uptime/total time. Reliability = correct responses/total responses. A system that's up but returning garbage is arguably worse than one that's honestly down.</p>
+    </div>
+    </div>
+  </div>
+
+  <!-- Mistake 4 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span><i class="fa-solid fa-xmark" style="color:#e74c3c;"></i> No Runbooks</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p><strong>The mistake:</strong> When something breaks at 3 AM, the on-call engineer has no idea what to do and has to wake up the one person who built the system.</p>
+      <p>
+        A <span class="tooltip-trigger">runbook<span class="tooltip-content">Runbook — a step-by-step guide for handling specific operational scenarios. Like a recipe book for incidents: 'If X happens, do Y, then Z.'</span></span>
+        is a simple document that says: "If this alert fires, here's exactly what to check and what to do."
+        Without one, every incident becomes an improvisation exercise.
+      </p>
+      <p><strong>The fix:</strong> For every alert you create, write a matching runbook. Include: what the alert means, what to check first, how to mitigate, and who to escalate to. Keep it next to the alert definition.</p>
+    </div>
+    </div>
+  </div>
+
+  <!-- Mistake 5 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span><i class="fa-solid fa-xmark" style="color:#e74c3c;"></i> Alert Fatigue</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p><strong>The mistake:</strong> Setting up so many alerts that the on-call engineer gets 200 notifications a day and starts ignoring all of them.</p>
+      <p><strong>Why it's dangerous:</strong> When everything screams for attention, nothing gets attention. The real critical alert drowns in a sea of noise, and the engineer who should respond has already mentally tuned out.</p>
+      <p><strong>The fix:</strong> Ruthlessly prune alerts. Every alert must be <em>actionable</em> — if the response is "do nothing, it'll fix itself," delete the alert. Aim for fewer than 5 pages per on-call shift. Categorize alerts into P1 (wake someone up) and P2 (check tomorrow morning).</p>
+    </div>
+    </div>
+  </div>
+
+  <!-- Mistake 6 -->
+  <div class="collapsible">
+    <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+      <span><i class="fa-solid fa-xmark" style="color:#e74c3c;"></i> No Chaos Testing</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p><strong>The mistake:</strong> Building fault tolerance in theory but never actually testing whether the system survives real failures.</p>
+      <p><strong>Why it happens:</strong> Teams are afraid to intentionally break production. "What if the fallback doesn't work?" Well, that's exactly why you need to test it — better to discover the fallback is broken during a controlled test than during a real outage at peak traffic.</p>
+      <p><strong>The fix:</strong> Start small. Kill one non-critical process in staging and see what happens. Gradually increase scope: kill a server, block a network path, introduce latency. Netflix's Chaos Monkey does this automatically in production — but you can start with a manual monthly drill.</p>
+    </div>
+    </div>
+  </div>
+
+  <!-- Common Mistakes Overview SVG -->
+  <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six common reliability mistakes">
+    <text x="380" y="20" text-anchor="middle" font-size="14" fill="#e74c3c" font-weight="700">6 Reliability Landmines</text>
+    <!-- Row 1 -->
+    <rect x="20" y="40" width="230" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="135" y="62" text-anchor="middle" font-size="11" fill="#e74c3c">1. Untested Backups</text>
+    <text x="135" y="78" text-anchor="middle" font-size="10" fill="#888">Schrodinger's backup</text>
+    <rect x="265" y="40" width="230" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="380" y="62" text-anchor="middle" font-size="11" fill="#e74c3c">2. Hidden SPOFs</text>
+    <text x="380" y="78" text-anchor="middle" font-size="10" fill="#888">The thing you forgot about</text>
+    <rect x="510" y="40" width="230" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="625" y="62" text-anchor="middle" font-size="11" fill="#e74c3c">3. Avail vs Reliable</text>
+    <text x="625" y="78" text-anchor="middle" font-size="10" fill="#888">Up ≠ correct</text>
+    <!-- Row 2 -->
+    <rect x="20" y="110" width="230" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="135" y="132" text-anchor="middle" font-size="11" fill="#e74c3c">4. No Runbooks</text>
+    <text x="135" y="148" text-anchor="middle" font-size="10" fill="#888">3 AM panic mode</text>
+    <rect x="265" y="110" width="230" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="380" y="132" text-anchor="middle" font-size="11" fill="#e74c3c">5. Alert Fatigue</text>
+    <text x="380" y="148" text-anchor="middle" font-size="10" fill="#888">Boy who cried wolf</text>
+    <rect x="510" y="110" width="230" height="50" rx="8" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="625" y="132" text-anchor="middle" font-size="11" fill="#e74c3c">6. No Chaos Testing</text>
+    <text x="625" y="148" text-anchor="middle" font-size="10" fill="#888">Hope is not a strategy</text>
+  </svg>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S12 · INTERVIEW PLAYBOOK
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-user-tie"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook</h2>
+    </div>
+  </div>
+  <p>
+    Reliability questions come up in almost every system design interview. The interviewer wants to
+    know that you think about what happens when things <em>go wrong</em>, not just how things work
+    when everything is fine. Here's how to structure your answers.
+  </p>
+
+  <!-- Interview Timeline SVG -->
+  <svg viewBox="0 0 760 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interview answer structure timeline">
+    <defs>
+      <marker id="rel-iv-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#e74c3c"/></marker>
+    </defs>
+    <line x1="30" y1="70" x2="730" y2="70" stroke="#e74c3c" stroke-width="3" marker-end="url(#rel-iv-arr)"/>
+    <!-- Step 1 -->
+    <circle cx="100" cy="70" r="22" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="100" y="75" text-anchor="middle" font-size="13" fill="#e74c3c" font-weight="700">1</text>
+    <text x="100" y="110" text-anchor="middle" font-size="10" fill="#ccc" font-weight="600">Identify</text>
+    <text x="100" y="123" text-anchor="middle" font-size="9" fill="#888">failure modes</text>
+    <!-- Step 2 -->
+    <circle cx="260" cy="70" r="22" fill="#1a1a2e" stroke="#e67e22" stroke-width="2"/>
+    <text x="260" y="75" text-anchor="middle" font-size="13" fill="#e67e22" font-weight="700">2</text>
+    <text x="260" y="110" text-anchor="middle" font-size="10" fill="#ccc" font-weight="600">Mitigate</text>
+    <text x="260" y="123" text-anchor="middle" font-size="9" fill="#888">redundancy + fallbacks</text>
+    <!-- Step 3 -->
+    <circle cx="420" cy="70" r="22" fill="#1a1a2e" stroke="#f1c40f" stroke-width="2"/>
+    <text x="420" y="75" text-anchor="middle" font-size="13" fill="#f1c40f" font-weight="700">3</text>
+    <text x="420" y="110" text-anchor="middle" font-size="10" fill="#ccc" font-weight="600">Detect</text>
+    <text x="420" y="123" text-anchor="middle" font-size="9" fill="#888">monitoring + alerts</text>
+    <!-- Step 4 -->
+    <circle cx="580" cy="70" r="22" fill="#1a1a2e" stroke="#2ecc71" stroke-width="2"/>
+    <text x="580" y="75" text-anchor="middle" font-size="13" fill="#2ecc71" font-weight="700">4</text>
+    <text x="580" y="110" text-anchor="middle" font-size="10" fill="#ccc" font-weight="600">Recover</text>
+    <text x="580" y="123" text-anchor="middle" font-size="9" fill="#888">RTO + RPO targets</text>
+    <!-- Step 5 -->
+    <circle cx="690" cy="70" r="22" fill="#1a1a2e" stroke="#3498db" stroke-width="2"/>
+    <text x="690" y="75" text-anchor="middle" font-size="13" fill="#3498db" font-weight="700">5</text>
+    <text x="690" y="110" text-anchor="middle" font-size="10" fill="#ccc" font-weight="600">Learn</text>
+    <text x="690" y="123" text-anchor="middle" font-size="9" fill="#888">postmortem culture</text>
+  </svg>
+
+  <div class="callout callout-success">
+    <strong>The magic phrase:</strong> <em>"What happens when [X] fails?"</em> — Say this proactively in your interview.
+    Don't wait for the interviewer to ask about failures. Volunteer it: "Now let me think about what happens
+    when the database goes down..." This immediately signals senior-level thinking.
+  </div>
+
+  <!-- Tabs: Beginner / Intermediate / Advanced -->
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="rel-iv-beginner" role="tab" aria-selected="true">Beginner</button>
+      <button class="tab-btn" data-tab="rel-iv-intermediate" role="tab" aria-selected="false">Intermediate</button>
+      <button class="tab-btn" data-tab="rel-iv-advanced" role="tab" aria-selected="false">Advanced</button>
+    </div>
+
+    <div class="tab-panel active" id="rel-iv-beginner" role="tabpanel">
+      <h4>What Beginners Should Cover</h4>
+      <ul>
+        <li><strong>Redundancy:</strong> "I'd run at least 2 instances behind a load balancer so if one dies, the other handles traffic."</li>
+        <li><strong>Backups:</strong> "I'd set up automated database backups and test restores monthly."</li>
+        <li><strong>Health checks:</strong> "A /health endpoint that the load balancer pings to know if a server is alive."</li>
+        <li><strong>Timeouts:</strong> "Every external call should have a timeout so we don't hang forever waiting."</li>
+      </ul>
+      <p>At this level, showing you <em>think about failure at all</em> puts you ahead of most candidates.</p>
+    </div>
+
+    <div class="tab-panel" id="rel-iv-intermediate" role="tabpanel">
+      <h4>What Intermediate Candidates Should Add</h4>
+      <ul>
+        <li><strong>Circuit breakers:</strong> "If the payment service fails 5 times in a row, I'll stop calling it for 30 seconds and return a cached result or graceful error."</li>
+        <li><strong>Retry with backoff:</strong> "Retries are fine, but with exponential backoff and jitter to avoid thundering herd."</li>
+        <li><strong>
+          <span class="tooltip-trigger">RTO<span class="tooltip-content">Recovery Time Objective — the maximum acceptable time to restore service after an outage. RTO = 'how long can we be down?'</span></span>
+          and
+          <span class="tooltip-trigger">RPO<span class="tooltip-content">Recovery Point Objective — the maximum acceptable amount of data loss measured in time. RPO = 'how much data can we afford to lose?'</span></span>:
+        </strong> "I'd set RTO at 15 minutes and RPO at 1 hour based on the business requirements."</li>
+        <li><strong>Graceful degradation:</strong> "If recommendations are down, we show popular items instead of an error page."</li>
+      </ul>
+    </div>
+
+    <div class="tab-panel" id="rel-iv-advanced" role="tabpanel">
+      <h4>What Senior/Staff Candidates Should Discuss</h4>
+      <ul>
+        <li><strong>
+          <span class="tooltip-trigger">Error budgets<span class="tooltip-content">Error Budget — the allowed amount of unreliability within your SLO. If your SLO is 99.9%, your error budget is 0.1% (about 43 min/month). Once the budget is spent, freeze feature releases and focus on reliability.</span></span>:
+        </strong> "With a 99.9% SLO, we have a 43-minute monthly error budget. If we burn through it, we freeze deploys and focus on reliability."</li>
+        <li><strong>Chaos engineering:</strong> "We'd run regular game days — inject failures in staging, then graduate to production with kill switches."</li>
+        <li><strong>Blast radius control:</strong> "We deploy to 1% canary first. If error rates spike, auto-rollback before it hits 100%."</li>
+        <li><strong>
+          <span class="tooltip-trigger">Postmortem<span class="tooltip-content">Postmortem — a blame-free document written after an incident. It covers what happened, why, what was the impact, and what we're changing to prevent recurrence. The goal is learning, not punishment.</span></span>
+          culture:
+        </strong> "After every P1 incident, we write a blameless postmortem and track action items to completion."</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Sample dialogue -->
+  <h3>Sample Interview Dialogue</h3>
+  <div class="callout callout-purple">
+    <p><strong>Interviewer:</strong> "Design a payment processing system. How do you handle reliability?"</p>
+    <p><strong>You:</strong> "Great question — let me walk through the failure modes first. The biggest risk is
+    double-charging a customer, so I need idempotency keys on every payment request. If the payment gateway
+    times out, I won't retry blindly — I'll check the status first. For infrastructure, I'd run the service
+    across two availability zones with a load balancer doing health checks every 10 seconds. Database writes
+    go to a primary with synchronous replication to a standby, giving us an RPO near zero.
+    I'd set the RTO at 5 minutes using automated failover. And I'd add a circuit breaker around the gateway
+    call — if it fails 3 times in 10 seconds, we trip the breaker and queue the payment for retry with
+    exponential backoff."</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S13 · PRACTICE EXERCISES
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Practice Exercises</h2>
+    </div>
+  </div>
+  <p>
+    Reading about reliability is one thing — designing for it is another.
+    These exercises progress from beginner-friendly thought experiments to advanced hands-on challenges.
+  </p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 1: SPOF Detective</span>
+      <span class="difficulty-tag difficulty-beginner">Beginner</span>
+    </div>
+    <p>
+      You're given this architecture: a single web server, a single database, and a single load balancer
+      (yes, even the load balancer is single). Users connect through one DNS provider.
+    </p>
+    <p><strong>Task:</strong> List every single point of failure. For each one, propose a fix that adds redundancy. Draw a before-and-after diagram.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p>There are at least 4 SPOFs in this architecture. Don't forget about the DNS provider and the network path itself.</p>
+      </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p><strong>SPOFs found:</strong></p>
+        <ul>
+          <li><strong>Web server</strong> — Fix: Run 2+ instances behind a load balancer</li>
+          <li><strong>Database</strong> — Fix: Primary-replica setup with automatic failover</li>
+          <li><strong>Load balancer</strong> — Fix: Active-passive LB pair with a floating IP</li>
+          <li><strong>DNS provider</strong> — Fix: Use two DNS providers (e.g., Route 53 + Cloudflare)</li>
+        </ul>
+        <p>After fixing all four, there's no single component whose failure takes down the entire system.</p>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 2: SLA Calculator</span>
+      <span class="difficulty-tag difficulty-beginner">Beginner</span>
+    </div>
+    <p>
+      Your
+      <span class="tooltip-trigger">SLA<span class="tooltip-content">Service Level Agreement — a formal contract with customers specifying minimum uptime guarantees. Unlike SLOs (internal targets), SLAs carry financial penalties when breached.</span></span>
+      promises 99.95% uptime. Your system depends on three services in series:
+      Service A (99.99%), Service B (99.97%), Service C (99.99%).
+    </p>
+    <p><strong>Task:</strong> Calculate the combined availability. Does it meet the SLA? What's the maximum downtime per month?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p><strong>Combined availability</strong> = 0.9999 x 0.9997 x 0.9999 = <strong>99.95%</strong></p>
+        <p>This <em>barely</em> meets the SLA. Monthly downtime = 43,200 minutes x 0.0005 = <strong>21.6 minutes</strong>.</p>
+        <p>In practice, you'd want your SLO to be stricter than your SLA (e.g., target 99.97% internally so you have a safety margin).</p>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 3: Design a Health Check System</span>
+      <span class="difficulty-tag difficulty-intermediate">Intermediate</span>
+    </div>
+    <p>
+      Design a health check system for a microservices architecture with 12 services.
+      The system should detect failures within 30 seconds and automatically remove unhealthy
+      instances from the load balancer.
+    </p>
+    <p><strong>Considerations:</strong> How often do you poll? What counts as "unhealthy"? How do you avoid false positives? What about cascading failures where Service A is unhealthy only because Service B is down?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p>Think about shallow vs. deep health checks. A shallow check ("am I running?") vs. a deep check ("can I reach my database and all dependencies?"). What are the tradeoffs?</p>
+      </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p><strong>Design:</strong></p>
+        <ul>
+          <li><strong>Poll interval:</strong> Every 10 seconds (3 checks within 30s window)</li>
+          <li><strong>Unhealthy threshold:</strong> 3 consecutive failures before removal (avoids flapping)</li>
+          <li><strong>Two-tier checks:</strong> Shallow /health (is process alive) every 10s + deep /health/ready (can I serve traffic) every 30s</li>
+          <li><strong>Dependency isolation:</strong> If Service A reports unhealthy because B is down, mark A as "degraded" but don't remove it — it might still serve cached responses</li>
+          <li><strong>Auto-recovery:</strong> Once a removed instance passes 2 consecutive checks, re-add it</li>
+        </ul>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 4: Chaos Engineering Game Day</span>
+      <span class="difficulty-tag difficulty-advanced">Advanced</span>
+    </div>
+    <p>
+      You're planning a chaos engineering game day for a 3-tier e-commerce app
+      (web servers, API servers, database cluster). Design a series of 5 failure injection
+      experiments, ordered from least to most risky.
+    </p>
+    <p><strong>For each experiment:</strong> Define the hypothesis, the injection method, the expected behavior, the abort criteria, and the rollback plan.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p><strong>Experiment progression:</strong></p>
+        <ol>
+          <li><strong>Kill one web server instance</strong> — Hypothesis: LB reroutes in &lt;10s. Low risk.</li>
+          <li><strong>Inject 500ms latency on API-to-DB calls</strong> — Hypothesis: Timeouts fire, no cascading failure. Medium risk.</li>
+          <li><strong>Block network between API tier and cache</strong> — Hypothesis: API falls back to DB, response time increases but no errors. Medium risk.</li>
+          <li><strong>Trigger DB failover to replica</strong> — Hypothesis: Writes resume in &lt;30s, no data loss. Higher risk.</li>
+          <li><strong>Simulate full AZ outage</strong> — Hypothesis: Traffic shifts to second AZ, all functionality intact. Highest risk.</li>
+        </ol>
+        <p><strong>Abort criteria for all:</strong> Error rate exceeds 5% OR p99 latency exceeds 5s OR any data inconsistency detected. Rollback: revert the failure injection immediately.</p>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 5: Post-Incident Review</span>
+      <span class="difficulty-tag difficulty-expert">Expert</span>
+    </div>
+    <p>
+      An e-commerce site had a 2-hour outage on Black Friday. The root cause was a database
+      connection pool exhaustion caused by a slow query that was introduced 3 weeks earlier.
+      Monitoring didn't catch it because the slow query only triggers under high load.
+    </p>
+    <p><strong>Task:</strong> Write a full postmortem. Include: timeline, root cause analysis (use the "5 Whys" technique), impact assessment, what went well, what went poorly, and 5 concrete action items with owners and deadlines.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p>For the 5 Whys: Why did the connection pool exhaust? Because of a slow query. Why was there a slow query? Because it was missing an index. Why wasn't the missing index caught? ... Keep going until you reach the systemic cause.</p>
+      </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" aria-expanded="false" role="button" tabindex="0">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content"><div class="collapsible-body">
+        <p><strong>5 Whys:</strong></p>
+        <ol>
+          <li>Why did the site go down? — Connection pool exhausted.</li>
+          <li>Why was the pool exhausted? — A slow query held connections for 30s each.</li>
+          <li>Why was there a slow query? — A new feature added a full table scan (missing index).</li>
+          <li>Why wasn't the missing index caught? — No query performance testing in CI/CD.</li>
+          <li>Why no query perf testing? — Team didn't have load testing as part of the release checklist.</li>
+        </ol>
+        <p><strong>Action items:</strong></p>
+        <ul>
+          <li>Add connection pool usage alerts (threshold 80%) — SRE team, 1 week</li>
+          <li>Add slow query logging and alerting — DBA, 1 week</li>
+          <li>Integrate load testing into CI pipeline — Platform team, 2 weeks</li>
+          <li>Add query EXPLAIN analysis to PR review checklist — Engineering leads, 3 days</li>
+          <li>Create Black Friday capacity planning runbook — SRE + Product, 1 month</li>
+        </ul>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S14 · CHEAT CARDS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-cards">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-clone"></i></div>
+    <div>
+      <div class="section-num">Section ?</div>
+      <h2 class="section-title">Cheat Cards</h2>
+    </div>
+  </div>
+  <p>Quick-reference cards you can screenshot and review before interviews.</p>
+
+  <div class="grid-3">
+    <!-- Card 1 -->
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-calculator"></i> Availability Math</div>
+      <div class="cheat-card-body">
+<pre>
+99%    = 3.65 days/year down
+99.9%  = 8.76 hours/year
+99.99% = 52.6 minutes/year
+99.999%= 5.26 minutes/year
+
+Series:  A × B × C
+Parallel: 1 - (1-A)(1-B)
+</pre>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-shield-halved"></i> Fault Tolerance Toolkit</div>
+      <div class="cheat-card-body">
+<pre>
+Redundancy   → no SPOF
+Replication  → data survives
+Failover     → auto-switch
+Circuit Break→ stop cascade
+Retry+Backoff→ transient fix
+Health Check → detect early
+</pre>
+      </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-clock-rotate-left"></i> RTO vs RPO</div>
+      <div class="cheat-card-body">
+<pre>
+RTO = Recovery Time Objective
+ "How long can we be down?"
+ Measured in minutes/hours
+
+RPO = Recovery Point Objective
+ "How much data can we lose?"
+ Measured in seconds/minutes
+
+Lower = more expensive
+</pre>
+      </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-bullseye"></i> SLA vs SLO vs SLI</div>
+      <div class="cheat-card-body">
+<pre>
+SLI = what you measure
+ (e.g., latency, error rate)
+
+SLO = what you target
+ (e.g., p99 &lt; 200ms)
+
+SLA = what you promise
+ (e.g., 99.9% or refund)
+
+SLI feeds SLO feeds SLA
+</pre>
+      </div>
+    </div>
+
+    <!-- Card 5 -->
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-fire"></i> Incident Response</div>
+      <div class="cheat-card-body">
+<pre>
+1. Detect  → monitoring alert
+2. Triage  → P1/P2/P3 severity
+3. Mitigate→ stop the bleeding
+4. Fix     → root cause repair
+5. Review  → blameless postmortem
+6. Improve → action items tracked
+
+Mitigate FIRST, fix later!
+</pre>
+      </div>
+    </div>
+
+    <!-- Card 6 -->
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-bomb"></i> Chaos Engineering</div>
+      <div class="cheat-card-body">
+<pre>
+1. Define steady state
+2. Hypothesize what survives
+3. Inject real-world failure
+4. Observe vs hypothesis
+5. Fix what broke
+
+Start small → staging first
+Always have a kill switch
+Netflix Chaos Monkey = OG
+</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     S15 · CONNECTED TOPICS
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section ?</div>
+      <h2 class="section-title">Connected Topics</h2>
+    </div>
+  </div>
+  <p>
+    Reliability doesn't exist in a vacuum — it connects to almost every other system design concept.
+    Here's how this topic links to the rest of your learning path.
+  </p>
+
+  <!-- Connection Map SVG -->
+  <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reliability connections to related topics">
+    <defs>
+      <marker id="rel-cn-arr" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#e74c3c"/></marker>
+    </defs>
+    <!-- Center node -->
+    <circle cx="300" cy="160" r="45" fill="#1a1a2e" stroke="#e74c3c" stroke-width="3"/>
+    <text x="300" y="155" text-anchor="middle" font-size="12" fill="#e74c3c" font-weight="700">Reliability</text>
+    <text x="300" y="170" text-anchor="middle" font-size="10" fill="#e74c3c">&amp; Fault Tol.</text>
+    <!-- Scalability -->
+    <circle cx="120" cy="60" r="35" fill="#1a1a2e" stroke="#3498db" stroke-width="2"/>
+    <text x="120" y="63" text-anchor="middle" font-size="11" fill="#3498db">Scalability</text>
+    <line x1="160" y1="85" x2="260" y2="130" stroke="#3498db" stroke-width="1.5" marker-end="url(#rel-cn-arr)"/>
+    <!-- Availability -->
+    <circle cx="480" cy="60" r="35" fill="#1a1a2e" stroke="#2ecc71" stroke-width="2"/>
+    <text x="480" y="63" text-anchor="middle" font-size="11" fill="#2ecc71">Availability</text>
+    <line x1="440" y1="85" x2="340" y2="130" stroke="#2ecc71" stroke-width="1.5" marker-end="url(#rel-cn-arr)"/>
+    <!-- Distributed Systems -->
+    <circle cx="80" cy="200" r="35" fill="#1a1a2e" stroke="#9b59b6" stroke-width="2"/>
+    <text x="80" y="196" text-anchor="middle" font-size="10" fill="#9b59b6">Distributed</text>
+    <text x="80" y="210" text-anchor="middle" font-size="10" fill="#9b59b6">Systems</text>
+    <line x1="120" y1="195" x2="255" y2="168" stroke="#9b59b6" stroke-width="1.5" marker-end="url(#rel-cn-arr)"/>
+    <!-- Monitoring -->
+    <circle cx="520" cy="200" r="35" fill="#1a1a2e" stroke="#e67e22" stroke-width="2"/>
+    <text x="520" y="203" text-anchor="middle" font-size="11" fill="#e67e22">Monitoring</text>
+    <line x1="480" y1="195" x2="345" y2="168" stroke="#e67e22" stroke-width="1.5" marker-end="url(#rel-cn-arr)"/>
+    <!-- Circuit Breakers -->
+    <circle cx="160" cy="290" r="35" fill="#1a1a2e" stroke="#f1c40f" stroke-width="2"/>
+    <text x="160" y="286" text-anchor="middle" font-size="10" fill="#f1c40f">Circuit</text>
+    <text x="160" y="300" text-anchor="middle" font-size="10" fill="#f1c40f">Breakers</text>
+    <line x1="190" y1="268" x2="275" y2="198" stroke="#f1c40f" stroke-width="1.5" marker-end="url(#rel-cn-arr)"/>
+    <!-- Chaos Engineering -->
+    <circle cx="440" cy="290" r="35" fill="#1a1a2e" stroke="#e74c3c" stroke-width="2"/>
+    <text x="440" y="286" text-anchor="middle" font-size="10" fill="#e74c3c">Chaos</text>
+    <text x="440" y="300" text-anchor="middle" font-size="10" fill="#e74c3c">Engineering</text>
+    <line x1="410" y1="268" x2="325" y2="198" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#rel-cn-arr)"/>
+  </svg>
+
+  <!-- Learning Path SVG -->
+  <svg viewBox="0 0 760 80" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Suggested learning path from reliability">
+    <defs>
+      <marker id="rel-lp-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#888"/></marker>
+    </defs>
+    <rect x="10" y="20" width="140" height="40" rx="8" fill="#e74c3c" opacity="0.2" stroke="#e74c3c" stroke-width="2"/>
+    <text x="80" y="45" text-anchor="middle" font-size="12" fill="#e74c3c" font-weight="700">Reliability</text>
+    <line x1="150" y1="40" x2="190" y2="40" stroke="#888" stroke-width="2" marker-end="url(#rel-lp-arr)"/>
+    <rect x="195" y="20" width="140" height="40" rx="8" fill="#1a1a2e" stroke="#3498db" stroke-width="2"/>
+    <text x="265" y="45" text-anchor="middle" font-size="12" fill="#3498db">Scalability</text>
+    <line x1="335" y1="40" x2="375" y2="40" stroke="#888" stroke-width="2" marker-end="url(#rel-lp-arr)"/>
+    <rect x="380" y="20" width="140" height="40" rx="8" fill="#1a1a2e" stroke="#2ecc71" stroke-width="2"/>
+    <text x="450" y="45" text-anchor="middle" font-size="12" fill="#2ecc71">Availability</text>
+    <line x1="520" y1="40" x2="560" y2="40" stroke="#888" stroke-width="2" marker-end="url(#rel-lp-arr)"/>
+    <rect x="565" y="20" width="170" height="40" rx="8" fill="#1a1a2e" stroke="#e67e22" stroke-width="2"/>
+    <text x="650" y="45" text-anchor="middle" font-size="12" fill="#e67e22">Monitoring</text>
+  </svg>
+
+  <!-- Related Cards Grid -->
+  <div class="related-grid">
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-arrows-up-down-left-right"></i></div>
+      <div class="related-card-text">
+        <h4>Scalability</h4>
+        <p>How to grow your system to handle more load — horizontal scaling, sharding, and caching strategies.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-server"></i></div>
+      <div class="related-card-text">
+        <h4>Availability</h4>
+        <p>Keeping your system up and reachable — redundancy, failover, and the math behind uptime guarantees.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-network-wired"></i></div>
+      <div class="related-card-text">
+        <h4>Distributed Systems</h4>
+        <p>Coordination across multiple machines — consensus, replication, and the CAP theorem.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-chart-bar"></i></div>
+      <div class="related-card-text">
+        <h4>Monitoring &amp; Observability</h4>
+        <p>Metrics, logs, and traces — how to see what's happening inside your system before users complain.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-plug-circle-xmark"></i></div>
+      <div class="related-card-text">
+        <h4>Circuit Breakers</h4>
+        <p>The pattern that stops cascading failures — trip the breaker before one bad service takes everything down.</p>
+      </div>
+    </a>
+    <a class="related-card" href="#">
+      <div class="related-card-icon"><i class="fa-solid fa-bomb"></i></div>
+      <div class="related-card-text">
+        <h4>Chaos Engineering</h4>
+        <p>Intentionally breaking things to prove they survive — from Netflix's Chaos Monkey to your own game days.</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
