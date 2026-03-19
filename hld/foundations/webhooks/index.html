@@ -28,13 +28,13 @@
   <div class="relative z-1">
     <div class="hero-badge"><i class="fa-solid fa-satellite-dish"></i> API &amp; Communication Patterns</div>
     <h1>Webhooks</h1>
-    <p class="hero-subtitle">Don't call us, we'll call you — the event-driven HTTP callback pattern that powers every payment confirmation, CI/CD pipeline, and third-party integration on the modern web.</p>
+    <p class="hero-subtitle">Don't call us, we'll call you. The event-driven pattern that powers every payment confirmation, CI/CD pipeline, and real-time integration on the web.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 7 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 16 SVG Diagrams</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
       <span><i class="fa-solid fa-dumbbell"></i> 4 Exercises</span>
-      <span><i class="fa-solid fa-circle-info"></i> 16 Tooltips</span>
+      <span><i class="fa-solid fa-circle-info"></i> 24 Tooltips</span>
     </div>
   </div>
 </div>
@@ -54,57 +54,69 @@
   </div>
 
   <div class="callout callout-success">
-    <strong>Mental Model:</strong> Instead of refreshing your email every 10 seconds to see if you got a reply, imagine the post office knocks on your door the moment a letter arrives. That's a webhook — the sender tells YOU when something happens, so you never have to ask.
+    <strong>Mental Model:</strong> Polling is calling the pizza shop every 30 seconds asking "Is my pizza ready yet?" Webhooks is giving them your phone number and saying "Call me when it's done." Same result, 99% less wasted effort.
   </div>
 
-  <p>Most APIs work like a question-and-answer conversation: your code asks a server "did anything happen?", the server says "nope", and you ask again a few seconds later. This is called <span class="tooltip-trigger">polling<span class="tooltip-content">Repeatedly sending requests to a server at regular intervals to check if new data is available — like refreshing a webpage over and over.</span></span>, and it works, but it's horribly wasteful. Imagine calling a restaurant every minute to ask "Is my food ready yet?" — wouldn't it be better if the restaurant just called you when it's done?</p>
+  <p>Most APIs work like a question-and-answer conversation: your code asks a server "did anything happen?", the server says "nope", and you ask again a few seconds later. This is called <span class="tooltip-trigger">polling<span class="tooltip-content">Repeatedly sending requests at regular intervals to check for new data — like refreshing a webpage over and over hoping something changed.</span></span>, and it works, but it's horribly wasteful. You're burning CPU, bandwidth, and API rate limits just to hear "nothing new" over and over again.</p>
 
-  <p>That's exactly what a <strong>webhook</strong> does. Instead of your code constantly asking "anything new?", you give the other service a URL and say "POST to this URL whenever something interesting happens." The service remembers your URL, and when an event fires — a payment succeeds, a commit is pushed, an order ships — it sends an HTTP POST to your endpoint with all the details. No wasted requests. No delay. Instant notification.</p>
+  <p>A <strong>webhook</strong> flips this entirely. Instead of your code constantly asking "anything new?", you give the other service a URL and say <em>"POST to this address whenever something interesting happens."</em> The service saves your URL, and when an event fires — a payment succeeds, a commit is pushed, an order ships — it sends an HTTP POST request to your endpoint with a <span class="tooltip-trigger">JSON payload<span class="tooltip-content">JSON (JavaScript Object Notation) is a lightweight text format for structured data. A "payload" is the data carried inside a request — like the contents of a package.</span></span> containing all the details. No wasted requests. No delay. Instant notification.</p>
 
   <!-- TL;DR overview SVG -->
-  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Webhook overview: provider pushes event to your URL">
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Webhook overview: provider pushes event to your URL">
     <defs>
       <marker id="whk-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+      <marker id="whk-tldr-arr-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
       </marker>
     </defs>
     <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Polling vs Webhooks — The Core Idea</text>
 
     <!-- Polling row -->
-    <rect x="30" y="48" width="130" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="95" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR APP</text>
-    <text x="95" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(polls endlessly)</text>
+    <rect x="30" y="48" width="140" height="54" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="100" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR APP</text>
+    <text x="100" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(polls every 5 sec)</text>
 
-    <line x1="160" y1="65" x2="290" y2="65" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#whk-tldr-arr)"/>
-    <text x="225" y="58" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">"Anything new?" ×1000</text>
+    <line x1="170" y1="68" x2="288" y2="68" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#whk-tldr-arr-red)"/>
+    <text x="230" y="60" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">"Anything new?" x 17,280/day</text>
 
-    <rect x="295" y="48" width="130" height="50" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="360" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">PROVIDER</text>
-    <text x="360" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"No. No. No. No."</text>
+    <rect x="293" y="48" width="140" height="54" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="363" y="70" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">STRIPE</text>
+    <text x="363" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"No. No. No. No."</text>
 
-    <text x="475" y="75" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">← WASTEFUL</text>
+    <rect x="470" y="54" width="260" height="42" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1"/>
+    <text x="600" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="10">172.8M requests/day for 10K users</text>
+    <text x="600" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">99.99% return "nothing changed"</text>
 
     <!-- Webhook row -->
-    <rect x="30" y="130" width="130" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
-    <text x="95" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR APP</text>
-    <text x="95" y="167" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(just waits)</text>
+    <rect x="30" y="130" width="140" height="54" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="100" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">YOUR APP</text>
+    <text x="100" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(just listens)</text>
 
-    <line x1="290" y1="147" x2="162" y2="147" stroke="#10b981" stroke-width="2" marker-end="url(#whk-tldr-arr)"/>
-    <text x="225" y="140" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">POST /webhook — "Payment done!"</text>
+    <line x1="288" y1="150" x2="172" y2="150" stroke="#10b981" stroke-width="2" marker-end="url(#whk-tldr-arr)"/>
+    <text x="230" y="142" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">POST /webhook {event data}</text>
 
-    <rect x="295" y="130" width="130" height="50" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
-    <text x="360" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">PROVIDER</text>
-    <text x="360" y="167" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(pushes when ready)</text>
+    <rect x="293" y="130" width="140" height="54" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="363" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">STRIPE</text>
+    <text x="363" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">(pushes when ready)</text>
 
-    <text x="475" y="157" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">← EFFICIENT</text>
+    <rect x="470" y="136" width="260" height="42" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="600" y="154" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">100K requests/day for 10K users</text>
+    <text x="600" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">1 request per actual event</text>
 
-    <!-- Bottom summary -->
-    <rect x="130" y="195" width="500" height="30" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
-    <text x="380" y="215" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-weight="600">Webhooks flip the direction — the provider pushes data to you when events happen.</text>
+    <!-- Ratio callout -->
+    <rect x="180" y="210" width="400" height="34" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="232" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="12" font-weight="700">That's 1,728x fewer requests. Same result.</text>
   </svg>
 
   <div class="callout callout-info">
-    <strong>One-line takeaway:</strong> A webhook is a user-defined HTTP callback — you register a URL, and the provider POSTs to it when an event occurs. Zero wasted requests, near-instant delivery.
+    <div class="callout-title"><i class="fa-solid fa-hand-pointer"></i> Try It Right Now — 30 Seconds</div>
+    <p class="body-text">Open <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a> in a new tab. You'll get a unique URL instantly. Now go to any GitHub repo you own: <strong>Settings &rarr; Webhooks &rarr; Add webhook</strong>. Paste your webhook.site URL. Push a commit. Within 1 second, webhook.site shows the <em>exact</em> JSON payload GitHub sent you. That's a webhook. You just received one.</p>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>One-line takeaway:</strong> A webhook is a user-defined <span class="tooltip-trigger">HTTP callback<span class="tooltip-content">A URL you hand to another service, saying "call this when something happens." It's the web equivalent of giving someone your phone number.</span></span> — you register a URL, and the provider POSTs to it when an event occurs. Zero wasted requests, near-instant delivery.
   </div>
 </div>
 
@@ -117,21 +129,21 @@
     <div class="section-icon green"><i class="fa-solid fa-map"></i></div>
     <div>
       <div class="section-num">Section 2</div>
-      <h2 class="section-title">The Scenario — Payment Confirmation</h2>
+      <h2 class="section-title">The Scenario — "Is My Payment Done Yet?"</h2>
     </div>
   </div>
 
-  <p>Let's say you're building an e-commerce checkout. A customer clicks "Pay Now" and your server sends the payment details to a payment provider like Stripe. The provider talks to the customer's bank, runs fraud checks, and eventually either approves or declines the charge. This process can take anywhere from 1 second to 30 seconds — sometimes even longer for international cards.</p>
-
-  <p>Your checkout page needs to know the result so it can show "Payment successful!" or "Payment failed, try again." The question is: <strong>how does your server find out what happened?</strong></p>
-
-  <div class="callout callout-warning">
-    <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> The Core Problem</div>
-    <p class="body-text">The payment provider is doing work asynchronously. Your server sent the request and got back a "we're processing it" response. Now what? You need to know when it's done — but you can't just sit there waiting forever. You have thousands of other customers to serve.</p>
+  <div class="callout callout-purple">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p class="body-text">You order food on a delivery app. After paying, the app doesn't just freeze — it shows you "Preparing your order..." and eventually "Out for delivery!" How does the app know when the restaurant started cooking? When the driver picked it up? Someone — or something — is <em>telling</em> the app each time a status changes. That's the same problem we're about to solve with webhooks.</p>
   </div>
 
-  <!-- Scenario SVG: async payment flow -->
-  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Async payment flow: your server sends payment, provider processes, result needed">
+  <p>You're building an e-commerce checkout. A customer clicks "Pay Now" and your server sends the payment details to <span class="tooltip-trigger">Stripe<span class="tooltip-content">Stripe is the most popular payment processing API. Companies like Amazon, Google, and Shopify use it. It handles credit cards, fraud detection, and bank transfers so you don't have to.</span></span>. Here's the thing most beginners don't realize: Stripe does <strong>not</strong> respond synchronously with "payment succeeded." The payment goes through a pipeline — fraud checks with Stripe Radar, bank authorization via the card network (Visa/Mastercard), possible <span class="tooltip-trigger">3D Secure<span class="tooltip-content">An extra verification step (like a bank's SMS code or biometric check) that reduces fraud for online card payments. It's why you sometimes get redirected to your bank's page during checkout.</span></span> challenges. This takes anywhere from 1 to 30 seconds. For international cards or high-value transactions, even longer.</p>
+
+  <p>Your checkout page is sitting there, waiting. The customer is staring at a spinner. Your server got back a <code>202 Accepted</code> from Stripe — meaning "Got it, working on it" — but that's not a final answer. You need to know: <strong>did the payment actually succeed or fail?</strong></p>
+
+  <!-- Scenario SVG: Stripe async payment pipeline -->
+  <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stripe async payment pipeline showing fraud checks, bank auth, and result">
     <defs>
       <marker id="whk-sc-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
@@ -139,39 +151,66 @@
       <marker id="whk-sc-arr-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
       </marker>
+      <marker id="whk-sc-arr-amber" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f59e0b"/>
+      </marker>
     </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">What Happens After "Pay Now" — Stripe's Internal Pipeline</text>
 
     <!-- Your Server -->
-    <rect x="30" y="50" width="140" height="60" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
-    <text x="100" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Your Server</text>
-    <text x="100" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">e-commerce backend</text>
+    <rect x="20" y="50" width="120" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="80" y="72" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">Your Server</text>
+    <text x="80" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">POST /v1/payment_intents</text>
 
-    <!-- Arrow 1: Send payment -->
-    <line x1="170" y1="70" x2="285" y2="70" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-sc-arr)"/>
-    <text x="228" y="63" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">POST /charge</text>
+    <line x1="140" y1="70" x2="188" y2="70" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-sc-arr)"/>
 
-    <!-- Stripe -->
-    <rect x="290" y="40" width="170" height="80" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
-    <text x="375" y="65" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Payment Provider</text>
-    <text x="375" y="82" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Fraud checks, bank talk...</text>
-    <text x="375" y="105" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="9" font-weight="600">⏳ 1–30 seconds</text>
+    <!-- Stripe API -->
+    <rect x="193" y="50" width="100" height="55" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="243" y="72" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">Stripe API</text>
+    <text x="243" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">202 Accepted</text>
 
-    <!-- Arrow 2: 202 Accepted -->
-    <line x1="290" y1="95" x2="172" y2="95" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#whk-sc-arr-gray)"/>
-    <text x="228" y="108" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">202 Accepted</text>
+    <line x1="193" y1="90" x2="142" y2="90" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#whk-sc-arr-gray)"/>
 
-    <!-- Question mark -->
-    <rect x="540" y="50" width="180" height="60" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3"/>
-    <text x="630" y="75" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">How do you know</text>
-    <text x="630" y="92" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">when it's done?</text>
+    <line x1="293" y1="77" x2="328" y2="77" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#whk-sc-arr-amber)"/>
 
-    <line x1="460" y1="80" x2="538" y2="80" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#whk-sc-arr)"/>
+    <!-- Fraud Check -->
+    <rect x="333" y="50" width="100" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="383" y="70" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">Stripe Radar</text>
+    <text x="383" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Fraud check</text>
+    <text x="383" y="98" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">~200ms</text>
+
+    <line x1="433" y1="77" x2="468" y2="77" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#whk-sc-arr-amber)"/>
+
+    <!-- Bank Auth -->
+    <rect x="473" y="50" width="100" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="523" y="70" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">Card Network</text>
+    <text x="523" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Bank auth</text>
+    <text x="523" y="98" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">1-30 sec</text>
+
+    <line x1="573" y1="77" x2="618" y2="77" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#whk-sc-arr-amber)"/>
+
+    <!-- 3DS (optional) -->
+    <rect x="623" y="50" width="110" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="678" y="70" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">3D Secure</text>
+    <text x="678" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">(if required)</text>
+    <text x="678" y="98" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">+5-15 sec</text>
+
+    <!-- Your server waiting -->
+    <rect x="20" y="140" width="120" height="50" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3"/>
+    <text x="80" y="160" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">Your Server</text>
+    <text x="80" y="176" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="9">Waiting...</text>
+
+    <!-- Big question -->
+    <rect x="200" y="140" width="530" height="50" rx="10" fill="rgba(245,158,11,0.06)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="465" y="162" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="13">How does your server find out the result?</text>
+    <text x="465" y="178" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Option A: Keep asking (polling) &nbsp;&nbsp;|&nbsp;&nbsp; Option B: Get called (webhook)</text>
 
     <!-- Bottom note -->
-    <text x="380" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10" font-style="italic">Two approaches: keep asking (polling) or get notified (webhooks).</text>
+    <rect x="160" y="210" width="440" height="30" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="230" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">Every major payment provider (Stripe, PayPal, Square) works this way — async by design.</text>
   </svg>
 
-  <p>There are two approaches. The naive one — polling — is what most beginners try first. The better one — webhooks — is what production systems actually use. Let's explore both so you understand <em>why</em> webhooks exist.</p>
+  <p>Two approaches exist. The naive one — <strong>polling</strong> — is what most beginners try first. The smart one — <strong>webhooks</strong> — is what every production system actually uses. Let's build the naive version first, watch it fall apart, and then discover why webhooks were invented.</p>
 </div>
 
 
@@ -183,108 +222,135 @@
     <div class="section-icon green"><i class="fa-solid fa-rotate"></i></div>
     <div>
       <div class="section-num">Section 3</div>
-      <h2 class="section-title">First Attempt — Polling Every Few Seconds</h2>
+      <h2 class="section-title">First Attempt — "Is It Done Yet?" on Repeat</h2>
     </div>
   </div>
 
   <div class="callout callout-purple">
     <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
-    <p class="body-text">If a friend is baking your birthday cake and you want to know when it's done, the simplest approach is to call them every 5 minutes and ask "Is it ready?" That's polling. It works — but it's annoying for both of you.</p>
+    <p class="body-text">You're waiting for a friend to finish baking your birthday cake. The simplest approach: call them every 5 minutes and ask "Is it ready yet?" They'll say "no" six times before finally saying "yes." It works — but you wasted six phone calls, annoyed your friend, and tied up both your phones. That's polling.</p>
   </div>
 
-  <p>The straightforward solution: after sending the payment request, start a loop. Every few seconds, call the payment provider's status API and ask "Is this payment done yet?" When the response finally says "completed" or "failed", you update your database and show the result to the customer.</p>
+  <p>The most obvious solution: after sending the payment request, start a loop. Every few seconds, call Stripe's <span class="tooltip-trigger">PaymentIntent API<span class="tooltip-content">Stripe's PaymentIntent endpoint (GET /v1/payment_intents/:id) returns the current status of a payment — "requires_payment_method", "processing", "succeeded", or "canceled".</span></span> and ask "Is this payment done yet?" When the status finally changes to <code>succeeded</code> or <code>failed</code>, update your database and show the result to the customer.</p>
+
+  <p>Here's what that looks like — real Stripe API code you could run today:</p>
 
   <div class="macos-window">
     <div class="macos-titlebar">
       <span class="dot dot-red"></span>
       <span class="dot dot-yellow"></span>
       <span class="dot dot-green"></span>
-      <span class="macos-filename">PaymentPoller.py</span>
+      <span class="macos-filename">payment_poller.py</span>
     </div>
     <div class="macos-body">
-<pre><code class="language-python"># The naive approach: poll until we get a final answer
+<pre><code class="language-python"># The naive approach: keep asking Stripe until we get a final answer
 import time
-import requests
+import stripe
 
-def wait_for_payment(payment_id):
-    """Keep asking Stripe: 'Is it done yet?'"""
+stripe.api_key = "sk_test_..."  # Your Stripe secret key
+
+def wait_for_payment(payment_intent_id):
+    """Poll Stripe every 5 seconds. Wasteful but simple."""
+    attempts = 0
     while True:
-        response = requests.get(
-            f"https://api.stripe.com/v1/charges/{payment_id}"
-        )
-        status = response.json()["status"]
+        # Each call counts against Stripe's rate limit (100 req/sec in live mode)
+        pi = stripe.PaymentIntent.retrieve(payment_intent_id)
+        attempts += 1
 
-        if status == "succeeded":
-            return "Payment successful!"
-        elif status == "failed":
-            return "Payment failed."
+        if pi.status == "succeeded":
+            print(f"Payment done after {attempts} API calls")
+            return {"status": "paid", "amount": pi.amount}
 
-        # Not done yet — wait 5 seconds and ask again
-        time.sleep(5)</code></pre>
+        elif pi.status in ("canceled", "requires_payment_method"):
+            return {"status": "failed", "reason": pi.last_payment_error}
+
+        # Still processing — wait and ask again
+        time.sleep(5)  # 5 seconds × forever = a LOT of wasted requests
+
+# For one customer, this might make 6 calls over 30 seconds. Fine.
+# For 10,000 concurrent checkouts? That's 2,000 requests/second to Stripe.
+# Stripe's rate limit: 100 req/sec. You'd be blocked in under a minute.</code></pre>
     </div>
   </div>
 
-  <p>This code is easy to understand: ask, wait, ask again. But even in this tiny example, you can see the problem forming. What if the payment takes 30 seconds? That's 6 wasted API calls. What if you have 10,000 customers checking out simultaneously? That's 60,000 requests that all get the same answer: "not yet."</p>
+  <p>This code is dead simple: ask, wait, ask again. For a single checkout, it's fine — 6 calls over 30 seconds, no big deal. But now multiply it. What happens when 10,000 customers are checking out at the same time? Each one polls every 5 seconds. That's <strong>2,000 requests per second</strong> hitting Stripe's API, and 99% of them get the same useless answer: "still processing."</p>
+
+  <p>Let's do the full math, because the numbers are what make this click:</p>
+
+  <div class="callout callout-danger">
+    <div class="callout-title"><i class="fa-solid fa-calculator"></i> The Polling Math — One Day at Scale</div>
+    <p class="body-text">Polling every 5 seconds for 10,000 users:<br>
+    <strong>10,000 users &times; (86,400 seconds/day &divide; 5 seconds) = 172,800,000 requests/day</strong><br>
+    That's 172.8 million requests. And the vast majority return "nothing changed." Meanwhile, the average user only triggers about 10 actual events per day. With webhooks, that's 10,000 &times; 10 = <strong>100,000 requests/day</strong>. Same information, 1,728&times; fewer requests.</p>
+  </div>
 
   <!-- Polling timeline SVG -->
-  <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling timeline showing repeated wasted requests">
+  <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling timeline showing repeated wasted requests over 30 seconds">
     <defs>
       <marker id="whk-poll-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
       </marker>
     </defs>
-    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Polling Timeline — 30 Seconds of Waste</text>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Polling Timeline — 30 Seconds for One Customer</text>
 
     <!-- Timeline line -->
     <line x1="50" y1="80" x2="720" y2="80" stroke="#334155" stroke-width="2"/>
 
     <!-- Poll 1 -->
-    <line x1="80" y1="55" x2="80" y2="80" stroke="#ef4444" stroke-width="1.5"/>
-    <circle cx="80" cy="55" r="4" fill="#ef4444"/>
-    <text x="80" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">0s</text>
-    <text x="80" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+    <line x1="80" y1="52" x2="80" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="80" cy="52" r="4" fill="#ef4444"/>
+    <text x="80" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">0s</text>
+    <text x="80" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"processing"</text>
 
     <!-- Poll 2 -->
-    <line x1="180" y1="55" x2="180" y2="80" stroke="#ef4444" stroke-width="1.5"/>
-    <circle cx="180" cy="55" r="4" fill="#ef4444"/>
-    <text x="180" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">5s</text>
-    <text x="180" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+    <line x1="180" y1="52" x2="180" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="180" cy="52" r="4" fill="#ef4444"/>
+    <text x="180" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">5s</text>
+    <text x="180" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"processing"</text>
 
     <!-- Poll 3 -->
-    <line x1="280" y1="55" x2="280" y2="80" stroke="#ef4444" stroke-width="1.5"/>
-    <circle cx="280" cy="55" r="4" fill="#ef4444"/>
-    <text x="280" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">10s</text>
-    <text x="280" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+    <line x1="280" y1="52" x2="280" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="280" cy="52" r="4" fill="#ef4444"/>
+    <text x="280" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">10s</text>
+    <text x="280" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"processing"</text>
 
     <!-- Poll 4 -->
-    <line x1="380" y1="55" x2="380" y2="80" stroke="#ef4444" stroke-width="1.5"/>
-    <circle cx="380" cy="55" r="4" fill="#ef4444"/>
-    <text x="380" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">15s</text>
-    <text x="380" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+    <line x1="380" y1="52" x2="380" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="380" cy="52" r="4" fill="#ef4444"/>
+    <text x="380" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">15s</text>
+    <text x="380" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"processing"</text>
 
     <!-- Poll 5 -->
-    <line x1="480" y1="55" x2="480" y2="80" stroke="#ef4444" stroke-width="1.5"/>
-    <circle cx="480" cy="55" r="4" fill="#ef4444"/>
-    <text x="480" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">20s</text>
-    <text x="480" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+    <line x1="480" y1="52" x2="480" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="480" cy="52" r="4" fill="#ef4444"/>
+    <text x="480" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">20s</text>
+    <text x="480" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"processing"</text>
 
     <!-- Poll 6 -->
-    <line x1="580" y1="55" x2="580" y2="80" stroke="#ef4444" stroke-width="1.5"/>
-    <circle cx="580" cy="55" r="4" fill="#ef4444"/>
-    <text x="580" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">25s</text>
-    <text x="580" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"Nope"</text>
+    <line x1="580" y1="52" x2="580" y2="80" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="580" cy="52" r="4" fill="#ef4444"/>
+    <text x="580" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">25s</text>
+    <text x="580" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">"processing"</text>
 
     <!-- Poll 7: Finally! -->
-    <line x1="680" y1="55" x2="680" y2="80" stroke="#10b981" stroke-width="2"/>
-    <circle cx="680" cy="55" r="5" fill="#10b981"/>
-    <text x="680" y="46" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8" font-weight="700">30s</text>
-    <text x="680" y="100" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8" font-weight="600">"Done!"</text>
+    <line x1="680" y1="52" x2="680" y2="80" stroke="#10b981" stroke-width="2"/>
+    <circle cx="680" cy="52" r="5" fill="#10b981"/>
+    <text x="680" y="43" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8" font-weight="700">30s</text>
+    <text x="680" y="98" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="8" font-weight="600">"succeeded"</text>
 
-    <!-- Waste label -->
-    <line x1="80" y1="125" x2="580" y2="125" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,2"/>
-    <text x="330" y="145" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">6 requests wasted — server said "nope" every time</text>
-    <text x="330" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">× 10,000 customers = 60,000 useless API calls</text>
+    <!-- Waste bracket -->
+    <line x1="80" y1="120" x2="580" y2="120" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="80" y1="115" x2="80" y2="120" stroke="#ef4444" stroke-width="1"/>
+    <line x1="580" y1="115" x2="580" y2="120" stroke="#ef4444" stroke-width="1"/>
+    <text x="330" y="140" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">6 wasted API calls — each one said "still processing"</text>
+
+    <!-- Scale label -->
+    <rect x="120" y="158" width="520" height="40" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+    <text x="380" y="176" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">Now multiply: 10,000 customers = 120,000 wasted calls per hour</text>
+    <text x="380" y="191" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Stripe rate limit: 100 req/sec. You'd hit it in under 20 seconds.</text>
   </svg>
+
+  <p>The code works. The math doesn't. At any meaningful scale, polling is a denial-of-service attack on yourself — and on the provider you're polling. Let's see exactly where it breaks.</p>
 </div>
 
 
@@ -296,64 +362,111 @@ def wait_for_payment(payment_id):
     <div class="section-icon green"><i class="fa-solid fa-heart-crack"></i></div>
     <div>
       <div class="section-num">Section 4</div>
-      <h2 class="section-title">Where It Breaks — The Cost of "Are We There Yet?"</h2>
+      <h2 class="section-title">Where It Breaks — Three Walls You'll Hit</h2>
     </div>
   </div>
 
   <div class="callout callout-purple">
     <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
-    <p class="body-text">Imagine a call center where 10,000 people call every 5 seconds to ask "Is my order shipped?" 99% of the time the answer is "not yet." You'd need an army of operators just to say "no" — and the phone lines would be jammed for people who actually need help.</p>
+    <p class="body-text">Imagine a hospital where 10,000 patients each press the nurse call button every 5 seconds — not because they need anything, but just to ask "Am I discharged yet?" The nurses can't help actual emergencies because they're buried under pointless "no, not yet" responses. That's what polling does to an API server at scale.</p>
   </div>
 
-  <p>Polling seems harmless for one customer, but it falls apart at scale. Here are the three problems that make it a bad choice for production systems:</p>
+  <p>Polling works fine for one user. But three specific problems turn it into a production disaster. Each one comes with real numbers from real APIs.</p>
 
   <div class="card open">
     <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
-      <span><i class="fa-solid fa-1 text-red" aria-hidden="true"></i> Wasted Bandwidth &amp; Server Load</span>
+      <span><i class="fa-solid fa-1 text-red" aria-hidden="true"></i> You'll Burn Through Rate Limits in Minutes</span>
     </h3>
     <div class="card-body">
-      <p class="body-text">Every poll is a full HTTP request-response cycle. If you poll every 5 seconds and 99% of responses are "nothing new", you're burning server CPU, network bandwidth, and <span class="tooltip-trigger">API rate limits<span class="tooltip-content">Most APIs cap how many requests you can make per minute or hour. Wasting them on empty polls means you might run out when you actually need them.</span></span> on requests that deliver zero value. At 10,000 concurrent users polling every 5 seconds, that's 2,000 requests per second — just to hear "no."</p>
+      <p class="body-text">Every major API enforces <span class="tooltip-trigger">rate limits<span class="tooltip-content">A maximum number of API requests allowed in a time window (e.g., Stripe: 100 reads/sec in live mode, GitHub: 5,000/hour for authenticated requests). Exceeding it returns HTTP 429 "Too Many Requests."</span></span> — and polling burns through them fast. Here are the actual numbers from real providers:</p>
+      <ul>
+        <li><strong>Stripe:</strong> 100 read requests/second in live mode. With 10,000 users polling every 5 seconds, you need 2,000 req/sec. That's <strong>20x over the limit</strong>. Stripe starts returning <code>429 Too Many Requests</code> and may temporarily revoke your API key.</li>
+        <li><strong>GitHub:</strong> 5,000 requests/hour for authenticated users. Polling every 5 seconds burns through your quota in <strong>25 seconds</strong> (5,000 &divide; 200/sec). After that, you can't even fetch commit statuses for your CI/CD.</li>
+        <li><strong>Shopify:</strong> 2 requests/second per app. A single polling loop could consume your <em>entire</em> rate limit, leaving nothing for actual store operations.</li>
+      </ul>
+      <p class="body-text">And here's the worst part: the rate limit you burn on empty polls is the <em>same</em> rate limit you need for real operations. Wasting it on "anything new? no." means you can't create charges, fetch user data, or do any actual work.</p>
     </div>
   </div>
 
   <div class="card">
     <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-      <span><i class="fa-solid fa-2 text-red" aria-hidden="true"></i> Latency Gap</span>
+      <span><i class="fa-solid fa-2 text-red" aria-hidden="true"></i> The Latency-Cost Tradeoff Is Unwinnable</span>
     </h3>
     <div class="card-body">
-      <p class="body-text">If you poll every 5 seconds, the event could have happened 4.9 seconds ago and you wouldn't know. On average, there's a delay of half your polling interval between the event happening and your code finding out. Poll every 5 seconds? Average 2.5-second delay. Want sub-second awareness? You'd need to poll multiple times per second, which makes the bandwidth problem even worse.</p>
+      <p class="body-text">Polling has a built-in delay: on average, you discover an event <em>half your polling interval</em> after it happened. Poll every 5 seconds? Average 2.5-second delay before you know. Poll every 1 second to reduce delay? Now you've 5x'd your request volume.</p>
+
+      <!-- Latency tradeoff SVG -->
+      <svg viewBox="0 0 720 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling interval vs latency tradeoff showing you can't win">
+        <defs>
+          <marker id="whk-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+          </marker>
+        </defs>
+        <text x="360" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="12">The Unwinnable Tradeoff</text>
+
+        <!-- Row 1: 5s -->
+        <rect x="30" y="38" width="100" height="30" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+        <text x="80" y="58" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="10">Poll: 5 sec</text>
+        <rect x="150" y="38" width="160" height="30" rx="6" fill="rgba(239,68,68,0.08)" stroke="#64748b" stroke-width="1"/>
+        <text x="230" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Avg delay: 2.5 sec</text>
+        <rect x="330" y="38" width="200" height="30" rx="6" fill="rgba(239,68,68,0.08)" stroke="#64748b" stroke-width="1"/>
+        <text x="430" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">172.8M req/day (10K users)</text>
+
+        <!-- Row 2: 1s -->
+        <rect x="30" y="78" width="100" height="30" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+        <text x="80" y="98" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="10">Poll: 1 sec</text>
+        <rect x="150" y="78" width="160" height="30" rx="6" fill="rgba(245,158,11,0.08)" stroke="#64748b" stroke-width="1"/>
+        <text x="230" y="98" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="10">Avg delay: 0.5 sec</text>
+        <rect x="330" y="78" width="200" height="30" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1"/>
+        <text x="430" y="98" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10">864M req/day (10K users)</text>
+
+        <!-- Row 3: Webhook -->
+        <rect x="30" y="118" width="100" height="30" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="80" y="138" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">Webhook</text>
+        <rect x="150" y="118" width="160" height="30" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="230" y="138" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">Avg delay: &lt;1 sec</text>
+        <rect x="330" y="118" width="200" height="30" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="430" y="138" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">100K req/day (10K users)</text>
+
+        <text x="600" y="138" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">WINS BOTH</text>
+      </svg>
+
+      <p class="body-text">Webhooks break this tradeoff entirely. Delivery latency is typically under 1 second (GitHub delivers within 10 seconds; Stripe is usually under 5), and the request count is proportional to actual events — not clock ticks.</p>
     </div>
   </div>
 
   <div class="card">
     <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
-      <span><i class="fa-solid fa-3 text-red" aria-hidden="true"></i> Provider Rate Limits &amp; Throttling</span>
+      <span><i class="fa-solid fa-3 text-red" aria-hidden="true"></i> Server Cost Scales with Time, Not Events</span>
     </h3>
     <div class="card-body">
-      <p class="body-text">Payment providers, GitHub, Twilio — they all enforce <span class="tooltip-trigger">rate limits<span class="tooltip-content">A maximum number of API requests allowed in a time window (e.g., 100 requests per minute). Exceeding it returns HTTP 429 "Too Many Requests."</span></span>. Stripe allows 100 reads per second in live mode. If your polling loop burns through your rate limit, you won't be able to make actual business requests (like creating new charges). Worse, the provider might temporarily ban your API key.</p>
+      <p class="body-text">With polling, your server load is proportional to <em>time × users</em>, regardless of whether anything is happening. At 3 AM when nobody's shopping, your polling loops are still firing 2,000 requests/second — paying for compute and bandwidth to hear "nothing changed" 172 million times a day.</p>
+      <p class="body-text">With webhooks, load is proportional to <em>actual events</em>. Zero events at 3 AM? Zero requests. Black Friday surge with 50,000 orders per hour? 50,000 webhook deliveries — exactly the traffic you'd expect, and exactly what you need to handle. The infrastructure costs track the business, not the clock.</p>
     </div>
   </div>
 
   <!-- Cost comparison SVG -->
-  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling cost vs webhook cost comparison">
-    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Daily Cost Comparison: 10,000 Users</text>
+  <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polling vs webhook daily request volume comparison at scale">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Daily Request Volume: 10,000 Users</text>
 
     <!-- Polling bar -->
-    <rect x="60" y="50" width="560" height="40" rx="6" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="75" y="75" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">Polling: ~17.3 million requests/day</text>
-    <text x="540" y="75" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">99% wasted</text>
+    <rect x="60" y="50" width="620" height="44" rx="6" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="80" y="70" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">Polling (5s interval):</text>
+    <text x="80" y="86" fill="#ef4444" font-family="Inter,sans-serif" font-size="11">172,800,000 requests/day</text>
+    <text x="600" y="78" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">99.94% wasted</text>
 
-    <!-- Webhook bar -->
-    <rect x="60" y="110" width="30" height="40" rx="6" fill="rgba(16,185,129,0.2)" stroke="#10b981" stroke-width="1.5"/>
-    <text x="105" y="135" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Webhooks: ~10,000 requests/day</text>
-    <text x="390" y="135" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">1 request per actual event</text>
+    <!-- Webhook bar — tiny in comparison -->
+    <rect x="60" y="112" width="4" height="44" rx="2" fill="rgba(16,185,129,0.3)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="80" y="132" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Webhooks:</text>
+    <text x="80" y="148" fill="#10b981" font-family="Inter,sans-serif" font-size="11">100,000 requests/day</text>
+    <text x="320" y="140" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">1 request per actual event — 0 waste</text>
 
-    <!-- Ratio label -->
-    <rect x="220" y="165" width="320" height="28" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
-    <text x="380" y="184" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="11" font-weight="600">Webhooks use ~1,730× fewer requests for the same result</text>
+    <!-- Ratio callout -->
+    <rect x="180" y="172" width="400" height="30" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="192" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="12" font-weight="700">1,728x fewer requests. Same information delivered.</text>
   </svg>
 
-  <p>The bottom line: polling is a quick hack for prototyping, but it doesn't belong in production when the provider supports webhooks. Every major API — Stripe, GitHub, Twilio, Shopify, PayPal — offers webhooks precisely because polling doesn't scale.</p>
+  <p>Polling is a perfectly fine prototype hack. But every production API you'll work with — Stripe, GitHub, Twilio, Shopify, PayPal, SendGrid, Slack — offers webhooks for exactly these reasons. The industry voted with their APIs: push beats pull.</p>
 </div>
 
 
@@ -365,21 +478,124 @@ def wait_for_payment(payment_id):
     <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
     <div>
       <div class="section-num">Section 5</div>
-      <h2 class="section-title">The Breakthrough — Let Them Call You</h2>
+      <h2 class="section-title">The Breakthrough — Reverse the Direction</h2>
     </div>
   </div>
 
   <div class="callout callout-purple">
     <div class="callout-title"><i class="fa-solid fa-brain"></i> Think First</div>
-    <p class="body-text">You're waiting for a delivery. Instead of checking the front door every 5 minutes, you put a doorbell there. The delivery driver presses it when they arrive. You do zero work until you hear the ring. That doorbell is your webhook endpoint.</p>
+    <p class="body-text">You're expecting a package. Instead of walking to the front door every 5 minutes to check, you install a doorbell. The delivery driver presses it when they arrive. You do zero work until the bell rings. Your webhook endpoint is that doorbell — it just sits there, waiting for someone to ring it.</p>
   </div>
 
-  <p>The key insight behind webhooks is simple: <strong>reverse the direction of communication</strong>. Instead of your code pulling data from the provider, let the provider push data to your code. You expose an HTTP endpoint (a URL that accepts POST requests), and you tell the provider: "When something happens, send the details to this URL."</p>
+  <p>The breakthrough is embarrassingly simple: <strong>reverse who calls whom</strong>. Instead of your code pulling status from the provider, let the provider push events to your code. You expose a URL — any URL that accepts HTTP POST requests — and tell the provider "send event data here whenever something happens." The provider saves that URL, and from that moment on, every time a relevant event occurs, it fires an HTTP POST to your endpoint with a <span class="tooltip-trigger">JSON payload<span class="tooltip-content">JSON (JavaScript Object Notation) is a lightweight text format for structured data. The "payload" is the actual data inside the request — like the contents of a delivered package.</span></span> describing exactly what happened.</p>
 
-  <p>This pattern is sometimes called a <span class="tooltip-trigger">callback<span class="tooltip-content">A function (or in this case, a URL) that you hand to someone else, saying 'call this when you're done.' The same concept exists in programming — you pass a function to be called later.</span></span> — you give someone your phone number and say "call me when it's ready." In web terms, you give them a URL and say "POST to this when the event fires."</p>
+  <p>This pattern is called a <span class="tooltip-trigger">callback<span class="tooltip-content">A function (or URL) you hand to someone else, saying "call this when you're done." Same concept in programming — you pass a function to be invoked later.</span></span> — you give someone your phone number and say "call me when it's ready." In web terms, you give them a URL and say "POST to this when the event fires." The industry calls it a <strong>webhook</strong> — combining "web" (HTTP) with "hook" (a place where you attach your own code to someone else's system).</p>
 
-  <!-- Webhook flow SVG -->
-  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Webhook registration and delivery flow">
+  <h3>How Stripe Webhooks Actually Work</h3>
+
+  <p>Let's make this concrete with Stripe — the payment provider you'll encounter in most e-commerce jobs. Here's the real setup process, step by step:</p>
+
+  <p><strong>Step 1: Register your endpoint.</strong> In the Stripe Dashboard, go to <strong>Developers &rarr; Webhooks &rarr; Add endpoint</strong>. Enter your server's URL (e.g., <code>https://yourapp.com/webhooks/stripe</code>) and select which events you care about — like <code>payment_intent.succeeded</code> and <code>payment_intent.payment_failed</code>. Stripe gives you a <span class="tooltip-trigger">webhook signing secret<span class="tooltip-content">A unique string (starts with "whsec_") that Stripe uses to cryptographically sign every webhook it sends you. You use this secret to verify the webhook is really from Stripe, not an attacker.</span></span> starting with <code>whsec_</code>.</p>
+
+  <p><strong>Step 2: Wait.</strong> Your server does nothing. No polling loops. No timers. It just listens on that endpoint like a doorbell waiting to be rung.</p>
+
+  <p><strong>Step 3: Event fires.</strong> A customer's payment goes through. Stripe immediately sends an HTTP POST to your registered URL. Here's the <em>actual</em> payload structure Stripe sends — this is not a simplified example, this is what hits your server:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="macos-filename">Real Stripe Webhook Payload</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-json">POST /webhooks/stripe HTTP/1.1
+Host: yourapp.com
+Content-Type: application/json
+Stripe-Signature: t=1695123456,v1=5257a869e7ecebeda32af...
+
+{
+  "id": "evt_1Nh7Ac2eZvKYlo2C",
+  "object": "event",
+  "type": "payment_intent.succeeded",
+  "api_version": "2023-10-16",
+  "created": 1695123456,
+  "data": {
+    "object": {
+      "id": "pi_3Nh7Ab2eZvKYlo2C",
+      "object": "payment_intent",
+      "amount": 2000,
+      "currency": "usd",
+      "status": "succeeded",
+      "customer": "cus_OjN1abc123",
+      "payment_method": "pm_1Nh7Ab2eZvKY...",
+      "metadata": {
+        "order_id": "order_98765"
+      }
+    }
+  },
+  "livemode": true,
+  "pending_webhooks": 1,
+  "request": {
+    "id": "req_abc123",
+    "idempotency_key": null
+  }
+}</code></pre>
+    </div>
+  </div>
+
+  <p>Notice the <code>Stripe-Signature</code> header — that's how you verify the webhook is legitimately from Stripe and not an attacker spoofing requests. Stripe signs every webhook using <span class="tooltip-trigger">HMAC-SHA256<span class="tooltip-content">A cryptographic algorithm that combines a message with a secret key to produce a unique "fingerprint." If the message or key changes even slightly, the fingerprint is completely different — so you can verify authenticity.</span></span> with your per-endpoint <code>whsec_</code> secret. Here's the verification code:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="macos-filename">webhook_handler.py</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-python">import stripe
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+endpoint_secret = "whsec_..."  # From Stripe Dashboard → Webhooks
+
+@app.route("/webhooks/stripe", methods=["POST"])
+def handle_stripe_webhook():
+    payload = request.get_data()        # Raw bytes — DON'T parse JSON first
+    sig_header = request.headers.get("Stripe-Signature")
+
+    # Step 1: Verify the signature (CRITICAL — never skip this)
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except stripe.error.SignatureVerificationError:
+        return "Invalid signature", 400  # Reject forged webhooks
+
+    # Step 2: Handle the event
+    if event["type"] == "payment_intent.succeeded":
+        payment = event["data"]["object"]
+        order_id = payment["metadata"]["order_id"]
+        amount = payment["amount"] / 100  # Stripe uses cents
+        print(f"Order {order_id} paid: ${amount:.2f}")
+        # → Update your database, send confirmation email, etc.
+
+    elif event["type"] == "payment_intent.payment_failed":
+        payment = event["data"]["object"]
+        error = payment.get("last_payment_error", {}).get("message", "Unknown")
+        print(f"Payment failed: {error}")
+        # → Notify customer, offer retry
+
+    # Step 3: Return 200 quickly — Stripe times out after 20 seconds
+    return jsonify({"received": True}), 200</code></pre>
+    </div>
+  </div>
+
+  <p>That's the real code. No polling loop. No timer. Your server sits idle until Stripe rings the doorbell, then handles the event and replies with <code>200 OK</code>. If you don't return a 2xx status within 20 seconds, Stripe assumes delivery failed and retries — up to 3 times over 3 hours with <span class="tooltip-trigger">exponential backoff<span class="tooltip-content">Each retry waits longer than the previous one — e.g., 1 minute, then 5 minutes, then 30 minutes. This avoids hammering a server that might be temporarily down.</span></span>.</p>
+
+  <!-- Webhook lifecycle SVG -->
+  <svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Complete webhook lifecycle: register, event fires, POST delivered, verify, process, respond">
     <defs>
       <marker id="whk-brk-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
@@ -391,52 +607,95 @@ def wait_for_payment(payment_id):
     <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Webhook Lifecycle — Register Once, Receive Forever</text>
 
     <!-- Step 1: Register -->
-    <rect x="30" y="50" width="150" height="55" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
-    <text x="105" y="72" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="11">① REGISTER</text>
-    <text x="105" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Give provider your URL</text>
+    <rect x="20" y="50" width="145" height="55" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="93" y="72" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="11">1. REGISTER</text>
+    <text x="93" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Stripe Dashboard &rarr; Webhooks</text>
 
-    <line x1="180" y1="77" x2="240" y2="77" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#whk-brk-arr-b)"/>
+    <line x1="165" y1="77" x2="218" y2="77" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#whk-brk-arr-b)"/>
 
-    <!-- Provider stores it -->
-    <rect x="245" y="45" width="180" height="65" rx="10" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
-    <text x="335" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="600" font-size="11">Provider saves URL</text>
-    <text x="335" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">https://you.com/webhook</text>
-    <text x="335" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">+ event types to listen for</text>
+    <!-- Stripe stores URL -->
+    <rect x="223" y="45" width="180" height="65" rx="10" fill="rgba(59,130,246,0.08)" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="313" y="66" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="600" font-size="10">Stripe saves your URL</text>
+    <text x="313" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">https://you.com/webhooks/stripe</text>
+    <text x="313" y="98" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">+ whsec_ signing secret + event filters</text>
 
-    <!-- Step 2: Event happens -->
-    <rect x="490" y="50" width="150" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="565" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">② EVENT FIRES</text>
-    <text x="565" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Payment succeeds</text>
+    <!-- Step 2: Event fires -->
+    <rect x="460" y="50" width="145" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="533" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="11">2. EVENT FIRES</text>
+    <text x="533" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">payment_intent.succeeded</text>
 
-    <!-- Arrow down from event -->
-    <line x1="565" y1="105" x2="565" y2="140" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#whk-brk-arr)"/>
+    <!-- Arrow down to POST -->
+    <line x1="533" y1="105" x2="533" y2="140" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#whk-brk-arr)"/>
 
-    <!-- Step 3: Provider POSTs -->
-    <rect x="450" y="145" width="230" height="55" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
-    <text x="565" y="167" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">③ PROVIDER POSTs TO YOU</text>
-    <text x="565" y="184" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">POST https://you.com/webhook</text>
+    <!-- Step 3: Stripe POSTs -->
+    <rect x="420" y="145" width="230" height="55" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+    <text x="535" y="165" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">3. STRIPE POSTs TO YOU</text>
+    <text x="535" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">JSON payload + Stripe-Signature header</text>
+    <text x="535" y="193" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">HMAC-SHA256 signed with whsec_ secret</text>
 
     <!-- Arrow to Your Server -->
-    <line x1="450" y1="172" x2="230" y2="172" stroke="#10b981" stroke-width="2" marker-end="url(#whk-brk-arr)"/>
-    <text x="340" y="165" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">JSON payload with event data</text>
+    <line x1="420" y1="172" x2="222" y2="172" stroke="#10b981" stroke-width="2" marker-end="url(#whk-brk-arr)"/>
 
-    <!-- Your server receives -->
-    <rect x="50" y="145" width="175" height="55" rx="10" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
-    <text x="138" y="167" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">④ YOU PROCESS IT</text>
-    <text x="138" y="184" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Update DB, notify customer</text>
+    <!-- Your server verifies + processes -->
+    <rect x="30" y="145" width="188" height="55" rx="10" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
+    <text x="124" y="165" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="10">4. VERIFY + PROCESS</text>
+    <text x="124" y="180" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Check HMAC → update DB</text>
+    <text x="124" y="193" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">→ email customer</text>
 
-    <!-- Step 4: Return 200 -->
-    <line x1="138" y1="200" x2="138" y2="235" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-brk-arr)"/>
-    <rect x="60" y="238" width="155" height="30" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
-    <text x="138" y="258" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">⑤ Return HTTP 200 OK</text>
+    <!-- Return 200 -->
+    <line x1="124" y1="200" x2="124" y2="232" stroke="#10b981" stroke-width="1.5" marker-end="url(#whk-brk-arr)"/>
+    <rect x="45" y="236" width="158" height="34" rx="8" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="124" y="250" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">5. Return HTTP 200 OK</text>
+    <text x="124" y="264" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">Must respond within 20 sec</text>
+
+    <!-- Retry note -->
+    <rect x="420" y="236" width="310" height="34" rx="8" fill="rgba(245,158,11,0.06)" stroke="#f59e0b" stroke-width="1"/>
+    <text x="575" y="250" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-size="9" font-weight="600">If no 2xx response: Stripe retries 3x over 3 hours</text>
+    <text x="575" y="264" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">Exponential backoff: ~1min → ~5min → ~30min</text>
   </svg>
 
-  <p>That's the entire pattern. Five steps: register your URL, wait for events, receive the POST, process the data, return 200. No polling loop. No wasted requests. The provider does the heavy lifting of tracking events and delivering them to you.</p>
+  <h3>How Other Providers Do It</h3>
+
+  <p>Stripe isn't unique — every major API uses the same pattern with its own security twist. Here's how four real webhook providers compare:</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="whk-s5-stripe" role="tab" aria-selected="true">Stripe</button>
+      <button class="tab-btn" data-tab="whk-s5-github" role="tab" aria-selected="false">GitHub</button>
+      <button class="tab-btn" data-tab="whk-s5-twilio" role="tab" aria-selected="false">Twilio</button>
+      <button class="tab-btn" data-tab="whk-s5-shopify" role="tab" aria-selected="false">Shopify</button>
+    </div>
+    <div class="tab-panel active" id="whk-s5-stripe" role="tabpanel">
+      <p><strong>Signature:</strong> <code>Stripe-Signature</code> header with HMAC-SHA256, using a per-endpoint <code>whsec_</code> secret.</p>
+      <p><strong>Retries:</strong> 3 attempts over 3 hours with exponential backoff. Events are <span class="tooltip-trigger">idempotent<span class="tooltip-content">The same event always has the same ID (like "evt_1Nh7Ac..."). If Stripe retries, it sends the same event ID — so your code can check "did I already process this?" and avoid duplicate actions.</span></span> — same event ID on retries.</p>
+      <p><strong>Debugging:</strong> Dashboard shows delivery attempts with full request/response bodies. CLI tool: <code>stripe listen --forward-to localhost:3000/webhooks</code> for local dev.</p>
+      <p><strong>Recovery:</strong> <code>stripe events list --limit 10</code> to fetch missed events manually.</p>
+    </div>
+    <div class="tab-panel" id="whk-s5-github" role="tabpanel">
+      <p><strong>Signature:</strong> <code>X-Hub-Signature-256</code> header with HMAC-SHA256.</p>
+      <p><strong>Delivery speed:</strong> Typically within 10 seconds of the event.</p>
+      <p><strong>Debugging:</strong> Settings &rarr; Webhooks &rarr; Recent Deliveries shows request/response bodies. One-click "Redeliver" button for failed deliveries.</p>
+      <p><strong>Events:</strong> 200+ event types — <code>push</code>, <code>pull_request</code>, <code>issues</code>, <code>deployment</code>, etc.</p>
+    </div>
+    <div class="tab-panel" id="whk-s5-twilio" role="tabpanel">
+      <p><strong>Signature:</strong> <code>X-Twilio-Signature</code> header plus HTTP Basic Auth. Uses a different algorithm (HMAC-SHA1 with your auth token).</p>
+      <p><strong>Use case:</strong> StatusCallback URLs for SMS delivery receipts, call status updates, and recording-ready notifications.</p>
+      <p><strong>Retries:</strong> Configurable per-event. Failed callbacks can trigger fallback URLs.</p>
+    </div>
+    <div class="tab-panel" id="whk-s5-shopify" role="tabpanel">
+      <p><strong>Signature:</strong> <code>X-Shopify-Hmac-Sha256</code> header with HMAC-SHA256 using your app's API secret.</p>
+      <p><strong>Enforcement:</strong> Mandatory verification — Shopify apps that don't verify webhook signatures can be <strong>suspended from the app store</strong>.</p>
+      <p><strong>Events:</strong> <code>orders/create</code>, <code>products/update</code>, <code>app/uninstalled</code>, etc.</p>
+    </div>
+  </div>
 
   <div class="callout callout-info">
-    <strong>Why "webhook"?</strong> The name combines "web" (HTTP) with "hook" (a place where you attach your own code). You're "hooking into" the provider's event system via a web URL. Some people call them "HTTP callbacks" or "reverse APIs" — same idea, different names.
+    <div class="callout-title"><i class="fa-solid fa-terminal"></i> Try It Locally in 60 Seconds</div>
+    <p class="body-text">You don't need a deployed server to receive webhooks. Use <a href="https://ngrok.com" target="_blank" rel="noopener">ngrok</a> to expose your localhost: run <code>ngrok http 3000</code> and you'll get a public URL like <code>https://abc123.ngrok.io</code>. Paste that into Stripe/GitHub webhook settings. Even easier: Stripe's CLI has a built-in tunnel — <code>stripe listen --forward-to localhost:3000/webhooks</code> — which auto-registers a test endpoint and forwards events to your local Flask/Express app.</p>
   </div>
 </div>
+
+<!-- SECTIONS 6+ CONTINUE BELOW -->
 
 
 <!-- ════════════════════════════════════════════════════════════
