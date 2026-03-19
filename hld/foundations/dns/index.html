@@ -1152,6 +1152,39 @@ com.    172800  IN  NS  c.gtld-servers.net.
       </div>
 
       <p>Notice the TTL: <code>172800</code> seconds = 48 hours. TLD assignments almost never change, so root servers tell resolvers to cache this answer for two full days.</p>
+
+      <div class="callout callout-warning">
+        <strong>But wait — how does the resolver know the root server's IP address?</strong> This is the bootstrap problem. You can't use DNS to look up the root servers, because DNS hasn't started yet! The answer: <strong>every resolver has a hardcoded file</strong> containing all 13 root server IP addresses. This file is called <code>named.cache</code> (BIND), <code>named.root</code> (older systems), or <code>root.hints</code>. It ships with the DNS software and is updated roughly once a year by IANA.
+      </div>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">The root hints file — see it yourself</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-bash"># Linux (BIND):
+$ cat /etc/bind/db.root
+
+# Or download the official version from IANA:
+$ curl https://www.internic.net/domain/named.root
+
+# You'll see entries like:
+.                        3600000  NS    A.ROOT-SERVERS.NET.
+A.ROOT-SERVERS.NET.      3600000  A     198.41.0.4        # Verisign
+A.ROOT-SERVERS.NET.      3600000  AAAA  2001:503:ba3e::2:30
+B.ROOT-SERVERS.NET.      3600000  A     170.247.170.2     # USC-ISI
+...all 13 listed with both IPv4 and IPv6 addresses</code></pre>
+        </div>
+      </div>
+
+      <p>This is one of the internet's elegant bootstraps: the very first step of DNS resolution doesn't use DNS at all — it reads from a local file. The file is tiny (about 3 KB, just 13 entries), practically never changes, and every DNS implementation on Earth includes it. That's why DNS works even if you've never configured anything — the root server addresses are already baked in.</p>
+
+      <div class="think-first-box">
+        <span class="think-label">Think First</span>
+        <p>If the root hints file is hardcoded, what happens if a root server's IP address changes? How does the internet update millions of resolvers worldwide?</p>
+        <span class="think-hint">Root server IPs almost never change — most haven't changed in 20+ years. When one does change (rare), the new IP is announced months in advance, the root hints file is updated, and DNS software vendors include the new file in their next release. Meanwhile, resolvers that haven't updated still work because the other 12 root servers provide the updated information through a mechanism called "priming" — the resolver's first query to any root server returns the current list of ALL root servers.</span>
+      </div>
     </div>
   </div>
 
