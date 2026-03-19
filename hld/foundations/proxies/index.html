@@ -1267,78 +1267,99 @@
   </svg>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #1: Forgetting X-Forwarded-For</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> Your app logs the client's IP address. But after adding a reverse proxy, every request shows the <em>proxy's</em> IP instead of the real client's IP. Your analytics, rate limiting, and geo-blocking all break overnight.</p>
       <p><strong>Why:</strong> The proxy is the one connecting to your backend. Your backend sees the proxy's IP as the "client." Unless the proxy explicitly passes along the original client IP in a header (usually <code>X-Forwarded-For</code>), that information is lost.</p>
       <p><strong>Fix:</strong> Configure your proxy to add the <code>X-Forwarded-For</code> header, and configure your backend to read client IPs from that header instead of the connection IP. But be careful — if you blindly trust this header, an attacker can spoof any IP. Always validate that the header comes from a trusted proxy.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #2: The Proxy Becomes a Single Point of Failure</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> You put everything behind one proxy. The proxy crashes. Your entire system goes down — every single service is unreachable.</p>
       <p><strong>Why:</strong> A proxy is only helpful if it's always up. If it's running on one machine with no failover, it's a <span class="tooltip-trigger">single point of failure<span class="tooltip-content">A component whose failure takes down the entire system. If you have 10 backend servers but one proxy, the proxy is the single point of failure — not the backend servers.</span></span> — the very thing you were trying to avoid.</p>
       <p><strong>Fix:</strong> Run at least two proxy instances behind a floating IP or DNS-based failover. Use keepalived (for on-prem) or a cloud load balancer (for cloud) in front of your proxies. Yes, it's proxies in front of proxies — that's normal at scale.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #3: Not Tuning Timeouts</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> Your proxy has a 60-second timeout but your backend API sometimes takes 90 seconds for complex queries. The proxy cuts the connection, returns a 504 Gateway Timeout, and your users see an error — even though the backend was working, just slowly.</p>
       <p><strong>Why:</strong> Proxies have default timeouts for reading from upstream servers (often 60s). If your backend is slower than this default, the proxy kills the connection prematurely.</p>
       <p><strong>Fix:</strong> Set <code>proxy_read_timeout</code> (Nginx) or <code>timeout server</code> (HAProxy) to match your actual backend response times. But don't just set it to 5 minutes — that wastes resources on hung connections. Tune it per route: fast APIs get short timeouts, slow report generators get longer ones.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #4: Caching Without Invalidation Strategy</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> Your proxy caches API responses. You update a product's price in the database. Users keep seeing the old price because the proxy is serving stale cached data.</p>
       <p><strong>Why:</strong> Caching is easy to enable, but <span class="tooltip-trigger">cache invalidation<span class="tooltip-content">The process of removing or updating stale data from a cache. It's famously one of the "two hard things in computer science" (the other being naming things). Getting it wrong means serving outdated data.</span></span> is notoriously hard. If you don't have a strategy for when and how cached entries get refreshed, you'll serve stale data.</p>
       <p><strong>Fix:</strong> Use proper <code>Cache-Control</code> headers from your backend. Set appropriate <code>max-age</code> values. For dynamic data, use <code>no-cache</code> or short TTLs. For data that changes on demand, implement cache purge APIs.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #5: Enabling Caching on POST/PUT/DELETE Requests</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> You turn on proxy caching, and it accidentally caches responses to write operations. A user submits an order, gets a "success" page cached, and the next user sees that same "success" page without actually submitting their own order.</p>
       <p><strong>Why:</strong> Some proxy configurations cache all 200 responses by default, regardless of the HTTP method.</p>
       <p><strong>Fix:</strong> Only cache GET and HEAD requests. Never cache POST, PUT, PATCH, or DELETE. In Nginx: <code>proxy_cache_methods GET HEAD;</code> — this is the default, but always verify. Also ensure your backend sends appropriate <code>Cache-Control: no-store</code> on write responses.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #6: Not Setting Up Health Checks</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> One of your backend servers crashes. The proxy keeps sending traffic to it. Users randomly get 502 Bad Gateway errors because every few requests, the proxy picks the dead server.</p>
       <p><strong>Why:</strong> Without <span class="tooltip-trigger">health checks<span class="tooltip-content">Periodic probes sent by the proxy to each backend server. If a server fails the check (times out, returns an error), the proxy removes it from the rotation until it recovers. Like a hospital checking patients' vital signs.</span></span>, the proxy assumes all configured backends are alive. It has no way to know a server has crashed.</p>
       <p><strong>Fix:</strong> Configure active health checks. HAProxy has this built-in (free). Nginx requires the Plus version for active checks, but the open-source version does passive health checks (marks a server as down after N consecutive failures). Envoy has both active and passive built-in.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Mistake #7: Mixing Up Forward and Reverse in Interviews</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>What happens:</strong> The interviewer asks "how does a proxy help with security?" and you describe a VPN (forward proxy) when they're asking about protecting your API (reverse proxy). You lose credibility.</p>
       <p><strong>Fix:</strong> <strong>Forward</strong> = sits in front of clients, protects/hides the client. <strong>Reverse</strong> = sits in front of servers, protects/hides the server. In 99% of system design interviews, they mean reverse proxy. If unsure, ask: "Are you asking about a client-side proxy or a server-side proxy?"</p>
+      </div>
     </div>
   </div>
 </div>
@@ -1468,9 +1489,11 @@
     <h4>Exercise 1: Draw the Proxy Architecture <span class="exercise-difficulty">Beginner</span></h4>
     <p>You have a web app with 3 backend servers. Draw an architecture diagram showing: clients, a reverse proxy, the backend servers, and a database. Label where SSL termination happens, where load balancing happens, and which connections are HTTPS vs HTTP.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Hint</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Hint</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>HTTPS goes from client to proxy. HTTP goes from proxy to backend. The proxy sits in a DMZ or public subnet; backends and database sit in a private subnet.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1479,9 +1502,11 @@
     <h4>Exercise 2: Forward vs Reverse Scenarios <span class="exercise-difficulty">Beginner</span></h4>
     <p>Classify each scenario as forward proxy or reverse proxy: (a) A company blocks employees from accessing social media. (b) A website uses Nginx to distribute traffic across 5 servers. (c) A user connects through a VPN to appear as if they're in another country. (d) An e-commerce site caches product pages to reduce server load. (e) A school filters which websites students can visit.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>(a) Forward — company controls client access. (b) Reverse — server-side load balancing. (c) Forward — hides client identity. (d) Reverse — server-side caching. (e) Forward — controls client access at the network level.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1490,9 +1515,11 @@
     <h4>Exercise 3: Choose the Right Tool <span class="exercise-difficulty">Intermediate</span></h4>
     <p>For each scenario, pick Nginx, HAProxy, or Envoy and explain why: (a) A small startup needs a reverse proxy that also serves their React frontend's static files. (b) A fintech company needs a TCP-level proxy with sub-millisecond latency. (c) A company with 200 microservices on Kubernetes needs consistent networking behavior across all services.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>(a) <strong>Nginx</strong> — it can serve static files AND act as a reverse proxy. HAProxy can't serve files, and Envoy is overkill. (b) <strong>HAProxy</strong> — legendary TCP-level performance, built for low-latency load balancing. (c) <strong>Envoy</strong> — designed for sidecar deployment in Kubernetes, with hot config reloading and built-in observability.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1501,9 +1528,11 @@
     <h4>Exercise 4: Debug the Proxy Problem <span class="exercise-difficulty">Intermediate</span></h4>
     <p>Your team deployed Nginx as a reverse proxy. Everything works, but your rate-limiting middleware (which limits by client IP) now treats all clients as the same IP. Users are getting rate-limited after just a few requests because all traffic appears to come from one source. What's wrong and how do you fix it?</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>The backend sees the proxy's IP for all requests. You need to: (1) Configure Nginx to pass <code>X-Forwarded-For</code> header with the real client IP. (2) Update your rate-limiting middleware to read the client IP from <code>X-Forwarded-For</code> instead of the connection source IP. (3) Validate that the header is from a trusted proxy to prevent spoofing.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1512,9 +1541,11 @@
     <h4>Exercise 5: Explain the Request Journey <span class="exercise-difficulty">Intermediate</span></h4>
     <p>A user types <code>https://shop.example.com/api/products</code> in their browser. The system uses Cloudflare as a CDN, Nginx as a reverse proxy, and has 3 backend API servers. Trace the complete journey of this request — every hop, every transformation, every decision — from the browser to the backend and back.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p><strong>1. DNS:</strong> Browser resolves shop.example.com → gets Cloudflare's IP (not the origin server's IP). <strong>2. Cloudflare edge:</strong> Request hits the nearest Cloudflare PoP. Cloudflare checks its cache — miss (dynamic API). Checks WAF rules — passes. Terminates TLS. Forwards to origin via Cloudflare tunnel. <strong>3. Nginx:</strong> Receives HTTP request. Reads path <code>/api/products</code> → matches <code>location /api</code> block. Picks backend using round-robin (e.g., Server 2). Adds <code>X-Forwarded-For</code> and <code>X-Request-ID</code> headers. Forwards. <strong>4. Backend:</strong> Server 2 processes the request, queries DB, builds JSON. Returns 200 with <code>Cache-Control: public, max-age=60</code>. <strong>5. Return:</strong> Nginx receives response, could cache it for 60s. Forwards to Cloudflare. Cloudflare caches it at the edge for 60s. Re-encrypts with TLS. Sends to browser. <strong>Total hops:</strong> Browser → Cloudflare edge → Nginx → Server 2 → Nginx → Cloudflare → Browser (6 hops, ~150ms total).</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1523,9 +1554,11 @@
     <h4>Exercise 6: Design a Multi-Layer Proxy Architecture <span class="exercise-difficulty">Advanced</span></h4>
     <p>Design the proxy architecture for an e-commerce platform that: serves customers globally (low latency), handles 50,000 requests/second during flash sales, has 40 microservices, needs DDoS protection, and requires mutual TLS between services. Describe each proxy layer, which tool you'd use, and why.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p><strong>Layer 1 — CDN/DDoS:</strong> Cloudflare at the edge for DDoS protection, global caching of static assets, and SSL termination. <strong>Layer 2 — API Gateway:</strong> Kong or Nginx Plus for authentication, rate limiting, and path-based routing to different service clusters. <strong>Layer 3 — Service Mesh:</strong> Envoy sidecars (Istio) on each microservice for mutual TLS, retries, circuit breaking, and distributed tracing. This gives you global reach (Cloudflare), flash sale resilience (Kong rate limiting), security (mTLS via Istio), and observability (Envoy tracing).</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1633,72 +1666,92 @@
   </svg>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q1: Can a server be both a web server and a reverse proxy?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q1: Can a server be both a web server and a reverse proxy?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Yes! Nginx is the most common example. It can serve static files as a web server AND act as a reverse proxy for dynamic content at the same time. In a typical setup, Nginx serves your React/Vue frontend files directly and proxies API requests to your backend servers.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q2: Is a load balancer the same as a reverse proxy?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q2: Is a load balancer the same as a reverse proxy?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Not exactly. A load balancer distributes traffic — that's its main job. A reverse proxy does that AND more (caching, SSL termination, header manipulation, compression). Every reverse proxy can load-balance, but a pure load balancer (like an AWS NLB operating at Layer 4) doesn't inspect HTTP content, cache responses, or terminate SSL. Think of a load balancer as a subset of what a reverse proxy can do.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q3: What's the difference between L4 and L7 proxying?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q3: What's the difference between L4 and L7 proxying?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><span class="tooltip-trigger">Layer 4<span class="tooltip-content">Layer 4 operates at the transport level (TCP/UDP). The proxy sees IP addresses and port numbers but doesn't look inside the actual data. It's faster because there's less to inspect.</span></span> (transport) proxying routes based on IP and port — it doesn't look at the actual content. <span class="tooltip-trigger">Layer 7<span class="tooltip-content">Layer 7 operates at the application level (HTTP, gRPC, etc.). The proxy reads the full request — URL path, headers, cookies, body — and can make smarter routing decisions. It's slower but much more powerful.</span></span> (application) proxying reads the HTTP request — URL, headers, cookies — and makes routing decisions based on content. L4 is faster (less inspection), L7 is smarter (content-aware routing). HAProxy does both. Nginx primarily does L7. AWS NLB is L4, AWS ALB is L7.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q4: Do I need a proxy if I'm using a cloud provider?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q4: Do I need a proxy if I'm using a cloud provider?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Cloud providers give you managed proxies (AWS ALB/NLB, Azure Application Gateway, GCP Cloud Load Balancing). You're still using a proxy — you're just not managing the hardware. The concepts are identical: SSL termination, load balancing, health checks, routing. The difference is you configure it through a dashboard instead of an nginx.conf file.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q5: When would I NOT use a reverse proxy?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q5: When would I NOT use a reverse proxy?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>For small, personal projects or prototypes where simplicity matters more than scalability. If you have one server, no SSL needs, no caching requirements, and no security concerns — direct access is fine. Also, for internal development servers that aren't exposed to the internet. But the moment your app faces real traffic or touches the public internet, a reverse proxy becomes essential.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q6: What happens if the proxy itself gets overwhelmed?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q6: What happens if the proxy itself gets overwhelmed?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>You scale the proxy layer! Run multiple proxy instances behind DNS round-robin or a Layer 4 load balancer (like AWS NLB). The proxies themselves can be horizontally scaled just like your backend servers. At massive scale, companies like Cloudflare run thousands of proxy servers across hundreds of data centers.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q7: What is SSL passthrough vs SSL termination?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q7: What is SSL passthrough vs SSL termination?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>With <strong>SSL termination</strong>, the proxy decrypts HTTPS and forwards plain HTTP to backends — the proxy "terminates" the encrypted session. With <strong>SSL passthrough</strong>, the proxy forwards the encrypted traffic <em>as-is</em> to the backend, without decrypting anything. The backend handles the certificate and decryption. Passthrough is used when the backend must see the original TLS connection (e.g., for client certificate authentication), but you lose the ability to cache, inspect, or modify the request at the proxy level.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q8: How does a proxy handle WebSocket connections?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q8: How does a proxy handle WebSocket connections?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>WebSockets start as a regular HTTP request with an "Upgrade" header. The proxy detects this, upgrades the connection, and then maintains a persistent, bidirectional tunnel between the client and backend. Nginx supports this with <code>proxy_set_header Upgrade</code> and <code>proxy_set_header Connection "upgrade"</code>. The key difference from regular HTTP is that WebSocket connections are long-lived — the proxy must keep the connection open, not close it after the response. This means your timeout settings need to be much longer for WebSocket routes.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q9: What's the difference between a proxy and a firewall?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q9: What's the difference between a proxy and a firewall?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>A <strong>firewall</strong> operates at the network level — it allows or blocks traffic based on IP addresses, ports, and protocols. It doesn't understand HTTP or application-level content. A <strong>proxy</strong> operates at the application level — it understands HTTP, can read URLs, headers, cookies, and make intelligent routing decisions. They complement each other: the firewall blocks obvious bad traffic (wrong ports, known bad IPs), and the proxy handles application-level security (authentication, rate limiting, request validation). Most production setups use both.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><span>Q10: Can I use multiple reverse proxies in a chain?</span></div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Q10: Can I use multiple reverse proxies in a chain?</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Yes, and this is common at scale! A typical chain: Cloudflare (CDN/DDoS) → Nginx (SSL/routing) → Application. Each proxy in the chain adds its processing. The main gotcha is that <code>X-Forwarded-For</code> becomes a comma-separated list as each proxy appends its own IP. Your backend must know how many proxies are in the chain to extract the real client IP correctly (trust the Nth entry from the right, where N is the number of trusted proxies).</p>
+      </div>
     </div>
   </div>
 </div>

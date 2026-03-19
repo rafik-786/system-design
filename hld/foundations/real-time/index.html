@@ -1366,10 +1366,12 @@ ws.onclose = () => {
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Pitfall 1: Not handling reconnection</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>The mistake:</strong> Assuming WebSocket connections stay open forever. In reality, connections drop constantly — mobile users switch from Wi-Fi to cellular, corporate proxies timeout idle connections after 60 seconds, servers restart during deployments.</p>
       <p><strong>Why it's bad:</strong> Without reconnection logic, users silently stop receiving updates. They see a frozen UI and think the app is broken.</p>
       <p><strong>The fix:</strong> Always implement exponential backoff reconnection. Start with a 1-second retry, double it each attempt (2s, 4s, 8s...), cap at 30 seconds. Add jitter (random 0-1s) to prevent all clients reconnecting at once after a server restart (a <span class="tooltip-trigger">thundering herd<span class="tooltip-content">When a server restarts or recovers from an outage, all disconnected clients try to reconnect at the exact same moment, overwhelming the server before it can stabilize. Adding random jitter (small random delays) to reconnection timers prevents this stampede.</span></span>).</p>
@@ -1406,14 +1408,17 @@ ws.onclose = () => {
         <text x="380" y="120" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">+ random jitter (0-1s) on each retry to avoid thundering herd</text>
         <text x="380" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Pattern: wait = min(2^attempt + random(0,1), maxDelay)</text>
       </svg>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Pitfall 2: Using WebSockets when SSE would suffice</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>The mistake:</strong> Defaulting to WebSockets for every real-time feature, even when data only flows from server to client.</p>
       <p><strong>Why it's bad:</strong> WebSockets are harder to scale (stateful connections, need Redis Pub/Sub), harder to debug (binary protocol, not visible in standard HTTP logs), and harder to deploy (some proxies and CDNs don't support them). If all you need is "server pushes updates to client," SSE gives you 90% of the benefit with 20% of the complexity.</p>
       <p><strong>The fix:</strong> Ask "does the client need to send data through this connection?" If no → SSE. If yes → WebSocket. Dashboard updates, live scores, notification feeds, stock tickers — all SSE candidates.</p>
@@ -1429,25 +1434,31 @@ ws.onclose = () => {
         <text x="565" y="73" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Chat, gaming, collaborative editing,</text>
         <text x="565" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">live auctions, trading platforms</text>
       </svg>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Pitfall 3: Forgetting about message ordering and delivery guarantees</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>The mistake:</strong> Assuming messages arrive in order and exactly once. With WebSockets, if the connection drops and reconnects, you might miss messages sent during the gap. Or if the server reprocesses a message, you might get duplicates.</p>
       <p><strong>Why it's bad:</strong> In a chat app, messages appear out of order. In a trading app, you might execute the same trade twice. In a collaborative editor, you get data corruption.</p>
       <p><strong>The fix:</strong> Assign each message a <span class="tooltip-trigger">sequence number<span class="tooltip-content">A monotonically increasing integer assigned to each message. When the client reconnects, it tells the server "I last received message #42" and the server replays everything from #43 onward. This ensures no messages are lost during disconnection and duplicates can be detected and ignored.</span></span> or timestamp. On reconnection, the client sends "I last saw message #42" and the server replays everything from #43. Deduplicate on the client side using message IDs.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Pitfall 4: No backpressure on fast producers</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p><strong>The mistake:</strong> A server producing events faster than clients can consume them. If 1,000 stock price updates arrive per second but the client can only render 30 frames per second, the client's message buffer grows without bound.</p>
       <p><strong>Why it's bad:</strong> Client memory explodes. Browser tabs crash. On mobile, the OS kills your app.</p>
       <p><strong>The fix:</strong> Implement server-side throttling (send at most 1 update per 100ms per client), or use <span class="tooltip-trigger">backpressure<span class="tooltip-content">A flow control mechanism where the consumer signals the producer to slow down when it can't keep up. In WebSockets, this might mean monitoring the send buffer size and dropping or batching updates when the client is falling behind. Without backpressure, fast producers overwhelm slow consumers.</span></span> mechanisms where the server detects slow consumers and either batches updates or drops intermediate ones (sending only the latest state).</p>
@@ -1476,6 +1487,7 @@ ws.onclose = () => {
         <text x="680" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Tab killed</text>
         <text x="380" y="110" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="10" font-weight="600">Fix: Server-side throttling → send only latest state, batch updates</text>
       </svg>
+      </div>
     </div>
   </div>
 </div>
@@ -1508,19 +1520,23 @@ ws.onclose = () => {
     <p>(d) A multiplayer chess game.</p>
     <p>(e) A Twitter-like social feed that shows new tweets as they appear.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Hints</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Hints</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>Think about: (1) direction of data flow, (2) how often updates happen, (3) whether the client needs to send data back through the same channel.</p>
+        </div>
       </div>
     </div>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>(a) <strong>SSE</strong> — Scores flow one direction (server → client), moderate frequency, no client input needed.</p>
         <p>(b) <strong>WebSocket</strong> — Users type (client → server) and see others' edits (server → client). Very high frequency, needs to be bidirectional and fast.</p>
         <p>(c) <strong>SSE or Short Polling</strong> — Every 10 seconds is slow enough that even short polling works. SSE is cleaner if you want instant updates when sensors spike.</p>
         <p>(d) <strong>WebSocket</strong> — Both players need to send moves and see the opponent's moves. Although moves are infrequent, the bidirectional nature and low latency requirement (clock is ticking!) make WebSocket the right fit.</p>
         <p>(e) <strong>SSE</strong> — New tweets push from server to client. User interactions (liking, retweeting) go through separate REST API calls.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1529,10 +1545,12 @@ ws.onclose = () => {
     <h4>Exercise 2: Estimate WebSocket Server Capacity</h4>
     <p>You're designing a chat app. Each WebSocket connection uses ~10 KB of server memory. Your server has 8 GB of RAM available for connections. How many concurrent users can one server handle? If you have 500,000 users online simultaneously, how many servers do you need?</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>8 GB = 8,000,000 KB. At 10 KB per connection: <strong>800,000 connections per server</strong>.</p>
         <p>For 500,000 users: technically 1 server is enough (500K < 800K). But in production you'd use at least 3 servers for redundancy, load distribution, and headroom during traffic spikes. A common rule: plan for 50% utilization, so you'd want 500K / 400K = <strong>2 servers minimum, 3 for safety</strong>.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1541,8 +1559,9 @@ ws.onclose = () => {
     <h4>Exercise 3: Design the Fallback Chain</h4>
     <p>Your application needs to work behind strict corporate firewalls that block WebSocket upgrade requests, old browsers that don't support SSE, and modern browsers on fast networks. Design a transport negotiation strategy that picks the best available option. Write pseudocode for the client-side logic.</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <div class="macos-window">
           <div class="macos-titlebar">
             <span class="dot dot-red"></span>
@@ -1580,6 +1599,7 @@ ws.onclose = () => {
           </div>
         </div>
         <p>This is essentially what Socket.IO and SignalR do internally. The key insight: start with the best, gracefully degrade.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1608,8 +1628,9 @@ ws.onclose = () => {
       </div>
     </div>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p><strong>The bug:</strong> When the server is down, every <code>fetch()</code> fails immediately (no 30-second hold). The <code>catch</code> block runs and immediately calls <code>longPoll()</code> again, which fails instantly again. This creates an infinite loop of rapid-fire failed requests — thousands per second — which will crash the browser tab and DDoS your own server.</p>
         <p><strong>The fix:</strong> Add a delay in the <code>catch</code> block before retrying:</p>
         <div class="macos-window">
@@ -1634,6 +1655,7 @@ ws.onclose = () => {
 }</code></pre>
           </div>
         </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1642,18 +1664,22 @@ ws.onclose = () => {
     <h4>Exercise 5: Interview Scenario</h4>
     <p>You're asked to design the real-time notification system for a platform like GitHub. Users should see notifications instantly when someone mentions them, reviews their PR, or comments on their issue. There are 20 million registered users, but only about 2 million are online at any given time. How would you architect the real-time delivery?</p>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Hints</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Hints</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p>Think about: (1) Which technique for the browser connection? (2) How do you route a notification to the right server if you have many? (3) What happens to notifications when the user is offline? (4) How many servers do you need?</p>
+        </div>
       </div>
     </div>
     <div class="collapsible">
-      <div class="collapsible-header"><span>Solution</span></div>
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span>Solution</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
       <div class="collapsible-content">
+        <div class="collapsible-body">
         <p><strong>Transport:</strong> SSE for browser delivery (notifications are server → client only; users don't need to send data back through the notification channel). WebSocket is overkill here.</p>
         <p><strong>Architecture:</strong> 2M connections at ~10KB each = ~20GB total. With 8GB/server at 50% utilization: ~5 servers for SSE connections. Use a connection registry (Redis hash: userId → serverId) so when a notification is generated, the system knows which server to route it to. Use Redis Pub/Sub to broadcast to the correct server.</p>
         <p><strong>Offline users:</strong> Store undelivered notifications in a database. When the user reconnects, they fetch missed notifications via a regular REST API call (GET /notifications?since=lastSeen).</p>
         <p><strong>Scaling:</strong> The notification <em>generation</em> service is separate from the notification <em>delivery</em> service. Generation writes to a queue (Kafka/RabbitMQ). Delivery workers consume from the queue, look up the user's server in Redis, and push through SSE.</p>
+        </div>
       </div>
     </div>
   </div>
