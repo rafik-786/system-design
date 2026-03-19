@@ -34,7 +34,7 @@
       <span><i class="fa-solid fa-diagram-project"></i> 22 SVG Diagrams</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
       <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
-      <span><i class="fa-solid fa-circle-info"></i> 18 Tooltips</span>
+      <span><i class="fa-solid fa-circle-info"></i> 22 Tooltips</span>
     </div>
   </div>
 </div>
@@ -57,7 +57,7 @@
     <strong>Mental Model:</strong> HTTP evolves like highway engineering. HTTP/1.0 was a single-lane dirt road (one car at a time). HTTP/1.1 paved it and let cars queue up. HTTP/2 turned it into a multi-lane highway (many cars at once). HTTP/3 said "forget roads entirely" and built a maglev train that doesn't get stuck when one rail breaks.
   </div>
 
-  <p>Every time you open a website, your browser talks to a server using <span class="tooltip">HTTP<span class="tooltip-text">HyperText Transfer Protocol — the language browsers and servers use to exchange web pages, images, APIs, and pretty much everything on the internet.</span></span>. The problem? The original version was painfully slow for modern websites. Each new version of HTTP exists because the previous one had a specific bottleneck that made the web feel sluggish. Understanding these bottlenecks — and the clever solutions each version introduced — is essential for any engineer who builds things on the web.</p>
+  <p>Every time you open a website, your browser talks to a server using <span class="tooltip-trigger">HTTP<span class="tooltip-content">HyperText Transfer Protocol — the language browsers and servers use to communicate. Every webpage you've ever loaded was delivered via HTTP.</span></span>. The problem? The original version was painfully slow for modern websites. Each new version of HTTP exists because the previous one had a specific bottleneck that made the web feel sluggish. Understanding these bottlenecks — and the clever solutions each version introduced — is essential for any engineer who builds things on the web.</p>
 
   <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP version timeline showing the evolution from 1.0 to 3">
     <defs>
@@ -112,7 +112,7 @@
     <text x="380" y="172" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-size="11" font-weight="600">Each version solves the previous version's biggest bottleneck</text>
   </svg>
 
-  <p>Here's the pattern: <strong>HTTP/1.0</strong> opened a brand-new connection for every single file — brutally wasteful. <strong>HTTP/1.1</strong> fixed that by reusing connections, but requests still had to wait in line one after another. <strong>HTTP/2</strong> let multiple requests fly over a single connection simultaneously — a massive leap. But it ran on <span class="tooltip">TCP<span class="tooltip-text">Transmission Control Protocol — a reliable transport layer that guarantees data arrives in order and without errors, at the cost of some overhead.</span></span>, and when one packet got lost, everything froze. <strong>HTTP/3</strong> ditched TCP entirely, switching to a new transport called <span class="tooltip">QUIC<span class="tooltip-text">Quick UDP Internet Connections — a transport protocol built on UDP that provides reliable delivery, encryption, and multiplexing without TCP's head-of-line blocking problem.</span></span> that doesn't have this freezing problem.</p>
+  <p>Here's the pattern: <strong>HTTP/1.0</strong> opened a brand-new connection for every single file — brutally wasteful. <strong>HTTP/1.1</strong> fixed that by reusing connections, but requests still had to wait in line one after another. <strong>HTTP/2</strong> let multiple requests fly over a single connection simultaneously — a massive leap. But it ran on TCP, and when one packet got lost, everything froze. <strong>HTTP/3</strong> ditched TCP entirely, switching to a new transport called <span class="tooltip-trigger">QUIC<span class="tooltip-content">Quick UDP Internet Connections — Google's protocol that replaces TCP for HTTP/3. Built on UDP, supports 0-RTT connection resumption.</span></span> that doesn't have this freezing problem.</p>
 
   <div class="callout callout-info">
     <strong>One-line takeaway:</strong> HTTP/1.1 reuses connections. HTTP/2 multiplexes streams. HTTP/3 eliminates TCP's blocking with QUIC. Each version makes the web measurably faster.
@@ -273,10 +273,10 @@
     <text x="380" y="308" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">55 handshakes × 100ms = 5,500ms wasted on setup</text>
   </svg>
 
-  <p>This was fine when a web page had 3 files. But by the mid-2000s, pages had 50-100 resources. Each one needed its own <span class="tooltip">TCP handshake<span class="tooltip-text">A three-step process (SYN → SYN-ACK → ACK) that two computers use to establish a reliable connection. Takes one round trip — typically 50-150ms depending on distance.</span></span> — a back-and-forth greeting that takes one full round trip. On a connection with 100ms latency (common for cross-continent requests), that's <strong>100ms of pure overhead per file</strong>, before a single byte of actual data transfers.</p>
+  <p>This was fine when a web page had 3 files. But by the mid-2000s, pages had 50-100 resources. Each one needed its own <span class="tooltip-trigger">TCP handshake<span class="tooltip-content">A three-step process (SYN → SYN-ACK → ACK) that two computers use to establish a reliable connection. Takes one round trip — typically 50-150ms depending on distance.</span></span> — a back-and-forth greeting that takes one full <span class="tooltip-trigger">round trip (RTT)<span class="tooltip-content">The time for a packet to travel from client to server and back. Typically 20-150ms depending on distance.</span></span>. On a connection with 100ms <span class="tooltip-trigger">latency<span class="tooltip-content">The time delay between sending a request and receiving the first byte of the response. Determined by distance, network hops, and processing time.</span></span> (common for cross-continent requests), that's <strong>100ms of pure overhead per file</strong>, before a single byte of actual data transfers.</p>
 
   <div class="callout callout-info">
-    <strong>Did HTTP/1.1 fix this?</strong> Partially. It introduced <strong>keep-alive</strong> — reusing the same connection for multiple requests. But it had its own problem, which we'll see in the next section. The connection stayed open, but requests still had to wait in line.
+    <strong>Did HTTP/1.1 fix this?</strong> Partially. It introduced <strong><span class="tooltip-trigger">keep-alive<span class="tooltip-content">Reusing a TCP connection for multiple HTTP requests instead of opening a new one each time. Saves the 3-way handshake overhead.</span></span></strong> — reusing the same connection for multiple requests. But it had its own problem, which we'll see in the next section. The connection stayed open, but requests still had to wait in line.
   </div>
 </div>
 
@@ -295,7 +295,7 @@
 
   <p>HTTP/1.1 (1997) made a crucial improvement: <strong>persistent connections</strong>. Instead of opening and closing a connection for every file, the browser keeps the connection open and sends multiple requests over it. Great! But here's the catch — requests must still go one after another on a single connection. You send request 1, wait for the response, then send request 2, wait for the response, and so on.</p>
 
-  <p>This is like being in a single-file checkout line at a grocery store. The person at the front is paying with a complicated coupon that takes 30 seconds to process. Everyone behind them — even people with a single item — has to wait. That slow request at the front <strong>blocks everything behind it</strong>. Engineers call this <span class="tooltip">head-of-line blocking<span class="tooltip-text">When the first item in a queue prevents all subsequent items from being processed, even if they could be handled immediately. The "head" (front) of the "line" (queue) blocks everyone behind it.</span></span>.</p>
+  <p>This is like being in a single-file checkout line at a grocery store. The person at the front is paying with a complicated coupon that takes 30 seconds to process. Everyone behind them — even people with a single item — has to wait. That slow request at the front <strong>blocks everything behind it</strong>. Engineers call this <span class="tooltip-trigger">head-of-line blocking<span class="tooltip-content">When one slow request blocks all other requests behind it — like a slow car in a single-lane tunnel holding up everyone.</span></span>.</p>
 
   <div class="callout callout-purple">
     <strong>🧠 Think First:</strong> HTTP/1.1 allows persistent connections but processes requests sequentially. Browsers work around this by opening <em>multiple</em> connections in parallel (typically 6 per domain). If a page needs 55 resources and each connection handles requests one at a time, how many "batches" does the browser need with 6 connections? What if one resource is a slow 2-second API call?
@@ -368,12 +368,12 @@
 
   <ul>
     <li><strong>Each connection has its own TCP handshake</strong> — 6 handshakes × 100ms = 600ms wasted before any data flows</li>
-    <li><strong>Each connection has its own <span class="tooltip">TLS handshake<span class="tooltip-text">Transport Layer Security handshake — an additional negotiation (1-2 round trips) on top of TCP where browser and server agree on encryption keys. Required for HTTPS.</span></span></strong> — for HTTPS sites, that's another 1-2 round trips per connection</li>
+    <li><strong>Each connection has its own <span class="tooltip-trigger">TLS<span class="tooltip-content">Transport Layer Security — the encryption layer that makes HTTPS secure. Adds 1-2 round trips to establish a secure connection.</span></span> handshake</strong> — for HTTPS sites, that's another 1-2 round trips per connection</li>
     <li><strong>6 connections still isn't enough</strong> for 55+ resources — you need ~10 sequential batches</li>
-    <li><strong>The server must maintain 6 open sockets per client</strong> — at scale, this means millions of open connections doing nothing most of the time</li>
+    <li><strong>The server must maintain 6 open sockets per client</strong> — at scale, <span class="tooltip-trigger">connection pooling<span class="tooltip-content">Maintaining a set of pre-established connections that can be reused, avoiding the cost of creating new connections for each request.</span></span> helps, but this still means millions of open connections doing nothing most of the time</li>
   </ul>
 
-  <p>Web developers got creative with hacks: <span class="tooltip">CSS sprites<span class="tooltip-text">Combining many small images into one big image, then using CSS to show only the relevant portion. Reduces HTTP requests at the cost of complexity.</span></span> (cramming 30 icons into one image), concatenating all JavaScript into a single massive file, inlining CSS directly into HTML, and even spreading assets across multiple domains (domain sharding) to bypass the 6-connection limit. These were clever workarounds for a broken protocol.</p>
+  <p>Web developers got creative with hacks: <span class="tooltip-trigger">CSS sprites<span class="tooltip-content">Combining many small images into one big image, then using CSS to show only the relevant portion. Reduces HTTP requests at the cost of complexity.</span></span> (cramming 30 icons into one image), concatenating all JavaScript into a single massive file, inlining CSS directly into HTML, and even spreading assets across multiple domains (domain sharding) to bypass the 6-connection limit. These were clever workarounds for a broken protocol.</p>
 
   <div class="callout callout-danger">
     <strong>The fundamental problem:</strong> HTTP/1.1 is text-based, sequential, and has no way to interleave responses on a single connection. No matter how many connections you open, each individual connection processes one request at a time. The protocol needs a fundamentally different design — not more workarounds.
@@ -422,7 +422,7 @@
     </div>
   </div>
 
-  <p>What if instead of sending requests one after another (like a single-file checkout line), you could send them <em>all at once</em> and have the server respond with pieces of different files interleaved together? That's <strong>multiplexing</strong> — and it's the core idea behind HTTP/2.</p>
+  <p>What if instead of sending requests one after another (like a single-file checkout line), you could send them <em>all at once</em> and have the server respond with pieces of different files interleaved together? That's <strong><span class="tooltip-trigger">multiplexing<span class="tooltip-content">Sending multiple requests and responses simultaneously over a single connection, instead of waiting for each one to finish before starting the next.</span></span></strong> — and it's the core idea behind HTTP/2.</p>
 
   <p>Think of it like a restaurant kitchen with multiple chefs. You hand the waiter your entire order at once — burger, fries, drink, dessert. The kitchen doesn't finish the burger before starting the fries. All four items are being prepared <em>simultaneously</em>. As each one is ready, the waiter brings it to your table. The fries arrive first because they're quick. The burger takes longer. But nothing is waiting in line.</p>
 
@@ -512,7 +512,7 @@
 
   <p>With HTTP/2 multiplexing, all 55 requests fly out immediately on a single connection. The server sends back pieces of different files interleaved — a chunk of CSS, then a chunk of JavaScript, then a chunk of an image — all mixed together on the same connection. The browser reassembles each file from its chunks. The total time is determined by the <em>slowest individual file</em>, not by the sum of all files.</p>
 
-  <p>This is the fundamental breakthrough of HTTP/2, and it came from Google's experimental <span class="tooltip">SPDY<span class="tooltip-text">An experimental protocol created by Google in 2009 that introduced multiplexing, header compression, and server push. It was so successful that it became the basis for HTTP/2.</span></span> protocol. Google tested it across Chrome and their own servers, saw 40-60% improvement in page load times, and it eventually became the HTTP/2 standard in 2015.</p>
+  <p>This is the fundamental breakthrough of HTTP/2, and it came from Google's experimental <span class="tooltip-trigger">SPDY<span class="tooltip-content">An experimental protocol created by Google in 2009 that introduced multiplexing, header compression, and server push. It was so successful that it became the basis for HTTP/2.</span></span> protocol. Google tested it across Chrome and their own servers, saw 40-60% improvement in page load times, and it eventually became the HTTP/2 standard in 2015.</p>
 
   <div class="callout callout-success">
     <strong>Key insight:</strong> HTTP/2 didn't change what HTTP does (request a resource, get a response). It changed <em>how</em> — by replacing the text-based, sequential wire format with a binary, multiplexed one. Your existing websites, APIs, and servers work with zero code changes.
@@ -584,9 +584,9 @@
         <text x="50" y="195" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">✗ Text-based headers sent in full every time (~800 bytes each)</text>
       </svg>
 
-      <p>HTTP/1.1 also introduced <span class="tooltip">pipelining<span class="tooltip-text">A technique where the browser sends multiple requests without waiting for responses. Sounds great in theory, but responses must arrive in order, so a slow response still blocks everything. Most browsers disabled it.</span></span> — sending multiple requests without waiting for responses. In theory, this could have solved head-of-line blocking. In practice, responses still had to arrive in order, so it didn't actually help. Most browsers disabled pipelining because it caused more problems than it solved.</p>
+      <p>HTTP/1.1 also introduced <span class="tooltip-trigger">pipelining<span class="tooltip-content">HTTP/1.1 feature that allows sending multiple requests without waiting for responses — but responses must arrive in order, limiting its usefulness.</span></span> — sending multiple requests without waiting for responses. In theory, this could have solved head-of-line blocking. In practice, responses still had to arrive in order, so it didn't actually help. Most browsers disabled pipelining because it caused more problems than it solved.</p>
 
-      <p>Other features HTTP/1.1 brought: <code>Host</code> header (allowing multiple websites on one IP address), <span class="tooltip">chunked transfer encoding<span class="tooltip-text">A way to send a response in pieces without knowing the total size upfront. The server sends chunks as they're ready, each prefixed with its size, ending with a zero-length chunk.</span></span> (streaming responses before the full size is known), and better caching with <code>Cache-Control</code>, <code>ETag</code>, and conditional requests.</p>
+      <p>Other features HTTP/1.1 brought: <code>Host</code> header (allowing multiple websites on one IP address), <span class="tooltip-trigger">chunked transfer encoding<span class="tooltip-content">A way to send a response in pieces without knowing the total size upfront. The server sends chunks as they're ready, each prefixed with its size, ending with a zero-length chunk.</span></span> (streaming responses before the full size is known), and better caching with <code>Cache-Control</code>, <code>ETag</code>, and conditional requests.</p>
     </div>
   </div>
 
@@ -597,7 +597,7 @@
       <i class="fa-solid fa-chevron-down icon-gap"></i>
     </h3>
     <div class="card-body">
-      <p>HTTP/2 (2015) reimagined the entire wire format. Instead of plain text, it uses a <strong>binary framing layer</strong>. Every message — request or response — is split into small <span class="tooltip">frames<span class="tooltip-text">The smallest unit of communication in HTTP/2. Each frame has a fixed header (9 bytes) that says its length, type, stream ID, and flags. Types include HEADERS, DATA, SETTINGS, PUSH_PROMISE, and more.</span></span>, and each frame is tagged with a <strong>stream ID</strong>. Frames from different streams can be interleaved on a single connection — that's multiplexing.</p>
+      <p>HTTP/2 (2015) reimagined the entire wire format. Instead of plain text, it uses a <strong><span class="tooltip-trigger">binary framing<span class="tooltip-content">HTTP/2 encodes messages as binary frames instead of text. Faster to parse, smaller on the wire, enables multiplexing.</span></span> layer</strong>. Every message — request or response — is split into small <span class="tooltip-trigger">frames<span class="tooltip-content">The smallest unit of communication in HTTP/2. Each frame has a fixed header (9 bytes) that says its length, type, stream ID, and flags. Types include HEADERS, DATA, SETTINGS, PUSH_PROMISE, and more.</span></span>, and each frame is tagged with a <strong><span class="tooltip-trigger">stream<span class="tooltip-content">In HTTP/2, a virtual channel within a single TCP connection. Each request/response pair gets its own stream, enabling multiplexing.</span></span> ID</strong>. Frames from different streams can be interleaved on a single connection — that's multiplexing.</p>
 
       <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="HTTP/2 binary framing: requests split into frames with stream IDs, interleaved on one connection">
         <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">HTTP/2 Binary Framing — Multiple Streams, One Connection</text>
@@ -669,10 +669,10 @@
       <ul>
         <li><strong>Stream:</strong> A logical channel within the connection. Each request-response pair gets its own stream ID. Streams are independent — a slow response on stream 5 doesn't block stream 7.</li>
         <li><strong>Frame:</strong> The smallest unit of data. Each frame has a 9-byte header that tells the receiver its length, type, which stream it belongs to, and any flags. Think of frames as labeled envelopes on a shared conveyor belt.</li>
-        <li><strong>HPACK:</strong> A compression algorithm specifically designed for HTTP headers. Both client and server maintain a synchronized table of previously-seen headers. When a header repeats (which happens constantly — cookies, user-agent, accept), it's sent as a tiny index number instead of the full text.</li>
+        <li><strong><span class="tooltip-trigger">HPACK<span class="tooltip-content">HTTP/2's header compression algorithm. Compresses repeated headers using a shared dictionary, reducing header overhead by 85-95%.</span></span>:</strong> A compression algorithm specifically designed for HTTP headers. Both client and server maintain a synchronized table of previously-seen headers. When a header repeats (which happens constantly — cookies, user-agent, accept), it's sent as a tiny index number instead of the full text.</li>
       </ul>
 
-      <p>HTTP/2 also introduced <strong>server push</strong> — the server can proactively send resources the client hasn't asked for yet. If a client requests <code>index.html</code>, the server knows it will also need <code>style.css</code>, so it pushes the CSS immediately without waiting for the browser to discover and request it. (In practice, server push was tricky to get right, and Chrome eventually removed support for it in 2022.)</p>
+      <p>HTTP/2 also introduced <strong><span class="tooltip-trigger">server push<span class="tooltip-content">HTTP/2 feature where the server sends resources before the browser asks — like a waiter bringing water without you ordering it.</span></span></strong> — the server can proactively send resources the client hasn't asked for yet. If a client requests <code>index.html</code>, the server knows it will also need <code>style.css</code>, so it pushes the CSS immediately without waiting for the browser to discover and request it. (In practice, server push was tricky to get right, and Chrome eventually removed support for it in 2022.)</p>
     </div>
   </div>
 
@@ -749,11 +749,11 @@
         <text x="380" y="250" text-anchor="middle" fill="var(--text-secondary, #94a3b8)" font-family="Inter, sans-serif" font-size="10">If you've connected to this server before, QUIC can send data in the FIRST packet — zero round-trips of setup.</text>
       </svg>
 
-      <p>HTTP/3's solution was radical: <strong>replace TCP entirely</strong>. QUIC is a brand-new transport protocol built on top of <span class="tooltip">UDP<span class="tooltip-text">User Datagram Protocol — a simple transport that sends packets without guarantees. No ordering, no retransmission, no handshakes. Fast and lightweight, but unreliable on its own. QUIC adds reliability on top of UDP.</span></span>. But unlike raw UDP, QUIC provides everything TCP does — reliable delivery, congestion control, encryption — plus native multiplexing at the transport layer. Each <span class="tooltip">QUIC stream<span class="tooltip-text">An independent, ordered sequence of data within a QUIC connection. Unlike TCP, streams are first-class citizens — loss on one stream doesn't affect others.</span></span> is independent, so a lost packet on stream 3 only affects stream 3. Streams 1, 5, and 7 keep flowing.</p>
+      <p>HTTP/3's solution was radical: <strong>replace TCP entirely</strong>. QUIC is a brand-new transport protocol built on top of <span class="tooltip-trigger">UDP<span class="tooltip-content">User Datagram Protocol — a simple transport that sends packets without guarantees. No ordering, no retransmission, no handshakes. Fast and lightweight, but unreliable on its own. QUIC adds reliability on top of UDP.</span></span>. But unlike raw UDP, QUIC provides everything TCP does — reliable delivery, congestion control, encryption — plus native multiplexing at the transport layer. Each <span class="tooltip-trigger">QUIC stream<span class="tooltip-content">An independent, ordered sequence of data within a QUIC connection. Unlike TCP, streams are first-class citizens — loss on one stream doesn't affect others.</span></span> is independent, so a lost packet on stream 3 only affects stream 3. Streams 1, 5, and 7 keep flowing.</p>
 
       <p>Two more game-changers in HTTP/3:</p>
       <ul>
-        <li><strong>0-RTT connection resumption:</strong> If you've visited a server before, QUIC remembers the encryption keys. On your next visit, it sends data <em>in the very first packet</em> — zero round trips of handshaking. TCP + TLS needs 2-3 round trips before any data flows.</li>
+        <li><strong><span class="tooltip-trigger">0-RTT<span class="tooltip-content">Zero Round Trip Time resumption — QUIC can send data on the very first packet when reconnecting to a known server, eliminating handshake delay.</span></span> connection resumption:</strong> If you've visited a server before, QUIC remembers the encryption keys. On your next visit, it sends data <em>in the very first packet</em> — zero round trips of handshaking. TCP + TLS needs 2-3 round trips before any data flows.</li>
         <li><strong>Built-in encryption:</strong> QUIC mandates TLS 1.3. There's no unencrypted HTTP/3. The TLS handshake is combined with the QUIC handshake, saving a round trip compared to TCP + TLS.</li>
         <li><strong>Connection migration:</strong> If your phone switches from Wi-Fi to cellular, the IP address changes. TCP connections break (they're identified by IP + port). QUIC connections survive because they're identified by a <strong>connection ID</strong>, not by IP. The same request continues seamlessly on the new network.</li>
       </ul>
@@ -955,7 +955,7 @@ Connection: keep-alive</code></pre>
       <button class="tab-btn" data-tab="http-qpack" role="tab" aria-selected="false">QPACK (HTTP/3)</button>
     </div>
     <div class="tab-panel active" id="http-hpack" role="tabpanel">
-      <p><strong>HPACK</strong> maintains a <span class="tooltip">dynamic table<span class="tooltip-text">A key-value lookup table that both client and server maintain in sync. Previously sent headers get added to this table and can be referenced by index number in future requests — dramatically reducing header size.</span></span> — a synchronized lookup table on both client and server. When you send <code>User-Agent: Mozilla/5.0...</code> for the first time, it gets added to the table at index 62. The next request refers to it as just the number <code>62</code> — a single byte instead of 80 bytes.</p>
+      <p><strong>HPACK</strong> maintains a <span class="tooltip-trigger">dynamic table<span class="tooltip-content">A key-value lookup table that both client and server maintain in sync. Previously sent headers get added to this table and can be referenced by index number in future requests — dramatically reducing header size.</span></span> — a synchronized lookup table on both client and server. When you send <code>User-Agent: Mozilla/5.0...</code> for the first time, it gets added to the table at index 62. The next request refers to it as just the number <code>62</code> — a single byte instead of 80 bytes.</p>
       <p>HPACK also uses <strong>Huffman encoding</strong> for header values that aren't in the table yet, squeezing them to about 70% of their original size. The static table includes 61 pre-defined entries for common headers like <code>:method: GET</code>, <code>:status: 200</code>, and <code>content-type: text/html</code>.</p>
       <p><strong>The catch:</strong> HPACK requires both sides to process headers in <em>exact order</em>. If header frame X arrives before header frame Y, they must be decoded in that order. This works fine on TCP (which guarantees order) but is a problem for QUIC (where packets can arrive out of order).</p>
     </div>
@@ -1034,7 +1034,7 @@ Connection: keep-alive</code></pre>
     <strong>🧠 Think First:</strong> 0-RTT sounds like magic, but it has a security trade-off. If someone captures the first packet and replays it later, the server might process the same request twice. What kinds of requests would be dangerous to replay? (Hint: think about <code>POST /transfer-money</code> vs <code>GET /homepage</code>.)
   </div>
 
-  <p>That's exactly right — 0-RTT data is vulnerable to <span class="tooltip">replay attacks<span class="tooltip-text">An attacker captures a valid 0-RTT packet and sends it again to the server. If the request is a GET, no harm done (same page is returned). If it's a POST that transfers money, the server might process the transfer twice.</span></span>. That's why servers should only accept 0-RTT for <strong>idempotent requests</strong> (like GET) — requests that are safe to process more than once. Non-idempotent operations (POST, PUT, DELETE) should require a full handshake.</p>
+  <p>That's exactly right — 0-RTT data is vulnerable to <span class="tooltip-trigger">replay attacks<span class="tooltip-content">An attacker captures a valid 0-RTT packet and sends it again to the server. If the request is a GET, no harm done (same page is returned). If it's a POST that transfers money, the server might process the transfer twice.</span></span>. That's why servers should only accept 0-RTT for <strong>idempotent requests</strong> (like GET) — requests that are safe to process more than once. Non-idempotent operations (POST, PUT, DELETE) should require a full handshake.</p>
 </div>
 
 
@@ -1059,7 +1059,7 @@ Connection: keep-alive</code></pre>
       <i class="fa-solid fa-chevron-down icon-gap"></i>
     </h3>
     <div class="card-body">
-      <p><span class="tooltip">gRPC<span class="tooltip-text">Google Remote Procedure Call — a framework for calling functions on remote servers as if they were local. Uses Protocol Buffers for serialization and HTTP/2 for transport, enabling efficient bidirectional streaming.</span></span> is Google's framework for service-to-service communication. It runs exclusively on HTTP/2 because it needs multiplexing for its four communication patterns:</p>
+      <p><span class="tooltip-trigger">gRPC<span class="tooltip-content">Google Remote Procedure Call — a framework for calling functions on remote servers as if they were local. Uses Protocol Buffers for serialization and HTTP/2 for transport, enabling efficient bidirectional streaming.</span></span> is Google's framework for service-to-service communication. It runs exclusively on HTTP/2 because it needs multiplexing for its four communication patterns:</p>
 
       <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four gRPC communication patterns: unary, server streaming, client streaming, bidirectional">
         <text x="380" y="22" text-anchor="middle" fill="var(--text-primary, #f1f5f9)" font-family="Inter, sans-serif" font-weight="700" font-size="13">gRPC Communication Patterns (all need HTTP/2 streams)</text>
@@ -1105,12 +1105,12 @@ Connection: keep-alive</code></pre>
       <i class="fa-solid fa-chevron-down icon-gap"></i>
     </h3>
     <div class="card-body">
-      <p><span class="tooltip">WebSocket<span class="tooltip-text">A protocol that provides full-duplex (two-way) communication over a single TCP connection. Starts as an HTTP/1.1 request with an Upgrade header, then switches to a completely different protocol for real-time messaging.</span></span> starts its life as a regular HTTP/1.1 request with a special <code>Upgrade: websocket</code> header. The server agrees, and the connection "upgrades" from HTTP to the WebSocket protocol. After that, HTTP is completely gone — it's a raw bidirectional data pipe.</p>
+      <p><span class="tooltip-trigger">WebSocket<span class="tooltip-content">A protocol that provides full-duplex (two-way) communication over a single TCP connection. Starts as an HTTP/1.1 request with an Upgrade header, then switches to a completely different protocol for real-time messaging.</span></span> starts its life as a regular HTTP/1.1 request with a special <code>Upgrade: websocket</code> header. The server agrees, and the connection "upgrades" from HTTP to the WebSocket protocol. After that, HTTP is completely gone — it's a raw bidirectional data pipe.</p>
 
       <p>With HTTP/2 and HTTP/3, WebSocket works differently. HTTP/2 introduced WebSocket over a single stream (RFC 8441) — the upgrade happens within one stream while other streams continue normal HTTP traffic. This is more efficient than HTTP/1.1 WebSocket, which took over the entire TCP connection.</p>
 
       <div class="callout callout-info">
-        <strong>When to use what:</strong> Need real-time bidirectional messaging (chat, gaming, live feeds)? WebSocket. Need efficient API calls between services? gRPC over HTTP/2. Need one-way server updates? <span class="tooltip">Server-Sent Events<span class="tooltip-text">A simple standard for one-way real-time updates from server to client over a regular HTTP connection. Simpler than WebSocket but only server → client, not bidirectional.</span></span> (SSE) over any HTTP version.
+        <strong>When to use what:</strong> Need real-time bidirectional messaging (chat, gaming, live feeds)? WebSocket. Need efficient API calls between services? gRPC over HTTP/2. Need one-way server updates? <span class="tooltip-trigger">Server-Sent Events<span class="tooltip-content">A simple standard for one-way real-time updates from server to client over a regular HTTP connection. Simpler than WebSocket but only server → client, not bidirectional.</span></span> (SSE) over any HTTP version.
       </div>
     </div>
   </div>
@@ -1204,7 +1204,7 @@ shop.example.com {
       <i class="fa-solid fa-chevron-down icon-gap"></i>
     </h3>
     <div class="card-body">
-      <p>In 2009, Google's Mike Belshe published research showing that on typical web pages, <strong>increasing bandwidth beyond 5 Mbps didn't improve load times</strong>. The bottleneck wasn't bandwidth — it was <span class="tooltip">latency<span class="tooltip-text">The time it takes for a single packet to travel from client to server and back (the round-trip time). Unlike bandwidth (how many packets per second), latency is limited by the speed of light and network hops.</span></span>. All those TCP handshakes, sequential requests, and head-of-line blocking were the real problem.</p>
+      <p>In 2009, Google's Mike Belshe published research showing that on typical web pages, <strong>increasing bandwidth beyond 5 Mbps didn't improve load times</strong>. The bottleneck wasn't bandwidth — it was latency. All those TCP handshakes, sequential requests, and head-of-line blocking were the real problem.</p>
 
       <p>Google built SPDY (pronounced "speedy") as an experiment. They deployed it between Chrome and Google's servers and measured: <strong>page load times dropped 40-60%</strong> on news sites, ~27-60% on complex web apps. The improvement was so dramatic that the IETF used SPDY as the starting point for HTTP/2.</p>
 
