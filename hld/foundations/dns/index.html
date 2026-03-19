@@ -1153,37 +1153,155 @@ com.    172800  IN  NS  c.gtld-servers.net.
 
       <p>Notice the TTL: <code>172800</code> seconds = 48 hours. TLD assignments almost never change, so root servers tell resolvers to cache this answer for two full days.</p>
 
-      <div class="callout callout-warning">
-        <strong>But wait — how does the resolver know the root server's IP address?</strong> This is the bootstrap problem. You can't use DNS to look up the root servers, because DNS hasn't started yet! The answer: <strong>every resolver has a hardcoded file</strong> containing all 13 root server IP addresses. This file is called <code>named.cache</code> (BIND), <code>named.root</code> (older systems), or <code>root.hints</code>. It ships with the DNS software and is updated roughly once a year by IANA.
+      <h3>The Bootstrap Problem — How Does the Resolver Find Root Servers?</h3>
+
+      <p>Stop and think about this for a moment. DNS resolves names to IP addresses. But root servers have names like <code>a.root-servers.net</code>. To resolve that name... you'd need DNS. But DNS can't start without knowing the root servers. It's a chicken-and-egg problem. <strong>How does the very first DNS query ever work?</strong></p>
+
+      <div class="think-first-box">
+        <span class="think-label">Think First</span>
+        <p>If DNS resolves names to IPs, and root servers are identified by names (a.root-servers.net), how does a brand-new resolver that has never made a DNS query find the root servers? It can't use DNS — DNS hasn't started yet.</p>
+        <span class="think-hint">The answer is beautifully simple: cheating. The root server IPs aren't looked up — they're written down in advance.</span>
       </div>
+
+      <p>The answer is a small, unglamorous text file called the <strong>root hints file</strong>. Every DNS resolver on Earth — from Google's 8.8.8.8 handling billions of queries per day to the tiny DNS cache on your home router — ships with this file pre-installed. It contains the IP addresses (both IPv4 and IPv6) of all 13 root servers. No DNS lookup required. The addresses are just... there.</p>
+
+      <p>The file goes by different names depending on the software:</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>DNS Software</th><th>File Location</th><th>Used By</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>BIND</strong> (most popular)</td><td><code>/etc/bind/db.root</code> or <code>/var/named/named.ca</code></td><td>Most Linux DNS servers, ISPs</td></tr>
+            <tr><td><strong>Unbound</strong></td><td><code>/etc/unbound/root.hints</code></td><td>Cloudflare 1.1.1.1, many resolvers</td></tr>
+            <tr><td><strong>Windows DNS Server</strong></td><td><code>C:\Windows\System32\dns\cache.dns</code></td><td>Active Directory environments</td></tr>
+            <tr><td><strong>macOS</strong></td><td>Built into <code>mDNSResponder</code> binary</td><td>Every Mac and iPhone</td></tr>
+            <tr><td><strong>systemd-resolved</strong></td><td>Compiled into the binary</td><td>Modern Ubuntu, Fedora</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>You can download the official, canonical version maintained by IANA (the Internet Assigned Numbers Authority) right now:</p>
 
       <div class="macos-window">
         <div class="macos-titlebar">
           <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-          <span class="macos-filename">The root hints file — see it yourself</span>
+          <span class="macos-filename">Download and read the root hints file</span>
         </div>
         <div class="macos-body">
-<pre><code class="language-bash"># Linux (BIND):
-$ cat /etc/bind/db.root
+<pre><code class="language-bash"># Download the official root hints file from IANA:
+$ curl -s https://www.internic.net/domain/named.root
 
-# Or download the official version from IANA:
-$ curl https://www.internic.net/domain/named.root
-
-# You'll see entries like:
-.                        3600000  NS    A.ROOT-SERVERS.NET.
-A.ROOT-SERVERS.NET.      3600000  A     198.41.0.4        # Verisign
-A.ROOT-SERVERS.NET.      3600000  AAAA  2001:503:ba3e::2:30
-B.ROOT-SERVERS.NET.      3600000  A     170.247.170.2     # USC-ISI
-...all 13 listed with both IPv4 and IPv6 addresses</code></pre>
+# Here's what you'll see (the COMPLETE file — it's tiny):
+;       This file holds the information on root name servers needed to
+;       initialize cache of Internet domain name servers.
+;       (Related file: named.cache)
+;
+;       last update:    December 01, 2023
+;       related version of root zone:   2023120101
+;
+.                        3600000      NS    A.ROOT-SERVERS.NET.
+A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
+A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:ba3e::2:30
+;
+; FORMERLY NS.INTERNIC.NET - operated by Verisign, Inc.
+;
+.                        3600000      NS    B.ROOT-SERVERS.NET.
+B.ROOT-SERVERS.NET.      3600000      A     170.247.170.2
+B.ROOT-SERVERS.NET.      3600000      AAAA  2001:500:200::b
+;
+; FORMERLY NS1.ISI.EDU - operated by USC-ISI
+;
+.                        3600000      NS    C.ROOT-SERVERS.NET.
+C.ROOT-SERVERS.NET.      3600000      A     192.33.4.12
+C.ROOT-SERVERS.NET.      3600000      AAAA  2001:500:2::c
+;
+; FORMERLY C.PSI.NET - operated by Cogent Communications
+;
+; ... (D through M follow the same pattern)
+;
+.                        3600000      NS    M.ROOT-SERVERS.NET.
+M.ROOT-SERVERS.NET.      3600000      A     202.12.27.33
+M.ROOT-SERVERS.NET.      3600000      AAAA  2001:dc3::35
+;
+; OPERATED BY WIDE Project (Japan)</code></pre>
         </div>
       </div>
 
-      <p>This is one of the internet's elegant bootstraps: the very first step of DNS resolution doesn't use DNS at all — it reads from a local file. The file is tiny (about 3 KB, just 13 entries), practically never changes, and every DNS implementation on Earth includes it. That's why DNS works even if you've never configured anything — the root server addresses are already baked in.</p>
+      <p>That's the entire file. 13 entries, each with an IPv4 address (A record) and an IPv6 address (AAAA record). About <strong>3 KB of text</strong>. This tiny file is the foundation that the entire internet's naming system bootstraps from.</p>
 
-      <div class="think-first-box">
-        <span class="think-label">Think First</span>
-        <p>If the root hints file is hardcoded, what happens if a root server's IP address changes? How does the internet update millions of resolvers worldwide?</p>
-        <span class="think-hint">Root server IPs almost never change — most haven't changed in 20+ years. When one does change (rare), the new IP is announced months in advance, the root hints file is updated, and DNS software vendors include the new file in their next release. Meanwhile, resolvers that haven't updated still work because the other 12 root servers provide the updated information through a mechanism called "priming" — the resolver's first query to any root server returns the current list of ALL root servers.</span>
+      <p>Notice a few things about this file:</p>
+
+      <ul>
+        <li><strong>The TTL is 3,600,000 seconds</strong> — that's 41.6 days. The file is saying "these addresses are valid for over a month." Root server IPs almost <em>never</em> change.</li>
+        <li><strong>Both IPv4 and IPv6 addresses are listed</strong> — so the resolver works on both protocols.</li>
+        <li><strong>The comments show the operator</strong> — "operated by Verisign," "operated by USC-ISI," etc. These are the 12 organizations trusted with running the internet's root.</li>
+        <li><strong>The last update date is in the file</strong> — the file is updated roughly once a year, sometimes less frequently. The 2023 version is still current in 2026.</li>
+      </ul>
+
+      <h3>What Happens When a Resolver Boots Up: The Priming Query</h3>
+
+      <p>When a DNS resolver starts for the first time (or restarts), it doesn't just blindly trust the root hints file forever. It immediately performs what's called a <strong>priming query</strong> — it picks one of the 13 root server IPs from the hints file and asks: "Hey, what are the CURRENT root server addresses?"</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">The priming query — what the resolver does on boot</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-bash"># This is essentially what the resolver does internally:
+$ dig @198.41.0.4 . NS
+
+# Response: the CURRENT list of all root servers
+.     518400  IN  NS  a.root-servers.net.
+.     518400  IN  NS  b.root-servers.net.
+.     518400  IN  NS  c.root-servers.net.
+...all 13 listed...
+
+# PLUS the "glue records" — their actual IP addresses:
+a.root-servers.net.  518400  IN  A     198.41.0.4
+a.root-servers.net.  518400  IN  AAAA  2001:503:ba3e::2:30
+b.root-servers.net.  518400  IN  A     170.247.170.2
+...all 26 addresses (13 IPv4 + 13 IPv6)...</code></pre>
+        </div>
+      </div>
+
+      <p>This is the clever part: even if the root hints file is outdated (say, B.ROOT-SERVERS.NET changed its IP address since the file was last updated), the priming query returns the <strong>current, live</strong> list. As long as at least ONE of the 13 IPs in your hints file still works, the resolver gets the updated list and caches it. The hints file is just the seed — the priming query is the self-correcting mechanism.</p>
+
+      <p>This is why root server IP changes are so rare and so carefully coordinated. When B.ROOT-SERVERS.NET changed from <code>128.9.0.107</code> to <code>199.9.14.201</code> in 2004, and then to <code>170.247.170.2</code> in 2017, it was announced <strong>months</strong> in advance. The old IP continued to work for years alongside the new one. And even if a resolver had a 10-year-old hints file, the priming query to any of the other 12 servers would return the updated address.</p>
+
+      <h3>Glue Records — Breaking the Other Chicken-and-Egg Problem</h3>
+
+      <p>There's a second circular dependency hiding in DNS. The root server says: "The .com TLD is handled by <code>a.gtld-servers.net</code>." But wait — <code>a.gtld-servers.net</code> is itself a domain name. To connect to it, the resolver needs its IP address. To get its IP address... it would need to do a DNS lookup. But we're in the MIDDLE of a DNS lookup. Circular again.</p>
+
+      <p>The solution is <strong><span class="tooltip-trigger">glue records<span class="tooltip-content">Glue records are IP addresses included in a DNS referral response alongside the nameserver names. They "glue" the referral chain together by providing the IP you need to contact the next server — without requiring a separate DNS lookup. Without glue records, DNS resolution would get stuck in circular dependencies whenever a nameserver's name is within the zone it serves.</span></span></strong> — when a root server refers you to <code>a.gtld-servers.net</code>, it includes the IP address right there in the same response, in a section called "additional records":</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">Glue records in action — see them with dig</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-bash">$ dig @a.root-servers.net google.com
+
+;; AUTHORITY SECTION:    (referral — "ask these servers instead")
+com.      172800  IN  NS  a.gtld-servers.net.
+com.      172800  IN  NS  b.gtld-servers.net.
+...
+
+;; ADDITIONAL SECTION:   (glue — "and here are their IPs so you don't get stuck")
+a.gtld-servers.net.  172800  IN  A     192.5.6.30
+a.gtld-servers.net.  172800  IN  AAAA  2001:503:a83e::2:30
+b.gtld-servers.net.  172800  IN  A     192.33.14.30
+...</code></pre>
+        </div>
+      </div>
+
+      <p>Without glue records, DNS resolution would deadlock. The root says "ask a.gtld-servers.net" but you can't find a.gtld-servers.net without completing a DNS query first. Glue records break the cycle by providing the IP inline — no separate lookup needed. This happens at every referral step in the chain: root → TLD and TLD → authoritative, whenever the nameserver's name falls within the zone it serves.</p>
+
+      <div class="callout callout-info">
+        <strong>The full bootstrap chain:</strong> (1) Resolver reads root hints file (hardcoded IPs, no DNS needed). (2) Resolver sends priming query to get current root list. (3) Root server referral includes glue records for TLD servers. (4) TLD server referral includes glue records for domain nameservers. At no point does DNS need DNS to work — every circular dependency is broken by either a local file or glue records.
       </div>
     </div>
   </div>
