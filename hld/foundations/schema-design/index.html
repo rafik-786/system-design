@@ -30,7 +30,7 @@
     <h1>Schema Design &amp; Data Modeling</h1>
     <p class="hero-subtitle">Twitter stores 500 million tweets a day. Shopify processes $7.5 billion in orders per quarter. GitHub tracks 420 million repositories. None of it works without a schema &mdash; the blueprint that tells the database what your data looks like, how pieces connect, and what rules they must follow. Here's how to design one that doesn't collapse at scale.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 14+ SVG Diagrams</span>
       <span><i class="fa-solid fa-terminal"></i> Real SQL</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
@@ -487,6 +487,10 @@ DELETE FROM store_data WHERE order_id = 2;
     </div>
   </div>
 
+  <div class="callout callout-info">
+    <strong>Think First:</strong> You've just seen that the giant table causes update anomalies, insertion anomalies, and deletion anomalies. How would <em>you</em> fix it? You have five kinds of data: users, products, orders, reviews, and inventory. Sketch out how many tables you'd create and what columns go in each. What column would link an order to the user who placed it?
+  </div>
+
   <div class="callout callout-success">
     <strong>The core idea:</strong> Instead of one giant table with duplicated data everywhere, give each "thing" (users, products, orders) its own table. Then use <span class="tooltip-trigger">foreign keys<span class="tooltip-content">A column in one table that references the primary key of another table. It's the "link" between tables. When your <code>orders</code> table has <code>user_id = 42</code>, that's a foreign key pointing to <code>users.id = 42</code>. The database enforces this link &mdash; you can't create an order for user 999 if user 999 doesn't exist. Try it: <code>INSERT INTO orders (user_id) VALUES (999);</code> &mdash; the database will reject it with a foreign key violation.</span></span> to link them together. Each piece of information is stored in <strong>exactly one place</strong>. Update it once, and everywhere that references it sees the change automatically.
   </div>
@@ -653,6 +657,10 @@ DELETE FROM orders WHERE id = 2;
   </div>
 
   <p>Now that you understand <em>why</em> we separate tables, let's go deeper into the <em>how</em>. Schema design has six core building blocks. Master these, and you can design a clean database for any application.</p>
+
+  <div class="callout callout-info">
+    <strong>Think First:</strong> A user can place many orders, and each order can contain many products. How many tables do you need just for the user-order-product relationship? (Hint: an order with 3 products needs to store quantity and price <em>per product</em>. Can you do that with just a users, products, and orders table, or do you need a fourth table?)
+  </div>
 
   <!-- Card 1: ER Diagrams -->
   <div class="card open">
@@ -1367,6 +1375,10 @@ ALTER TABLE users RENAME COLUMN name TO full_name;        -- instant but takes A
     </div>
   </div>
 
+  <div class="callout callout-info">
+    <strong>Think First:</strong> Your analytics team needs to answer: "What was the total revenue per product category per month for the last 2 years?" On your normalized OLTP schema, that query joins 4 tables and scans 50 million order rows. It takes 45 seconds. Why is the OLTP schema wrong for this query, and what would a better schema look like?
+  </div>
+
   <p>Everything we've covered so far is <span class="tooltip-trigger">OLTP<span class="tooltip-content">Online Transaction Processing &mdash; the kind of database work that powers your day-to-day application. Inserts, updates, deletes, and simple lookups by primary key. Think: "add item to cart," "update user address," "record a payment." OLTP schemas are normalized (3NF) to minimize redundancy and support fast writes. PostgreSQL, MySQL, and SQL Server are all OLTP-first databases.</span></span> schema design &mdash; the standard approach for applications that read and write individual records. But not all workloads are the same. Analytics, reporting, and event-driven architectures need fundamentally different schema shapes. Here are the three main variations.</p>
 
   <!-- Card 1: OLTP -->
@@ -1600,6 +1612,10 @@ WHERE account_id = 'a1b2c3d4-...' AND created_at <= '2024-01-15';
   </div>
 
   <p>Theory is great, but the real test of a schema is whether it survives 10 million users, 500 million rows, and a team of 200 engineers all writing migrations at the same time. Let's look at four companies that faced exactly that &mdash; and how their schema decisions shaped everything.</p>
+
+  <div class="callout callout-info">
+    <strong>Think First:</strong> Instagram has 2 billion users. Every user has photos, likes, comments, and followers. If all that data lives in one PostgreSQL instance, the tables would have hundreds of billions of rows. How would you split this data across multiple database servers? What column would you use to decide which server stores which rows, and why?
+  </div>
 
   <!-- Card 1: Instagram -->
   <div class="card">

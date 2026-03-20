@@ -30,7 +30,7 @@
     <h1>CAP Theorem &amp; PACELC</h1>
     <p class="hero-subtitle">Network breaks. Choose: wrong answers or no answers? The most misunderstood theorem in system design — and why "pick 2 of 3" is a lie.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 20 SVG Diagrams</span>
       <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
@@ -626,7 +626,13 @@
     </div>
   </div>
 
-  <p>Now that you understand the big picture, let's get precise about each piece. This section breaks down the three letters of CAP and then shows the two families of systems that result from choosing between them.</p>
+  <div class="think-first-box">
+    <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>You have a 5-node Cassandra cluster with <code>CONSISTENCY QUORUM</code>. A network partition splits nodes into a group of 3 and a group of 2. Can the group of 3 still accept writes? Can the group of 2? What happens when the partition heals?</p>
+    <div class="think-hint"><strong>Hint:</strong> Quorum for 5 nodes = ceil(5/2 + 1) = 3. The group of 3 CAN reach quorum and keeps writing. The group of 2 CANNOT &#x2014; writes fail. When the partition heals, the group of 2 catches up from the group of 3. Quorum protects you from inconsistency, but the minority side goes unavailable.</div>
+  </div>
+
+  <p>Run <code>etcdctl endpoint status</code> on a Kubernetes cluster and you&#x2019;ll see a Raft leader, follower counts, and commit indices. That&#x2019;s CP in action &#x2014; etcd refuses writes if it can&#x2019;t reach a quorum. Now run <code>nodetool status</code> on a Cassandra ring and you&#x2019;ll see every node marked UN (Up Normal) with no leader at all &#x2014; that&#x2019;s AP. Two real systems, two opposite choices. Let&#x2019;s break down exactly what C, A, and P mean and how they combine.</p>
 
   <!-- Overview SVG -->
   <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Overview of C, A, P components and how they combine into CP and AP systems">
@@ -1121,7 +1127,13 @@
     </div>
   </div>
 
-  <p>Theory is clean. Reality is messy. Let's look at four real domains and see exactly how they navigate the CAP/PACELC trade-off — because most real systems don't pick "pure CP" or "pure AP." They use different strategies for different parts of the same system.</p>
+  <div class="think-first-box">
+    <div class="think-label"><i class="fa-solid fa-brain"></i> Think First</div>
+    <p>Amazon&#x2019;s shopping cart uses DynamoDB (AP). Amazon&#x2019;s payment processing uses a relational database (CP). Both are part of the same checkout flow. Why would the same company use opposite CAP strategies within a single user action?</p>
+    <div class="think-hint"><strong>Hint:</strong> Adding items to a cart must always work (even during a network partition) &#x2014; a lost sale is worse than a briefly inconsistent cart. But charging a credit card must never double-charge &#x2014; a refused transaction is better than an incorrect one. The cost of being wrong differs by data type.</div>
+  </div>
+
+  <p>Theory is clean. Reality is messy. Let&#x2019;s look at four real domains and see exactly how they navigate the CAP/PACELC trade-off &#x2014; because most real systems don&#x2019;t pick &#x201c;pure CP&#x201d; or &#x201c;pure AP.&#x201d; They use different strategies for different parts of the same system.</p>
 
   <!-- Variation 1: Banking/Finance -->
   <div class="card open">

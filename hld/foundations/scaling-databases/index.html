@@ -35,7 +35,7 @@
     <h1>Scaling Databases</h1>
     <p class="hero-subtitle">Your single PostgreSQL handles 5K reads/sec today. Your app is about to need 50K. Vertical scaling buys you 6 months. Read replicas, connection pooling, and failover buy you the next 5 years. Real configs, real commands, real companies.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 5 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 22 SVG Diagrams</span>
       <span><i class="fa-solid fa-terminal"></i> Real Configs</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
@@ -1109,6 +1109,12 @@ redis-cli INFO replication
 
   <p>Everything in Section 6 works on paper. But production has a way of finding the edge cases that diagrams skip over. This section covers the four gotchas that experienced database engineers have learned the hard way &mdash; each one discovered through real outages and late-night debugging sessions.</p>
 
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>A user updates their profile name. Your app writes to the primary. 200 milliseconds later, the user refreshes the page &mdash; and sees the <em>old</em> name. The data hasn't reached the replica yet. How would you fix this without sending <strong>all</strong> reads to the primary? (Hint: think about which reads need to be "fresh" and which can tolerate a small delay.)</p>
+    <span class="think-hint">One approach: after a write, direct that specific user's reads to the primary for the next N seconds. Everyone else still reads from replicas. This is called "read-your-own-writes" consistency.</span>
+  </div>
+
   <!-- ── Collapsible 1: Replication Lag ── -->
   <div class="collapsible">
     <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
@@ -1410,6 +1416,12 @@ SHOW SERVERS;</code></pre>
 
   <p>Everything so far has been about one topology: a single primary that handles writes, with read replicas that handle reads. But that's not the only way to scale a database. Different problems call for different architectures, and knowing which topology fits which problem is what separates a junior who "adds replicas" from a senior who designs the right replication strategy.</p>
 
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>What if you allowed <em>two</em> databases to both accept writes? User A writes to Database 1 and User B writes to Database 2 at the same time. Both update the same row &mdash; User A sets <code>status = 'shipped'</code> and User B sets <code>status = 'cancelled'</code>. When the two databases sync, which value wins? How would you resolve this conflict?</p>
+    <span class="think-hint">This is the fundamental problem with multi-primary replication. There's no universal answer &mdash; some systems use "last-write-wins" (timestamp), some use application-level conflict resolution, and some avoid the problem by ensuring the same row is only written on one primary.</span>
+  </div>
+
   <!-- ── Card 1: Primary-Replica vs Multi-Primary ── -->
   <div class="card open">
     <h3 class="card-title" role="button" tabindex="0" aria-expanded="true"><span><i class="fa-solid fa-diagram-project text-cyan" aria-hidden="true"></i> Primary-Replica vs Multi-Primary &mdash; One Writer or Many?</span></h3>
@@ -1617,6 +1629,12 @@ SHOW SERVERS;</code></pre>
   </div>
 
   <p>Theory is great, but what does database scaling actually look like at companies handling millions of users? Let's walk through four real-world setups &mdash; each one solves a different kind of scaling problem.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>GitHub serves 100 million developers. Every <code>git push</code> writes to the database, and every page view reads from it. Their read/write ratio is roughly 50:1. If a single primary handles 10K writes/sec and each replica handles 15K reads/sec, how many replicas does GitHub need to absorb 500K reads/sec? What's the bottleneck &mdash; reads or writes?</p>
+    <span class="think-hint">500K / 15K = ~34 replicas for reads. But 10K writes/sec from one primary? At that scale, they need write sharding too. This is why GitHub switched to Vitess &mdash; to shard writes across multiple primaries.</span>
+  </div>
 
   <!-- ── Card 1: Instagram ── -->
   <div class="card">
@@ -1828,6 +1846,12 @@ SHOW SERVERS;</code></pre>
   </div>
 
   <p>These are popular "rules of thumb" that sound right but are dangerously incomplete. They spread through blog posts and interview prep sites, and people repeat them without thinking through the consequences.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Your team proposes: "Let's use async replication everywhere &mdash; it's faster, and we'll deal with failures later." You have two workloads: a social media "like" counter and a payment processing system. Should you use async for both? What's the worst case for each if the primary crashes 0.5 seconds after a write?</p>
+    <span class="think-hint">Losing a "like" = annoying. Losing a confirmed payment = regulatory incident. The replication strategy should match the data's importance.</span>
+  </div>
 
   <!-- Anti-lesson 1 -->
   <div class="collapsible">

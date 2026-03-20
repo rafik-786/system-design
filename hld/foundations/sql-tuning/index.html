@@ -36,7 +36,7 @@
     <h1>SQL Tuning &amp; Query Optimization</h1>
     <p class="hero-subtitle">The single most impactful skill in backend engineering — turning a 90-second query into a 0.1ms query by changing one line. Every section has SQL you can run yourself.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 4 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 15 SVG Diagrams</span>
       <span><i class="fa-solid fa-terminal"></i> Real EXPLAIN Output</span>
       <span><i class="fa-solid fa-dumbbell"></i> 5 Hands-On Exercises</span>
@@ -427,6 +427,12 @@ LIMIT 20;</code></pre>
   </div>
 
   <p>The "add servers" approach failed because the problem was never the servers. It was the database. Specifically, it was one (or more) of four problems that cause 95% of all database performance issues. Let's meet all four — because you'll encounter every single one of them in your career.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Your "order history" page loads 20 orders. For each order, the code runs a separate query to fetch order items: <code>SELECT * FROM order_items WHERE order_id = ?</code>. That's 1 query for orders + 20 queries for items = <strong>21 queries per page load</strong>. If 200 users hit this page per second, how many queries per second hit the database? And what would happen if you replaced those 21 queries with a single JOIN?</p>
+    <span class="think-hint">200 users × 21 queries = 4,200 queries/sec. With one JOIN: 200 queries/sec. That's a 21x reduction. This is the N+1 problem.</span>
+  </div>
 
   <!-- SVG: Four horsemen overview -->
   <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four horsemen of slow queries: sequential scan, N+1, missing indexes, connection exhaustion">
@@ -1423,6 +1429,12 @@ EXECUTE get_orders(7);   -- plan: 0ms (cached) + exec: 0.1ms
 
   <p>Section 6 gave you the tools. This section explains the engine behind them — the internals that determine <em>why</em> the planner picks one plan over another, why your table gets slower over time even without schema changes, and how to handle tables that outgrow a single machine.</p>
 
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You have a table with 10 million rows and an index on <code>status</code>. 95% of rows have <code>status = 'completed'</code> and 5% have <code>status = 'pending'</code>. You run <code>WHERE status = 'completed'</code>. Will the database use the index or do a sequential scan? What about <code>WHERE status = 'pending'</code>?</p>
+    <span class="think-hint">Reading 9.5 million index entries + 9.5 million random data page fetches is <em>slower</em> than just scanning the whole table sequentially. The planner is smart enough to know this.</span>
+  </div>
+
   <!-- Collapsible 1: Query Planner Internals -->
   <div class="collapsible">
     <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-brain icon-gap"></i> Query Planner Internals — The Cost Model</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
@@ -1711,6 +1723,12 @@ SELECT * FROM orders WHERE user_id = 42;
   </div>
 
   <p>Everything so far has been PostgreSQL-focused. But the principles — EXPLAIN ANALYZE, indexes, N+1 detection, connection pooling — apply to every relational database. The <em>syntax</em> changes. The <em>thinking</em> doesn't. Here are the three most common variations you'll encounter.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>In PostgreSQL, <code>EXPLAIN ANALYZE</code> actually runs the query and shows real execution times. In MySQL, <code>EXPLAIN</code> only shows the plan without executing. What's the trade-off? When would you <em>not</em> want to actually execute the query to get its plan?</p>
+    <span class="think-hint">Think about a DELETE or UPDATE query. Running it "for real" to see the plan would actually modify data. Also, a query that takes 30 minutes — do you want to wait 30 minutes just to see the plan?</span>
+  </div>
 
   <!-- Variation 1: PostgreSQL vs MySQL EXPLAIN -->
   <div class="card open">
@@ -2041,6 +2059,12 @@ end</code></pre>
   </div>
 
   <p>Everything we've covered works great on a single database. But what happens when your product has millions of users and billions of rows? Let's look at four companies that deal with massive SQL workloads every single day — and how they keep things fast.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>Stack Overflow serves 1.3 billion page views per month with just <strong>2 SQL Server instances</strong>. Meanwhile, Shopify uses hundreds of MySQL shards across Vitess. Both are successful. Why would one company need hundreds of databases while another serves a billion views from two? What's fundamentally different about their workloads?</p>
+    <span class="think-hint">Think about the read/write ratio and whether queries can be cached. Stack Overflow's content changes rarely — the same question page can be cached for minutes. Shopify's checkout flow is unique per merchant, per customer, per cart.</span>
+  </div>
 
   <!-- SVG: Scale overview — 4 companies at a glance -->
   <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four companies and their SQL scale: Stack Overflow, GitHub, Shopify, Netflix">

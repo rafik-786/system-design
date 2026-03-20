@@ -30,7 +30,7 @@
     <h1>HTTP/1.0 → HTTP/1.1 → HTTP/2 → HTTP/3</h1>
     <p class="hero-subtitle">The web's delivery truck got upgraded three times — each version exists because the previous one had a specific bottleneck that made the internet feel slow. Here's the full story, with real people, real RFCs, real math, and real commands you can run right now.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 5 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 19 SVG Diagrams</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
       <span><i class="fa-solid fa-terminal"></i> Live Commands</span>
@@ -950,6 +950,11 @@ $ curl -v --http1.1 -o /dev/null -s https://www.example.com 2>&1 | grep -i "conn
       <span><i class="fa-solid fa-layer-group text-green icon-gap"></i> HTTP/2 — Binary Framing, Streams, HPACK, Server Push</span>
     </h3>
     <div class="card-body">
+      <div class="qa-think">
+        <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+        HTTP/1.1 sends headers as plain text. A typical request has headers like <code>User-Agent</code> (120 bytes), <code>Cookie</code> (250 bytes), <code>Accept</code> (80 bytes) — about 800 bytes total. For a page with 80 requests, that is 64,000 bytes of headers. Most of these headers are identical across all 80 requests. How much bandwidth could you save if you only sent each unique header value once and used a short index number for repeats?
+      </div>
+
       <p>HTTP/2 (RFC 7540, 2015) was a fundamental redesign of how data moves on the wire. While HTTP/1.1 sends plain text that a human can read with telnet, HTTP/2 sends <strong>binary frames</strong> — compact, machine-optimized packets. You can't telnet into an HTTP/2 server and type requests by hand anymore. That's the tradeoff: human readability for machine performance.</p>
 
       <p>The four big features:</p>
@@ -1266,6 +1271,11 @@ $ curl --http3 -v -o /dev/null -s https://cloudflare.com 2>&1
 
   <p>The previous sections covered <em>what</em> each version does. This section covers <em>how</em> it does it — the wire-level details that come up in senior-level system design interviews. Each topic below is a common follow-up question after you explain the HTTP versions.</p>
 
+  <div class="qa-think">
+    <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+    HTTP/2 multiplexes all requests on one TCP connection. HTTP/1.1 uses 6 parallel connections. If a single TCP packet is lost, HTTP/2 freezes ALL streams on that one connection. HTTP/1.1 only freezes the one connection that lost the packet — the other 5 keep flowing. In what network conditions would HTTP/1.1 actually outperform HTTP/2? Think about packet loss rates.
+  </div>
+
   <!-- Collapsible 1: Binary Framing Layer -->
   <div class="collapsible">
     <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
@@ -1578,6 +1588,11 @@ content-type: text/html
   </div>
 
   <p>HTTP is a request-response protocol — the client asks, the server answers. But many real-world applications need different communication patterns: continuous streams of data, real-time bidirectional chat, or compact binary serialization for microservice-to-microservice calls. Three protocols extend or replace HTTP for these use cases. Understanding when to use which is a staple of system design interviews.</p>
+
+  <div class="qa-think">
+    <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+    Your microservice architecture has 50 services. Service A calls Service B 10,000 times per second. Each call sends a JSON payload averaging 2 KB, and the response averages 5 KB. That is 70 MB/sec of raw JSON. If you switched to Protocol Buffers (60-70% smaller), how much bandwidth would you save per second? Per day? What about header compression savings if you use HTTP/2 with HPACK?
+  </div>
 
   <!-- Card 1: gRPC -->
   <div class="card open">
@@ -2115,6 +2130,11 @@ curl -w "HTTP/2:   %{time_total}s\n" --http2   -so /dev/null https://example.com
   </div>
 
   <p>These aren't hypothetical — they're the mistakes that show up in post-mortems, Hacker News threads, and 3 AM Slack messages. Every one of them has a simple fix, but you have to know they exist first. If you're running a web server or building APIs, scan this list and check whether any apply to you right now.</p>
+
+  <div class="qa-think">
+    <strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong>
+    Your web server is running nginx with default settings. You run <code>curl -v https://yoursite.com</code> and see <code>HTTP/1.1 200 OK</code> instead of <code>HTTP/2</code>. You have a valid TLS certificate. What is the most likely configuration issue? What single nginx directive would you add to fix it?
+  </div>
 
   <!-- Mistake 1 (open) -->
   <div class="collapsible open">

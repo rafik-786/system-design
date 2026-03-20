@@ -30,7 +30,7 @@
     <h1>ACID vs BASE</h1>
     <p class="hero-subtitle">Stripe processes billions in payments with PostgreSQL's SERIALIZABLE isolation &mdash; they'd rather be slow than lose a cent. Discord stores 12 billion messages per week in Cassandra &mdash; they'd rather be fast than perfectly synchronized. Two philosophies, both correct, for completely different reasons.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 10 SVG Diagrams</span>
       <span><i class="fa-solid fa-terminal"></i> Live Commands</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
@@ -503,7 +503,13 @@ SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
     </div>
   </div>
 
-  <p>In 2007, Amazon published a paper that changed distributed systems forever. It was called <em>Dynamo: Amazon's Highly Available Key-value Store</em>, and it contained a sentence that became legendary in the engineering world:</p>
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You&#x2019;re building an e-commerce checkout. The system has: (1) shopping cart state, (2) payment processing, (3) order confirmation email, (4) inventory count. Which of these four need ACID guarantees and which can use BASE? What&#x2019;s the <em>cost</em> of getting each one wrong?</p>
+    <span class="think-hint"><strong>Hint:</strong> Payments = ACID (double-charge is catastrophic). Inventory = ACID (overselling is expensive). Cart = BASE (briefly inconsistent cart is harmless). Email = BASE (duplicate email is annoying but not dangerous). Match the guarantee to the cost of failure.</span>
+  </div>
+
+  <p>In 2007, Amazon published a paper that changed distributed systems forever. It was called <em>Dynamo: Amazon&#x2019;s Highly Available Key-value Store</em>, and it contained a sentence that became legendary in the engineering world:</p>
 
   <div class="callout callout-info">
     <strong>Werner Vogels (Amazon CTO), 2007:</strong> "Customers should be able to view and add items to their shopping cart even if disks are failing, network routes are flapping, or data centers are being destroyed by tornados. <strong>Therefore, the service responsible for managing shopping cart state must always be available &mdash; it should be able to write to and read from its data store, under all circumstances.</strong>"
@@ -686,7 +692,7 @@ INSERT INTO payments (id, amount) VALUES (uuid(), 500.00)
     </div>
   </div>
 
-  <p>Now that you understand <em>why</em> ACID and BASE exist, let's dig into the individual properties. ACID has four guarantees, BASE has three principles. Each one solves a specific problem.</p>
+  <p>Run <code>psql -c "SHOW transaction_isolation"</code> and you&#x2019;ll see <code>read committed</code> &#x2014; that&#x2019;s the &#x201c;I&#x201d; in ACID, dialed to a specific level. Run <code>cqlsh -e "CONSISTENCY"</code> in Cassandra and you&#x2019;ll see <code>ONE</code> &#x2014; that&#x2019;s BASE, accepting stale reads for speed. Seven properties, two philosophies &#x2014; and every one maps to a setting you can inspect on a live system right now.</p>
 
   <svg viewBox="0 0 760 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Overview of all 7 properties: 4 ACID and 3 BASE">
     <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Seven Properties, Two Philosophies</text>
@@ -915,7 +921,13 @@ INSERT INTO payments (id, amount) VALUES (uuid(), 500.00)
     </div>
   </div>
 
-  <p>You now understand <em>what</em> ACID and BASE mean. This section digs into <em>how</em> they're implemented in real systems. Four topics that interviewers love to ask about &mdash; and that come up in every real-world system design.</p>
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>PostgreSQL&#x2019;s default isolation level is <code>READ COMMITTED</code>. MySQL&#x2019;s default is <code>REPEATABLE READ</code>. Both are ACID databases. If they&#x2019;re both ACID, why do they default to <em>different</em> isolation levels? What does your application see differently under each one?</p>
+    <span class="think-hint"><strong>Hint:</strong> READ COMMITTED lets you see other transactions&#x2019; committed changes mid-query (non-repeatable reads). REPEATABLE READ gives you a snapshot &#x2014; you see the same data throughout your transaction. The trade-off is freshness vs. consistency within a single transaction. PostgreSQL&#x2019;s MVCC makes READ COMMITTED cheap; MySQL&#x2019;s InnoDB optimizes for REPEATABLE READ.</span>
+  </div>
+
+  <p>You now understand <em>what</em> ACID and BASE mean. This section digs into <em>how</em> they&#x2019;re implemented in real systems. Four topics that interviewers love to ask about &mdash; and that come up in every real-world system design.</p>
 
   <!-- Collapsible 1: Isolation Levels -->
   <div class="collapsible">

@@ -30,7 +30,7 @@
     <h1>Relational Databases</h1>
     <p class="hero-subtitle">The 54-year-old technology that STILL powers Instagram, Stripe, Shopify, and Stack Overflow. From Edgar Codd's 1970 paper to your next production deployment &mdash; here's everything you need to know, with commands you can run right now.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 5 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 19 SVG Diagrams</span>
       <span><i class="fa-solid fa-terminal"></i> Live Commands</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
@@ -494,6 +494,11 @@ ORDER BY total_spent DESC;
     </div>
   </div>
 
+  <div class="think-first">
+    <span class="think-label">Think First</span>
+    <p>You delete user #42 from your JSON file. But user #42 has 15 orders, 3 reviews, and a saved payment method &mdash; all referencing <code>user_id: 42</code>. What happens to those records? Who's responsible for cleaning them up? What if you miss one?</p>
+  </div>
+
   <p>Let's name the four specific things that go wrong when you store relational data in flat files or document stores. These aren't theoretical &mdash; each one has cost real companies real money.</p>
 
   <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four failure modes of flat storage: orphans, duplication, query pain, corruption">
@@ -626,7 +631,7 @@ ROLLBACK;  -- Bob doesn't get the keyboard. But no oversell happened.
   <div class="callout callout-purple">
     <div class="callout-title"><i class="fa-solid fa-scroll"></i> Codd's Core Insight</div>
     <p><strong>Stop thinking about HOW data is stored. Think about WHAT the data IS.</strong> Organize data into <strong>tables</strong> (which he called "relations" &mdash; hence "relational"). Each table has <strong>rows</strong> (records) and <strong>columns</strong> (attributes). Link tables together using <strong>keys</strong>. Then let users describe WHAT they want in a simple language, and let the computer figure out HOW to get it efficiently.</p>
-    <p>In other words: you say <em>"give me all orders from California users,"</em> and the database figures out whether to use an index, a sequential scan, a hash join, or a nested loop. You never touch a pointer. You never navigate a tree. You just ask.</p>
+    <p>You say <em>"give me all orders from California users,"</em> and the database figures out whether to use an index, a sequential scan, a hash join, or a nested loop. You never touch a pointer. You never navigate a tree. You just ask.</p>
   </div>
 
   <p>IBM ignored him. They had billions invested in IMS and didn't want to cannibalize their own product. But a young programmer named <strong>Larry Ellison</strong> read the paper and saw the future. He founded a company to build a relational database. That company is <span class="tooltip-trigger">Oracle<span class="tooltip-content">Oracle Corporation, founded in 1977 by Larry Ellison, Bob Miner, and Ed Oates. They read Codd's papers and IBM's System R research papers (which described SQL), then built the first commercial relational database. Oracle v2 was released in 1979 &mdash; before IBM's own SQL/DS (1981). Ellison literally beat IBM to market using IBM's own research. Oracle is now a $300B company. Larry Ellison is one of the richest people on Earth.</span></span>.</p>
@@ -971,6 +976,11 @@ GROUP BY p.category;
       <div class="section-num">Section 6</div>
       <h2 class="section-title">How It Works &mdash; ACID Deep Dive</h2>
     </div>
+  </div>
+
+  <div class="think-first">
+    <span class="think-label">Think First</span>
+    <p>Alice has $500 in her account. She transfers $200 to Bob. The system deducts $200 from Alice's balance, but crashes before adding $200 to Bob's balance. Now $200 has vanished into thin air. How would a database prevent this &mdash; making sure BOTH changes happen or NEITHER does?</p>
   </div>
 
   <p>Section 1 mentioned ACID. Now let's <em>prove</em> each property with commands you can run in a real PostgreSQL terminal. These aren't theoretical &mdash; every demo below works on a fresh <code>psql</code> session. If you set up the tables from Section 5, you're ready to go.</p>
@@ -1507,6 +1517,11 @@ SHOW synchronous_commit;
     </div>
   </div>
 
+  <div class="think-first">
+    <span class="think-label">Think First</span>
+    <p>Your <code>users</code> table has 10 million rows. You run <code>SELECT * FROM users WHERE email = 'alice@example.com'</code>. Without any optimization, the database reads all 10 million rows to find one match. That takes ~30 seconds. How would you make this query run in under 5 milliseconds? What data structure would you use behind the scenes?</p>
+  </div>
+
   <p>If ACID is the safety net, indexing is the speed engine. A query on a table with 10 million rows can take 30 seconds without an index and 2 milliseconds with one. The difference between "our site is down" and "our site is fast" is often <em>a single <code>CREATE INDEX</code> statement</em>.</p>
 
   <p>Here's the intuition: imagine a 500-page textbook with no table of contents and no index at the back. To find every mention of "B-tree," you'd read every page. That's a <span class="tooltip-trigger">sequential scan<span class="tooltip-content">The database reads every single row in the table, one by one, checking each against your WHERE clause. For a 10 million row table, that's 10 million checks. It's the slowest access pattern, but it's always correct &mdash; it never misses a row. PostgreSQL falls back to sequential scan when no suitable index exists, when the table is tiny (faster than the index overhead), or when you're selecting most of the rows anyway (a full scan beats 8 million individual index lookups).</span></span>. Now imagine the textbook has an index: "B-tree: pages 47, 112, 289." You jump straight to those pages. That's a database index.</p>
@@ -1765,6 +1780,11 @@ ORDER BY pg_relation_size(indexrelid) DESC;
       <div class="section-num">Section 8</div>
       <h2 class="section-title">The Variations &mdash; Normalization &amp; Denormalization</h2>
     </div>
+  </div>
+
+  <div class="think-first">
+    <span class="think-label">Think First</span>
+    <p>You have a <code>users</code> table with columns for city, state, and country. "New York" appears in 500,000 rows. If NYC renamed itself (unlikely, but bear with us), you'd update 500,000 rows. A purist would say: make a separate <code>cities</code> table and store just a <code>city_id</code> in users. But now every user query needs a JOIN. Which is worse &mdash; the redundancy or the JOIN overhead? When does each choice make sense?</p>
   </div>
 
   <p>Section 5 showed you normalized tables &mdash; "store each fact once." But how far do you take this? And when should you break the rules and store data in more than one place? This section gives you the theory (normal forms), the practice (when to break them), and the tools to see what's happening under the hood (the query planner).</p>

@@ -30,7 +30,7 @@
     <h1>TCP &amp; UDP</h1>
     <p class="hero-subtitle">Two ways to send data. One obsesses over getting every byte right (TCP). The other just yells and hopes you heard (UDP). Every system you'll ever build picks one — here's how to choose.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 5 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 31 SVG Diagrams</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
       <span><i class="fa-solid fa-terminal"></i> Live Commands</span>
@@ -736,6 +736,12 @@ $ ping -c 100 google.com
         <text x="520" y="330" fill="#64748b" font-family="Inter,sans-serif" font-size="9">t=45ms (1.5 RTT)</text>
       </svg>
 
+      <div class="think-first-box">
+        <span class="think-label">Think First</span>
+        <p>TCP's 3-way handshake costs 1.5 round trips before any data can flow. On a 30ms RTT link that is 45ms. On a 150ms link (Mumbai to Virginia), that is 225ms. If your app makes 10 sequential API calls to the same server (each on a new TCP connection), how much total time is spent just on handshakes? What technique would you use to avoid this waste?</p>
+        <span class="think-hint">Hint: Think about connection reuse, keep-alive, and connection pooling.</span>
+      </div>
+
       <p>Those huge numbers (2,837,104,521) aren't made up — they're the <span class="tooltip-trigger">Initial Sequence Numbers (ISNs)<span class="tooltip-content">Each side of a TCP connection picks a random 32-bit starting number. Every byte of data sent gets a sequence number relative to this start. The randomness prevents old packets from previous connections being confused with new ones and provides basic defense against attackers guessing numbers.</span></span> you'd actually see in Wireshark. Each side picks a random 32-bit number, and from then on, every byte of data gets numbered starting from there. Why random? Two reasons: (1) prevents old packets from a previous connection being mistaken for new ones, and (2) makes it harder for attackers to inject fake packets by guessing the numbers.</p>
 
       <div class="callout callout-warning">
@@ -1123,6 +1129,12 @@ $ ping -c 100 google.com
     </div>
     <div class="collapsible-content">
       <div class="collapsible-body">
+        <div class="think-first-box">
+          <span class="think-label">Think First</span>
+          <p>HTTP/2 multiplexes 10 streams over a single TCP connection. One packet (carrying data for stream 3) gets lost. TCP blocks ALL 10 streams until that packet is retransmitted — roughly 200ms on a typical network. How many of the other 9 streams actually needed that packet? What percentage of the connection's throughput is wasted by this blocking?</p>
+          <span class="think-hint">Hint: The answer is why HTTP/3 exists. Think about what would happen if each stream managed its own reliability independently.</span>
+        </div>
+
         <p>This is TCP's biggest weakness, and it's the main reason HTTP/3 moved to UDP. TCP guarantees that data arrives <em>in order</em>. That sounds great — until one packet gets lost.</p>
 
         <p>Imagine you're loading a webpage over a single HTTP/2 connection. The browser is downloading images, CSS, and JavaScript as multiplexed streams. Packet 5 contains part of an image. Packet 6 contains CSS. Packet 7 contains JavaScript. If packet 5 gets lost, TCP <strong>blocks everything</strong> — packets 6 and 7 sit in the buffer, waiting for packet 5's retransmission. The CSS and JavaScript are right there, ready to go, but TCP won't deliver them out of order.</p>
@@ -1435,6 +1447,12 @@ $ ping -c 100 google.com
         <text x="620" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Voice channels, video, screen share</text>
         <text x="620" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Opus codec, adaptive bitrate</text>
       </svg>
+
+      <div class="think-first-box">
+        <span class="think-label">Think First</span>
+        <p>Discord has 200 million monthly active users. Voice channels use UDP for real-time audio. Text chat uses TCP via WebSocket. What would happen if Discord used TCP for voice calls too? On a typical home Wi-Fi connection with 0.5% packet loss, how often would a voice call freeze?</p>
+        <span class="think-hint">At 50 packets/sec for voice audio and 0.5% loss, roughly 1 packet is lost every 4 seconds. Each TCP retransmission adds ~200ms. Would you notice a 200ms pause every 4 seconds in a voice call?</span>
+      </div>
 
       <p>Text messages, friend lists, server data, and reactions all go over a persistent <span class="tooltip-trigger">WebSocket<span class="tooltip-content">A protocol that upgrades an HTTP/TCP connection to a full-duplex, persistent channel. The initial HTTP request says "upgrade to WebSocket," and then both sides can send data freely without the overhead of HTTP request/response cycles. Perfect for real-time chat.</span></span> connection (TCP). Every message must arrive perfectly and in order — you can't have chat messages disappearing or arriving scrambled.</p>
 
