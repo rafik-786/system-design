@@ -1,0 +1,2610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schema Design &amp; Data Modeling &mdash; System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="green" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-pencil-ruler"></i> Data Fundamentals</div>
+    <h1>Schema Design &amp; Data Modeling</h1>
+    <p class="hero-subtitle">Twitter stores 500 million tweets a day. Shopify processes $7.5 billion in orders per quarter. GitHub tracks 420 million repositories. None of it works without a schema &mdash; the blueprint that tells the database what your data looks like, how pieces connect, and what rules they must follow. Here's how to design one that doesn't collapse at scale.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 14+ SVG Diagrams</span>
+      <span><i class="fa-solid fa-terminal"></i> Real SQL</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 20+ Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 &mdash; Mental Model
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="mental-model">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">Mental Model &mdash; The Blueprint of Your Data's House</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>One sentence:</strong> A <span class="tooltip-trigger">schema<span class="tooltip-content">The formal definition of your database's structure &mdash; what tables exist, what columns each table has, what data types those columns use, and what rules (constraints) the data must follow. Think of it as an architect's blueprint: it doesn't contain the furniture (data), but it defines every room (table), every doorway (foreign key), and every building code requirement (constraint). In PostgreSQL, you can see your schema right now: <code>\d+ users</code></span></span> is the blueprint of your data's house. It defines which rooms exist (tables), what goes in each room (columns and types), and which doorways connect them (foreign keys). Without a blueprint, you get a pile of bricks.
+  </div>
+
+  <p>Before you write a single line of application code, someone has to answer a deceptively simple question: <em>what shape is our data?</em> That answer is the schema. It's the contract between your code and your database &mdash; your code says "give me all orders for user 42," and the schema guarantees that "orders" and "users" are real things with real columns and a real relationship between them.</p>
+
+  <p>Every company you've heard of started with this step. When the Shopify founders built their online store in 2006, one of the first things they did was sketch out tables for <code>shops</code>, <code>products</code>, <code>orders</code>, and <code>customers</code>. When Jack Dorsey built the first version of Twitter in 2006, he needed a <code>tweets</code> table. When GitHub launched in 2008, they needed <code>repositories</code>, <code>users</code>, and <code>commits</code>. The schema came before the UI, before the API, before everything.</p>
+
+  <p>Get it right, and your database hums along for years. Get it wrong, and you'll spend months on painful <span class="tooltip-trigger">migrations<span class="tooltip-content">The process of changing your database schema after it's already in production with real data. Adding a column, renaming a table, changing a data type &mdash; all migrations. They range from trivial (adding a nullable column takes milliseconds) to terrifying (changing a primary key type on a table with 500 million rows can take hours and requires downtime). Tools like Rails migrations, Alembic (Python), and Flyway (Java) help you version-control these changes.</span></span> &mdash; rewriting table structures while millions of rows of live data flow through them. GitHub had to migrate their <code>repositories</code> table primary key from 32-bit to 64-bit integers in 2019 when they approached 2.1 billion repositories. That migration took <em>months</em> of engineering. A better upfront schema choice would have avoided it entirely.</p>
+
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schema is the blueprint: analogy showing architect blueprint mapping to database tables">
+    <defs>
+      <marker id="sch-mm-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Schema = The Blueprint of Your Data</text>
+
+    <!-- House blueprint side -->
+    <rect x="30" y="50" width="320" height="240" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="190" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">Architect's Blueprint</text>
+
+    <rect x="55" y="95" width="120" height="55" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="115" y="118" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Kitchen</text>
+    <text x="115" y="136" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">sink, stove, fridge</text>
+
+    <rect x="195" y="95" width="120" height="55" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="255" y="118" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Bedroom</text>
+    <text x="255" y="136" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">bed, closet, window</text>
+
+    <rect x="55" y="170" width="120" height="55" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="115" y="193" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="11">Living Room</text>
+    <text x="115" y="211" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">sofa, TV, bookshelf</text>
+
+    <!-- Doorway arrows -->
+    <line x1="175" y1="122" x2="195" y2="122" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+    <line x1="115" y1="150" x2="115" y2="170" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+    <text x="190" y="260" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">Rooms = structure. Doorways = connections.</text>
+
+    <!-- Arrow connecting the two -->
+    <line x1="360" y1="175" x2="410" y2="175" stroke="#10b981" stroke-width="2" marker-end="url(#sch-mm-arr)"/>
+    <text x="385" y="165" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">maps to</text>
+
+    <!-- Database schema side -->
+    <rect x="420" y="50" width="320" height="240" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="580" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">Database Schema</text>
+
+    <rect x="445" y="95" width="120" height="55" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+    <text x="505" y="115" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-weight="600" font-size="11">users</text>
+    <text x="505" y="136" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">id, name, email</text>
+
+    <rect x="585" y="95" width="130" height="55" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+    <text x="650" y="115" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-weight="600" font-size="11">products</text>
+    <text x="650" y="136" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">id, name, price</text>
+
+    <rect x="445" y="170" width="120" height="55" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+    <text x="505" y="190" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-weight="600" font-size="11">orders</text>
+    <text x="505" y="211" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">id, user_id, total</text>
+
+    <!-- FK arrows -->
+    <line x1="505" y1="150" x2="505" y2="170" stroke="#10b981" stroke-width="1.5" marker-end="url(#sch-mm-arr)"/>
+    <line x1="585" y1="150" x2="555" y2="170" stroke="#10b981" stroke-width="1.5" marker-end="url(#sch-mm-arr)"/>
+    <text x="580" y="260" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">Tables = rooms. Foreign keys = doorways.</text>
+  </svg>
+
+  <p>Here's the comforting part: schema design is not magic. It follows a small set of rules that you can learn in an afternoon and apply for the rest of your career. By the end of this page, you'll be able to look at any business requirement and sketch a clean, <span class="tooltip-trigger">normalized<span class="tooltip-content">Organizing your tables so that each piece of information is stored in exactly one place. If a customer's address changes, you update it in ONE row, not in 500 order rows that all copied the address. The formal rules are called "normal forms" (1NF, 2NF, 3NF) &mdash; we'll cover them in Section 6. For now, just think of it as "don't repeat yourself" for databases.</span></span> schema that won't crumble under production traffic.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 &mdash; The Scenario
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="scenario">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-store"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario &mdash; Building an E-Commerce Database from Scratch</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Think First:</strong> You're building a Shopify competitor. You need to store users, products, orders, reviews, and inventory. Where do you even start? Before reading on, grab a piece of paper and sketch what tables you'd create.
+  </div>
+
+  <p>Let's make this concrete. You're building an online store &mdash; think a simplified version of Shopify or Amazon. Your store needs to handle these things:</p>
+
+  <ul>
+    <li><strong>Users</strong> &mdash; people who sign up, have an email and a shipping address</li>
+    <li><strong>Products</strong> &mdash; items for sale, each with a name, description, price, and category</li>
+    <li><strong>Orders</strong> &mdash; when a user buys something, you record what they bought, how much they paid, and when</li>
+    <li><strong>Reviews</strong> &mdash; users leave star ratings and comments on products</li>
+    <li><strong>Inventory</strong> &mdash; how many units of each product are in stock</li>
+  </ul>
+
+  <p>This is the same problem every e-commerce company has solved. Shopify's real <code>orders</code> table has columns like <code>id</code>, <code>shop_id</code>, <code>customer_id</code>, <code>total_price DECIMAL(10,2)</code>, <code>financial_status</code>, <code>fulfillment_status</code>, and <code>created_at</code>. We'll build something similar, but we'll start with the <em>wrong</em> approach first &mdash; because understanding why it fails teaches you more than jumping straight to the right answer.</p>
+
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="E-commerce domain: five entities that need to be stored">
+    <defs>
+      <marker id="sch-sc-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Our E-Commerce Domain &mdash; Five Things to Store</text>
+
+    <!-- User -->
+    <rect x="30" y="60" width="130" height="80" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="95" y="85" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="13"><tspan>&#128100;</tspan> Users</text>
+    <text x="95" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">name, email</text>
+    <text x="95" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">address</text>
+
+    <!-- Products -->
+    <rect x="190" y="60" width="130" height="80" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="255" y="85" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="13"><tspan>&#128722;</tspan> Products</text>
+    <text x="255" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">name, price</text>
+    <text x="255" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">category</text>
+
+    <!-- Orders -->
+    <rect x="350" y="60" width="130" height="80" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="415" y="85" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13"><tspan>&#128230;</tspan> Orders</text>
+    <text x="415" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">total, status</text>
+    <text x="415" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">date</text>
+
+    <!-- Reviews -->
+    <rect x="510" y="60" width="130" height="80" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="575" y="85" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="13"><tspan>&#11088;</tspan> Reviews</text>
+    <text x="575" y="105" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">stars, comment</text>
+    <text x="575" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">user + product</text>
+
+    <!-- Inventory -->
+    <rect x="315" y="180" width="160" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+    <text x="395" y="205" text-anchor="middle" fill="#f97316" font-family="Inter,sans-serif" font-weight="700" font-size="13"><tspan>&#128230;</tspan> Inventory</text>
+    <text x="395" y="225" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">product + quantity_in_stock</text>
+
+    <!-- Connections -->
+    <line x1="160" y1="100" x2="190" y2="100" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="320" y1="100" x2="350" y2="100" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="480" y1="100" x2="510" y2="100" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+    <line x1="415" y1="140" x2="395" y2="180" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+
+    <text x="380" y="270" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">These five entities are connected. The question is HOW to store them.</text>
+  </svg>
+
+  <p>The natural instinct &mdash; especially if you've used spreadsheets before &mdash; is to put everything into one big table. One row per order, with all the user info, product info, review info, and inventory count crammed into the same row. Let's try that approach and watch it fall apart.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 &mdash; First Attempt (The Spreadsheet Approach)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-table"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">First Attempt &mdash; One Giant Table</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>Think First:</strong> Imagine putting ALL your e-commerce data into a single spreadsheet &mdash; every order gets one row with the customer name, product name, price, review, and stock count all in that same row. What could go wrong?
+  </div>
+
+  <p>Here's the "just throw it all in one table" approach. It's how most people think about data when they first start, because it feels natural &mdash; like a spreadsheet. One row per order, with everything you need right there:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">the-one-giant-table.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- The "spreadsheet" approach: everything in one table
+CREATE TABLE store_data (
+    order_id        INT PRIMARY KEY,
+    order_date      TIMESTAMP,
+    order_total     DECIMAL(10,2),
+
+    -- Customer info (repeated on EVERY order)
+    customer_name   VARCHAR(100),
+    customer_email  VARCHAR(255),
+    customer_address TEXT,
+
+    -- Product info (repeated on EVERY order)
+    product_name    VARCHAR(200),
+    product_price   DECIMAL(10,2),
+    product_category VARCHAR(50),
+
+    -- Review info
+    review_stars    INT,
+    review_comment  TEXT,
+
+    -- Inventory
+    stock_quantity  INT
+);
+
+-- Let's insert some data
+INSERT INTO store_data VALUES
+(1, '2024-01-15', 29.99, 'Alice Johnson', 'alice@email.com',
+ '123 Main St, NYC', 'Wireless Mouse', 29.99, 'Electronics', 5,
+ 'Great mouse!', 150),
+
+(2, '2024-01-16', 29.99, 'Bob Smith', 'bob@email.com',
+ '456 Oak Ave, LA', 'Wireless Mouse', 29.99, 'Electronics', 4,
+ 'Good but battery dies fast', 149),
+
+(3, '2024-01-16', 79.99, 'Alice Johnson', 'alice@email.com',
+ '123 Main St, NYC', 'Mechanical Keyboard', 79.99, 'Electronics',
+ NULL, NULL, 75);</code></pre>
+    </div>
+  </div>
+
+  <p>Look at that data carefully. Alice has two orders. Her name, email, and address appear in <strong>both rows</strong>. The "Wireless Mouse" product name, price, and category also appear in <strong>both rows</strong>. Already, we're storing the same information multiple times. With 3 rows, this is mildly annoying. With 3 million rows, this is a catastrophe waiting to happen.</p>
+
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The giant table showing duplicated data highlighted in red">
+    <text x="380" y="24" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Giant Table &mdash; Spot the Duplication</text>
+
+    <!-- Table header -->
+    <rect x="20" y="45" width="720" height="28" rx="4" fill="rgba(16,185,129,0.15)"/>
+    <text x="55" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">order_id</text>
+    <text x="140" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">customer_name</text>
+    <text x="245" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">customer_email</text>
+    <text x="365" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">customer_address</text>
+    <text x="490" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">product_name</text>
+    <text x="590" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">product_price</text>
+    <text x="680" y="64" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-weight="600" font-size="9">stock_qty</text>
+
+    <!-- Row 1 -->
+    <rect x="100" y="80" width="180" height="50" rx="3" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="55" y="108" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">1</text>
+    <text x="140" y="100" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">Alice Johnson</text>
+    <text x="245" y="100" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">alice@email.com</text>
+    <text x="365" y="100" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">123 Main St</text>
+    <text x="490" y="100" text-anchor="middle" fill="#eab308" font-family="JetBrains Mono,monospace" font-size="9">Wireless Mouse</text>
+    <text x="590" y="100" text-anchor="middle" fill="#eab308" font-family="JetBrains Mono,monospace" font-size="9">29.99</text>
+    <text x="680" y="100" text-anchor="middle" fill="#f97316" font-family="JetBrains Mono,monospace" font-size="9">150</text>
+
+    <!-- Row 2 -->
+    <text x="55" y="148" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">2</text>
+    <text x="140" y="140" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Bob Smith</text>
+    <text x="245" y="140" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">bob@email.com</text>
+    <text x="365" y="140" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">456 Oak Ave</text>
+    <text x="490" y="140" text-anchor="middle" fill="#eab308" font-family="JetBrains Mono,monospace" font-size="9">Wireless Mouse</text>
+    <text x="590" y="140" text-anchor="middle" fill="#eab308" font-family="JetBrains Mono,monospace" font-size="9">29.99</text>
+    <text x="680" y="140" text-anchor="middle" fill="#f97316" font-family="JetBrains Mono,monospace" font-size="9">149</text>
+    <line x1="20" y1="120" x2="740" y2="120" stroke="#334155" stroke-width="0.5"/>
+
+    <!-- Row 3 — Alice again -->
+    <rect x="100" y="155" width="180" height="50" rx="3" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="55" y="183" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">3</text>
+    <text x="140" y="175" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">Alice Johnson</text>
+    <text x="245" y="175" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">alice@email.com</text>
+    <text x="365" y="175" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">123 Main St</text>
+    <text x="490" y="175" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">Mech Keyboard</text>
+    <text x="590" y="175" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">79.99</text>
+    <text x="680" y="175" text-anchor="middle" fill="#f97316" font-family="JetBrains Mono,monospace" font-size="9">75</text>
+    <line x1="20" y1="160" x2="740" y2="160" stroke="#334155" stroke-width="0.5"/>
+
+    <!-- Annotations -->
+    <rect x="100" y="80" width="180" height="125" rx="3" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="190" y="225" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="11">Alice's info: DUPLICATED</text>
+    <text x="190" y="242" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Stored twice. Changes must update both rows.</text>
+
+    <rect x="440" y="80" width="150" height="85" rx="3" fill="none" stroke="#eab308" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="515" y="225" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="11">"Wireless Mouse": DUPLICATED</text>
+    <text x="515" y="242" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Product info repeated per order.</text>
+
+    <rect x="640" y="80" width="80" height="125" rx="3" fill="none" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="680" y="260" text-anchor="middle" fill="#f97316" font-family="Inter,sans-serif" font-weight="600" font-size="11">Stock: CONFLICTING</text>
+    <text x="680" y="277" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">150 or 149? Which is right?</text>
+
+    <text x="380" y="320" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Three rows, three problems. Now imagine 3 million rows.</text>
+  </svg>
+
+  <p>It "works" if you squint. You can query it, you can insert data, you can join... nothing. There's only one table, so there's nothing to join. But the moment you need to update Alice's address, or correct the price of the Wireless Mouse, or figure out the actual stock count &mdash; this design crumbles. Let's see exactly how.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 &mdash; Where It Breaks
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks &mdash; The Three Anomalies</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-danger">
+    <strong>Think First:</strong> Alice moves to a new address. You update row 1 but forget row 3. Now your database says Alice lives in two places. That's not a bug in your code &mdash; it's a bug in your <em>schema</em>. The design itself made this mistake possible.
+  </div>
+
+  <p>The one-giant-table approach has three fatal flaws. Database textbooks call them <span class="tooltip-trigger">anomalies<span class="tooltip-content">A data integrity problem caused by poor schema design. There are three types: update anomaly (changing data in one place but not everywhere it's duplicated), insertion anomaly (can't add new data without unrelated data), and deletion anomaly (deleting one thing accidentally destroys other data). All three vanish when you normalize your schema &mdash; separate tables, linked by keys.</span></span> &mdash; situations where the structure of your table actively causes data corruption. These aren't theoretical risks; they're things that happen in production at real companies every day when schemas aren't designed properly.</p>
+
+  <h3>Anomaly #1: Update Anomaly</h3>
+
+  <p>Alice moves from "123 Main St, NYC" to "789 Pine Rd, Chicago." You run an update:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">update-anomaly.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- You update Alice's address on her latest order...
+UPDATE store_data
+SET customer_address = '789 Pine Rd, Chicago'
+WHERE order_id = 3;
+
+-- But order 1 STILL says "123 Main St, NYC"
+-- Now Alice has TWO addresses in your database.
+-- Which one is correct? Your database doesn't know.
+
+-- The "fix" is to update ALL rows for Alice:
+UPDATE store_data
+SET customer_address = '789 Pine Rd, Chicago'
+WHERE customer_email = 'alice@email.com';
+-- But if you have 500 orders for Alice across 3 tables,
+-- and a developer forgets ONE... you have corrupted data.</code></pre>
+    </div>
+  </div>
+
+  <p>This is exactly what happened at a real e-commerce startup in 2019 &mdash; they stored customer addresses directly in order rows instead of a separate customers table. When customers updated their addresses, old orders kept the old address (which was intentional for shipping records), but the <em>customer profile</em> data was also duplicated and went out of sync. Support tickets flooded in: "Why does my account show two different addresses?"</p>
+
+  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Update anomaly: Alice has two different addresses in the same table">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Update Anomaly &mdash; Alice Has Two Addresses</text>
+
+    <!-- Row 1: old address -->
+    <rect x="40" y="50" width="320" height="65" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="200" y="72" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="11">Order #1 (old, NOT updated)</text>
+    <text x="200" y="92" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">Alice Johnson</text>
+    <text x="200" y="107" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">123 Main St, NYC</text>
+
+    <!-- Row 3: new address -->
+    <rect x="400" y="50" width="320" height="65" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="560" y="72" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="11">Order #3 (updated)</text>
+    <text x="560" y="92" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">Alice Johnson</text>
+    <text x="560" y="107" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10">789 Pine Rd, Chicago</text>
+
+    <!-- Conflict -->
+    <text x="380" y="150" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">CONFLICT: Same person, two addresses</text>
+    <text x="380" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">If Alice's address lived in ONE place (a separate users table),</text>
+    <text x="380" y="186" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">you'd update it once and every order would reference the same record.</text>
+  </svg>
+
+  <h3>Anomaly #2: Insertion Anomaly</h3>
+
+  <p>You just got a new product in &mdash; a "USB-C Hub" for $49.99. You want to add it to your catalog. But in the giant table, every row is an <em>order</em>. There's no way to add a product without also creating an order. You'd have to insert a fake row with NULL for the customer, order date, and order total just to record that the product exists:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">insertion-anomaly.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- You want to add a new product to your catalog.
+-- But every row needs an order_id (it's the PRIMARY KEY).
+-- You're forced to create a fake order:
+INSERT INTO store_data VALUES
+(NULL, NULL, NULL,                          -- no order
+ NULL, NULL, NULL,                          -- no customer
+ 'USB-C Hub', 49.99, 'Electronics',         -- the actual product
+ NULL, NULL,                                -- no review
+ 200);                                      -- stock count
+
+-- This fails! order_id is the PRIMARY KEY and can't be NULL.
+-- You literally CANNOT add a product without an order.
+-- That's an insertion anomaly.</code></pre>
+    </div>
+  </div>
+
+  <p>The table structure is blocking you from recording perfectly valid information. A product exists in the real world, but your database can't represent it until someone buys it. That's like saying a house doesn't exist until someone moves in.</p>
+
+  <h3>Anomaly #3: Deletion Anomaly</h3>
+
+  <p>Bob's order (#2) was a mistake &mdash; he wants a refund and you delete the order. But Bob is the <em>only</em> customer who ordered the Wireless Mouse with stock count 149. When you delete his order row, you also lose the fact that Bob exists as a customer. His email, his address &mdash; gone. Not because you wanted to delete Bob, but because his customer data was trapped inside an order row.</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">deletion-anomaly.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- Bob wants a refund. Delete his order.
+DELETE FROM store_data WHERE order_id = 2;
+
+-- Bob's order is gone. But so is:
+-- ❌ Bob's customer record (name, email, address)
+-- ❌ The fact that Bob exists in your system at all
+-- ❌ Bob's review of the Wireless Mouse (4 stars)
+
+-- If Bob comes back next week to buy something,
+-- your system has no idea who he is.
+-- You deleted a customer by trying to delete an order.</code></pre>
+    </div>
+  </div>
+
+  <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three anomalies summary: update, insertion, deletion">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Three Anomalies &mdash; Why One Table Fails</text>
+
+    <!-- Update anomaly -->
+    <rect x="30" y="50" width="220" height="160" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="140" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">Update Anomaly</text>
+    <text x="140" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Change data in one row</text>
+    <text x="140" y="118" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">but not the copies</text>
+    <line x1="60" y1="130" x2="220" y2="130" stroke="#334155" stroke-width="0.5"/>
+    <text x="140" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Result: contradictory</text>
+    <text x="140" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">data in the same table</text>
+    <text x="140" y="198" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">2 addresses for Alice</text>
+
+    <!-- Insertion anomaly -->
+    <rect x="270" y="50" width="220" height="160" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="380" y="75" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="12">Insertion Anomaly</text>
+    <text x="380" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Can't add new data</text>
+    <text x="380" y="118" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">without unrelated data</text>
+    <line x1="300" y1="130" x2="460" y2="130" stroke="#334155" stroke-width="0.5"/>
+    <text x="380" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Result: forced to create</text>
+    <text x="380" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">fake/NULL rows</text>
+    <text x="380" y="198" text-anchor="middle" fill="#eab308" font-family="JetBrains Mono,monospace" font-size="9">Can't add product w/o order</text>
+
+    <!-- Deletion anomaly -->
+    <rect x="510" y="50" width="220" height="160" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+    <text x="620" y="75" text-anchor="middle" fill="#f97316" font-family="Inter,sans-serif" font-weight="700" font-size="12">Deletion Anomaly</text>
+    <text x="620" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Deleting one thing</text>
+    <text x="620" y="118" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">destroys unrelated data</text>
+    <line x1="540" y1="130" x2="700" y2="130" stroke="#334155" stroke-width="0.5"/>
+    <text x="620" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Result: permanent</text>
+    <text x="620" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">unintended data loss</text>
+    <text x="620" y="198" text-anchor="middle" fill="#f97316" font-family="JetBrains Mono,monospace" font-size="9">Deleting order kills Bob</text>
+
+    <text x="380" y="240" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="11">All three anomalies vanish when you separate your data into proper tables.</text>
+  </svg>
+
+  <p>These three anomalies are the <em>reason</em> normalization exists. Every rule of normalization &mdash; 1NF, 2NF, 3NF &mdash; is specifically designed to eliminate one or more of these anomalies. The fix is beautifully simple: stop cramming everything into one table.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 &mdash; The Breakthrough (Normalization)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough &mdash; Separate Tables, Linked by Keys</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>The core idea:</strong> Instead of one giant table with duplicated data everywhere, give each "thing" (users, products, orders) its own table. Then use <span class="tooltip-trigger">foreign keys<span class="tooltip-content">A column in one table that references the primary key of another table. It's the "link" between tables. When your <code>orders</code> table has <code>user_id = 42</code>, that's a foreign key pointing to <code>users.id = 42</code>. The database enforces this link &mdash; you can't create an order for user 999 if user 999 doesn't exist. Try it: <code>INSERT INTO orders (user_id) VALUES (999);</code> &mdash; the database will reject it with a foreign key violation.</span></span> to link them together. Each piece of information is stored in <strong>exactly one place</strong>. Update it once, and everywhere that references it sees the change automatically.
+  </div>
+
+  <p>The fix is to split that monster table into separate tables, each responsible for one type of thing. This is called <span class="tooltip-trigger">normalization<span class="tooltip-content">The process of organizing a database schema to reduce redundancy and prevent anomalies. Invented by Edgar Codd at IBM in 1970. The basic idea: each fact should be stored in exactly one place. There are formal "normal forms" (1NF through 5NF), but in practice you usually aim for Third Normal Form (3NF). Going beyond 3NF is rarely worth the complexity for most applications.</span></span>, and it was invented by Edgar Codd at IBM in 1970. Over fifty years later, it's still the standard approach used by every production database at every major tech company.</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">the-normalized-schema.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- Each "thing" gets its own table. No duplication.
+
+CREATE TABLE users (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
+    email       VARCHAR(255) UNIQUE NOT NULL,
+    address     TEXT,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE products (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(200) NOT NULL,
+    price       DECIMAL(10,2) NOT NULL,  -- DECIMAL, not FLOAT! (0.1 + 0.2 = 0.3, not 0.30000000000000004)
+    category    VARCHAR(50),
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE orders (
+    id          SERIAL PRIMARY KEY,
+    user_id     INT NOT NULL REFERENCES users(id),     -- foreign key: links to users
+    total       DECIMAL(10,2) NOT NULL,
+    status      VARCHAR(20) DEFAULT 'pending',
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+    id          SERIAL PRIMARY KEY,
+    order_id    INT NOT NULL REFERENCES orders(id),    -- links to orders
+    product_id  INT NOT NULL REFERENCES products(id),  -- links to products
+    quantity    INT NOT NULL DEFAULT 1,
+    unit_price  DECIMAL(10,2) NOT NULL                 -- price AT TIME OF PURCHASE (important!)
+);
+
+CREATE TABLE reviews (
+    id          SERIAL PRIMARY KEY,
+    user_id     INT NOT NULL REFERENCES users(id),
+    product_id  INT NOT NULL REFERENCES products(id),
+    stars       INT CHECK (stars BETWEEN 1 AND 5),     -- constraint: only 1-5 stars
+    comment     TEXT,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE inventory (
+    product_id  INT PRIMARY KEY REFERENCES products(id),
+    quantity    INT NOT NULL DEFAULT 0,
+    updated_at  TIMESTAMP DEFAULT NOW()
+);</code></pre>
+    </div>
+  </div>
+
+  <p>Look at what changed. Alice's name and address now live in <strong>one row</strong> in the <code>users</code> table. Her orders reference her user ID. If she moves, you update <em>one row</em>, and every order, review, and shipment that references her ID automatically points to her new address. No duplication, no anomalies.</p>
+
+  <p>Notice a subtle but critical detail in <code>order_items</code>: we store <code>unit_price</code> separately from the product's current price. Why? Because prices change. If the Wireless Mouse goes from $29.99 to $34.99 next month, Alice's old order should still show $29.99 &mdash; that's what she actually paid. Shopify does exactly this: their <code>line_items</code> table captures the price at the moment of purchase, independent of the product's current price.</p>
+
+  <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Normalized schema: six tables linked by foreign keys">
+    <defs>
+      <marker id="sch-norm-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">The Normalized Schema &mdash; Each Thing in Its Own Table</text>
+
+    <!-- users table -->
+    <rect x="30" y="50" width="180" height="100" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="120" y="73" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="12">users</text>
+    <text x="120" y="93" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">id (PK), name, email</text>
+    <text x="120" y="110" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">address, created_at</text>
+    <text x="120" y="140" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Alice stored ONCE</text>
+
+    <!-- products table -->
+    <rect x="540" y="50" width="190" height="100" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="635" y="73" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="12">products</text>
+    <text x="635" y="93" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">id (PK), name, price</text>
+    <text x="635" y="110" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">category, created_at</text>
+    <text x="635" y="140" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Mouse stored ONCE</text>
+
+    <!-- orders table -->
+    <rect x="30" y="190" width="180" height="90" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="120" y="213" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">orders</text>
+    <text x="120" y="233" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">id (PK), user_id (FK)</text>
+    <text x="120" y="250" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">total, status, created_at</text>
+
+    <!-- order_items table -->
+    <rect x="280" y="190" width="200" height="90" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="380" y="213" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">order_items</text>
+    <text x="380" y="233" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">id, order_id (FK), product_id (FK)</text>
+    <text x="380" y="250" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">quantity, unit_price</text>
+
+    <!-- reviews table -->
+    <rect x="280" y="320" width="200" height="70" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="380" y="343" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="12">reviews</text>
+    <text x="380" y="363" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">id, user_id (FK), product_id (FK), stars</text>
+
+    <!-- inventory table -->
+    <rect x="540" y="190" width="190" height="70" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+    <text x="635" y="213" text-anchor="middle" fill="#f97316" font-family="Inter,sans-serif" font-weight="700" font-size="12">inventory</text>
+    <text x="635" y="233" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">product_id (PK/FK), quantity</text>
+
+    <!-- FK arrows -->
+    <line x1="120" y1="150" x2="120" y2="190" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+    <text x="132" y="175" fill="#3b82f6" font-family="Inter,sans-serif" font-size="8">user_id</text>
+
+    <line x1="210" y1="235" x2="280" y2="235" stroke="#10b981" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+    <text x="245" y="228" fill="#10b981" font-family="Inter,sans-serif" font-size="8">order_id</text>
+
+    <line x1="480" y1="220" x2="540" y2="145" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+    <text x="520" y="175" fill="#a78bfa" font-family="Inter,sans-serif" font-size="8">product_id</text>
+
+    <line x1="635" y1="150" x2="635" y2="190" stroke="#f97316" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+    <text x="660" y="175" fill="#f97316" font-family="Inter,sans-serif" font-size="8">product_id</text>
+
+    <line x1="120" y1="280" x2="300" y2="340" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#sch-norm-arr)"/>
+    <line x1="635" y1="260" x2="460" y2="340" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#sch-norm-arr)"/>
+  </svg>
+
+  <p>Now let's verify that the anomalies are gone:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">anomalies-fixed.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- ✅ Update Anomaly: GONE
+-- Alice moves? Update ONE row.
+UPDATE users SET address = '789 Pine Rd, Chicago' WHERE id = 1;
+-- Every order, review, shipment that references user_id = 1
+-- automatically sees the new address. One update, done.
+
+-- ✅ Insertion Anomaly: GONE
+-- New product? Just insert it. No fake order needed.
+INSERT INTO products (name, price, category)
+VALUES ('USB-C Hub', 49.99, 'Electronics');
+-- The product exists in your catalog immediately.
+
+-- ✅ Deletion Anomaly: GONE
+-- Delete Bob's order? Bob still exists in the users table.
+DELETE FROM orders WHERE id = 2;
+-- Bob's customer record is safe. His reviews are safe.
+-- Only the order is deleted.</code></pre>
+    </div>
+  </div>
+
+  <p>This is the fundamental insight of schema design: <strong>store each fact in exactly one place, and link facts together with keys</strong>. It's the same principle as "Don't Repeat Yourself" in code, but applied to data. And just like DRY in code, it eliminates an entire category of bugs.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 &mdash; How It Works (6 Cards)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works &mdash; The Building Blocks of Schema Design</h2>
+    </div>
+  </div>
+
+  <p>Now that you understand <em>why</em> we separate tables, let's go deeper into the <em>how</em>. Schema design has six core building blocks. Master these, and you can design a clean database for any application.</p>
+
+  <!-- Card 1: ER Diagrams -->
+  <div class="card open">
+    <h3 class="card-title">1. Entity-Relationship Diagrams &mdash; Drawing Your Data Before Building It</h3>
+    <div class="card-body">
+      <p>Before you write <code>CREATE TABLE</code>, you draw. An <span class="tooltip-trigger">ER diagram<span class="tooltip-content">Entity-Relationship diagram &mdash; a visual blueprint of your database. Rectangles are entities (tables). Diamonds are relationships. Lines show how they connect. Crow's foot notation (the little "fork" at the end of a line) shows cardinality: one-to-many, many-to-many, etc. Every database textbook uses ER diagrams, and tools like dbdiagram.io, Lucidchart, and pgModeler let you draw them and export SQL.</span></span> is a picture of your data before it becomes SQL. Every rectangle is a table. Every line is a relationship. The little symbols at the end of lines (called <span class="tooltip-trigger">crow's foot notation<span class="tooltip-content">A way to show relationship cardinality in ER diagrams. A single line means "one." A fork (looks like a crow's foot) means "many." A circle means "zero (optional)." So a line from users to orders with a fork on the orders end means "one user has many orders." A circle + fork means "one user has zero or many orders." You'll see this in every database design tool.</span></span>) tell you the cardinality &mdash; one-to-many, many-to-many, etc.</p>
+
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ER diagram for e-commerce schema with crow's foot notation">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">E-Commerce ER Diagram &mdash; Crow's Foot Notation</text>
+
+        <!-- Users entity -->
+        <rect x="30" y="100" width="150" height="120" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <rect x="30" y="100" width="150" height="30" rx="8" fill="#3b82f6" opacity="0.2"/>
+        <text x="105" y="120" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="12">USERS</text>
+        <text x="45" y="148" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">PK id</text>
+        <text x="45" y="165" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">name VARCHAR(100)</text>
+        <text x="45" y="182" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">email VARCHAR(255)</text>
+        <text x="45" y="199" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">address TEXT</text>
+
+        <!-- Orders entity -->
+        <rect x="300" y="60" width="160" height="110" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <rect x="300" y="60" width="160" height="30" rx="8" fill="#10b981" opacity="0.2"/>
+        <text x="380" y="80" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">ORDERS</text>
+        <text x="315" y="108" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">PK id</text>
+        <text x="315" y="125" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">FK user_id</text>
+        <text x="315" y="142" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">total DECIMAL(10,2)</text>
+        <text x="315" y="159" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">status VARCHAR(20)</text>
+
+        <!-- Products entity -->
+        <rect x="580" y="100" width="155" height="120" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+        <rect x="580" y="100" width="155" height="30" rx="8" fill="#a78bfa" opacity="0.2"/>
+        <text x="658" y="120" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="12">PRODUCTS</text>
+        <text x="595" y="148" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">PK id</text>
+        <text x="595" y="165" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">name VARCHAR(200)</text>
+        <text x="595" y="182" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">price DECIMAL(10,2)</text>
+        <text x="595" y="199" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">category VARCHAR(50)</text>
+
+        <!-- Reviews entity -->
+        <rect x="300" y="210" width="160" height="90" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+        <rect x="300" y="210" width="160" height="30" rx="8" fill="#eab308" opacity="0.2"/>
+        <text x="380" y="230" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="12">REVIEWS</text>
+        <text x="315" y="258" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">FK user_id, FK product_id</text>
+        <text x="315" y="275" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">stars INT, comment TEXT</text>
+
+        <!-- Relationship lines with crow's foot -->
+        <!-- Users -> Orders (one-to-many) -->
+        <line x1="180" y1="140" x2="290" y2="115" stroke="#64748b" stroke-width="1.5"/>
+        <text x="232" y="118" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">1 : N</text>
+        <!-- Crow's foot at Orders end -->
+        <line x1="290" y1="110" x2="300" y2="115" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="290" y1="120" x2="300" y2="115" stroke="#64748b" stroke-width="1.5"/>
+
+        <!-- Orders -> Products (many-to-many via order_items) -->
+        <line x1="460" y1="115" x2="570" y2="140" stroke="#64748b" stroke-width="1.5"/>
+        <text x="518" y="118" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="9">N : M</text>
+        <line x1="460" y1="110" x2="470" y2="115" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="460" y1="120" x2="470" y2="115" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="570" y1="135" x2="580" y2="140" stroke="#64748b" stroke-width="1.5"/>
+        <line x1="570" y1="145" x2="580" y2="140" stroke="#64748b" stroke-width="1.5"/>
+
+        <!-- Users -> Reviews -->
+        <line x1="180" y1="195" x2="300" y2="240" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+        <!-- Products -> Reviews -->
+        <line x1="580" y1="195" x2="460" y2="240" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <text x="380" y="315" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Draw this FIRST, before writing any SQL. Tools: dbdiagram.io, Lucidchart, pgModeler</text>
+      </svg>
+
+      <p>Real companies use ER diagrams before every major feature. When Shopify adds a new entity like "subscriptions," the database team draws the ER diagram first, reviews it with the application team, and only then writes the migration. You can draw yours for free at <strong>dbdiagram.io</strong> &mdash; type your schema in plain text and it generates the diagram automatically.</p>
+    </div>
+  </div>
+
+  <!-- Card 2: Normal Forms -->
+  <div class="card">
+    <h3 class="card-title">2. Normal Forms (1NF &rarr; 2NF &rarr; 3NF) &mdash; The Rules That Prevent Anomalies</h3>
+    <div class="card-body">
+      <p>Normal forms are the formal rules behind normalization. Don't let the academic names scare you &mdash; each one is just a specific rule about how to organize your columns. In practice, you need to know three:</p>
+
+      <p><strong>First Normal Form (1NF)</strong> &mdash; every column holds a single value, not a list. Sounds obvious, but it's the #1 beginner mistake:</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="sch-1nf-bad" role="tab" aria-selected="true">Bad (Violates 1NF)</button>
+          <button class="tab-btn" data-tab="sch-1nf-good" role="tab" aria-selected="false">Good (1NF)</button>
+        </div>
+        <div class="tab-panel active" id="sch-1nf-bad" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">violates-1nf.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- ❌ BAD: Multiple values crammed into one column
+CREATE TABLE orders_bad (
+    id          INT PRIMARY KEY,
+    customer    VARCHAR(100),
+    products    VARCHAR(500)       -- "Mouse, Keyboard, Monitor" ← a LIST in one cell
+);
+
+INSERT INTO orders_bad VALUES (1, 'Alice', 'Mouse, Keyboard, Monitor');
+
+-- Want all orders that include "Keyboard"?
+SELECT * FROM orders_bad WHERE products LIKE '%Keyboard%';
+-- This works... until someone orders "Keyboard Cleaner"
+-- and now you get false matches. Unreliable.</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sch-1nf-good" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">satisfies-1nf.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- ✅ GOOD: Each value in its own row
+CREATE TABLE order_items (
+    order_id    INT REFERENCES orders(id),
+    product_id  INT REFERENCES products(id),
+    quantity    INT DEFAULT 1,
+    PRIMARY KEY (order_id, product_id)
+);
+
+-- One row per product per order
+INSERT INTO order_items VALUES (1, 101, 1);  -- Mouse
+INSERT INTO order_items VALUES (1, 102, 1);  -- Keyboard
+INSERT INTO order_items VALUES (1, 103, 1);  -- Monitor
+
+-- Want all orders with a Keyboard? Easy, exact, reliable.
+SELECT o.* FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+WHERE oi.product_id = 102;</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p><strong>Second Normal Form (2NF)</strong> &mdash; every non-key column depends on the <em>entire</em> primary key, not just part of it. This matters when you have a <span class="tooltip-trigger">composite key<span class="tooltip-content">A primary key made of two or more columns. For example, <code>PRIMARY KEY (order_id, product_id)</code> in the order_items table. The combination of order_id + product_id uniquely identifies each row. 2NF says that every other column must depend on BOTH parts of that key, not just one.</span></span> (a primary key with multiple columns). If a column depends on only <em>part</em> of the key, it belongs in a different table.</p>
+
+      <p><strong>Third Normal Form (3NF)</strong> &mdash; no column depends on another non-key column. Classic example: storing <code>city</code> and <code>zip_code</code> in the same table. The city depends on the zip code (zip 10001 is always New York), not on the primary key. Technically, <code>city</code> should be in a <code>zip_codes</code> lookup table. In practice, most teams keep city and zip together for simplicity and accept the tiny duplication &mdash; pragmatism over purity.</p>
+
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Progressive normal forms: 1NF, 2NF, 3NF as stepping stones">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Normal Forms &mdash; Each One Eliminates More Problems</text>
+
+        <rect x="50" y="50" width="190" height="100" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="145" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="13">1NF</text>
+        <text x="145" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">No lists in columns</text>
+        <text x="145" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Each cell = one value</text>
+        <text x="145" y="140" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Fixes: can't query inside lists</text>
+
+        <rect x="280" y="50" width="200" height="100" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+        <text x="380" y="78" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="13">2NF</text>
+        <text x="380" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">Full key dependency</text>
+        <text x="380" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">No partial-key dependencies</text>
+        <text x="380" y="140" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Fixes: update anomalies in composites</text>
+
+        <rect x="520" y="50" width="200" height="100" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="620" y="78" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="13">3NF</text>
+        <text x="620" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">No transitive dependencies</text>
+        <text x="620" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Non-key columns independent</text>
+        <text x="620" y="140" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Fixes: all three anomalies gone</text>
+
+        <!-- Arrows -->
+        <line x1="240" y1="100" x2="280" y2="100" stroke="#64748b" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+        <line x1="480" y1="100" x2="520" y2="100" stroke="#64748b" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+
+        <text x="380" y="185" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="11">Most production schemas target 3NF. Beyond that (4NF, 5NF) is rarely worth it.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Card 3: Foreign Keys & Constraints -->
+  <div class="card">
+    <h3 class="card-title">3. Foreign Keys &amp; Constraints &mdash; Your Database's Safety Net</h3>
+    <div class="card-body">
+      <p>A schema without <span class="tooltip-trigger">constraints<span class="tooltip-content">Rules that the database enforces automatically. PRIMARY KEY (uniqueness + not null), FOREIGN KEY (must reference an existing row), UNIQUE (no duplicates), NOT NULL (can't be empty), CHECK (custom validation like <code>CHECK (price > 0)</code>), DEFAULT (auto-fill a value). These run inside the database engine, so they can't be bypassed by buggy application code. That's why you add them &mdash; even if your app validates too.</span></span> is like a building without a fire code &mdash; it works until something goes wrong, and then everything burns down. Constraints are the rules that your database enforces <em>no matter what</em>. Even if your application code has a bug, the database catches the invalid data.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">constraints-in-action.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- FOREIGN KEY: Can't create an order for a non-existent user
+INSERT INTO orders (user_id, total) VALUES (9999, 50.00);
+-- ERROR: insert or update on table "orders" violates foreign key constraint
+-- Key (user_id)=(9999) is not present in table "users".
+
+-- UNIQUE: Can't register two users with the same email
+INSERT INTO users (name, email) VALUES ('Fake Alice', 'alice@email.com');
+-- ERROR: duplicate key value violates unique constraint "users_email_key"
+
+-- CHECK: Can't give a 6-star review
+INSERT INTO reviews (user_id, product_id, stars) VALUES (1, 1, 6);
+-- ERROR: new row for relation "reviews" violates check constraint
+-- Check constraint: stars BETWEEN 1 AND 5
+
+-- NOT NULL: Can't create a product without a name
+INSERT INTO products (name, price) VALUES (NULL, 29.99);
+-- ERROR: null value in column "name" violates not-null constraint
+
+-- DEFAULT: Status auto-fills if you don't specify it
+INSERT INTO orders (user_id, total) VALUES (1, 29.99);
+-- status automatically set to 'pending' — you don't need to pass it</code></pre>
+        </div>
+      </div>
+
+      <p>Twitter uses <code>VARCHAR(280)</code> on their tweet text column, not <code>TEXT</code>. Why? Because <code>VARCHAR(280)</code> is a constraint &mdash; the database <em>physically cannot</em> store a tweet longer than 280 characters. If a bug in the Twitter app tried to save a 500-character tweet, the database would reject it. Using <code>TEXT</code> (unlimited length) would mean relying on application code alone to enforce the character limit. Constraints are your last line of defense.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: Data Types -->
+  <div class="card">
+    <h3 class="card-title">4. Data Types &amp; Why They Matter &mdash; DECIMAL vs FLOAT, VARCHAR vs TEXT</h3>
+    <div class="card-body">
+      <p>Choosing the right <span class="tooltip-trigger">data type<span class="tooltip-content">The kind of value a column can hold. Common types: INT (whole numbers), BIGINT (big numbers, up to 9.2 quintillion), VARCHAR(n) (text up to n characters), TEXT (unlimited text), DECIMAL(p,s) (exact numbers with p total digits and s decimal places), BOOLEAN (true/false), TIMESTAMP (date + time), UUID (128-bit unique identifier). The wrong choice causes bugs. The right choice prevents them.</span></span> is not pedantic &mdash; it prevents real bugs. The most dangerous mistake in schema design is using <code>FLOAT</code> for money.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">float-vs-decimal.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- ❌ FLOAT: Stores money as a binary approximation
+SELECT 0.1::FLOAT + 0.2::FLOAT;
+-- Result: 0.30000000000000004  ← NOT 0.3!
+
+-- This is not a PostgreSQL bug. It's how IEEE 754 floating point works.
+-- Stripe, Shopify, every bank, every payment processor uses DECIMAL for money.
+
+-- ✅ DECIMAL: Stores money as exact base-10 digits
+SELECT 0.1::DECIMAL + 0.2::DECIMAL;
+-- Result: 0.3  ← Exactly right.
+
+-- Shopify's orders table:
+-- total_price DECIMAL(10,2)  ← 10 digits total, 2 after the decimal
+-- This means prices from 0.00 to 99,999,999.99 — more than enough.
+
+-- GitHub's repositories table uses BIGINT for id, not INT:
+-- INT max: 2,147,483,647 (2.1 billion) — GitHub approached this in 2019
+-- BIGINT max: 9,223,372,036,854,775,807 (9.2 quintillion) — safe for centuries</code></pre>
+        </div>
+      </div>
+
+      <p>Here's a quick reference for the most common choices:</p>
+
+      <div class="callout callout-info">
+        <strong>Data type cheat sheet:</strong>
+        <ul>
+          <li><strong>Money</strong>: Always <code>DECIMAL(10,2)</code>. Never <code>FLOAT</code>. Never <code>DOUBLE</code>.</li>
+          <li><strong>IDs</strong>: <code>BIGINT</code> for new projects (future-proof). <code>INT</code> only if you're absolutely sure you'll never exceed 2.1 billion rows.</li>
+          <li><strong>Short text</strong>: <code>VARCHAR(n)</code> with a sensible limit. Emails: <code>VARCHAR(255)</code>. Usernames: <code>VARCHAR(50)</code>.</li>
+          <li><strong>Long text</strong>: <code>TEXT</code> for descriptions, comments, blog posts &mdash; no length limit.</li>
+          <li><strong>Yes/No</strong>: <code>BOOLEAN</code>. Not <code>INT</code> with 0/1. Not <code>VARCHAR(3)</code> with "yes"/"no".</li>
+          <li><strong>Dates/times</strong>: <code>TIMESTAMPTZ</code> (with timezone) in PostgreSQL. Never store dates as strings.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 5: Timestamps & Timezone Handling -->
+  <div class="card">
+    <h3 class="card-title">5. Timestamps &amp; Timezone Handling &mdash; The Silent Source of Bugs</h3>
+    <div class="card-body">
+      <p>Timestamps cause more subtle bugs than almost any other data type. The problem: your server is in US-East, your user is in Tokyo, and your database stores <code>2024-01-15 14:30:00</code>. Is that 2:30 PM in New York or 2:30 PM in Tokyo? Without a timezone, <em>nobody knows</em>.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">timestamps-right-way.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- ❌ BAD: TIMESTAMP without timezone (ambiguous)
+CREATE TABLE events_bad (
+    id         SERIAL PRIMARY KEY,
+    event_time TIMESTAMP           -- 2024-01-15 14:30:00 — which timezone?
+);
+
+-- ✅ GOOD: TIMESTAMPTZ (stores as UTC, converts on display)
+CREATE TABLE events (
+    id         SERIAL PRIMARY KEY,
+    event_time TIMESTAMPTZ         -- stores internally as UTC
+);
+
+-- Insert with any timezone — PostgreSQL converts to UTC
+INSERT INTO events (event_time) VALUES ('2024-01-15 14:30:00+09:00');  -- Tokyo
+INSERT INTO events (event_time) VALUES ('2024-01-15 00:30:00-05:00');  -- NYC (same instant!)
+
+-- Both rows store the same UTC moment: 2024-01-15 05:30:00+00
+-- Display in any timezone:
+SET timezone = 'America/New_York';
+SELECT event_time FROM events;  -- shows 2024-01-15 00:30:00-05
+
+SET timezone = 'Asia/Tokyo';
+SELECT event_time FROM events;  -- shows 2024-01-15 14:30:00+09
+
+-- RULE: Always use TIMESTAMPTZ. Always store in UTC. Convert on display.</code></pre>
+        </div>
+      </div>
+
+      <p>Every major company has learned this the hard way. GitHub stores all timestamps in UTC. Stripe's API returns all timestamps as <span class="tooltip-trigger">Unix timestamps<span class="tooltip-content">The number of seconds since January 1, 1970, 00:00:00 UTC (called the "Unix epoch"). For example, 1705315800 = 2024-01-15 14:30:00 UTC. No timezone ambiguity &mdash; it's always UTC. Stripe's API returns timestamps this way: <code>"created": 1705315800</code>. Your application converts to local time for display. Many APIs use this format because it's unambiguous and easy to do math on (want "5 minutes ago"? subtract 300).</span></span> (seconds since 1970, always UTC). Shopify stores <code>created_at</code> and <code>updated_at</code> on every table, both in UTC. If you take away one rule: <strong>always use TIMESTAMPTZ, always store in UTC</strong>.</p>
+    </div>
+  </div>
+
+  <!-- Card 6: Soft Deletes & Audit Trails -->
+  <div class="card">
+    <h3 class="card-title">6. Soft Deletes &amp; Audit Trails &mdash; Never Actually Delete Anything</h3>
+    <div class="card-body">
+      <p>When a user "deletes" their account on Stripe, their data doesn't vanish from the database. It gets a timestamp in a column called <code>deleted_at</code>. This is called a <span class="tooltip-trigger">soft delete<span class="tooltip-content">Instead of <code>DELETE FROM users WHERE id = 42;</code>, you do <code>UPDATE users SET deleted_at = NOW() WHERE id = 42;</code>. The row is still in the database, but your application filters it out: <code>SELECT * FROM users WHERE deleted_at IS NULL;</code>. This means you can "undo" deletes, comply with audit requirements, and debug issues by looking at "deleted" records. Stripe, Shopify, GitHub, and most SaaS companies use soft deletes on critical tables.</span></span> &mdash; the data looks deleted to the user, but it's still there for auditing, compliance, and "oops, undo that."</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">soft-deletes.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- Soft delete pattern (used by Stripe, Shopify, GitHub)
+CREATE TABLE users (
+    id         SERIAL PRIMARY KEY,
+    name       VARCHAR(100) NOT NULL,
+    email      VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ          -- NULL = active, non-NULL = "deleted"
+);
+
+-- "Delete" a user (they still exist in the database)
+UPDATE users SET deleted_at = NOW() WHERE id = 42;
+
+-- Your application's default query ALWAYS filters deleted rows:
+SELECT * FROM users WHERE deleted_at IS NULL;
+
+-- Admin/support can see "deleted" users for debugging:
+SELECT * FROM users WHERE deleted_at IS NOT NULL;
+
+-- "Undo" a delete (customer changed their mind):
+UPDATE users SET deleted_at = NULL WHERE id = 42;
+
+-- For heavy audit requirements, add a separate audit table:
+CREATE TABLE user_audit (
+    id         SERIAL PRIMARY KEY,
+    user_id    INT NOT NULL,
+    action     VARCHAR(20) NOT NULL,  -- 'created', 'updated', 'deleted'
+    old_data   JSONB,                 -- snapshot before change
+    new_data   JSONB,                 -- snapshot after change
+    changed_by INT,                   -- who made the change
+    changed_at TIMESTAMPTZ DEFAULT NOW()
+);</code></pre>
+        </div>
+      </div>
+
+      <p>The <code>created_at</code> + <code>updated_at</code> + <code>deleted_at</code> trio appears on virtually every table at companies like Shopify. Rails generates these columns automatically. They're not optional &mdash; they're essential for debugging ("when was this record last changed?"), compliance ("show me the deletion timestamp for GDPR"), and data recovery ("undelete this accidentally removed product").</p>
+
+      <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Soft delete lifecycle: active, soft deleted, recovered">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Soft Delete Lifecycle &mdash; Data Never Truly Dies</text>
+
+        <!-- Active state -->
+        <rect x="50" y="50" width="180" height="70" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="140" y="78" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">ACTIVE</text>
+        <text x="140" y="100" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">deleted_at = NULL</text>
+
+        <!-- Soft deleted state -->
+        <rect x="290" y="50" width="180" height="70" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="380" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">SOFT DELETED</text>
+        <text x="380" y="100" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">deleted_at = 2024-01-15</text>
+
+        <!-- Recovered state -->
+        <rect x="530" y="50" width="180" height="70" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="620" y="78" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="12">RECOVERED</text>
+        <text x="620" y="100" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">deleted_at = NULL (again)</text>
+
+        <!-- Arrows -->
+        <line x1="230" y1="85" x2="290" y2="85" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+        <text x="260" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8">SET NOW()</text>
+
+        <line x1="470" y1="85" x2="530" y2="85" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#sch-norm-arr)"/>
+        <text x="500" y="78" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-size="8">SET NULL</text>
+
+        <text x="380" y="155" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Hard DELETE is permanent and irreversible. Soft delete gives you an undo button.</text>
+        <text x="380" y="172" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Add a WHERE deleted_at IS NULL to every application query.</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 &mdash; Going Deeper (4 Collapsibles)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper &mdash; Advanced Schema Decisions</h2>
+    </div>
+  </div>
+
+  <p>The basics &mdash; tables, foreign keys, normal forms &mdash; get you 80% of the way. The remaining 20% involves decisions that depend on your specific situation: how big is your system? Do you need distributed IDs? Do you store semi-structured data? How do you change the schema without downtime? These four topics come up in every real production system.</p>
+
+  <!-- Collapsible 1: UUID vs Auto-Increment -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>UUID vs Auto-Increment &mdash; How to Generate Primary Keys</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Every row needs a unique identifier &mdash; a <span class="tooltip-trigger">primary key<span class="tooltip-content">The column (or combination of columns) that uniquely identifies each row in a table. No two rows can have the same primary key. It's automatically indexed for fast lookups. The two most common strategies: auto-increment integers (1, 2, 3...) and UUIDs (random 128-bit identifiers like <code>550e8400-e29b-41d4-a716-446655440000</code>). Each has trade-offs.</span></span>. The two main options are auto-incrementing integers (<code>1, 2, 3...</code>) and <span class="tooltip-trigger">UUIDs<span class="tooltip-content">Universally Unique Identifier &mdash; a 128-bit random number, typically displayed as a 36-character string like <code>550e8400-e29b-41d4-a716-446655440000</code>. The chance of generating two identical UUIDs is so astronomically small (1 in 2^122) that it's treated as zero. UUIDs can be generated on any machine without coordinating with a central database &mdash; which is why distributed systems love them. Downside: 16 bytes vs 4 bytes for INT, and they're harder to type/debug.</span></span> (random 128-bit identifiers). The choice matters more than you'd think.</p>
+
+        <div class="tab-container">
+          <div class="tab-header" role="tablist">
+            <button class="tab-btn active" data-tab="sch-autoinc" role="tab" aria-selected="true">Auto-Increment</button>
+            <button class="tab-btn" data-tab="sch-uuid" role="tab" aria-selected="false">UUID</button>
+          </div>
+          <div class="tab-panel active" id="sch-autoinc" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">auto-increment.sql</span></div>
+              <div class="macos-body">
+<pre><code class="language-sql">-- Auto-increment: the database assigns 1, 2, 3, 4...
+CREATE TABLE users (
+    id    SERIAL PRIMARY KEY,    -- PostgreSQL
+    -- id INT AUTO_INCREMENT PRIMARY KEY  -- MySQL
+    name  VARCHAR(100)
+);
+
+INSERT INTO users (name) VALUES ('Alice');  -- id = 1
+INSERT INTO users (name) VALUES ('Bob');    -- id = 2
+
+-- PROS:
+-- ✅ Small (4 bytes INT, 8 bytes BIGINT) — faster indexes
+-- ✅ Sequential — great for range queries and B-tree performance
+-- ✅ Human-readable — easy to debug ("check user 42")
+-- ✅ Simple — no libraries needed
+
+-- CONS:
+-- ❌ Leaks information — user 1000 means you have ~1000 users
+-- ❌ Single point of coordination — only ONE database generates IDs
+-- ❌ Can't pre-generate — you need the database to get an ID
+-- ❌ Merging databases is hell — two databases both have user #42</code></pre>
+              </div>
+            </div>
+          </div>
+          <div class="tab-panel" id="sch-uuid" role="tabpanel">
+            <div class="macos-window">
+              <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">uuid-primary-keys.sql</span></div>
+              <div class="macos-body">
+<pre><code class="language-sql">-- UUID: random 128-bit identifiers
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- enables gen_random_uuid()
+
+CREATE TABLE users (
+    id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name  VARCHAR(100)
+);
+
+INSERT INTO users (name) VALUES ('Alice');
+-- id = '7c9e6679-7425-40de-944b-e07fc1f90ae7' (auto-generated)
+
+INSERT INTO users (name) VALUES ('Bob');
+-- id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479' (different, random)
+
+-- PROS:
+-- ✅ No coordination — ANY server can generate IDs independently
+-- ✅ No information leakage — can't guess how many users you have
+-- ✅ Merge-safe — two databases will never collide
+-- ✅ Can generate BEFORE inserting — great for distributed systems
+
+-- CONS:
+-- ❌ Larger (16 bytes vs 4/8 bytes) — bigger indexes, more RAM
+-- ❌ Random — B-tree index fragmentation, slower inserts on huge tables
+-- ❌ Hard to type/debug — "check user 7c9e6679..." is painful
+-- ❌ UUIDv4 is fully random; UUIDv7 (2024) is time-ordered, fixing the B-tree issue</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p><strong>Real-world choices:</strong> Twitter uses neither &mdash; they built <span class="tooltip-trigger">Snowflake IDs<span class="tooltip-content">A 64-bit ID format invented by Twitter in 2010. Structure: 41 bits for timestamp (milliseconds since Twitter epoch) + 10 bits for machine ID + 12 bits for sequence number. This gives you: time-ordered IDs (great for "sort by newest"), distributed generation (up to 1024 machines), and 4096 IDs per millisecond per machine. It's used by Twitter, Discord, Instagram, and many others. Open-source implementations exist for every language.</span></span> (64-bit, time-ordered, distributed). Instagram uses a similar approach. Shopify uses auto-increment <code>BIGINT</code> for most tables. Stripe uses string IDs with prefixes: <code>cus_1234</code> for customers, <code>pi_5678</code> for payment intents &mdash; the prefix tells you the type at a glance.</p>
+
+        <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Comparison of ID strategies: auto-increment vs UUID vs Snowflake">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">ID Strategies &mdash; Real Companies, Real Choices</text>
+
+          <rect x="30" y="45" width="210" height="120" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="135" y="70" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="12">Auto-Increment</text>
+          <text x="135" y="92" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">id = 1, 2, 3, 4...</text>
+          <text x="135" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Shopify, Stack Overflow</text>
+          <text x="135" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Simple, single-server</text>
+          <text x="135" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">4-8 bytes, fast B-tree</text>
+
+          <rect x="275" y="45" width="210" height="120" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="380" y="70" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="12">UUID (v4 / v7)</text>
+          <text x="380" y="92" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="8">7c9e6679-7425-40de-...</text>
+          <text x="380" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Heroku, many SaaS apps</text>
+          <text x="380" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Distributed, no coordination</text>
+          <text x="380" y="152" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="9">16 bytes, index-heavy</text>
+
+          <rect x="520" y="45" width="210" height="120" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+          <text x="625" y="70" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Snowflake ID</text>
+          <text x="625" y="92" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">1453296345368752128</text>
+          <text x="625" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Twitter, Discord, Instagram</text>
+          <text x="625" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Time-ordered + distributed</text>
+          <text x="625" y="152" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">8 bytes, best of both</text>
+
+          <text x="380" y="190" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Default: BIGINT auto-increment. Switch to UUID/Snowflake when you need distributed ID generation.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2: Polymorphic Associations -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Polymorphic Associations &mdash; One Table, Many Parents</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Your app has posts, photos, and videos. Users can comment on <em>all three</em>. Do you create three separate comment tables (<code>post_comments</code>, <code>photo_comments</code>, <code>video_comments</code>) with identical columns? Or one <code>comments</code> table that knows which type of thing it's attached to?</p>
+
+        <p>The second approach is called a <span class="tooltip-trigger">polymorphic association<span class="tooltip-content">A pattern where a single table (like <code>comments</code>) can belong to multiple parent tables (posts, photos, videos) using two columns: <code>commentable_type</code> (which table) and <code>commentable_id</code> (which row). Ruby on Rails popularized this pattern. It's pragmatic and widely used, but technically breaks relational purity because the database can't enforce a foreign key when the target table is dynamic. Many teams add application-level checks instead.</span></span>. Ruby on Rails popularized it, and it's used extensively in production by GitHub, Shopify, and Basecamp.</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">polymorphic-comments.sql</span></div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- One comments table for posts, photos, and videos
+CREATE TABLE comments (
+    id               SERIAL PRIMARY KEY,
+    user_id          INT NOT NULL REFERENCES users(id),
+    commentable_type VARCHAR(50) NOT NULL,   -- 'Post', 'Photo', or 'Video'
+    commentable_id   BIGINT NOT NULL,        -- the ID in that table
+    body             TEXT NOT NULL,
+    created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Alice comments on a post (id=10)
+INSERT INTO comments (user_id, commentable_type, commentable_id, body)
+VALUES (1, 'Post', 10, 'Great article!');
+
+-- Alice comments on a photo (id=55)
+INSERT INTO comments (user_id, commentable_type, commentable_id, body)
+VALUES (1, 'Photo', 55, 'Beautiful sunset!');
+
+-- Get all comments on Post #10
+SELECT * FROM comments
+WHERE commentable_type = 'Post' AND commentable_id = 10;
+
+-- Add an index for fast lookups
+CREATE INDEX idx_comments_polymorphic
+ON comments (commentable_type, commentable_id);
+
+-- THE TRADE-OFF:
+-- ✅ One table instead of three — simpler queries, simpler code
+-- ❌ No foreign key constraint — the DB can't verify commentable_id exists
+-- ❌ Your application must enforce referential integrity
+-- Rails handles this automatically with belongs_to :commentable, polymorphic: true</code></pre>
+          </div>
+        </div>
+
+        <p><strong>The pure SQL alternative</strong> is to use separate tables or a shared parent table with <span class="tooltip-trigger">table inheritance<span class="tooltip-content">A PostgreSQL-specific feature where child tables inherit columns from a parent table. <code>CREATE TABLE photos () INHERITS (content);</code> means photos get all columns from content, plus any photo-specific columns. Then your comments table has a foreign key to the content table. This preserves referential integrity while allowing polymorphism. Most teams don't use this because it's PostgreSQL-only and adds complexity.</span></span>. But in practice, polymorphic associations are so convenient that they dominate real-world applications. Use them for comments, likes, tags, notifications &mdash; any feature that attaches to multiple entity types.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3: JSON Columns -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>JSON Columns in PostgreSQL &mdash; When Schema-less Meets Schema-ful</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Sometimes you <em>don't know</em> the exact shape of your data ahead of time. Product attributes are the classic example: a laptop has RAM and screen size, a shirt has color and size, a book has page count and ISBN. You could create a column for every possible attribute (hundreds of columns, mostly NULL), or you could use a <span class="tooltip-trigger">JSONB column<span class="tooltip-content">A PostgreSQL data type that stores JSON (JavaScript Object Notation) in a binary, indexed format. Unlike plain JSON (which is stored as text), JSONB is parsed once on insert and stored as a binary structure &mdash; so queries are fast. You can index individual keys with GIN indexes, query nested paths, and mix structured (normal columns) with semi-structured (JSONB) data. Shopify uses JSONB for product metafields. It's PostgreSQL's answer to "I need some NoSQL flexibility in my SQL database."</span></span> to store flexible data.</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">jsonb-columns.sql</span></div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- Structured columns for common fields, JSONB for flexible attributes
+CREATE TABLE products (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(200) NOT NULL,
+    price       DECIMAL(10,2) NOT NULL,
+    category    VARCHAR(50),
+    attributes  JSONB DEFAULT '{}'::jsonb   -- flexible key-value pairs
+);
+
+-- A laptop: has RAM, screen size, CPU
+INSERT INTO products (name, price, category, attributes) VALUES
+('MacBook Pro 14"', 1999.00, 'Laptops',
+ '{"ram_gb": 16, "screen_inches": 14.2, "cpu": "M3 Pro", "storage_gb": 512}');
+
+-- A shirt: has color, size, material
+INSERT INTO products (name, price, category, attributes) VALUES
+('Classic Oxford Shirt', 49.99, 'Clothing',
+ '{"color": "blue", "size": "M", "material": "cotton", "fit": "regular"}');
+
+-- Query JSONB: find all laptops with 16GB+ RAM
+SELECT name, price, attributes->>'ram_gb' AS ram
+FROM products
+WHERE category = 'Laptops'
+  AND (attributes->>'ram_gb')::INT >= 16;
+
+-- Index JSONB for fast lookups (GIN index)
+CREATE INDEX idx_product_attrs ON products USING GIN (attributes);
+
+-- Check if a key exists
+SELECT * FROM products WHERE attributes ? 'color';
+
+-- RULE OF THUMB:
+-- Use normal columns for data you query/filter/sort on frequently
+-- Use JSONB for data that varies per category or changes often
+-- NEVER store everything in JSONB — you lose type safety and constraints</code></pre>
+          </div>
+        </div>
+
+        <p>Shopify uses this exact pattern for <strong>metafields</strong> &mdash; custom attributes that store owners define for their products. The core product fields (name, price, SKU) are normal columns with constraints. The custom stuff (like "roast level" for a coffee shop or "vintage year" for a wine store) goes in a flexible JSONB column. This gives you the best of both worlds: relational structure where you need it, document-style flexibility where you don't.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 4: Database Migrations -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Database Migrations &mdash; Changing the Schema Without Breaking Production</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Your schema will change. Products will get new fields. Tables will need new indexes. Columns will need different types. The question isn't <em>whether</em> you'll need to modify your schema &mdash; it's <em>how</em> to do it safely on a database that's serving live traffic.</p>
+
+        <p>Every major framework has a migration tool that version-controls your schema changes:</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">migration-tools.sh</span></div>
+          <div class="macos-body">
+<pre><code class="language-bash"># Rails (Ruby) — the gold standard for migration tooling
+rails generate migration AddPhoneToUsers phone:string
+rails db:migrate                    # apply pending migrations
+rails db:rollback                   # undo the last migration
+rails db:migrate:status             # see what's applied and what's pending
+
+# Alembic (Python / SQLAlchemy)
+alembic revision --autogenerate -m "add phone column"
+alembic upgrade head                # apply all pending
+alembic downgrade -1                # undo last
+
+# Flyway (Java / JVM)
+flyway migrate                      # apply pending migrations
+flyway info                         # see current state
+
+# Entity Framework (.NET)
+dotnet ef migrations add AddPhone   # generate migration
+dotnet ef database update           # apply it
+
+# ALWAYS backup before a migration on production:
+pg_dump -Fc mydb > backup_before_migration.dump</code></pre>
+          </div>
+        </div>
+
+        <p>Some schema changes are instant, and some rewrite the entire table. Knowing the difference can save you from a 3 AM production incident:</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">safe-vs-dangerous-migrations.sql</span></div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- ✅ SAFE (instant, no table rewrite in PostgreSQL):
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);           -- nullable column: instant
+ALTER TABLE users ADD COLUMN age INT NOT NULL DEFAULT 0;  -- PostgreSQL 11+: instant!
+CREATE INDEX CONCURRENTLY idx_users_email ON users(email); -- non-blocking index
+
+-- ⚠️ DANGEROUS (rewrites entire table — can take hours on large tables):
+ALTER TABLE users ALTER COLUMN name TYPE TEXT;             -- type change: full rewrite
+ALTER TABLE users ADD COLUMN age INT NOT NULL DEFAULT 0;  -- PostgreSQL 10 and below: full rewrite!
+ALTER TABLE tweets ALTER COLUMN id TYPE BIGINT;           -- GitHub's 2019 migration nightmare
+
+-- ❌ VERY DANGEROUS (exclusive lock — blocks ALL reads and writes):
+ALTER TABLE users RENAME COLUMN name TO full_name;        -- instant but takes ACCESS EXCLUSIVE lock
+-- If any long-running query is reading the table, this waits.
+-- While it waits, ALL new queries queue behind it. Cascade timeout.
+
+-- THE SAFE MIGRATION CHECKLIST:
+-- 1. Always add columns as nullable OR with a DEFAULT (PostgreSQL 11+)
+-- 2. Create indexes with CONCURRENTLY to avoid blocking
+-- 3. Never rename columns in production — add new, migrate data, drop old
+-- 4. Always pg_dump before destructive changes
+-- 5. Test migrations on a copy of production data FIRST</code></pre>
+          </div>
+        </div>
+
+        <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Migration safety spectrum: safe operations to dangerous operations">
+          <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Migration Safety Spectrum</text>
+
+          <!-- Safe zone -->
+          <rect x="30" y="50" width="220" height="100" rx="10" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5"/>
+          <text x="140" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">SAFE (Instant)</text>
+          <text x="140" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Add nullable column</text>
+          <text x="140" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Add column w/ DEFAULT (PG 11+)</text>
+          <text x="140" y="129" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">CREATE INDEX CONCURRENTLY</text>
+          <text x="140" y="146" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">No downtime, no rewrite</text>
+
+          <!-- Warning zone -->
+          <rect x="270" y="50" width="220" height="100" rx="10" fill="rgba(234,179,8,0.1)" stroke="#eab308" stroke-width="1.5"/>
+          <text x="380" y="75" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="12">CAREFUL (Table Rewrite)</text>
+          <text x="380" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Change column type</text>
+          <text x="380" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Add NOT NULL to existing column</text>
+          <text x="380" y="129" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Drop column (PG: instant, MySQL: rewrite)</text>
+          <text x="380" y="146" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Minutes to hours on large tables</text>
+
+          <!-- Danger zone -->
+          <rect x="510" y="50" width="220" height="100" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="620" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">DANGEROUS (Locking)</text>
+          <text x="620" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Rename column/table</text>
+          <text x="620" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">Change primary key type</text>
+          <text x="620" y="129" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">CREATE INDEX (without CONCURRENTLY)</text>
+          <text x="620" y="146" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Blocks all queries. Potential outage.</text>
+
+          <text x="380" y="185" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Always test migrations on a staging database with production-size data before running in production.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 &mdash; Variations
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-code-branch"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations &mdash; Different Schemas for Different Workloads</h2>
+    </div>
+  </div>
+
+  <p>Everything we've covered so far is <span class="tooltip-trigger">OLTP<span class="tooltip-content">Online Transaction Processing &mdash; the kind of database work that powers your day-to-day application. Inserts, updates, deletes, and simple lookups by primary key. Think: "add item to cart," "update user address," "record a payment." OLTP schemas are normalized (3NF) to minimize redundancy and support fast writes. PostgreSQL, MySQL, and SQL Server are all OLTP-first databases.</span></span> schema design &mdash; the standard approach for applications that read and write individual records. But not all workloads are the same. Analytics, reporting, and event-driven architectures need fundamentally different schema shapes. Here are the three main variations.</p>
+
+  <!-- Card 1: OLTP -->
+  <div class="card open">
+    <h3 class="card-title">OLTP Schema Design &mdash; The Application Database</h3>
+    <div class="card-body">
+      <p>This is everything we've built in this page &mdash; normalized tables linked by foreign keys, optimized for <strong>fast reads and writes of individual records</strong>. When a user adds an item to their cart, your app reads the product, writes an order_item, and decrements inventory. Each operation touches a small number of rows.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">oltp-query-pattern.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- OLTP: small, targeted queries. Fast by design.
+
+-- "Get Alice's most recent order with items"
+SELECT o.id, o.total, o.created_at, p.name, oi.quantity, oi.unit_price
+FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+JOIN products p ON oi.product_id = p.id
+WHERE o.user_id = 1
+ORDER BY o.created_at DESC
+LIMIT 1;
+
+-- "Decrement inventory for product 42"
+UPDATE inventory SET quantity = quantity - 1, updated_at = NOW()
+WHERE product_id = 42 AND quantity > 0;
+-- The `quantity > 0` check prevents overselling.
+
+-- Characteristics of OLTP schemas:
+-- ✅ Normalized (3NF) — no redundancy
+-- ✅ Many tables with small rows
+-- ✅ Indexes on foreign keys and lookup columns
+-- ✅ Optimized for single-row or small-batch operations
+-- ✅ Used by: Shopify, Stripe, GitHub (PostgreSQL), Uber (MySQL)</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: OLAP / Star Schema -->
+  <div class="card">
+    <h3 class="card-title">OLAP / Star Schema &mdash; The Analytics Database</h3>
+    <div class="card-body">
+      <p>Imagine your product manager asks: "What was our total revenue by product category, by month, for the last two years, broken down by customer country?" That query needs to scan <em>millions</em> of rows across multiple tables. Your OLTP schema can answer it, but it'll take minutes. For analytics, companies use a different schema shape called a <span class="tooltip-trigger">star schema<span class="tooltip-content">A denormalized schema optimized for analytical queries. At the center is a "fact table" (e.g., <code>fact_sales</code>) containing measurements (revenue, quantity, timestamps). Around it are "dimension tables" (products, customers, dates) containing descriptive attributes. It's called "star" because the ER diagram looks like a star with the fact table at the center. Data warehouses like Snowflake, BigQuery, and Redshift all use star schemas.</span></span>.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">star-schema.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- STAR SCHEMA: one fact table at the center, dimension tables around it
+
+-- Fact table: one row per sale event (the measurements)
+CREATE TABLE fact_sales (
+    sale_id       BIGINT PRIMARY KEY,
+    date_key      INT REFERENCES dim_date(date_key),
+    product_key   INT REFERENCES dim_product(product_key),
+    customer_key  INT REFERENCES dim_customer(customer_key),
+    quantity      INT,
+    revenue       DECIMAL(12,2),
+    discount      DECIMAL(10,2)
+);
+
+-- Dimension: date (pre-computed calendar table)
+CREATE TABLE dim_date (
+    date_key    INT PRIMARY KEY,          -- 20240115
+    full_date   DATE,
+    year        INT, month INT, day INT,
+    quarter     INT,
+    day_of_week VARCHAR(10),
+    is_weekend  BOOLEAN,
+    is_holiday  BOOLEAN
+);
+
+-- Dimension: product (denormalized — category embedded, not a separate table)
+CREATE TABLE dim_product (
+    product_key   INT PRIMARY KEY,
+    name          VARCHAR(200),
+    category      VARCHAR(50),
+    subcategory   VARCHAR(50),
+    brand         VARCHAR(100)
+);
+
+-- Dimension: customer (denormalized — address embedded directly)
+CREATE TABLE dim_customer (
+    customer_key  INT PRIMARY KEY,
+    name          VARCHAR(100),
+    country       VARCHAR(50),
+    city          VARCHAR(100),
+    segment       VARCHAR(50)  -- 'Enterprise', 'SMB', 'Consumer'
+);
+
+-- The analytics query that would be slow on OLTP is FAST here:
+SELECT dp.category, dd.year, dd.month, SUM(fs.revenue) AS total_revenue
+FROM fact_sales fs
+JOIN dim_product dp ON fs.product_key = dp.product_key
+JOIN dim_date dd ON fs.date_key = dd.date_key
+WHERE dd.year IN (2023, 2024)
+GROUP BY dp.category, dd.year, dd.month
+ORDER BY dd.year, dd.month, total_revenue DESC;</code></pre>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Star schema: fact_sales at center with dimension tables around it">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Star Schema &mdash; The Analytics Pattern</text>
+
+        <!-- Fact table at center -->
+        <rect x="280" y="100" width="200" height="100" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="380" y="130" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="14">fact_sales</text>
+        <text x="380" y="150" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">revenue, quantity, discount</text>
+        <text x="380" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Millions/billions of rows</text>
+        <text x="380" y="186" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">THE MEASUREMENTS</text>
+
+        <!-- dim_date -->
+        <rect x="50" y="40" width="160" height="70" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="130" y="65" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="600" font-size="11">dim_date</text>
+        <text x="130" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">year, month, quarter, is_holiday</text>
+        <text x="130" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">WHEN</text>
+
+        <!-- dim_product -->
+        <rect x="550" y="40" width="170" height="70" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="635" y="65" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="11">dim_product</text>
+        <text x="635" y="82" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">name, category, brand</text>
+        <text x="635" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">WHAT</text>
+
+        <!-- dim_customer -->
+        <rect x="290" y="240" width="180" height="55" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+        <text x="380" y="262" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="11">dim_customer</text>
+        <text x="380" y="280" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">name, country, segment</text>
+
+        <!-- Lines connecting dimensions to fact -->
+        <line x1="210" y1="90" x2="280" y2="130" stroke="#3b82f6" stroke-width="1.5"/>
+        <line x1="550" y1="90" x2="480" y2="130" stroke="#a78bfa" stroke-width="1.5"/>
+        <line x1="380" y1="200" x2="380" y2="240" stroke="#eab308" stroke-width="1.5"/>
+
+        <text x="130" y="36" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">WHO</text>
+      </svg>
+
+      <p><strong>Key difference from OLTP:</strong> star schemas are intentionally <em>denormalized</em>. The customer's country is stored directly in <code>dim_customer</code>, not in a separate <code>countries</code> table. That duplication is fine &mdash; analytics databases optimize for read speed, not write consistency. Snowflake, BigQuery, Amazon Redshift, and ClickHouse are all built for star schemas.</p>
+    </div>
+  </div>
+
+  <!-- Card 3: Event Sourcing -->
+  <div class="card">
+    <h3 class="card-title">Event Sourcing Schema &mdash; Storing What Happened, Not What Is</h3>
+    <div class="card-body">
+      <p>Traditional schemas store <em>current state</em>: "Alice has $150 in her account." Event sourcing stores <em>every change that ever happened</em>: "Alice deposited $100, then deposited $50." You compute the current state by replaying the events. This sounds like more work (because it is), but it gives you a complete audit trail and the ability to reconstruct the state at any point in time.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">event-sourcing.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- EVENT SOURCING: store events, derive state
+
+-- The event log — append-only, NEVER update or delete
+CREATE TABLE account_events (
+    event_id    BIGSERIAL PRIMARY KEY,
+    account_id  UUID NOT NULL,
+    event_type  VARCHAR(50) NOT NULL,    -- 'deposit', 'withdrawal', 'transfer'
+    amount      DECIMAL(12,2) NOT NULL,
+    metadata    JSONB DEFAULT '{}',       -- extra context (ATM location, etc.)
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Alice opens an account and makes transactions
+INSERT INTO account_events (account_id, event_type, amount) VALUES
+('a1b2c3d4-...', 'account_opened', 0.00),
+('a1b2c3d4-...', 'deposit',        100.00),
+('a1b2c3d4-...', 'deposit',        50.00),
+('a1b2c3d4-...', 'withdrawal',     30.00);
+
+-- Compute current balance by replaying events
+SELECT account_id,
+       SUM(CASE
+           WHEN event_type = 'deposit' THEN amount
+           WHEN event_type = 'withdrawal' THEN -amount
+           ELSE 0
+       END) AS balance
+FROM account_events
+WHERE account_id = 'a1b2c3d4-...'
+GROUP BY account_id;
+-- balance = 120.00  (0 + 100 + 50 - 30)
+
+-- "What was Alice's balance on Jan 15?"
+-- Just replay events up to that date!
+SELECT SUM(CASE WHEN event_type = 'deposit' THEN amount
+                WHEN event_type = 'withdrawal' THEN -amount ELSE 0 END)
+FROM account_events
+WHERE account_id = 'a1b2c3d4-...' AND created_at <= '2024-01-15';
+
+-- WHO USES THIS:
+-- ✅ Banks and payment processors (complete audit trail required by law)
+-- ✅ Stripe (every charge, refund, dispute is an event)
+-- ✅ Event-driven systems (Kafka, EventStoreDB)
+-- ❌ NOT for simple CRUD apps — overkill for a blog or todo list</code></pre>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Traditional state vs event sourcing: state shows final balance, events show full history">
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Traditional State vs Event Sourcing</text>
+
+        <!-- Traditional -->
+        <rect x="40" y="50" width="310" height="110" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="195" y="75" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-weight="700" font-size="12">Traditional (Store State)</text>
+        <text x="195" y="105" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="10">accounts: { id: 1, balance: 120.00 }</text>
+        <text x="195" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">You see WHAT IS. History is lost.</text>
+        <text x="195" y="148" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">"How did we get to $120?" — No idea.</text>
+
+        <!-- Event Sourcing -->
+        <rect x="410" y="50" width="310" height="110" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="565" y="75" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Event Sourcing (Store Events)</text>
+        <text x="565" y="98" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">opened: $0 → deposit: +$100</text>
+        <text x="565" y="115" text-anchor="middle" fill="#f1f5f9" font-family="JetBrains Mono,monospace" font-size="9">→ deposit: +$50 → withdrawal: -$30</text>
+        <text x="565" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">You see WHAT HAPPENED. Full history.</text>
+        <text x="565" y="148" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">"Balance at any point in time?" — Easy.</text>
+
+        <text x="380" y="190" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Event sourcing: more storage, more complexity, but complete audit trail and time-travel queries.</text>
+      </svg>
+
+      <p>Event sourcing is not a replacement for OLTP &mdash; it's a complement. Many systems use event sourcing for the core domain (payments, banking) and traditional OLTP for everything else (user profiles, settings). The events are the <em>source of truth</em>, and materialized views or read models provide fast query access.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 &mdash; At Scale
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-city"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale &mdash; How Big Companies Actually Model Data</h2>
+    </div>
+  </div>
+
+  <p>Theory is great, but the real test of a schema is whether it survives 10 million users, 500 million rows, and a team of 200 engineers all writing migrations at the same time. Let's look at four companies that faced exactly that &mdash; and how their schema decisions shaped everything.</p>
+
+  <!-- Card 1: Instagram -->
+  <div class="card">
+    <h3 class="card-title">Instagram &mdash; Sharded PostgreSQL with User-ID-Based Routing</h3>
+    <div class="card-body">
+      <p>Instagram serves over 2 billion monthly active users, yet their core storage is still <span class="tooltip-trigger">PostgreSQL<span class="tooltip-content">An open-source relational database known for its correctness, extensibility, and rich feature set. It supports JSONB, full-text search, GIS data, and hundreds of extensions. Instagram, Shopify, GitLab, Supabase, and Notion all run on PostgreSQL.</span></span> &mdash; not some exotic NoSQL system. The secret? Sharding by <code>user_id</code>.</p>
+
+      <p>Every photo, like, comment, and follow relationship is keyed to the user who created it. When you upload a photo, Instagram hashes your <code>user_id</code> to determine which PostgreSQL shard stores it. That means all of <em>your</em> data lives on the same machine &mdash; so loading your profile, your feed, and your notifications doesn't require cross-shard joins.</p>
+
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Instagram sharding: user ID hashed to determine which PostgreSQL shard stores the data">
+        <defs>
+          <marker id="sch-ig-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Instagram: User-ID Shard Routing</text>
+
+        <!-- User -->
+        <rect x="30" y="60" width="140" height="60" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="100" y="86" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="11">User #48291</text>
+        <text x="100" y="106" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">uploads a photo</text>
+
+        <!-- Hash function -->
+        <rect x="240" y="60" width="120" height="60" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="300" y="86" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="11">hash(user_id)</text>
+        <text x="300" y="106" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">48291 % 4096</text>
+
+        <line x1="170" y1="90" x2="240" y2="90" stroke="#10b981" stroke-width="1.5" marker-end="url(#sch-ig-arr)"/>
+
+        <!-- Shards -->
+        <rect x="430" y="40" width="130" height="40" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="495" y="65" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Shard 0</text>
+
+        <rect x="430" y="90" width="130" height="40" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="495" y="115" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">Shard 1,187 &#x2714;</text>
+
+        <rect x="430" y="140" width="130" height="40" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+        <text x="495" y="165" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">Shard 4,095</text>
+
+        <line x1="360" y1="90" x2="430" y2="110" stroke="#10b981" stroke-width="1.5" marker-end="url(#sch-ig-arr)"/>
+
+        <!-- Label -->
+        <rect x="600" y="85" width="140" height="50" rx="6" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="670" y="105" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">photos, likes, comments</text>
+        <text x="670" y="122" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">all on same shard</text>
+
+        <line x1="560" y1="110" x2="600" y2="110" stroke="#10b981" stroke-width="1" marker-end="url(#sch-ig-arr)"/>
+
+        <text x="380" y="210" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">All of one user's data lives on a single shard &mdash; no cross-shard JOINs for profile loads.</text>
+      </svg>
+
+      <p>Their IDs are also clever: Instagram uses a variant of <span class="tooltip-trigger">Snowflake IDs<span class="tooltip-content">A 64-bit ID format invented by Twitter that encodes the creation timestamp, machine ID, and a sequence number into a single integer. It's sortable by time (newer IDs are always larger), globally unique without a central coordinator, and fits in a BIGINT column. Instagram, Discord, and many other companies use their own Snowflake variants.</span></span> &mdash; 64-bit integers that encode the timestamp, shard ID, and a per-shard sequence number. This means IDs are <em>time-sortable</em> (newer photos always have higher IDs) and you can extract the shard from the ID itself, so routing is instant.</p>
+    </div>
+  </div>
+
+  <!-- Card 2: Shopify -->
+  <div class="card">
+    <h3 class="card-title">Shopify &mdash; Per-Merchant Schema with Vitess</h3>
+    <div class="card-body">
+      <p>Shopify hosts millions of online stores, and every one of them has products, orders, customers, and inventory. The schema for each store is identical &mdash; same tables, same columns, same constraints. But the <em>data</em> is completely isolated. Merchant A can never accidentally see Merchant B's orders.</p>
+
+      <p>Under the hood, Shopify uses <span class="tooltip-trigger">Vitess<span class="tooltip-content">An open-source database clustering system for horizontal scaling of MySQL. Originally built at YouTube in 2010 to handle their massive growth, it sits between your application and MySQL, routing queries to the right shard automatically. Shopify, Slack, HubSpot, and Square all use Vitess in production. It handles connection pooling, query routing, and schema management across thousands of shards.</span></span> (originally built at YouTube) to shard MySQL across thousands of machines. The shard key is the <code>shop_id</code>. Every query includes the shop context, so Vitess routes it to the correct shard without the application needing to know which physical database holds the data.</p>
+
+      <p>The brilliant part? Each merchant's schema is exactly the same, but each lives in its own <em>virtual keyspace</em>. When Shopify adds a new column (like <code>fulfillment_status</code> on orders), they roll out the migration one shard at a time over days &mdash; not a single big-bang deployment.</p>
+    </div>
+  </div>
+
+  <!-- Card 3: Slack -->
+  <div class="card">
+    <h3 class="card-title">Slack &mdash; Denormalized for Speed at 18 Billion Messages</h3>
+    <div class="card-body">
+      <p>Slack's core product is messaging, and messages have a specific access pattern: you almost always read them <em>in order</em>, within a <em>single channel</em>, for a <em>single workspace</em>. Slack exploits this by storing messages in a heavily <span class="tooltip-trigger">denormalized<span class="tooltip-content">Intentionally duplicating data across tables to avoid JOINs at read time. The opposite of normalization. You trade disk space and write complexity for much faster reads. Common in high-throughput systems where reads vastly outnumber writes &mdash; Slack reads 10-100x more than it writes.</span></span> format, keyed by <code>(workspace_id, channel_id, message_ts)</code>.</p>
+
+      <p>The message row stores the author's display name and avatar URL <em>directly</em>, rather than joining to a users table. Yes, this duplicates data. Yes, it means updating a username requires a backfill. But it means loading 50 messages in a channel is one simple query with zero JOINs &mdash; and at 18 billion messages, eliminating JOINs matters more than saving a few bytes of duplication.</p>
+
+      <p>Their schema evolved over time. Early Slack was more normalized. As they grew past 10 billion messages, they denormalized aggressively &mdash; a textbook example of the principle that <em>the right schema at 1 million rows is not the right schema at 10 billion rows</em>.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: Airbnb -->
+  <div class="card">
+    <h3 class="card-title">Airbnb &mdash; Availability Calendars &amp; Dynamic Pricing</h3>
+    <div class="card-body">
+      <p>Airbnb's listing schema is deceptively complex. A listing isn't just a title and a price &mdash; it has an <em>availability calendar</em> (which dates are open, blocked, or booked), <em>dynamic pricing</em> (price changes per night based on demand, season, and local events), and <em>location data</em> (latitude, longitude, neighborhood, city).</p>
+
+      <p>Their calendar table has one row per listing per date &mdash; so a listing available for the next 365 days creates 365 rows. With millions of listings, that's billions of calendar rows. They partition this table by date range and shard by <code>listing_id</code>, so checking "is this listing available on March 15-18?" hits a single shard and scans only the relevant date partition.</p>
+
+      <p>The pricing model is even more interesting. Rather than storing a single <code>price_per_night</code> on the listing, Airbnb stores price overrides per date (like "New Year's Eve is $500/night instead of $150"). The schema supports a <code>default_price</code> on the listing, plus a <code>price_overrides</code> table keyed by <code>(listing_id, date)</code>. The app queries both and picks the override if one exists.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 &mdash; Anti-Lessons
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lessons">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-circle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Anti-Lessons &mdash; Advice That Sounds Smart but Hurts</h2>
+    </div>
+  </div>
+
+  <p>Some of the most popular schema advice on the internet is <em>technically correct</em> but <em>practically harmful</em>. These are the ideas that sound great in a textbook and fail miserably at scale. If someone tells you any of these without nuance, be suspicious.</p>
+
+  <!-- Anti-Lesson 1 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>"Normalize Everything" &mdash; Kills Read Performance</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Full normalization is academically elegant: no duplicated data, no update anomalies, every fact stored exactly once. In practice, queries that join 8 tables to display a single page are <em>slow</em>. Really slow. Especially at scale.</p>
+
+        <p>Slack learned this the hard way. Their early, fully normalized schema required 3-4 JOINs to render a single message (user table for display name, workspace table for settings, channel table for permissions). At 1 million messages, fine. At 18 billion, those JOINs became their biggest bottleneck. They denormalized &mdash; storing the display name directly on the message row &mdash; and read latency dropped by 60%.</p>
+
+        <div class="callout callout-info">
+          <strong>The balanced approach:</strong> Normalize your <em>write path</em> (avoid update anomalies). Denormalize your <em>read path</em> (avoid expensive JOINs on hot queries). Many production systems maintain both: a normalized source of truth, plus denormalized read replicas or materialized views.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anti-Lesson 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>"Use EAV for Flexibility" &mdash; The Query Nightmare</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><span class="tooltip-trigger">Entity-Attribute-Value (EAV)<span class="tooltip-content">A schema pattern where instead of columns, you store data as rows of (entity_id, attribute_name, attribute_value). Example: instead of a "color" column on products, you'd have a row like (product_id=1, key="color", value="blue"). It's infinitely flexible &mdash; you can add any attribute without a migration &mdash; but querying is a nightmare because you need to PIVOT rows back into columns.</span></span> is a pattern where instead of adding columns to a table, you store everything as key-value rows: <code>(entity_id, key, value)</code>. It sounds brilliant &mdash; infinite flexibility without schema migrations! But in practice, it turns every simple query into a multi-JOIN pivot nightmare.</p>
+
+        <p>WordPress's <code>wp_options</code> and <code>wp_postmeta</code> tables are the most infamous example. Want to find all posts with a custom field "color" equal to "blue" that also have "size" equal to "large"? That's a self-join on <code>wp_postmeta</code> for every attribute &mdash; and it gets slower with every custom field you add.</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">eav-nightmare.sql</span></div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- EAV: "flexible" but miserable to query
+-- Find products that are blue AND large
+SELECT p.id, p.name
+FROM products p
+JOIN product_meta pm1 ON p.id = pm1.product_id
+  AND pm1.meta_key = 'color' AND pm1.meta_value = 'blue'
+JOIN product_meta pm2 ON p.id = pm2.product_id
+  AND pm2.meta_key = 'size' AND pm2.meta_value = 'large';
+-- One self-join PER attribute. 5 attributes = 5 JOINs. Slow.
+
+-- Better alternative: JSONB column
+SELECT id, name FROM products
+WHERE attributes @> '{"color": "blue", "size": "large"}'::jsonb;
+-- One clause. One GIN index. Fast.</code></pre>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <strong>When EAV is acceptable:</strong> Only when you have truly unbounded, user-defined attributes (like a form builder where users create custom fields) and you <em>rarely</em> query across attributes. For everything else, use JSONB columns or proper relational columns.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anti-Lesson 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>"Schema-on-Read Is Always Better" &mdash; MongoDB's Hard-Learned Lesson</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><span class="tooltip-trigger">Schema-on-read<span class="tooltip-content">The idea that you don't enforce any structure when writing data &mdash; you just store raw documents (JSON, BSON) and validate the shape when you read it. MongoDB, early Elasticsearch, and data lakes like S3+Athena use this approach. It sounds flexible, but it means your application code becomes responsible for handling every possible shape of data, including corrupt or inconsistent documents.</span></span> was MongoDB's selling point in the early 2010s: "No schemas! Just throw JSON in and figure it out later!" And for prototyping, it's genuinely fast. You can start building without designing tables upfront.</p>
+
+        <p>But "figure it out later" always arrives, and it arrives painfully. Teams using schema-on-read consistently discovered that after 6-12 months, their data was full of inconsistencies &mdash; some documents had <code>email</code>, others had <code>Email</code>, others had <code>emailAddress</code>. No constraints meant duplicate records, missing required fields, and data that silently broke downstream consumers.</p>
+
+        <p>MongoDB themselves acknowledged this by adding <strong>schema validation</strong> in version 3.6 (2017). By version 5.0, they added stricter JSON Schema validation. Most mature MongoDB deployments today enforce schemas &mdash; which means they've effectively re-invented constraints, just with more ceremony.</p>
+
+        <div class="callout callout-info">
+          <strong>The lesson:</strong> Schema-on-read is great for exploration (data lakes, prototyping). Schema-on-write is necessary for production systems where data quality matters. Most teams end up adding validation regardless of which database they choose.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 &mdash; Common Mistakes
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bug"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes &mdash; Schema Sins We've All Committed</h2>
+    </div>
+  </div>
+
+  <p>These are the mistakes that show up in code reviews every single week. Each one seems harmless until it blows up in production &mdash; and by then, fixing it requires a painful migration on a table with 200 million rows.</p>
+
+  <!-- Mistake 1 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Storing Money as FLOAT</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>We covered this in Section 4, but it deserves its own mistake entry because it's <em>that</em> common. <code>FLOAT</code> and <code>DOUBLE</code> store numbers as binary approximations using IEEE 754. That means <code>0.1 + 0.2 = 0.30000000000000004</code>. For scientific calculations, this is fine. For money, it's a lawsuit waiting to happen.</p>
+        <div class="callout callout-danger">
+          <strong>Fix:</strong> Always use <code>DECIMAL(10,2)</code> for currency. Alternatively, store money as integers in the smallest unit (cents) &mdash; Stripe stores all amounts as integers. <code>$19.99</code> becomes <code>1999</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Dropping Foreign Keys "for Performance"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Some teams remove foreign keys because "they slow down inserts." And yes, a foreign key check does add a tiny overhead on writes &mdash; the database has to verify the referenced row exists. But the cost of <em>not</em> having them is orphaned data: orders pointing to deleted users, reviews referencing products that don't exist, line items with no parent order.</p>
+        <p>Once orphaned data creeps in, it's nearly impossible to clean up. You can't just add the foreign key back because the constraint would fail on existing bad rows. You'd need to find and fix (or delete) every orphan first &mdash; a project that can take weeks on a large dataset.</p>
+        <div class="callout callout-danger">
+          <strong>Fix:</strong> Keep foreign keys. If write performance is genuinely a bottleneck (rare below 50K writes/sec), consider deferrable constraints (<code>DEFERRABLE INITIALLY DEFERRED</code> in PostgreSQL) which check at transaction commit instead of per-statement.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Storing Emails/Phones as Unvalidated TEXT</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Using <code>TEXT</code> with no constraints for emails and phone numbers seems convenient &mdash; no length limits, no format checks, just store whatever the user sends. But then you end up with <code>"alice@email"</code>, <code>"123"</code>, <code>"not an email"</code>, and empty strings all in the same column. Good luck sending a password reset email to those.</p>
+        <div class="callout callout-danger">
+          <strong>Fix:</strong> Use <code>VARCHAR(255)</code> for emails with a <code>CHECK</code> constraint or a regex pattern. Use <code>UNIQUE</code> on emails to prevent duplicates. For phones, use <code>VARCHAR(20)</code> and store in E.164 format (<code>+14155551234</code>). Validate at the database level, not just the application &mdash; because application bugs happen.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 4 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>No created_at / updated_at on Every Table</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>You'll need timestamps. Maybe not today, maybe not next month, but someday a support ticket will come in asking "when was this order created?" or a bug investigation will need "when was this record last changed?" Without timestamps, the answer is "we have no idea."</p>
+        <div class="callout callout-danger">
+          <strong>Fix:</strong> Add <code>created_at TIMESTAMPTZ NOT NULL DEFAULT now()</code> and <code>updated_at TIMESTAMPTZ NOT NULL DEFAULT now()</code> to <em>every</em> table. Use a trigger or application middleware to auto-update <code>updated_at</code> on every modification. This is cheap &mdash; two columns, 16 bytes per row &mdash; and invaluable for debugging.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 5 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>One Giant Migration Instead of Small Steps</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>A single migration that renames 4 columns, changes 2 data types, adds 3 tables, and drops an index is a recipe for disaster. If step 3 fails, what state is your database in? Can you roll back safely? Usually not &mdash; because some of the changes were already applied and they can't be undone (like dropping a column).</p>
+        <div class="callout callout-danger">
+          <strong>Fix:</strong> One migration per logical change. "Add <code>phone</code> column to users" = one migration. "Rename <code>fname</code> to <code>first_name</code>" = another migration. Small migrations are easy to review, easy to test, and easy to roll back. GitHub deploys hundreds of small migrations per week, not one giant one per quarter.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 6 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span>Ignoring Character Encoding &mdash; UTF8 vs UTF8MB4</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>MySQL's <code>utf8</code> charset is a lie. It only supports 3-byte characters, which means it <em>cannot store emojis</em> (which require 4 bytes). If a user writes a review containing a thumbs-up emoji and your table uses <code>utf8</code>, MySQL silently truncates the text at the emoji. Your user's review just got cut in half.</p>
+        <p>This has caused real production outages. In 2013, several major Rails applications discovered that user-generated content was being silently corrupted because MySQL's default <code>utf8</code> couldn't handle the emoji explosion. The fix was migrating to <code>utf8mb4</code> &mdash; MySQL's <em>actual</em> UTF-8 implementation that supports the full Unicode range.</p>
+        <div class="callout callout-danger">
+          <strong>Fix:</strong> In MySQL, <em>always</em> use <code>utf8mb4</code> and <code>utf8mb4_unicode_ci</code> collation. In PostgreSQL, this isn't an issue &mdash; its <code>UTF8</code> encoding supports full 4-byte Unicode by default. When creating a MySQL database: <code>CREATE DATABASE myapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 &mdash; Interview Playbook
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-briefcase"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook &mdash; "Design the Schema for Twitter"</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>Think First:</strong> An interviewer asks: "Design the database schema for Twitter." What tables do you need? What relationships connect them? How do you handle the tweet-to-follower fanout? Take 60 seconds to sketch something before reading the answer.
+  </div>
+
+  <p>This is one of the most common system design interview questions. The interviewer isn't looking for the "one right answer" &mdash; they want to see your <em>thought process</em>: how you identify entities, define relationships, choose data types, and make trade-offs. Here's how a junior, mid-level, and senior engineer would each approach it.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="sch-interview-junior" role="tab" aria-selected="true">Junior</button>
+      <button class="tab-btn" data-tab="sch-interview-mid" role="tab" aria-selected="false">Mid-Level</button>
+      <button class="tab-btn" data-tab="sch-interview-senior" role="tab" aria-selected="false">Senior</button>
+    </div>
+
+    <div class="tab-panel active" id="sch-interview-junior" role="tabpanel">
+      <p><strong>The junior answer</strong> focuses on getting the core entities right. Don't overthink it &mdash; just identify the obvious tables and relationships.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">twitter-schema-junior.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- Core entities: users, tweets, follows
+CREATE TABLE users (
+    id          BIGINT PRIMARY KEY,
+    username    VARCHAR(50) UNIQUE NOT NULL,
+    email       VARCHAR(255) UNIQUE NOT NULL,
+    display_name VARCHAR(100),
+    created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE tweets (
+    id          BIGINT PRIMARY KEY,
+    user_id     BIGINT NOT NULL REFERENCES users(id),
+    content     VARCHAR(280) NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE follows (
+    follower_id BIGINT NOT NULL REFERENCES users(id),
+    followed_id BIGINT NOT NULL REFERENCES users(id),
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (follower_id, followed_id)
+);</code></pre>
+        </div>
+      </div>
+
+      <p>This covers the basics: users can tweet, and users can follow other users. The <code>follows</code> table uses a composite primary key to prevent duplicate follows. A <code>VARCHAR(280)</code> enforces the character limit at the database level. This alone would pass a junior-level interview.</p>
+    </div>
+
+    <div class="tab-panel" id="sch-interview-mid" role="tabpanel">
+      <p><strong>The mid-level answer</strong> extends the junior schema with likes, retweets, replies, and proper indexing &mdash; the features that make Twitter actually useful.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">twitter-schema-mid.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- Tweets now support replies and retweets
+CREATE TABLE tweets (
+    id              BIGINT PRIMARY KEY,   -- Snowflake ID (time-sortable)
+    user_id         BIGINT NOT NULL REFERENCES users(id),
+    content         VARCHAR(280) NOT NULL,
+    reply_to_id     BIGINT REFERENCES tweets(id),  -- NULL = original tweet
+    retweet_of_id   BIGINT REFERENCES tweets(id),  -- NULL = not a retweet
+    like_count      INT DEFAULT 0,        -- denormalized counter
+    retweet_count   INT DEFAULT 0,
+    reply_count     INT DEFAULT 0,
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Likes: who liked which tweet
+CREATE TABLE likes (
+    user_id    BIGINT NOT NULL REFERENCES users(id),
+    tweet_id   BIGINT NOT NULL REFERENCES tweets(id),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_id, tweet_id)
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_tweets_user ON tweets(user_id, created_at DESC);
+CREATE INDEX idx_tweets_reply ON tweets(reply_to_id) WHERE reply_to_id IS NOT NULL;
+CREATE INDEX idx_follows_followed ON follows(followed_id);  -- "who follows me?"</code></pre>
+        </div>
+      </div>
+
+      <p>Key improvements: Snowflake IDs for time-sortable primary keys. Denormalized counters (<code>like_count</code>) to avoid <code>COUNT(*)</code> queries on every tweet render. Partial indexes (the <code>WHERE reply_to_id IS NOT NULL</code>) to save space on indexes that only apply to a subset of rows.</p>
+    </div>
+
+    <div class="tab-panel" id="sch-interview-senior" role="tabpanel">
+      <p><strong>The senior answer</strong> addresses the hard problems: timeline generation, fan-out strategy, and sharding. This is where schema design meets system architecture.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">twitter-schema-senior.sql</span></div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- Timeline: pre-computed feed per user (fan-out on write)
+CREATE TABLE user_timeline (
+    user_id    BIGINT NOT NULL,
+    tweet_id   BIGINT NOT NULL,
+    author_id  BIGINT NOT NULL,           -- denormalized: avoid JOIN
+    created_at TIMESTAMPTZ NOT NULL,       -- denormalized: sort without JOIN
+    PRIMARY KEY (user_id, tweet_id)
+) PARTITION BY HASH (user_id);            -- shard-friendly
+
+-- When @elonmusk (100M followers) tweets:
+-- DON'T fan-out to 100M timeline rows (too slow).
+-- Instead, celebrities use fan-out-on-read:
+-- their tweets are fetched at read time and merged with
+-- the pre-computed timeline.
+
+-- Shard key: user_id for user_timeline, tweet_id for tweets.
+-- This means "show my timeline" hits ONE shard,
+-- but "show all replies to tweet X" might hit multiple.
+-- Trade-off: optimize for the most common query.</code></pre>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fan-out on write vs fan-out on read: normal users pre-compute timelines, celebrities merge at read time">
+        <defs>
+          <marker id="sch-fo-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Fan-Out Strategy: Write vs Read</text>
+
+        <!-- Fan-out on write -->
+        <rect x="30" y="45" width="330" height="130" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="195" y="68" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="11">Fan-Out on Write (Normal Users)</text>
+        <text x="195" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">@alice tweets (500 followers)</text>
+        <text x="195" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Insert 500 rows into user_timeline</text>
+        <text x="195" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Followers see tweet instantly (pre-computed)</text>
+        <text x="195" y="155" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Fast reads, manageable writes</text>
+
+        <!-- Fan-out on read -->
+        <rect x="400" y="45" width="330" height="130" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+        <text x="565" y="68" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="11">Fan-Out on Read (Celebrities)</text>
+        <text x="565" y="90" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">@elonmusk tweets (100M followers)</text>
+        <text x="565" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">DON'T insert 100M rows (too slow)</text>
+        <text x="565" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Fetch + merge at read time instead</text>
+        <text x="565" y="155" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="9">Slower reads, but writes stay sane</text>
+      </svg>
+
+      <p>The senior answer shows you understand that schema design doesn't exist in a vacuum. The right schema depends on <em>access patterns</em> (timelines are read-heavy), <em>scale</em> (100M follower fan-out is different from 500), and <em>operational concerns</em> (how do you shard? how do you migrate?). The interviewer wants to see you reason through these trade-offs, not recite a perfect CREATE TABLE.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 &mdash; Practice Exercises
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Practice Exercises &mdash; Build Muscle Memory</h2>
+    </div>
+  </div>
+
+  <p>Reading about schema design is helpful. <em>Doing</em> it is what makes you good. These exercises progress from straightforward table design to real-world migration challenges.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 1: Design a Blog Schema</span>
+      <span class="difficulty-tag difficulty-easy">Easy</span>
+    </div>
+    <p>Design the schema for a blogging platform. You need: <strong>users</strong> (name, email, bio), <strong>posts</strong> (title, body, status: draft/published), <strong>comments</strong> (nested &mdash; comments can reply to other comments), and <strong>tags</strong> (many-to-many with posts). Include appropriate constraints, indexes, and timestamps.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li>Nested comments need a <code>parent_comment_id</code> that references the same table (self-referencing foreign key).</li>
+            <li>Tags are many-to-many: you'll need a junction table (<code>post_tags</code>) with composite primary key.</li>
+            <li>Post status should be an ENUM or CHECK constraint &mdash; not free text.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">blog-schema.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">CREATE TABLE users (
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
+    email       VARCHAR(255) UNIQUE NOT NULL,
+    bio         TEXT,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE posts (
+    id          BIGSERIAL PRIMARY KEY,
+    author_id   BIGINT NOT NULL REFERENCES users(id),
+    title       VARCHAR(300) NOT NULL,
+    body        TEXT NOT NULL,
+    status      VARCHAR(20) NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published', 'archived')),
+    published_at TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE comments (
+    id              BIGSERIAL PRIMARY KEY,
+    post_id         BIGINT NOT NULL REFERENCES posts(id),
+    author_id       BIGINT NOT NULL REFERENCES users(id),
+    parent_comment_id BIGINT REFERENCES comments(id), -- self-ref for nesting
+    body            TEXT NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE tags (
+    id   SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL
+);
+
+CREATE TABLE post_tags (
+    post_id BIGINT NOT NULL REFERENCES posts(id),
+    tag_id  INT NOT NULL REFERENCES tags(id),
+    PRIMARY KEY (post_id, tag_id)
+);
+
+CREATE INDEX idx_posts_author ON posts(author_id, created_at DESC);
+CREATE INDEX idx_comments_post ON comments(post_id, created_at);
+CREATE INDEX idx_comments_parent ON comments(parent_comment_id)
+    WHERE parent_comment_id IS NOT NULL;</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 2: Normalize a Denormalized Orders Table</span>
+      <span class="difficulty-tag difficulty-medium">Medium</span>
+    </div>
+    <p>You're given this denormalized table with massive duplication. Break it into properly normalized tables (3NF) with appropriate foreign keys:</p>
+    <div class="macos-window">
+      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">denormalized-orders.sql</span></div>
+      <div class="macos-body">
+<pre><code class="language-sql">CREATE TABLE flat_orders (
+    order_id INT, order_date DATE, customer_name VARCHAR(100),
+    customer_email VARCHAR(255), customer_city VARCHAR(100),
+    product_name VARCHAR(200), product_price DECIMAL(10,2),
+    product_category VARCHAR(50), quantity INT, total DECIMAL(10,2)
+);</code></pre>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li>Identify three entities: customers, products, and orders.</li>
+            <li>An order can have multiple products &mdash; you'll need an <code>order_items</code> junction table.</li>
+            <li>Store <code>unit_price</code> on order_items (not just a FK to products) &mdash; because prices change over time, and the order should record what the customer actually paid.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">normalized-orders.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">CREATE TABLE customers (
+    id    BIGSERIAL PRIMARY KEY,
+    name  VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    city  VARCHAR(100)
+);
+
+CREATE TABLE products (
+    id       BIGSERIAL PRIMARY KEY,
+    name     VARCHAR(200) NOT NULL,
+    price    DECIMAL(10,2) NOT NULL,
+    category VARCHAR(50)
+);
+
+CREATE TABLE orders (
+    id          BIGSERIAL PRIMARY KEY,
+    customer_id BIGINT NOT NULL REFERENCES customers(id),
+    order_date  TIMESTAMPTZ DEFAULT now(),
+    total       DECIMAL(10,2) NOT NULL
+);
+
+CREATE TABLE order_items (
+    id         BIGSERIAL PRIMARY KEY,
+    order_id   BIGINT NOT NULL REFERENCES orders(id),
+    product_id BIGINT NOT NULL REFERENCES products(id),
+    quantity   INT NOT NULL CHECK (quantity > 0),
+    unit_price DECIMAL(10,2) NOT NULL -- snapshot of price at purchase time
+);</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 3: Add Soft Deletes + Audit Trail</span>
+      <span class="difficulty-tag difficulty-medium">Medium</span>
+    </div>
+    <p>Take any of the schemas above and add: (1) <strong>soft deletes</strong> &mdash; records are never truly deleted, just marked as deleted with a timestamp, and (2) an <strong>audit trail</strong> &mdash; a separate table that logs every INSERT, UPDATE, and DELETE with the old and new values. Bonus: use a PostgreSQL trigger to populate the audit table automatically.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li>Soft delete: add <code>deleted_at TIMESTAMPTZ</code> (NULL = active, non-NULL = deleted).</li>
+            <li>Update all queries to filter: <code>WHERE deleted_at IS NULL</code>.</li>
+            <li>Audit table columns: <code>table_name, record_id, action (INSERT/UPDATE/DELETE), old_data JSONB, new_data JSONB, changed_at, changed_by</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">soft-delete-audit.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- Soft delete: add to every table
+ALTER TABLE users ADD COLUMN deleted_at TIMESTAMPTZ;
+ALTER TABLE posts ADD COLUMN deleted_at TIMESTAMPTZ;
+
+-- "Delete" a user (soft)
+UPDATE users SET deleted_at = now() WHERE id = 42;
+
+-- All queries must respect soft deletes
+SELECT * FROM users WHERE deleted_at IS NULL;
+
+-- Audit trail table
+CREATE TABLE audit_log (
+    id          BIGSERIAL PRIMARY KEY,
+    table_name  VARCHAR(100) NOT NULL,
+    record_id   BIGINT NOT NULL,
+    action      VARCHAR(10) NOT NULL CHECK (action IN ('INSERT','UPDATE','DELETE')),
+    old_data    JSONB,
+    new_data    JSONB,
+    changed_at  TIMESTAMPTZ DEFAULT now(),
+    changed_by  VARCHAR(100)
+);
+
+-- PostgreSQL trigger to auto-log changes
+CREATE OR REPLACE FUNCTION audit_trigger() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO audit_log (table_name, record_id, action, old_data, new_data)
+    VALUES (
+        TG_TABLE_NAME,
+        COALESCE(NEW.id, OLD.id),
+        TG_OP,
+        CASE WHEN TG_OP != 'INSERT' THEN to_jsonb(OLD) END,
+        CASE WHEN TG_OP != 'DELETE' THEN to_jsonb(NEW) END
+    );
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach to any table
+CREATE TRIGGER users_audit AFTER INSERT OR UPDATE OR DELETE
+    ON users FOR EACH ROW EXECUTE FUNCTION audit_trigger();</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 4: Design a Star Schema for Analytics</span>
+      <span class="difficulty-tag difficulty-hard">Hard</span>
+    </div>
+    <p>Design a <span class="tooltip-trigger">star schema<span class="tooltip-content">A data warehouse design where a central "fact" table (containing measurements like revenue, quantity, clicks) is surrounded by "dimension" tables (containing descriptive attributes like product name, customer city, date). Called a "star" because the diagram looks like a star with the fact table in the center. Optimized for analytical queries (GROUP BY, SUM, AVG) rather than transactional workloads.</span></span> for an e-commerce analytics warehouse. The business wants to answer: "What was total revenue by product category, by month, by customer city?" Design a fact table and at least 3 dimension tables.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li>Fact table: <code>fact_sales</code> with foreign keys to each dimension + numeric measures (revenue, quantity, discount).</li>
+            <li>Dimensions: <code>dim_product</code> (name, category, brand), <code>dim_customer</code> (name, city, segment), <code>dim_date</code> (date, month, quarter, year, day_of_week).</li>
+            <li>The date dimension is pre-populated with one row per day for the next 10 years.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">star-schema.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- Dimension: dates (pre-populated, one row per day)
+CREATE TABLE dim_date (
+    date_key    INT PRIMARY KEY,        -- YYYYMMDD format: 20240315
+    full_date   DATE NOT NULL UNIQUE,
+    day_of_week VARCHAR(10),            -- 'Monday'
+    month       INT, quarter INT, year  INT,
+    is_weekend  BOOLEAN
+);
+
+-- Dimension: products
+CREATE TABLE dim_product (
+    product_key SERIAL PRIMARY KEY,
+    name        VARCHAR(200) NOT NULL,
+    category    VARCHAR(50),
+    brand       VARCHAR(100),
+    unit_cost   DECIMAL(10,2)
+);
+
+-- Dimension: customers
+CREATE TABLE dim_customer (
+    customer_key SERIAL PRIMARY KEY,
+    name        VARCHAR(100),
+    city        VARCHAR(100),
+    country     VARCHAR(50),
+    segment     VARCHAR(30)   -- 'retail', 'wholesale', 'enterprise'
+);
+
+-- Fact: sales (one row per order line item)
+CREATE TABLE fact_sales (
+    sale_id      BIGSERIAL PRIMARY KEY,
+    date_key     INT NOT NULL REFERENCES dim_date(date_key),
+    product_key  INT NOT NULL REFERENCES dim_product(product_key),
+    customer_key INT NOT NULL REFERENCES dim_customer(customer_key),
+    quantity     INT NOT NULL,
+    revenue      DECIMAL(12,2) NOT NULL,
+    discount     DECIMAL(10,2) DEFAULT 0
+);
+
+-- The analytics query the business wants:
+SELECT dp.category, dd.year, dd.month, dc.city,
+       SUM(fs.revenue) AS total_revenue
+FROM fact_sales fs
+JOIN dim_product dp ON fs.product_key = dp.product_key
+JOIN dim_date dd ON fs.date_key = dd.date_key
+JOIN dim_customer dc ON fs.customer_key = dc.customer_key
+GROUP BY dp.category, dd.year, dd.month, dc.city
+ORDER BY total_revenue DESC;</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 5: Migrate a Schema Safely</span>
+      <span class="difficulty-tag difficulty-hard">Hard</span>
+    </div>
+    <p>Your <code>users</code> table needs a new <code>phone</code> column that's required (NOT NULL). But the table has 50 million rows and you can't take the app offline. Write a safe migration plan: add column, backfill, set constraint, deploy. What order? What could go wrong?</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <ul>
+            <li>You can't add a NOT NULL column without a default &mdash; existing rows would violate the constraint.</li>
+            <li>Step 1: Add column as nullable. Step 2: Backfill in batches. Step 3: Add NOT NULL constraint.</li>
+            <li>Backfill in batches of 10K-50K rows to avoid locking the table for minutes.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">safe-migration.sql</span></div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- Step 1: Add column as NULLABLE (instant, no table rewrite)
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+
+-- Step 2: Deploy app code that writes phone on new signups
+-- (both old and new code must handle phone = NULL gracefully)
+
+-- Step 3: Backfill in batches (not one giant UPDATE)
+UPDATE users SET phone = 'UNKNOWN'
+WHERE id BETWEEN 1 AND 50000 AND phone IS NULL;
+-- repeat for next 50K, next 50K... (script this in a loop)
+
+-- Step 4: Verify no NULLs remain
+SELECT COUNT(*) FROM users WHERE phone IS NULL;
+-- Must be 0 before proceeding
+
+-- Step 5: Add NOT NULL constraint
+-- In PostgreSQL 12+, use NOT VALID + VALIDATE for zero-downtime:
+ALTER TABLE users ADD CONSTRAINT users_phone_nn
+    CHECK (phone IS NOT NULL) NOT VALID;
+-- NOT VALID: constraint added instantly, only checked on new rows
+
+ALTER TABLE users VALIDATE CONSTRAINT users_phone_nn;
+-- VALIDATE: scans existing rows (SHARE UPDATE EXCLUSIVE lock, not ACCESS EXCLUSIVE)
+-- reads still work, writes still work, just a background scan</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 &mdash; Cheat Sheet
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Cheat Sheet &mdash; Pin This to Your Wall</h2>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title">Data Types</div>
+      <div class="cheat-card-body">
+<pre>Money     → DECIMAL(10,2)
+IDs       → BIGINT or UUID
+Short txt → VARCHAR(n)
+Long txt  → TEXT
+Boolean   → BOOLEAN
+Dates     → TIMESTAMPTZ
+Flexible  → JSONB</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Every Table Needs</div>
+      <div class="cheat-card-body">
+<pre>id          BIGSERIAL PK
+created_at  TIMESTAMPTZ
+updated_at  TIMESTAMPTZ
+deleted_at  TIMESTAMPTZ (soft del)
+-- Always: NOT NULL where possible
+-- Always: UNIQUE on natural keys</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Normalization</div>
+      <div class="cheat-card-body">
+<pre>1NF → No repeating groups
+2NF → No partial-key deps
+3NF → No transitive deps
+-- Target 3NF for writes
+-- Denormalize for reads
+-- Materialized views bridge both</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Index Rules</div>
+      <div class="cheat-card-body">
+<pre>WHERE col = ?   → B-tree index
+WHERE col IN(?) → B-tree index
+ORDER BY col    → include in index
+JSONB @>        → GIN index
+Full-text       → GIN + tsvector
+Partial         → WHERE condition</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Safe Migrations</div>
+      <div class="cheat-card-body">
+<pre>1. Add column (nullable)
+2. Deploy app (handle NULL)
+3. Backfill in batches
+4. Add NOT NULL (NOT VALID)
+5. VALIDATE CONSTRAINT
+-- NEVER: rename + add in one step
+-- NEVER: one giant UPDATE</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title">Red Flags</div>
+      <div class="cheat-card-body">
+<pre>FLOAT for money     → DECIMAL
+No foreign keys     → orphan data
+No timestamps       → blind debugging
+utf8 in MySQL       → use utf8mb4
+EAV tables          → use JSONB
+Giant single table  → normalize it</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 &mdash; Connected Topics
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon green"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics &mdash; Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>Schema design connects to almost every other topic in system design. Here's where to deepen your knowledge.</p>
+
+  <div class="related-grid">
+    <div class="related-card">
+      <h4>Database Indexing</h4>
+      <p>You designed the tables &mdash; now learn how indexes make queries fast. B-trees, hash indexes, GIN, and composite indexes explained.</p>
+    </div>
+    <div class="related-card">
+      <h4>Database Sharding</h4>
+      <p>Instagram shards by user_id, Shopify by shop_id. Learn the strategies, trade-offs, and when to shard vs when to scale vertically.</p>
+    </div>
+    <div class="related-card">
+      <h4>SQL vs NoSQL</h4>
+      <p>When does a relational schema make sense? When should you reach for MongoDB, DynamoDB, or Cassandra instead?</p>
+    </div>
+    <div class="related-card">
+      <h4>Data Warehousing &amp; OLAP</h4>
+      <p>Star schemas, snowflake schemas, and columnar storage. How companies like Airbnb analyze billions of rows.</p>
+    </div>
+    <div class="related-card">
+      <h4>Database Replication</h4>
+      <p>Primary-replica setups, read replicas, and how schema design affects replication lag and conflict resolution.</p>
+    </div>
+    <div class="related-card">
+      <h4>CAP Theorem &amp; Consistency</h4>
+      <p>Strong vs eventual consistency. How your schema's foreign keys and constraints interact with distributed databases.</p>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <p>&copy; 2025 System Guide. Built for engineers who learn by doing.</p>
+</footer>
+<button class="back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
