@@ -1,0 +1,2282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Database Internals — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="orange" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-microscope"></i> Database Foundations</div>
+    <h1>Database Internals</h1>
+    <p class="hero-subtitle">Your database isn't magic — it's files, pages, and trees on disk. Understanding what happens INSIDE the database is the difference between guessing at performance and knowing exactly why your query takes 45 seconds.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 15 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 11 SVG Diagrams</span>
+      <span><i class="fa-solid fa-terminal"></i> Real SQL Commands</span>
+      <span><i class="fa-solid fa-database"></i> PostgreSQL &amp; InnoDB</span>
+      <span><i class="fa-solid fa-circle-info"></i> 23 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The Mental Model</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Mental Model:</strong> A database is a filing cabinet where every drawer is exactly the same size (a <strong>page</strong>). Every read, every write, every cache operation — it all comes down to moving these fixed-size pages between disk and memory. Understand pages, and you understand databases.
+  </div>
+
+  <p>Here's everything you need to know in 60 seconds. Your database stores data in fixed-size chunks called <strong>pages</strong> (8 KB in PostgreSQL, 16 KB in MySQL). When you run a query, the database doesn't read individual rows — it reads entire pages from disk into a memory area called the <span class="tooltip-trigger">buffer pool<span class="tooltip-content">A chunk of RAM that the database uses to cache frequently accessed pages. Think of it as the database's own private cache — pages live here so the database doesn't have to read from disk every time.</span></span>. Indexes are just cleverly organized trees (usually <span class="tooltip-trigger">B+ trees<span class="tooltip-content">A tree data structure optimized for disk storage. Every leaf node is linked to its neighbors, making range scans fast. Nearly all relational database indexes use B+ trees.</span></span>) that tell the database exactly which page to read instead of scanning every page in the table. And the <span class="tooltip-trigger">WAL<span class="tooltip-content">Write-Ahead Log — before the database changes any data page, it writes a description of the change to this log file. If the server crashes, the WAL is replayed to recover any changes that were in memory but not yet written to disk.</span></span> (Write-Ahead Log) makes sure nothing is lost if the power goes out.</p>
+
+  <!-- TL;DR mental model SVG -->
+  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mental model: query flows through buffer pool, indexes, pages on disk, and WAL">
+    <defs>
+      <marker id="dbi-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- Your Query -->
+    <rect x="10" y="70" width="120" height="60" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="70" y="95" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">YOUR QUERY</text>
+    <text x="70" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">SELECT * FROM users</text>
+
+    <!-- Arrow to Buffer Pool -->
+    <line x1="130" y1="100" x2="168" y2="100" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-tldr-arr)"/>
+
+    <!-- Buffer Pool -->
+    <rect x="170" y="50" width="140" height="100" rx="10" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="2"/>
+    <text x="240" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">BUFFER POOL</text>
+    <text x="240" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">(RAM — cached pages)</text>
+    <rect x="185" y="96" width="35" height="25" rx="4" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="202" y="113" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Page</text>
+    <rect x="225" y="96" width="35" height="25" rx="4" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="242" y="113" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Page</text>
+    <rect x="265" y="96" width="35" height="25" rx="4" fill="#334155" stroke="#f97316" stroke-width="1.5"/>
+    <text x="282" y="113" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8">HIT!</text>
+
+    <!-- Arrow: miss path to Index -->
+    <line x1="310" y1="85" x2="358" y2="85" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#dbi-tldr-arr)"/>
+    <text x="334" y="78" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">miss?</text>
+
+    <!-- Index (B+ Tree) -->
+    <rect x="360" y="50" width="130" height="100" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="425" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">B+ TREE INDEX</text>
+    <text x="425" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">(which page has my row?)</text>
+    <!-- Mini tree -->
+    <circle cx="425" cy="105" r="8" fill="#334155" stroke="#f97316" stroke-width="1"/>
+    <circle cx="405" cy="128" r="7" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <circle cx="445" cy="128" r="7" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <line x1="420" y1="112" x2="408" y2="122" stroke="#64748b" stroke-width="1"/>
+    <line x1="430" y1="112" x2="442" y2="122" stroke="#64748b" stroke-width="1"/>
+
+    <!-- Arrow to Disk -->
+    <line x1="490" y1="100" x2="528" y2="100" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-tldr-arr)"/>
+
+    <!-- Disk Pages -->
+    <rect x="530" y="40" width="130" height="120" rx="10" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
+    <text x="595" y="62" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="11">DISK (HEAP FILE)</text>
+    <text x="595" y="76" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">actual table data</text>
+    <rect x="545" y="86" width="30" height="20" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <rect x="580" y="86" width="30" height="20" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <rect x="615" y="86" width="30" height="20" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <rect x="545" y="112" width="30" height="20" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <rect x="580" y="112" width="30" height="20" rx="3" fill="#334155" stroke="#f97316" stroke-width="1.5"/>
+    <rect x="615" y="112" width="30" height="20" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="595" y="148" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">8 KB pages (PostgreSQL)</text>
+
+    <!-- WAL at bottom -->
+    <rect x="170" y="175" width="320" height="35" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="330" y="197" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="10">WAL (Write-Ahead Log) — crash recovery guarantee</text>
+
+    <!-- Arrow from Buffer Pool to WAL -->
+    <line x1="240" y1="150" x2="240" y2="173" stroke="#eab308" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="260" y="167" fill="#64748b" font-family="Inter, sans-serif" font-size="8">writes logged first</text>
+  </svg>
+
+  <p>That's the whole machine. Four moving parts: <strong>pages on disk</strong>, a <strong>buffer pool</strong> in RAM, <strong>indexes</strong> to find the right pages, and a <strong>WAL</strong> to keep everything crash-safe. Every database in the world — PostgreSQL, MySQL, Oracle, SQL Server — is a variation on this theme. Learn these four pieces, and you can reason about any database problem you'll ever face.</p>
+
+  <div class="callout callout-info">
+    <strong>What makes this page different:</strong> We won't just explain these concepts in the abstract. You'll see real PostgreSQL commands that let you <em>inspect</em> pages, peek inside the buffer pool, read WAL records, and look at the actual files on disk. This isn't theory — it's stuff you can try right now on any PostgreSQL instance.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario — When Your Query Takes 45 Seconds</h2>
+    </div>
+  </div>
+
+  <p>It's Monday morning. Your team just shipped a new feature — a user search page. The query looks innocent enough:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">slow-query.sql</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-sql">SELECT * FROM users WHERE email = 'alice@example.com';
+
+-- Table: users
+-- Rows: 500,000,000 (500 million)
+-- Result: 1 row
+-- Time: 45.2 seconds  😱</code></pre>
+    </div>
+  </div>
+
+  <p>Forty-five seconds to find a single row. The table has 500 million users. The product manager is furious. Users are leaving. The CEO sends a Slack message with exactly one word: <strong>"Fix."</strong></p>
+
+  <div class="callout callout-danger">
+    <div class="callout-title"><i class="fa-solid fa-bolt"></i> The Real Question</div>
+    <p class="body-text">You could just "add an index" and move on. Most developers do. But <strong>why</strong> does the query take 45 seconds without an index? What is the database actually doing during those 45 seconds? What <em>is</em> an index, physically? Where does it live on disk? How does the database decide to use it? Without understanding the internals, you're always guessing — and guessing stops working at scale.</p>
+  </div>
+
+  <div class="callout callout-info">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+    <p class="body-text">You have 500 million rows in a table. Each row is about 200 bytes. How much raw data is that? If the database reads from a standard SSD at 500 MB/s, how long would it take to scan every single row? Work it out before scrolling.</p>
+  </div>
+
+  <p>Let's do the math together. 500 million rows × 200 bytes = 100 GB of raw data. An SSD reads at roughly 500 MB/s sequentially. So scanning the entire table takes: 100 GB ÷ 500 MB/s = <strong>200 seconds</strong>. Wait — the actual query took 45 seconds, not 200. That means the database isn't even reading every byte sequentially — it's doing random I/O, page-by-page, which is <em>even worse</em> in some cases because <span class="tooltip-trigger">random reads<span class="tooltip-content">Reading data from scattered locations on disk, as opposed to reading a continuous block. Random reads are much slower because the storage device (especially HDDs) has to seek to each location separately. Even SSDs have some penalty for random reads vs sequential.</span></span> have higher latency than sequential scans. The 45-second time tells us something important: the database was probably doing a <span class="tooltip-trigger">sequential scan<span class="tooltip-content">Also called a "full table scan" — the database reads every single page of the table from start to finish, checking each row to see if it matches your WHERE clause. It's the brute-force approach.</span></span> but with OS-level read-ahead optimizations helping.</p>
+
+  <!-- SVG: The math of a full table scan -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Math showing why a full table scan of 500M rows takes 45 seconds">
+    <defs>
+      <marker id="dbi-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- Step boxes -->
+    <rect x="10" y="20" width="160" height="70" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="90" y="42" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">500M rows × 200 B</text>
+    <text x="90" y="60" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">= 100 GB</text>
+    <text x="90" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">total table size</text>
+
+    <line x1="170" y1="55" x2="200" y2="55" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-s2-arr)"/>
+
+    <rect x="202" y="20" width="160" height="70" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="282" y="42" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">100 GB ÷ 8 KB/page</text>
+    <text x="282" y="60" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">= 12.5M pages</text>
+    <text x="282" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">pages to scan</text>
+
+    <line x1="362" y1="55" x2="392" y2="55" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-s2-arr)"/>
+
+    <rect x="394" y="20" width="160" height="70" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="474" y="42" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">SSD: ~500 MB/s seq</text>
+    <text x="474" y="60" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="12" font-weight="600">200 sec raw</text>
+    <text x="474" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">with OS read-ahead: ~45s</text>
+
+    <line x1="554" y1="55" x2="584" y2="55" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-s2-arr)"/>
+
+    <rect x="586" y="20" width="160" height="70" rx="10" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="2"/>
+    <text x="666" y="42" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">RESULT</text>
+    <text x="666" y="60" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="14" font-weight="700">45 seconds</text>
+    <text x="666" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">for ONE row</text>
+
+    <!-- Bottom insight -->
+    <rect x="100" y="120" width="560" height="55" rx="10" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+    <text x="380" y="143" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="12" font-weight="600">The database read 12.5 MILLION pages to find ONE row.</text>
+    <text x="380" y="162" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">That's like reading every book in a library to find one sentence. There has to be a better way.</text>
+  </svg>
+
+  <p>Twelve and a half million pages. The database opened every single one, scanned every row inside, checked if the email matched, and moved on. For <em>one</em> row. There has to be a better way — and there is. But to understand it, you need to understand what pages are, how they're organized, and how indexes change the game.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — "Just Add an Index"</h2>
+    </div>
+  </div>
+
+  <p>Every developer knows the answer: create an index. You've probably done it dozens of times. Two seconds of typing, and the query goes from 45 seconds to 2 milliseconds:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">add-index.sql</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- Before: 45.2 seconds (sequential scan of 12.5M pages)
+CREATE INDEX idx_users_email ON users(email);
+
+-- After: 0.002 seconds (index scan of ~4 pages)
+SELECT * FROM users WHERE email = 'alice@example.com';
+-- Time: 2 ms  ✅</code></pre>
+    </div>
+  </div>
+
+  <p>Problem solved, right? The query is fast. Ship it. Go home.</p>
+
+  <p>But wait. <strong>What actually happened?</strong> What did <code>CREATE INDEX</code> build? Where does it live on disk? How does 45 seconds become 2 milliseconds? Most developers treat indexes like magic spells — you say the incantation, and things go fast. But magic isn't real, and understanding the mechanics is what separates someone who can <em>fix</em> database problems from someone who can only <em>google</em> them.</p>
+
+  <div class="callout callout-info">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+    <p class="body-text">The query went from scanning 12.5 million pages to reading about 4 pages. An index made that possible. But how? What data structure could possibly find one row among 500 million by reading only 4 pages? And if indexes are so great, why don't we just index every column?</p>
+  </div>
+
+  <p>Here are the questions that "just add an index" doesn't answer:</p>
+
+  <div class="callout callout-warning">
+    <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> Questions You Can't Answer Yet</div>
+    <ul class="styled">
+      <li><strong>What is a page?</strong> — You keep hearing "8 KB page" but what's actually <em>in</em> a page?</li>
+      <li><strong>What's inside an index?</strong> — It's a B+ tree, sure. But what does that look like on disk? How deep is it?</li>
+      <li><strong>Why only 4 page reads?</strong> — How did the index navigate 500 million rows in 4 hops?</li>
+      <li><strong>What's the buffer pool doing?</strong> — If the same query runs twice, does it hit disk again?</li>
+      <li><strong>What about writes?</strong> — You added an index for reads, but what happens to INSERT and UPDATE performance?</li>
+      <li><strong>What if the index doesn't help?</strong> — When would the database <em>ignore</em> your index and scan anyway?</li>
+    </ul>
+  </div>
+
+  <p>You can use <code>EXPLAIN ANALYZE</code> to see what changed — but unless you understand pages, trees, and I/O patterns, the output is just cryptic numbers:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">explain-output.sql</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-sql">EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'alice@example.com';
+
+-- Without index:
+-- Seq Scan on users  (cost=0.00..9850000.00 rows=1 width=200)
+--   Filter: (email = 'alice@example.com'::text)
+--   Rows Removed by Filter: 499999999
+--   Buffers: shared read=12500000        ← 12.5 MILLION page reads!
+--   Planning Time: 0.1 ms
+--   Execution Time: 45200 ms
+
+-- With index:
+-- Index Scan using idx_users_email on users (cost=0.57..8.59 rows=1 width=200)
+--   Index Cond: (email = 'alice@example.com'::text)
+--   Buffers: shared hit=4                ← 4 page reads, ALL from cache!
+--   Planning Time: 0.1 ms
+--   Execution Time: 0.02 ms</code></pre>
+    </div>
+  </div>
+
+  <p>Look at that <code>Buffers</code> line. Without an index: <strong>shared read=12,500,000</strong> — the database read 12.5 million pages from disk. With an index: <strong>shared hit=4</strong> — just 4 pages, and they came from the buffer pool (RAM), not disk. That's a 3-million-fold reduction in I/O. But <em>how</em>? To answer that, we need to go deeper.</p>
+
+  <!-- SVG: Before vs After comparison -->
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Before: 12.5M pages scanned. After: 4 pages via B+ tree index.">
+    <defs>
+      <marker id="dbi-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- LEFT: Without Index -->
+    <text x="190" y="20" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">WITHOUT INDEX</text>
+
+    <!-- Pages grid (showing many pages) -->
+    <rect x="20" y="35" width="340" height="95" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="190" y="53" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Sequential Scan — read EVERY page</text>
+    <!-- Row of pages -->
+    <rect x="35" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="63" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="91" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="119" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="147" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="175" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="203" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="231" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="259" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="287" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="315" y="62" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <!-- Second row -->
+    <rect x="35" y="86" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="63" y="86" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="91" y="86" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <rect x="119" y="86" width="24" height="18" rx="3" fill="#ef4444" opacity="0.3" stroke="#ef4444" stroke-width="1"/>
+    <text x="155" y="100" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">... 12,499,986 more pages ...</text>
+
+    <text x="190" y="150" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="14">12,500,000 page reads → 45 sec</text>
+
+    <!-- RIGHT: With Index -->
+    <text x="570" y="20" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">WITH B+ TREE INDEX</text>
+
+    <rect x="400" y="35" width="340" height="95" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="570" y="53" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Index Scan — jump straight to the right page</text>
+
+    <!-- B+ tree: root → internal → leaf → data page -->
+    <rect x="545" y="62" width="50" height="20" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1.5"/>
+    <text x="570" y="76" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">Root</text>
+    <line x1="558" y1="82" x2="530" y2="92" stroke="#10b981" stroke-width="1"/>
+    <line x1="582" y1="82" x2="610" y2="92" stroke="#10b981" stroke-width="1"/>
+
+    <rect x="505" y="92" width="50" height="18" rx="4" fill="#10b981" opacity="0.15" stroke="#10b981" stroke-width="1"/>
+    <text x="530" y="105" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7">Internal</text>
+
+    <rect x="585" y="92" width="50" height="18" rx="4" fill="#334155" stroke="#64748b" stroke-width="1"/>
+
+    <line x1="530" y1="110" x2="540" y2="115" stroke="#10b981" stroke-width="1"/>
+    <rect x="515" y="115" width="50" height="18" rx="4" fill="#10b981" opacity="0.3" stroke="#10b981" stroke-width="1.5"/>
+    <text x="540" y="128" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="7" font-weight="600">Leaf</text>
+
+    <text x="570" y="150" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="14">4 page reads → 0.02 ms</text>
+
+    <!-- Bottom comparison bar -->
+    <rect x="80" y="175" width="600" height="65" rx="10" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+    <text x="380" y="197" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="13" font-weight="700">3,125,000× fewer page reads. Same data. Same hardware.</text>
+    <text x="380" y="218" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">The only difference: the database knows WHERE to look instead of looking EVERYWHERE.</text>
+    <text x="380" y="232" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">To understand HOW, you need to understand pages, B+ trees, and the buffer pool.</text>
+  </svg>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-heart-crack"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — When "Just Add an Index" Isn't Enough</h2>
+    </div>
+  </div>
+
+  <p>Adding an index fixed the email lookup. Great. But now your team hits a cascade of new problems — and every single one requires understanding what's happening <em>inside</em> the database to diagnose:</p>
+
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <i class="fa-solid fa-snail text-red" aria-hidden="true"></i> Problem 1: "Writes got 3× slower after adding 6 indexes"
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Your team added indexes on <code>email</code>, <code>name</code>, <code>created_at</code>, <code>city</code>, <code>phone</code>, and <code>status</code>. Reads are blazing fast. But every INSERT now takes 18ms instead of 6ms. Every UPDATE that touches an indexed column triggers <strong>index maintenance</strong> on all affected indexes. Each index is a separate <span class="tooltip-trigger">B+ tree<span class="tooltip-content">A self-balancing tree structure optimized for systems that read and write large blocks of data (pages). Unlike a binary tree where each node has 2 children, a B+ tree node can have hundreds of children, keeping the tree extremely shallow.</span></span> on disk that must be updated independently.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">If each index update costs 2-3 page writes (finding the right leaf, possibly splitting a node), and you have 6 indexes, how many extra page writes does each INSERT require? What happens at 10,000 INSERTs per second?</p>
+      </div>
+
+      <p class="body-text">The math: 6 indexes × 2-3 page writes each = 12-18 extra page writes per INSERT. At 10K inserts/sec, that's 120K-180K extra page writes per second. Without understanding pages and B+ tree maintenance, you'd never figure out why your writes are slow — the query itself looks fine.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-ghost text-yellow" aria-hidden="true"></i> Problem 2: "Queries are fast in staging, slow in production"
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Same query, same index, same data shape. Staging: 2ms. Production: 800ms. Why? The answer is the <strong>buffer pool</strong>. In staging, your 8 GB buffer pool easily holds the entire index and most of the hot data pages. In production, 500 million rows means the index alone is 12 GB — larger than your buffer pool. Pages are constantly being <span class="tooltip-trigger">evicted<span class="tooltip-content">When the buffer pool is full and needs to load a new page, it removes (evicts) the least-recently-used page to make room. If that evicted page was modified (dirty), it must be written to disk first.</span></span> and re-read from disk.</p>
+      <p class="body-text">Run this in PostgreSQL to see exactly what's in your buffer pool right now:</p>
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">inspect-buffer-pool.sql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- See what's in the buffer pool RIGHT NOW
+-- Each row = one 8KB page in shared memory
+SELECT c.relname AS table_name,
+       count(*) AS pages_in_buffer,
+       pg_size_pretty(count(*) * 8192) AS size_in_buffer,
+       round(100.0 * count(*) / (SELECT setting::int
+         FROM pg_settings WHERE name = 'shared_buffers'), 2) AS pct_of_pool
+FROM pg_buffercache b
+JOIN pg_class c ON b.relfilenode = c.relfilenode
+WHERE b.reldatabase = (SELECT oid FROM pg_database WHERE datname = current_database())
+GROUP BY c.relname
+ORDER BY pages_in_buffer DESC
+LIMIT 10;</code></pre>
+        </div>
+      </div>
+      <p class="body-text">This shows you exactly which tables and indexes are hogging your buffer pool. If your <code>users</code> table is taking 60% and your index is fighting for the remaining 40%, you've found your bottleneck. Without understanding the buffer pool, you'd waste hours profiling the query itself — which isn't the problem.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-explosion text-red" aria-hidden="true"></i> Problem 3: "The database crashed, and we lost 30 seconds of transactions"
+    </h3>
+    <div class="card-body">
+      <p class="body-text">A power outage took down your database server. When it came back, you discovered that the last 30 seconds of committed transactions were missing. Users who got a "success" response had their data vanish. How is that possible if the database said it committed?</p>
+      <p class="body-text">The answer lies in the <strong>WAL</strong> (Write-Ahead Log) and how <span class="tooltip-trigger">fsync<span class="tooltip-content">A system call that forces the operating system to flush its file buffers to the physical storage device. Without fsync, data that the OS says is "written" might actually still be in an OS cache in RAM — vulnerable to power loss.</span></span> works. Some configurations delay flushing the WAL to disk for performance (<code>synchronous_commit = off</code> in PostgreSQL). The database told the client "committed" when it wrote to the WAL <em>in memory</em>, but the WAL hadn't been flushed to disk yet. Power dies → WAL in memory is gone → those transactions are lost.</p>
+      <p class="body-text">Without understanding the WAL, you'd never know this setting existed, let alone the trade-off: <code>synchronous_commit = off</code> makes commits ~5× faster but risks losing the last few hundred milliseconds of data on crash. For a logging system? Fine. For a payment system? Catastrophic.</p>
+    </div>
+  </div>
+
+  <!-- SVG: The three-layer problem -->
+  <svg viewBox="0 0 760 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three layers of database internals knowledge: pages, buffer pool, and WAL">
+    <defs>
+      <marker id="dbi-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Without Understanding Internals, You're Guessing</text>
+
+    <!-- Three problem boxes -->
+    <rect x="20" y="40" width="230" height="80" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="135" y="62" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="11">🐌 Slow writes</text>
+    <text x="135" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Need to understand:</text>
+    <text x="135" y="96" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">Pages + B+ Tree maintenance</text>
+    <text x="135" y="110" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">6 indexes = 18 extra page writes/row</text>
+
+    <rect x="265" y="40" width="230" height="80" rx="10" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+    <text x="380" y="62" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="11">👻 Slow in prod, fast in staging</text>
+    <text x="380" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Need to understand:</text>
+    <text x="380" y="96" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">Buffer pool + cache eviction</text>
+    <text x="380" y="110" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Index > RAM = constant disk reads</text>
+
+    <rect x="510" y="40" width="230" height="80" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="625" y="62" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="11">💥 Data loss on crash</text>
+    <text x="625" y="80" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Need to understand:</text>
+    <text x="625" y="96" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">WAL + fsync + durability</text>
+    <text x="625" y="110" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">async commit = possible data loss</text>
+
+    <!-- Arrow down to conclusion -->
+    <line x1="380" y1="120" x2="380" y2="145" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-s4-arr)"/>
+
+    <rect x="130" y="148" width="500" height="50" rx="10" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="2"/>
+    <text x="380" y="170" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">All three problems have the same root cause:</text>
+    <text x="380" y="188" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="11">Not understanding what the database is doing with PAGES, MEMORY, and DISK.</text>
+  </svg>
+
+  <p>These aren't exotic edge cases. They're the problems every team hits once their database has more than a few million rows. The fix isn't more indexes, more RAM, or a bigger server — it's understanding the four building blocks. Let's start with the most fundamental one.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="breakthrough">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-star"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — Everything Is Pages</h2>
+    </div>
+  </div>
+
+  <p>Here's the single most important idea in database internals — the one that makes everything else click:</p>
+
+  <div class="callout callout-success">
+    <div class="callout-title"><i class="fa-solid fa-lightbulb"></i> The Key Insight</div>
+    <p class="body-text"><strong>A database never reads or writes individual rows. It reads and writes fixed-size blocks called pages.</strong> A page is 8 KB in PostgreSQL, 16 KB in MySQL/InnoDB. Every table is a file on disk made up of these pages, laid out one after another. Every index is a separate file, also made of pages. The buffer pool caches pages. The WAL logs changes to pages. <em>Pages are the atom of the database world — the smallest unit of everything.</em></p>
+  </div>
+
+  <p>Think about it like a library. You don't store books as individual loose pages scattered around — you put them on shelves, and each shelf holds a fixed number of books. When someone wants a book, the librarian fetches an entire shelf section (a page), not one book at a time. If the librarian is smart, they keep the popular shelves on a cart near the front desk (the buffer pool) so they don't have to walk to the back every time.</p>
+
+  <div class="callout callout-info">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+    <p class="body-text">If a page is 8 KB and a row is 200 bytes, how many rows fit in one page? And if you have 500 million rows, how many pages is that? (This is the same math from Section 2 — but now you understand <em>why</em> the database thinks in pages.)</p>
+  </div>
+
+  <p>The math: 8,192 bytes per page ÷ 200 bytes per row = about <strong>40 rows per page</strong> (a bit less after accounting for page headers and row pointers). 500 million rows ÷ 40 rows/page = <strong>12.5 million pages</strong>. Now the EXPLAIN output makes sense: <code>Buffers: shared read=12500000</code> means "I read 12.5 million pages from disk." That's not an arbitrary number — it's every page in the table.</p>
+
+  <p>You can actually <strong>see</strong> the file where your table lives. This is a real file on disk, not an abstraction:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">find-table-file.sql</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- Find the actual file path of your table on disk
+SELECT pg_relation_filepath('users');
+-- Result: base/16384/16389
+
+-- That's a REAL file. You can see it in the filesystem:
+-- $ ls -la /var/lib/postgresql/14/main/base/16384/16389
+-- -rw------- 1 postgres postgres 107374182400 Mar 20 10:00 16389
+--                                 ↑ that's ~100 GB — your 500M rows
+
+-- For tables > 1 GB, PostgreSQL splits into 1 GB segments:
+-- 16389, 16389.1, 16389.2, ... 16389.99</code></pre>
+    </div>
+  </div>
+
+  <p>And you can peek inside a single page using the <code>pageinspect</code> extension — this shows you the actual bytes the database reads when it fetches page 0 of your users table:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">inspect-page.sql</span>
+    </div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- Enable the page inspection extension (one-time setup)
+CREATE EXTENSION IF NOT EXISTS pageinspect;
+
+-- Look at the header of page 0 (the first page) of the users table
+SELECT * FROM page_header(get_raw_page('users', 0));
+-- lsn       | checksum | flags | lower | upper | special | pagesize | version | prune_xid
+-- 0/1A8E930 |        0 |     0 |   212 |  6920 |    8192 |     8192 |       4 |       0
+
+-- pd_lower = 212  → row pointers end at byte 212
+-- pd_upper = 6920 → tuple data starts at byte 6920
+-- Free space = 6920 - 212 = 6708 bytes available on this page
+
+-- Count how many rows (tuples) are on this page:
+SELECT count(*) FROM heap_page_items(get_raw_page('users', 0));
+-- Result: 38 (slightly less than our 40 estimate — page header + alignment overhead)</code></pre>
+    </div>
+  </div>
+
+  <!-- SVG: Inside a single 8KB page -->
+  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Anatomy of a single 8KB database page: header, item pointers, free space, and tuples">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Inside a Single 8 KB Page</text>
+
+    <!-- Page rectangle -->
+    <rect x="180" y="35" width="400" height="270" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+
+    <!-- Page Header -->
+    <rect x="185" y="40" width="390" height="40" rx="4" fill="rgba(249,115,22,0.15)" stroke="#f97316" stroke-width="1"/>
+    <text x="380" y="57" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">PAGE HEADER (24 bytes)</text>
+    <text x="380" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">LSN, checksum, lower/upper pointers, page size</text>
+
+    <!-- Item Pointers -->
+    <rect x="185" y="84" width="390" height="35" rx="4" fill="rgba(234,179,8,0.1)" stroke="#eab308" stroke-width="1"/>
+    <text x="380" y="100" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="10">ITEM POINTERS (4 bytes each) — one per row</text>
+    <text x="380" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Point to the offset + length of each tuple below</text>
+
+    <!-- Arrow labels -->
+    <text x="155" y="85" text-anchor="end" fill="#eab308" font-family="Inter, sans-serif" font-size="9" font-weight="600">pd_lower →</text>
+    <line x1="160" y1="82" x2="183" y2="82" stroke="#eab308" stroke-width="1.5" stroke-dasharray="3,2"/>
+
+    <!-- Free Space -->
+    <rect x="185" y="123" width="390" height="80" rx="0" fill="rgba(100,116,139,0.05)" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="380" y="168" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-weight="600" font-size="12">FREE SPACE</text>
+    <text x="380" y="184" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">(pointers grow ↓ from top, tuples grow ↑ from bottom)</text>
+
+    <!-- Tuple Data -->
+    <rect x="185" y="207" width="390" height="90" rx="4" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="225" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">TUPLE DATA (your actual rows)</text>
+
+    <!-- Individual tuples -->
+    <rect x="195" y="234" width="120" height="22" rx="3" fill="#334155" stroke="#10b981" stroke-width="1"/>
+    <text x="255" y="249" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Row 38: alice@... | 200B</text>
+    <rect x="320" y="234" width="120" height="22" rx="3" fill="#334155" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="249" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Row 37: bob@... | 200B</text>
+    <rect x="445" y="234" width="120" height="22" rx="3" fill="#334155" stroke="#10b981" stroke-width="1"/>
+    <text x="505" y="249" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Row 36: carol@... | 200B</text>
+
+    <rect x="195" y="260" width="120" height="22" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+    <text x="255" y="275" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Row 35: ... | 200B</text>
+    <text x="410" y="278" fill="#64748b" font-family="Inter, sans-serif" font-size="9">... ~38 rows per page ...</text>
+
+    <!-- pd_upper arrow -->
+    <text x="155" y="210" text-anchor="end" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">pd_upper →</text>
+    <line x1="160" y1="207" x2="183" y2="207" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2"/>
+
+    <!-- Right side annotations -->
+    <text x="600" y="55" fill="#f97316" font-family="Inter, sans-serif" font-size="9">← byte 0</text>
+    <text x="600" y="100" fill="#eab308" font-family="Inter, sans-serif" font-size="9">← byte 24-212</text>
+    <text x="600" y="225" fill="#10b981" font-family="Inter, sans-serif" font-size="9">← byte 6920-8192</text>
+
+    <!-- Total size -->
+    <text x="100" y="180" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12" transform="rotate(-90, 100, 180)">8,192 bytes total</text>
+  </svg>
+
+  <p>Every page has this same structure: a header at the top (with bookkeeping info like the <span class="tooltip-trigger">LSN<span class="tooltip-content">Log Sequence Number — a monotonically increasing number that identifies a position in the WAL. Every page stores the LSN of the last WAL record that modified it. During crash recovery, the database replays WAL records that have an LSN higher than the page's LSN.</span></span>), item pointers that grow downward, free space in the middle, and actual row data (tuples) that grows upward. When the free space runs out, the page is full, and new rows go to a different page.</p>
+
+  <p>This is the breakthrough: once you see that <strong>everything is pages</strong>, the entire database becomes understandable. Reads = fetching pages. Writes = modifying pages. Caching = keeping pages in RAM. Recovery = replaying changes to pages. Indexes = a fast way to find the right page. It's all pages, all the way down.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS (5 cards)
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The Five Building Blocks</h2>
+    </div>
+  </div>
+
+  <p>Now that you know everything is pages, let's look at how the five core subsystems work together. Each one is a piece of the puzzle — and each one is something you can <em>inspect</em> on a real PostgreSQL instance.</p>
+
+  <!-- Card 1: Pages & Heap Files -->
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <i class="fa-solid fa-layer-group text-orange" aria-hidden="true"></i> 1. Pages &amp; Heap Files — Where Your Data Actually Lives
+    </h3>
+    <div class="card-body">
+      <p class="body-text">When you create a table, the database creates a <span class="tooltip-trigger">heap file<span class="tooltip-content">An unordered collection of pages. Rows are stored wherever there's free space — there's no sorting or structure. It's called a "heap" for the same reason as a pile of laundry: things go wherever they land.</span></span> — an unordered collection of pages. Think of it as a stack of paper where new rows get written on whatever page has space. There's no sorting, no ordering — it's just a pile.</p>
+
+      <p class="body-text">In PostgreSQL, this heap file is literally a file in your data directory. For tables larger than 1 GB, it gets split into 1 GB segments (because some filesystems can't handle huge files well). Each segment is just more pages, numbered sequentially.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">If the heap file is unordered (rows are just thrown in wherever there's space), what happens when you DELETE a row? Does the database physically remove it and compact the page? Or does something else happen?</p>
+      </div>
+
+      <p class="body-text">PostgreSQL doesn't physically remove deleted rows immediately. Instead, it marks them as "dead" — the space is wasted until <span class="tooltip-trigger">VACUUM<span class="tooltip-content">A PostgreSQL maintenance process that reclaims storage occupied by dead tuples. It marks the space as reusable but doesn't return it to the OS. VACUUM FULL actually reclaims disk space but locks the table.</span></span> comes along and reclaims the space. This is why PostgreSQL tables can "bloat" over time — if VACUUM isn't running often enough, dead rows accumulate and pages fill up with garbage.</p>
+
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">heap-inspection.sql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- See the physical size of your table's heap file
+SELECT pg_size_pretty(pg_relation_size('users')) AS heap_size,
+       pg_size_pretty(pg_indexes_size('users')) AS index_size,
+       pg_size_pretty(pg_total_relation_size('users')) AS total;
+-- heap_size: 97 GB  |  index_size: 12 GB  |  total: 109 GB
+
+-- Count dead vs live tuples (are you bloated?)
+SELECT relname, n_live_tup, n_dead_tup,
+       round(100.0 * n_dead_tup / nullif(n_live_tup + n_dead_tup, 0), 1) AS dead_pct
+FROM pg_stat_user_tables
+WHERE relname = 'users';
+-- dead_pct > 20%? You need more aggressive VACUUM settings.</code></pre>
+        </div>
+      </div>
+
+      <p class="body-text"><strong>MySQL/InnoDB is different.</strong> InnoDB doesn't use heap files — it uses <span class="tooltip-trigger">clustered indexes<span class="tooltip-content">In InnoDB, the table data IS the primary key index. Rows are physically sorted by the primary key on disk. This means primary key range scans are extremely fast (data is contiguous), but inserts with random PKs cause page splits.</span></span> instead. The data is physically sorted by the primary key inside a B+ tree. This means InnoDB doesn't have a separate heap file — the primary key B+ tree IS the table. This has huge implications for INSERT performance, especially with UUID primary keys (random inserts cause constant page splits).</p>
+    </div>
+  </div>
+
+  <!-- Card 2: B+ Tree Indexes -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-sitemap text-green" aria-hidden="true"></i> 2. B+ Tree Indexes — How 4 Page Reads Find 1 Row in 500 Million
+    </h3>
+    <div class="card-body">
+      <p class="body-text">A B+ tree is the data structure behind over 90% of database indexes. The name sounds intimidating, but the idea is simple: it's a tree where each node can have <em>hundreds</em> of children instead of just two. This makes the tree incredibly shallow — even with billions of entries.</p>
+
+      <p class="body-text">Here's the key number: <strong>fanout</strong>. Fanout means "how many children does each node have." In a B+ tree stored in 8 KB pages, if each key is 8 bytes and each pointer is 6 bytes, you can fit about (8192 - header) ÷ (8 + 6) ≈ <strong>500 children per node</strong>. That's the magic.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">If each B+ tree node (page) can point to 500 children, how many levels deep does the tree need to be to hold 500 million entries? (Hint: each level multiplies capacity by 500.)</p>
+      </div>
+
+      <p class="body-text">The math is beautiful. Level 1 (root): 1 node → points to 500 children. Level 2: 500 nodes → each points to 500 = 250,000 entries. Level 3: 250,000 nodes → each points to 500 = 125,000,000 entries. Level 4: 125,000,000 × 500 = 62.5 billion entries. So for 500 million rows, you need <strong>3 levels</strong> — maybe 4 if the pages aren't perfectly full. That's why the EXPLAIN showed <code>Buffers: shared hit=4</code>: one page per level, plus one to fetch the actual row from the heap.</p>
+
+      <!-- SVG: B+ Tree structure with fanout -->
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="B+ tree with fanout 500 showing how 3 levels covers 500M rows">
+        <defs>
+          <marker id="dbi-s6-btree-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">B+ Tree: Finding alice@example.com in 3 Hops</text>
+
+        <!-- Level 1: Root -->
+        <rect x="290" y="35" width="180" height="35" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+        <text x="380" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">ROOT (1 page)</text>
+        <text x="380" y="65" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">holds 500 key ranges</text>
+
+        <!-- Level label -->
+        <text x="130" y="57" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">Level 1: 1 page</text>
+        <text x="130" y="69" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">always in buffer pool</text>
+
+        <!-- Arrows to level 2 -->
+        <line x1="335" y1="70" x2="200" y2="100" stroke="#10b981" stroke-width="1.5"/>
+        <line x1="380" y1="70" x2="380" y2="100" stroke="#10b981" stroke-width="1.5"/>
+        <line x1="425" y1="70" x2="560" y2="100" stroke="#10b981" stroke-width="1.5"/>
+        <text x="305" y="83" fill="#64748b" font-family="Inter, sans-serif" font-size="7">a-d</text>
+        <text x="400" y="83" fill="#64748b" font-family="Inter, sans-serif" font-size="7">e-k</text>
+        <text x="490" y="83" fill="#64748b" font-family="Inter, sans-serif" font-size="7">l-z</text>
+
+        <!-- Level 2: Internal nodes -->
+        <rect x="130" y="100" width="140" height="30" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="200" y="119" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">a@... to d@...</text>
+
+        <rect x="310" y="100" width="140" height="30" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="380" y="119" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">e@... to k@...</text>
+
+        <rect x="490" y="100" width="140" height="30" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="560" y="119" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">l@... to z@...</text>
+
+        <text x="130" y="150" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">Level 2: ~500 pages</text>
+        <text x="130" y="162" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">250K entries covered</text>
+
+        <!-- Arrow to level 3 -->
+        <line x1="175" y1="130" x2="175" y2="175" stroke="#10b981" stroke-width="1.5"/>
+        <text x="195" y="160" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">alice@ is here!</text>
+
+        <!-- Level 3: Leaf nodes -->
+        <rect x="80" y="175" width="190" height="35" rx="6" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="2"/>
+        <text x="175" y="192" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">LEAF: aardvark@ ... alice@ ... amber@</text>
+        <text x="175" y="205" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">→ points to heap page 7,832,491</text>
+
+        <rect x="290" y="175" width="190" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="385" y="195" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">LEAF: andrew@ ... aria@ ...</text>
+
+        <rect x="500" y="175" width="190" height="35" rx="6" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="595" y="195" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">LEAF: ... next leaves ...</text>
+
+        <!-- Leaf linkage arrows -->
+        <line x1="270" y1="193" x2="290" y2="193" stroke="#64748b" stroke-width="1" stroke-dasharray="3,2"/>
+        <line x1="480" y1="193" x2="500" y2="193" stroke="#64748b" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <text x="130" y="228" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">Level 3: ~250K pages</text>
+        <text x="130" y="240" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">125M entries (leaves)</text>
+
+        <!-- Arrow to heap -->
+        <line x1="175" y1="210" x2="175" y2="250" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-s6-btree-arr)"/>
+
+        <!-- Heap page -->
+        <rect x="100" y="252" width="150" height="25" rx="6" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="1.5"/>
+        <text x="175" y="269" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">Heap Page 7,832,491 → Alice's row!</text>
+
+        <!-- Summary -->
+        <rect x="400" y="235" width="340" height="40" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+        <text x="570" y="253" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">Root → Internal → Leaf → Heap = 4 pages total</text>
+        <text x="570" y="268" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">That's why the index scan reads exactly 4 buffers</text>
+      </svg>
+
+      <p class="body-text">You can inspect a real B+ tree index in PostgreSQL:</p>
+
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">inspect-btree.sql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- See the internal structure of your B+ tree index
+-- Requires pageinspect extension
+SELECT * FROM bt_metap('idx_users_email');
+-- magic  | version | root | level | fastroot | fastlevel
+-- 340322 |       4 |    3 |     3 |        3 |         3
+--                          ↑ root is page 3
+--                                  ↑ tree has 3 levels!
+
+-- Look at stats of any internal page
+SELECT * FROM bt_page_stats('idx_users_email', 3);  -- page 3 = root
+-- blkno | type | live_items | dead_items | avg_item_size | free_size
+-- 3     | r    | 487        | 0          | 15            | 508
+--        ↑ r = root    ↑ 487 child pointers (close to our 500 estimate!)</code></pre>
+        </div>
+      </div>
+
+      <p class="body-text"><strong>Critical detail: leaf nodes are linked.</strong> B+ tree leaf nodes form a <span class="tooltip-trigger">doubly-linked list<span class="tooltip-content">Each leaf page has a pointer to the next leaf page AND the previous one. This means once you find a starting leaf (e.g., for email > 'a' and email < 'b'), you can just follow the forward pointers to scan through all matching entries without ever going back up the tree.</span></span>. This is what makes range queries fast: <code>WHERE email BETWEEN 'a' AND 'b'</code> finds the first leaf, then follows the linked list forward. No need to traverse the tree for each row.</p>
+    </div>
+  </div>
+
+  <!-- Card 3: Buffer Pool -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-microchip text-blue" aria-hidden="true"></i> 3. Buffer Pool — The Database's Private RAM Cache
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Every database has a section of RAM reserved for caching pages — this is the <strong>buffer pool</strong>. In PostgreSQL, it's controlled by the <code>shared_buffers</code> setting (typically 25% of system RAM). In MySQL/InnoDB, it's <code>innodb_buffer_pool_size</code> (typically 70-80% of RAM).</p>
+
+      <p class="body-text">The buffer pool is the single most important performance tuning knob. When a query needs a page, the database checks the buffer pool first. If the page is there (<span class="tooltip-trigger">buffer hit<span class="tooltip-content">The requested page was found in the buffer pool (RAM). Costs about 0.1 microseconds. The EXPLAIN output shows this as "shared hit=N".</span></span>), great — that's a memory access (~100 nanoseconds). If not (<span class="tooltip-trigger">buffer miss<span class="tooltip-content">The requested page was NOT in the buffer pool and had to be read from disk. Costs about 100 microseconds for SSD, 10 milliseconds for HDD. The EXPLAIN output shows this as "shared read=N".</span></span>), the database must read the page from disk (~100 microseconds on SSD) — that's 1,000× slower.</p>
+
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">buffer-pool-stats.sql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- What's your buffer pool hit ratio?
+-- (Should be > 99% for OLTP workloads)
+SELECT
+  sum(blks_hit) AS hits,
+  sum(blks_read) AS misses,
+  round(100.0 * sum(blks_hit) / nullif(sum(blks_hit) + sum(blks_read), 0), 2)
+    AS hit_ratio_pct
+FROM pg_stat_database
+WHERE datname = current_database();
+-- hits: 847,293,104 | misses: 2,341,987 | hit_ratio_pct: 99.72%
+
+-- If hit_ratio < 95%, your buffer pool is too small.
+-- Pages are being evicted and re-read constantly.</code></pre>
+        </div>
+      </div>
+
+      <p class="body-text">When the buffer pool is full and a new page needs to be loaded, the database evicts the least-recently-used page (using a clock-sweep algorithm in PostgreSQL, LRU in InnoDB). If the evicted page was <span class="tooltip-trigger">dirty<span class="tooltip-content">A page that has been modified in the buffer pool but not yet written to disk. Evicting a dirty page requires writing it to disk first (a "flush"), which adds I/O overhead.</span></span> (modified but not yet written to disk), it must be flushed to disk first.</p>
+
+      <p class="body-text">Remember the "fast in staging, slow in production" problem from Section 4? Now you can diagnose it: if your index is 12 GB but your buffer pool is 8 GB, the B+ tree's upper levels compete with data pages for space. The root page stays cached (it's accessed on every query), but internal and leaf pages get evicted constantly — turning a 4-page buffer hit into a 4-page disk read.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: WAL -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-scroll text-yellow" aria-hidden="true"></i> 4. Write-Ahead Log (WAL) — The Crash Safety Net
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Here's a scary scenario. You INSERT a row. The database modifies the page <em>in the buffer pool</em> (RAM). It returns "INSERT 0 1" — success. Then the power goes out. The modified page was in RAM and never written to disk. Is your data gone?</p>
+
+      <p class="body-text"><strong>No</strong> — because of the <strong>WAL</strong>. Before the database modifies any page in the buffer pool, it first writes a description of the change to a sequential log file on disk. This log is the Write-Ahead Log. The rule is absolute: <em>the WAL record hits disk before the client gets a success response.</em> If the server crashes, the database replays the WAL on startup — re-applying any changes that were in the buffer pool but hadn't been written to the actual data files yet.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">Writing to the WAL is a <em>sequential</em> write (just append to the end of a file). Writing to the actual data page on disk is a <em>random</em> write (seek to a specific position in the file). Why is this distinction crucial for performance?</p>
+      </div>
+
+      <p class="body-text">Sequential writes are <strong>much</strong> faster than random writes — 10-100× faster on HDDs, 2-5× faster even on SSDs. So the WAL gives you the best of both worlds: the durability of writing to disk immediately (via sequential WAL writes) and the performance of batching random data page writes (dirty pages are flushed in the background by the <span class="tooltip-trigger">checkpointer<span class="tooltip-content">A background PostgreSQL process that periodically writes all dirty pages from the buffer pool to disk and records a "checkpoint" in the WAL. After a checkpoint, WAL records before that point are no longer needed for crash recovery and can be recycled.</span></span>).</p>
+
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">wal-inspection.sh</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-bash"># See actual WAL records — what was written when you did an INSERT
+# (Run as postgres user on the server)
+pg_waldump --start=0/1A8E000 --end=0/1A8F000 /var/lib/postgresql/14/main/pg_wal/000000010000000000000001
+
+# Output looks like:
+# rmgr: Heap    len (rec/tot): 59/211  tx: 7843291
+#   desc: INSERT off 12, blkref #0: rel 1663/16384/16389 blk 7832491
+#         ↑                                              ↑
+#         inserted at item 12 on the page       this is heap page 7,832,491!
+#
+# rmgr: Btree   len (rec/tot): 64/64   tx: 7843291
+#   desc: INSERT_LEAF off 143, blkref #0: rel 1663/16384/16392 blk 94021
+#         ↑                                                    ↑
+#         B-tree leaf insert                     index page 94,021</code></pre>
+        </div>
+      </div>
+
+      <p class="body-text">Look at that output. One INSERT caused TWO WAL records — one for the heap page (the actual data) and one for the B-tree leaf page (the index). Every indexed column adds another WAL record per write. This is the write amplification cost of indexes — and it's why the WAL is often the bottleneck in write-heavy systems.</p>
+    </div>
+  </div>
+
+  <!-- Card 5: MVCC -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-code-branch text-purple" aria-hidden="true"></i> 5. MVCC Version Chains — How Reads Don't Block Writes
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Here's a question that seems impossible: how can two transactions see <em>different versions</em> of the same row at the same time? Transaction A is reading Alice's balance while Transaction B is updating it. A sees the old balance, B writes the new one, and neither blocks the other. How?</p>
+
+      <p class="body-text">The answer is <span class="tooltip-trigger">MVCC<span class="tooltip-content">Multi-Version Concurrency Control — instead of using locks to prevent concurrent access to the same row, the database keeps multiple versions of each row simultaneously. Each transaction sees the version that was current when it started.</span></span> (Multi-Version Concurrency Control). Instead of locking a row when someone reads it, the database keeps multiple versions of the row simultaneously. Each version is tagged with which transaction created it and which transaction deleted it.</p>
+
+      <p class="body-text">In PostgreSQL, every row (tuple) on a page has two hidden columns: <code>xmin</code> (the transaction ID that created this version) and <code>xmax</code> (the transaction ID that deleted/updated it — 0 if it's still alive). You can see them:</p>
+
+      <div class="macos-window mt-sm">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">mvcc-inspection.sql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- See the hidden MVCC columns on your rows
+SELECT xmin, xmax, ctid, email FROM users WHERE email = 'alice@example.com';
+-- xmin     | xmax | ctid          | email
+-- 7843291  | 0    | (7832491,12) | alice@example.com
+--  ↑         ↑       ↑
+--  created   alive   page 7,832,491, item 12 on that page
+--  by tx             (this is the physical location!)
+--  7843291
+
+-- Now UPDATE the row:
+UPDATE users SET name = 'Alice Smith' WHERE email = 'alice@example.com';
+
+-- Check again:
+SELECT xmin, xmax, ctid, email FROM users WHERE email = 'alice@example.com';
+-- xmin     | xmax | ctid          | email
+-- 7843310  | 0    | (7832491,39) | alice@example.com
+--  ↑                  ↑
+--  NEW tx ID          DIFFERENT item on the page!
+
+-- The old version (xmin=7843291) is still on the page
+-- but with xmax=7843310. Running transactions that
+-- started before tx 7843310 can still see the old version.</code></pre>
+        </div>
+      </div>
+
+      <p class="body-text">Notice the <code>ctid</code> changed — that means the UPDATE created a <strong>new copy</strong> of the row at a different position on the page. The old version is still there, marked as dead. This is PostgreSQL's MVCC in action: an UPDATE is really a DELETE + INSERT at the storage layer. The old version stays around until VACUUM removes it.</p>
+
+      <p class="body-text"><strong>MySQL/InnoDB handles MVCC differently.</strong> Instead of creating new row versions in the main table pages, InnoDB stores old versions in a separate <span class="tooltip-trigger">undo log<span class="tooltip-content">A separate storage area where InnoDB keeps the previous versions of modified rows. When a transaction needs to see an old version, the database follows a chain of undo records backwards to reconstruct what the row looked like at the start of that transaction.</span></span>. When a transaction needs to see an old version, it follows the undo chain backwards. This keeps the main table pages clean but makes long-running transactions expensive (the undo log grows and old versions can't be purged).</p>
+
+      <!-- SVG: MVCC version chain -->
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MVCC: old and new row versions coexist on the same page">
+        <defs>
+          <marker id="dbi-s6-mvcc-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#a855f7"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">MVCC: Two Versions, Two Readers, No Locks</text>
+
+        <!-- Page rectangle -->
+        <rect x="200" y="35" width="360" height="90" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+        <text x="380" y="53" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">Heap Page 7,832,491</text>
+
+        <!-- Old version -->
+        <rect x="215" y="62" width="160" height="50" rx="6" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="295" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="9">OLD VERSION (item 12)</text>
+        <text x="295" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">xmin=7843291 xmax=7843310</text>
+        <text x="295" y="104" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">name='Alice' (dead, awaiting VACUUM)</text>
+
+        <!-- New version -->
+        <rect x="385" y="62" width="160" height="50" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="465" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="9">NEW VERSION (item 39)</text>
+        <text x="465" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">xmin=7843310 xmax=0</text>
+        <text x="465" y="104" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">name='Alice Smith' (live)</text>
+
+        <!-- Transaction A (old reader) -->
+        <rect x="30" y="55" width="140" height="45" rx="8" fill="#334155" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="100" y="73" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="9">TX A (started early)</text>
+        <text x="100" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">sees OLD version ✓</text>
+        <line x1="170" y1="78" x2="213" y2="78" stroke="#ef4444" stroke-width="1.5" marker-end="url(#dbi-s6-mvcc-arr)"/>
+
+        <!-- Transaction B (new reader) -->
+        <rect x="590" y="55" width="140" height="45" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+        <text x="660" y="73" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="9">TX B (started after)</text>
+        <text x="660" y="88" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">sees NEW version ✓</text>
+        <line x1="590" y1="78" x2="547" y2="78" stroke="#10b981" stroke-width="1.5" marker-end="url(#dbi-s6-mvcc-arr)"/>
+
+        <!-- Bottom note -->
+        <rect x="150" y="145" width="460" height="40" rx="8" fill="rgba(168,85,247,0.06)" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="380" y="163" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="11">No locks needed. Both transactions proceed without waiting.</text>
+        <text x="380" y="178" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Cost: old versions take up space until VACUUM cleans them. That's the trade-off.</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-flask-vial"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — LSM Trees, Compaction, and Bloom Filters</h2>
+    </div>
+  </div>
+
+  <p>B+ trees are the king of read-heavy workloads (OLTP databases like PostgreSQL and MySQL). But what about systems that need to handle <em>millions</em> of writes per second? Social media feeds, IoT sensor data, time-series metrics — these systems need a different data structure. Enter the <strong>LSM tree</strong>.</p>
+
+  <!-- Collapsible 1: LSM Trees vs B+ Trees -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-scale-balanced text-orange icon-gap"></i> LSM Trees vs B+ Trees — The Fundamental Trade-off</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text">The core trade-off in storage engines is simple: <strong>optimize for reads or optimize for writes</strong>. You can't have both. B+ trees optimize for reads (any row in 3-4 page reads), but writes are expensive (random I/O to insert into the right leaf page, plus possible page splits). LSM trees flip this: writes are blazing fast (just append to a memory buffer), but reads are slower (have to check multiple levels on disk).</p>
+
+        <div class="callout callout-info">
+          <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+          <p class="body-text">If all writes go to an in-memory buffer (memtable), what happens when the buffer gets full? And if you flush it to disk as a sorted file, how do reads work when there are 50 such files on disk?</p>
+        </div>
+
+        <p class="body-text">Here's how an LSM tree works, step by step:</p>
+
+        <p class="body-text"><strong>Step 1: Write to the memtable.</strong> Every write goes to an in-memory sorted data structure (usually a <span class="tooltip-trigger">red-black tree<span class="tooltip-content">A self-balancing binary search tree that maintains O(log n) insertion, deletion, and lookup. It's used for the in-memory component because in-memory operations don't need to worry about page sizes — only speed of insertion and sorted iteration.</span></span> or skip list). This is RAM-speed — microseconds per write. The write is also appended to a WAL for crash safety (same idea as PostgreSQL).</p>
+
+        <p class="body-text"><strong>Step 2: Flush to SSTables.</strong> When the memtable reaches a threshold (typically 64 MB), it's written to disk as an immutable sorted file called an <span class="tooltip-trigger">SSTable<span class="tooltip-content">Sorted String Table — an immutable file on disk containing key-value pairs sorted by key. Once written, an SSTable is never modified. This immutability simplifies concurrency (no locks needed to read) and crash recovery.</span></span> (Sorted String Table). "Immutable" means it's never modified after being written — this is crucial for safety and simplicity.</p>
+
+        <p class="body-text"><strong>Step 3: Read from everywhere.</strong> A read must check: the memtable first, then L0 SSTables (most recent flushes), then L1, then L2... This is why reads are slower — in the worst case, you check every level. Bloom filters (see below) skip levels that definitely don't have your key.</p>
+
+        <!-- SVG: LSM Tree Architecture -->
+        <svg viewBox="0 0 740 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LSM tree: memtable in RAM flushes to SSTables on disk in multiple levels">
+          <defs>
+            <marker id="dbi-s7-lsm-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+            </marker>
+          </defs>
+
+          <text x="370" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">LSM Tree Architecture</text>
+
+          <!-- RAM section -->
+          <rect x="20" y="35" width="200" height="120" rx="10" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="1.5"/>
+          <text x="120" y="52" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">RAM</text>
+
+          <!-- Memtable -->
+          <rect x="40" y="60" width="160" height="45" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5"/>
+          <text x="120" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Memtable (sorted)</text>
+          <text x="120" y="95" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">~64 MB, red-black tree</text>
+
+          <!-- WAL -->
+          <rect x="40" y="112" width="160" height="30" rx="6" fill="rgba(234,179,8,0.1)" stroke="#eab308" stroke-width="1"/>
+          <text x="120" y="132" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">WAL (crash safety)</text>
+
+          <!-- Arrow: writes go to memtable -->
+          <text x="120" y="175" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">writes: O(log n) in-memory</text>
+
+          <!-- Flush arrow -->
+          <line x1="220" y1="82" x2="268" y2="82" stroke="#f97316" stroke-width="2" marker-end="url(#dbi-s7-lsm-arr)"/>
+          <text x="244" y="75" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="8" font-weight="600">flush</text>
+
+          <!-- Disk section -->
+          <rect x="270" y="35" width="450" height="260" rx="10" fill="rgba(249,115,22,0.03)" stroke="#64748b" stroke-width="1.5"/>
+          <text x="495" y="52" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="11">DISK (SSTables)</text>
+
+          <!-- L0 -->
+          <text x="290" y="75" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">L0</text>
+          <rect x="310" y="62" width="80" height="22" rx="5" fill="#334155" stroke="#f97316" stroke-width="1.5"/>
+          <text x="350" y="77" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">SSTable</text>
+          <rect x="395" y="62" width="80" height="22" rx="5" fill="#334155" stroke="#f97316" stroke-width="1"/>
+          <text x="435" y="77" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">SSTable</text>
+          <rect x="480" y="62" width="80" height="22" rx="5" fill="#334155" stroke="#f97316" stroke-width="1"/>
+          <text x="520" y="77" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">SSTable</text>
+          <text x="600" y="77" fill="#64748b" font-family="Inter, sans-serif" font-size="8">~64 MB each</text>
+
+          <!-- Compaction arrow -->
+          <line x1="430" y1="84" x2="430" y2="108" stroke="#a855f7" stroke-width="1.5" marker-end="url(#dbi-s7-lsm-arr)"/>
+          <text x="470" y="100" fill="#a855f7" font-family="Inter, sans-serif" font-size="8" font-weight="600">compaction</text>
+
+          <!-- L1 -->
+          <text x="290" y="125" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">L1</text>
+          <rect x="310" y="112" width="130" height="22" rx="5" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="375" y="127" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">SSTable (merged, sorted)</text>
+          <rect x="445" y="112" width="130" height="22" rx="5" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="510" y="127" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">SSTable (merged, sorted)</text>
+          <text x="610" y="127" fill="#64748b" font-family="Inter, sans-serif" font-size="8">~640 MB total</text>
+
+          <!-- Compaction arrow -->
+          <line x1="430" y1="134" x2="430" y2="158" stroke="#a855f7" stroke-width="1.5" marker-end="url(#dbi-s7-lsm-arr)"/>
+
+          <!-- L2 -->
+          <text x="290" y="175" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">L2</text>
+          <rect x="310" y="162" width="395" height="22" rx="5" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="507" y="177" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Larger, fewer SSTables — non-overlapping key ranges</text>
+          <text x="610" y="175" fill="#64748b" font-family="Inter, sans-serif" font-size="8">~6.4 GB total</text>
+
+          <!-- L3 -->
+          <text x="290" y="210" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">L3</text>
+          <rect x="310" y="198" width="395" height="22" rx="5" fill="#334155" stroke="#64748b" stroke-width="1"/>
+          <text x="507" y="213" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Even larger — bulk of the data lives here</text>
+          <text x="610" y="210" fill="#64748b" font-family="Inter, sans-serif" font-size="8">~64 GB total</text>
+
+          <!-- Read path annotation -->
+          <rect x="285" y="240" width="420" height="45" rx="8" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+          <text x="495" y="258" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Read path: check memtable → L0 → L1 → L2 → L3</text>
+          <text x="495" y="275" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Worst case: check EVERY level. Bloom filters skip irrelevant levels.</text>
+        </svg>
+
+        <div class="table-wrapper mt-sm">
+          <table>
+            <thead><tr><th>Operation</th><th>B+ Tree (PostgreSQL)</th><th>LSM Tree (RocksDB)</th></tr></thead>
+            <tbody>
+              <tr><td>Point read</td><td><strong>3-4 page reads</strong> (always)</td><td>1 to N level checks (variable)</td></tr>
+              <tr><td>Range scan</td><td><strong>Follow leaf linked list</strong></td><td>Merge sorted streams from all levels</td></tr>
+              <tr><td>Point write</td><td>Random I/O to leaf page + WAL</td><td><strong>Sequential write to memtable + WAL</strong></td></tr>
+              <tr><td>Bulk write</td><td>Expensive (many random page writes)</td><td><strong>Sequential memtable flushes</strong></td></tr>
+              <tr><td>Space overhead</td><td>~1.5× data size (fragmentation)</td><td>~1.1× (compacted), 2× during compaction</td></tr>
+              <tr><td>Used by</td><td>PostgreSQL, MySQL, Oracle, SQL Server</td><td>RocksDB, Cassandra, LevelDB, CockroachDB</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="body-text"><strong>Real-world numbers:</strong> Facebook's MyRocks (MySQL on RocksDB) saved <strong>50% disk space</strong> compared to InnoDB because LSM compaction eliminates fragmentation. But read latency P99 increased from 2ms to 8ms. That's the trade-off — and for Facebook's use case (write-heavy social graph), it was worth it.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2: Compaction Strategies -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-arrows-rotate text-orange icon-gap"></i> Compaction Strategies — Size-Tiered vs Leveled</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text">Compaction is the background process that merges SSTables to keep reads manageable. Without compaction, reads would have to check hundreds of SSTables. There are two main strategies:</p>
+
+        <p class="body-text"><strong>Size-Tiered Compaction</strong> (Cassandra default): When there are enough SSTables of similar size, merge them into one larger SSTable. Simple and write-friendly — fewer background writes. But it can temporarily use <strong>2× the disk space</strong> during a major compaction (old + new files coexist until the old ones are deleted). Also, read amplification is higher because SSTables at the same level can have overlapping key ranges.</p>
+
+        <p class="body-text"><strong>Leveled Compaction</strong> (RocksDB default): SSTables at each level have <em>non-overlapping</em> key ranges (like B+ tree pages). When L0 fills up, its SSTables are merged with the overlapping range in L1. Each level is 10× larger than the previous. Reads are faster (at most one SSTable per level to check), but writes are amplified because compacting one L0 file might rewrite several L1 files.</p>
+
+        <div class="table-wrapper mt-sm">
+          <table>
+            <thead><tr><th>Property</th><th>Size-Tiered</th><th>Leveled</th></tr></thead>
+            <tbody>
+              <tr><td>Write amplification</td><td><strong>Lower</strong> (~10×)</td><td>Higher (~30×)</td></tr>
+              <tr><td>Read amplification</td><td>Higher (overlapping SSTables)</td><td><strong>Lower</strong> (1 SSTable/level)</td></tr>
+              <tr><td>Space amplification</td><td>Higher (up to 2× during compaction)</td><td><strong>Lower</strong> (~1.1×)</td></tr>
+              <tr><td>Best for</td><td>Write-heavy, space-tolerant</td><td>Read-write balanced, space-sensitive</td></tr>
+              <tr><td>Default in</td><td>Cassandra</td><td>RocksDB, LevelDB</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="body-text"><strong>Write amplification</strong> is the ratio of actual bytes written to disk vs bytes written by the application. If you write 1 byte and the database ends up writing 30 bytes (across WAL, memtable flush, and multiple compaction passes), that's 30× write amplification. This matters because SSDs have a limited number of write cycles — high write amplification wears out SSDs faster.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3: Bloom Filters -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-filter text-orange icon-gap"></i> Bloom Filters — Skipping SSTables That Don't Have Your Key</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text">The biggest problem with LSM reads is checking every level. If you're looking for a key that only exists in L3, you'd waste time reading L0, L1, and L2 first. <span class="tooltip-trigger">Bloom filters<span class="tooltip-content">A probabilistic data structure that can tell you "this key is DEFINITELY NOT in this SSTable" or "this key is PROBABLY in this SSTable." It uses a bit array and multiple hash functions. False positives are possible (says "probably yes" when the key isn't there), but false negatives are impossible (never says "no" when the key IS there).</span></span> solve this elegantly.</p>
+
+        <p class="body-text">Each SSTable has a Bloom filter — a small bit array (typically 10 bits per key, so ~1.2 MB per million keys) that can answer: "Is key X definitely NOT in this SSTable?" If the Bloom filter says no, you skip the entire SSTable — no disk read needed. If it says "maybe yes," you check the SSTable. With a 1% false positive rate, you skip 99% of unnecessary SSTable reads.</p>
+
+        <!-- SVG: Bloom filter skip -->
+        <svg viewBox="0 0 740 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bloom filter checking SSTables: skipping L0 and L1, finding key in L2">
+          <text x="370" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">Bloom Filter: Looking for key 'user:42'</text>
+
+          <!-- L0 -->
+          <rect x="30" y="40" width="150" height="50" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="105" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-weight="600" font-size="10">L0 SSTable</text>
+          <text x="105" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Bloom: DEFINITELY NOT ❌</text>
+
+          <!-- L1 -->
+          <rect x="200" y="40" width="150" height="50" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+          <text x="275" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-weight="600" font-size="10">L1 SSTable</text>
+          <text x="275" y="78" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">Bloom: DEFINITELY NOT ❌</text>
+
+          <!-- L2 -->
+          <rect x="370" y="40" width="150" height="50" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="2"/>
+          <text x="445" y="58" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">L2 SSTable</text>
+          <text x="445" y="78" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Bloom: MAYBE YES → READ ✅</text>
+
+          <!-- L3 (not checked) -->
+          <rect x="540" y="40" width="150" height="50" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="615" y="58" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-weight="600" font-size="10">L3 SSTable</text>
+          <text x="615" y="78" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">(not checked — found in L2)</text>
+
+          <!-- Arrows: skip, skip, read -->
+          <text x="105" y="108" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">SKIP</text>
+          <text x="275" y="108" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">SKIP</text>
+          <text x="445" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="700">READ!</text>
+
+          <!-- Result -->
+          <rect x="170" y="125" width="400" height="35" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+          <text x="370" y="147" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">Result: 1 disk read instead of 4. Bloom filters save 75% of I/O.</text>
+        </svg>
+
+        <p class="body-text">RocksDB allocates 10 bits per key for its Bloom filters by default, giving a ~1% false positive rate. You can tune this — more bits per key means fewer false positives but more memory. For a 100 GB database with 1 billion keys, the Bloom filters use about 1.2 GB of RAM — a worthwhile investment when each avoided disk read saves 100 microseconds.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 4: Storage Engine Comparison -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-database text-orange icon-gap"></i> Storage Engine Comparison — InnoDB vs PostgreSQL Heap vs RocksDB</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text">Different databases choose different storage engines for different reasons. Here's what's actually happening under the hood in the three most important ones:</p>
+
+        <div class="table-wrapper mt-sm">
+          <table>
+            <thead><tr><th>Feature</th><th>PostgreSQL</th><th>MySQL/InnoDB</th><th>RocksDB</th></tr></thead>
+            <tbody>
+              <tr><td>Data structure</td><td>Heap + B-tree indexes</td><td>Clustered B+ tree (PK)</td><td>LSM tree</td></tr>
+              <tr><td>Table organization</td><td>Unordered heap file</td><td>Sorted by primary key</td><td>Sorted SSTables per level</td></tr>
+              <tr><td>Page size</td><td>8 KB</td><td>16 KB</td><td>4 KB (configurable)</td></tr>
+              <tr><td>MVCC approach</td><td>Multiple row versions in heap</td><td>Undo log for old versions</td><td>Multiple versions as separate entries</td></tr>
+              <tr><td>Crash recovery</td><td>WAL replay</td><td>Redo log + doublewrite buffer</td><td>WAL replay</td></tr>
+              <tr><td>PK range scan</td><td>Index scan + heap fetch</td><td><strong>Extremely fast</strong> (data is sorted by PK)</td><td>Good (sorted within levels)</td></tr>
+              <tr><td>Random writes</td><td>Moderate (heap + index updates)</td><td>Moderate (page splits with UUID PKs)</td><td><strong>Fastest</strong> (sequential memtable writes)</td></tr>
+              <tr><td>Space efficiency</td><td>Moderate (bloat from dead tuples)</td><td>Good (undo log is separate)</td><td><strong>Best</strong> (compaction eliminates waste)</td></tr>
+              <tr><td>Used by</td><td>PostgreSQL</td><td>MySQL, MariaDB</td><td>CockroachDB, TiDB, Yugabyte, MyRocks</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="body-text"><strong>Why InnoDB's clustered index matters:</strong> In InnoDB, the primary key index IS the table. Rows are physically sorted by PK on disk. This means: (1) PK range scans are incredibly fast — the data is contiguous on disk. (2) Secondary indexes must store the PK value (not a physical row pointer) because row locations change during page splits. (3) Random UUID primary keys are <em>terrible</em> for InnoDB — every insert goes to a random position in the tree, causing constant page splits. Auto-increment IDs always append to the end, which is much faster.</p>
+
+        <p class="body-text"><strong>Why RocksDB is eating the database world:</strong> RocksDB (built by Facebook) is now used as the <em>storage engine</em> inside many modern databases. CockroachDB, TiDB, and YugabyteDB all use RocksDB (or a fork) under the hood — they implement SQL and transactions on top, but the actual bytes-on-disk part is RocksDB. Facebook's own MySQL fork (MyRocks) replaced InnoDB with RocksDB and saved 50% of their SSD storage fleet.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — VARIATIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-cubes"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">The Variations — Different Storage for Different Problems</h2>
+    </div>
+  </div>
+
+  <p>Not every workload looks the same. An e-commerce site doing thousands of small transactions per second needs a very different storage layout than an analytics warehouse scanning billions of rows for a report. The storage engine you choose shapes <em>everything</em> — query speed, write throughput, compression ratio, and memory usage.</p>
+
+  <!-- Card 1: Row-Store vs Column-Store -->
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <i class="fa-solid fa-table-columns text-blue" aria-hidden="true"></i> Row-Store vs Column-Store — OLTP vs OLAP
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Every database we've discussed so far is a <strong>row-store</strong>: each page contains complete rows, laid out one after another. When you <code>SELECT * FROM users WHERE id = 42</code>, the database reads one page and gets all columns for that user. This is perfect for <span class="tooltip-trigger">OLTP<span class="tooltip-content">Online Transaction Processing — workloads that do many small, fast operations: insert an order, update a balance, read one user's profile. Think: your application's day-to-day operations.</span></span> workloads (read one user, insert one order).</p>
+
+      <p class="body-text">But what about analytics? <code>SELECT AVG(age) FROM users WHERE country = 'US'</code> needs only the <code>age</code> and <code>country</code> columns from every row — but a row-store reads entire rows (all 50 columns). If each row is 500 bytes but you only need 8 bytes (age + country), you're reading <strong>62× more data than necessary</strong>.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">What if, instead of storing rows together, you stored each column separately? All the <code>age</code> values in one file, all the <code>country</code> values in another. What would that change about read performance? About compression? About write performance?</p>
+      </div>
+
+      <p class="body-text">That's exactly what a <strong>column-store</strong> does. Each column is stored in its own file. To compute <code>AVG(age)</code>, the database reads only the age file — which is tiny and highly compressible (all the same data type, similar values). Column stores like <span class="tooltip-trigger">ClickHouse<span class="tooltip-content">An open-source columnar database built by Yandex. Known for extreme analytical query speed — it can scan billions of rows per second on a single machine thanks to columnar storage, vectorized execution, and aggressive compression.</span></span>, BigQuery, and Redshift can scan <strong>billions of rows per second</strong> for analytical queries.</p>
+
+      <!-- SVG: Row-store vs Column-store layout -->
+      <svg viewBox="0 0 740 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Row-store stores complete rows per page; column-store stores each column separately">
+        <text x="185" y="20" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">ROW STORE (PostgreSQL, MySQL)</text>
+        <text x="555" y="20" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">COLUMN STORE (ClickHouse, BigQuery)</text>
+
+        <!-- Row store pages -->
+        <rect x="30" y="35" width="310" height="85" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="185" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Page: complete rows stored together</text>
+
+        <rect x="42" y="60" width="286" height="16" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="185" y="72" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Row 1: id=1 | name='Alice' | age=28 | country='US' | phone=... | email=...</text>
+
+        <rect x="42" y="80" width="286" height="16" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="185" y="92" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Row 2: id=2 | name='Bob' | age=34 | country='UK' | phone=... | email=...</text>
+
+        <rect x="42" y="100" width="286" height="16" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="185" y="112" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Row 3: id=3 | name='Carol' | age=22 | country='US' | phone=... | email=...</text>
+
+        <!-- Column store files -->
+        <rect x="400" y="35" width="310" height="85" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="555" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Each column stored separately</text>
+
+        <rect x="412" y="60" width="70" height="52" rx="3" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+        <text x="447" y="74" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">age</text>
+        <text x="447" y="86" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="7">28, 34, 22</text>
+        <text x="447" y="98" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="7">...</text>
+
+        <rect x="488" y="60" width="70" height="52" rx="3" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+        <text x="523" y="74" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8" font-weight="600">country</text>
+        <text x="523" y="86" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="7">US, UK, US</text>
+        <text x="523" y="98" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="7">...</text>
+
+        <rect x="564" y="60" width="70" height="52" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="599" y="74" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">name</text>
+        <text x="599" y="86" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="7">(not read)</text>
+
+        <rect x="640" y="60" width="60" height="52" rx="3" fill="#334155" stroke="#64748b" stroke-width="1"/>
+        <text x="670" y="74" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">email</text>
+        <text x="670" y="86" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="7">(not read)</text>
+
+        <!-- Query annotation -->
+        <rect x="30" y="135" width="310" height="30" rx="6" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+        <text x="185" y="154" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">SELECT AVG(age) → reads ALL columns (500 B/row)</text>
+
+        <rect x="400" y="135" width="310" height="30" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+        <text x="555" y="154" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">SELECT AVG(age) → reads ONLY age column (4 B/row)</text>
+
+        <!-- Bottom comparison -->
+        <rect x="100" y="180" width="540" height="45" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+        <text x="370" y="200" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">For analytical queries: column-store reads 125× LESS data</text>
+        <text x="370" y="216" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Plus: columns of same type compress 5-10× better than mixed rows</text>
+      </svg>
+
+      <div class="table-wrapper mt-sm">
+        <table>
+          <thead><tr><th>Property</th><th>Row-Store</th><th>Column-Store</th></tr></thead>
+          <tbody>
+            <tr><td>Best for</td><td><strong>OLTP</strong> — single-row reads/writes</td><td><strong>OLAP</strong> — scans over many rows</td></tr>
+            <tr><td>Single row read</td><td><strong>1 page read</strong></td><td>1 read per column file (many files)</td></tr>
+            <tr><td>Full scan (2 cols)</td><td>Read ALL columns (wasteful)</td><td><strong>Read only needed columns</strong></td></tr>
+            <tr><td>Compression</td><td>Moderate (mixed types per page)</td><td><strong>Excellent</strong> (same type = similar values)</td></tr>
+            <tr><td>Write speed</td><td><strong>Fast</strong> (one page write per row)</td><td>Slower (write to N column files)</td></tr>
+            <tr><td>Examples</td><td>PostgreSQL, MySQL, Oracle</td><td>ClickHouse, BigQuery, Redshift, Parquet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Clustered vs Heap Storage -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-arrows-up-down text-green" aria-hidden="true"></i> Clustered vs Heap Storage — Where Your Rows Physically Live
+    </h3>
+    <div class="card-body">
+      <p class="body-text">We've touched on this difference in Section 6, but it's important enough to explore in detail. <strong>PostgreSQL</strong> and <strong>MySQL/InnoDB</strong> store table data in fundamentally different ways, and this affects everything from INSERT speed to secondary index size.</p>
+
+      <p class="body-text"><strong>Heap storage (PostgreSQL):</strong> Rows are stored in an unordered heap file. New rows go wherever there's free space. The primary key index is just another B+ tree that points to the physical location (page number + item offset) of each row. This means:</p>
+      <ul class="styled">
+        <li>Inserts are always fast — just find a page with space and put the row there</li>
+        <li>Primary key range scans require random I/O — the rows aren't physically sorted</li>
+        <li>Secondary indexes are the same size as the primary index (both store physical locations)</li>
+        <li>UPDATEs create new row versions that might be on a different page (HOT updates avoid this when possible)</li>
+      </ul>
+
+      <p class="body-text"><strong>Clustered storage (MySQL/InnoDB):</strong> The table data IS the primary key B+ tree. Rows are physically sorted by PK in the leaf pages. This means:</p>
+      <ul class="styled">
+        <li>PK range scans are blazing fast — rows are contiguous on disk</li>
+        <li>Random PK inserts (UUIDs) cause page splits — <strong>terrible performance</strong></li>
+        <li>Sequential PK inserts (auto-increment) always append to the end — <strong>great performance</strong></li>
+        <li>Secondary indexes store the PK value (not a physical pointer), so they're smaller but require a second lookup</li>
+      </ul>
+
+      <div class="callout callout-warning">
+        <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> The UUID Trap in InnoDB</div>
+        <p class="body-text">Using UUIDv4 as a primary key in InnoDB is one of the most common performance mistakes. Each insert goes to a random position in the B+ tree, causing constant page splits. At scale, insert throughput can drop by <strong>3-5×</strong> compared to auto-increment. If you need UUIDs, use UUIDv7 (time-ordered) or ULID, which preserve insert order while still being globally unique.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: In-Memory Databases -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <i class="fa-solid fa-bolt text-yellow" aria-hidden="true"></i> In-Memory Databases — When Disk I/O Is the Enemy
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Everything we've discussed assumes data lives on disk and gets cached in the buffer pool. But what if the <em>entire</em> dataset fits in RAM? Then you eliminate disk I/O completely, and the data structures can be optimized for memory access patterns instead of disk page access patterns.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">If all data is in memory, do you still need B+ trees? What data structure would you use for a key-value store if disk page size was no longer a constraint?</p>
+      </div>
+
+      <p class="body-text"><strong>Redis internals:</strong> Redis keeps all data in memory and uses data structures optimized for RAM, not disk. Instead of B+ trees, Redis uses <span class="tooltip-trigger">hash tables<span class="tooltip-content">A data structure that maps keys to values using a hash function. Average O(1) lookups. Redis uses a hash table as its global keyspace — every key you SET is stored in this hash table.</span></span> for key-value lookups (O(1) average), skip lists for sorted sets (O(log n) like a tree but simpler), and <span class="tooltip-trigger">ziplist<span class="tooltip-content">A compact, memory-efficient encoding used by Redis for small lists, hashes, and sorted sets. Instead of using pointers (8 bytes each on 64-bit), entries are packed tightly in a contiguous block of memory. Saves significant RAM for small datasets but becomes slow for large datasets due to O(n) operations.</span></span>/listpack for small collections (trading CPU for memory savings). Redis uses <code>jemalloc</code> as its memory allocator to minimize fragmentation.</p>
+
+      <p class="body-text">But "in-memory" doesn't mean "data disappears on restart." Redis offers two persistence options: <strong>RDB snapshots</strong> (periodic full dumps to disk — fast recovery but you lose data since the last snapshot) and <strong>AOF</strong> (Append-Only File — like a WAL, logs every write command — slower recovery but less data loss). You can use both together for the best of both worlds.</p>
+
+      <p class="body-text"><strong>VoltDB</strong> takes a different approach: it's a full SQL relational database that lives entirely in memory. It uses no buffer pool at all — every transaction operates directly on in-memory data. For durability, it uses command logging (similar to WAL) and K-safety replication (synchronous copies to other nodes). VoltDB achieves millions of SQL transactions per second on a single node because there's zero disk I/O in the critical path.</p>
+
+      <div class="table-wrapper mt-sm">
+        <table>
+          <thead><tr><th>Feature</th><th>Redis</th><th>VoltDB</th><th>Memcached</th></tr></thead>
+          <tbody>
+            <tr><td>Data model</td><td>Key-value + data structures</td><td>Relational (SQL)</td><td>Key-value only</td></tr>
+            <tr><td>Persistence</td><td>RDB snapshots + AOF</td><td>Command log + replication</td><td>None (pure cache)</td></tr>
+            <tr><td>Data structures</td><td>Hash tables, skip lists, ziplist</td><td>B+ tree indexes (in RAM)</td><td>Hash table only</td></tr>
+            <tr><td>Transactions</td><td>Limited (MULTI/EXEC)</td><td>Full ACID</td><td>None</td></tr>
+            <tr><td>Threading</td><td>Single-threaded (6.0+ has I/O threads)</td><td>Partitioned, no locking</td><td>Multi-threaded</td></tr>
+            <tr><td>Use case</td><td>Caching, sessions, leaderboards</td><td>High-throughput OLTP</td><td>Simple caching</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — AT SCALE
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How the Giants Tame Their Storage Engines</h2>
+    </div>
+  </div>
+
+  <p>Everything we've covered so far — pages, B+ trees, buffer pools, WAL, LSM trees — sounds clean in theory. But when your table has 2 billion rows and your cluster handles 500K queries per second, every internal detail becomes a landmine. Here's how four real companies hit the limits of database internals and what they did about it.</p>
+
+  <!-- Card 1: PostgreSQL at Instagram -->
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-camera text-orange icon-gap"></i> PostgreSQL at Instagram — Tuning shared_buffers for 1 Billion Users</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Instagram runs one of the world's largest PostgreSQL deployments. Their biggest challenge? Buffer pool management on machines with 256 GB of RAM serving tables with hundreds of millions of rows.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">You have a PostgreSQL server with 256 GB of RAM. The default <code>shared_buffers</code> is 128 MB. Your DBA sets it to 200 GB (80% of RAM) thinking "more cache = faster." What goes wrong? (Hint: there's another cache layer you're forgetting about.)</p>
+      </div>
+
+      <p class="body-text">The answer: the <strong>OS page cache</strong>. Linux already caches file pages in RAM. When you set <code>shared_buffers</code> to 200 GB, PostgreSQL manages 200 GB of pages <em>and</em> the OS also caches the same files — you get <strong>double caching</strong>. The OS cache becomes tiny (256 - 200 = 56 GB for everything else, including OS page cache), and PostgreSQL's own clock-sweep eviction algorithm is less efficient than the OS's LRU for large caches.</p>
+
+      <p class="body-text">Instagram's approach: <code>shared_buffers = 64 GB</code> (25% of RAM) with <code>huge_pages = on</code>. Standard 4 KB memory pages require a page table entry each — 64 GB / 4 KB = 16 million entries, consuming ~256 MB of kernel memory for the page table alone. Huge pages (2 MB each) cut that to 32,768 entries. They also tuned <code>checkpoint_completion_target = 0.9</code>, spreading dirty page writes across 90% of the checkpoint interval instead of the default 50%, smoothing out I/O spikes that caused latency blips during checkpoints.</p>
+
+      <!-- SVG: Double caching problem -->
+      <svg viewBox="0 0 740 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Double caching: PostgreSQL buffer pool and OS page cache both hold the same pages">
+        <defs>
+          <marker id="dbi-s9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+        <text x="370" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="12">The Double-Caching Problem (256 GB Server)</text>
+
+        <!-- BAD: 80% shared_buffers -->
+        <rect x="20" y="30" width="340" height="55" rx="8" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="190" y="48" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="10">BAD: shared_buffers = 200 GB (80%)</text>
+        <rect x="30" y="55" width="240" height="20" rx="4" fill="#ef4444" opacity="0.15"/>
+        <text x="150" y="69" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8">PG Buffer Pool: 200 GB (same pages cached twice)</text>
+        <rect x="275" y="55" width="75" height="20" rx="4" fill="#334155"/>
+        <text x="312" y="69" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">OS: 56 GB</text>
+
+        <!-- GOOD: 25% shared_buffers -->
+        <rect x="390" y="30" width="340" height="55" rx="8" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="560" y="48" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="10">GOOD: shared_buffers = 64 GB (25%)</text>
+        <rect x="400" y="55" width="95" height="20" rx="4" fill="#10b981" opacity="0.15"/>
+        <text x="447" y="69" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">PG: 64 GB</text>
+        <rect x="500" y="55" width="220" height="20" rx="4" fill="rgba(16,185,129,0.08)"/>
+        <text x="610" y="69" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="8">OS Page Cache: 192 GB (efficient LRU)</text>
+
+        <!-- Bottom insight -->
+        <rect x="100" y="105" width="540" height="55" rx="10" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+        <text x="370" y="125" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="11" font-weight="600">PostgreSQL reads files through the OS — the OS caches them automatically.</text>
+        <text x="370" y="142" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">A huge shared_buffers means two layers both caching the same data, wasting RAM.</text>
+        <text x="370" y="155" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">25% for PG hot pages + 75% for OS to cache everything else = maximum effective cache.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Card 2: InnoDB at Uber -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-car text-blue icon-gap"></i> InnoDB at Uber — Why They Left PostgreSQL</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">In 2016, Uber published a blog post titled "Why Uber Engineering Switched from Postgres to MySQL." The reason came down to one internal detail: <strong>how secondary indexes store row pointers</strong>.</p>
+
+      <p class="body-text">In PostgreSQL, every index entry points to a physical location on disk — a <code>(page_number, offset)</code> tuple called a <span class="tooltip-trigger">ctid<span class="tooltip-content">In PostgreSQL, every row has a ctid (current tuple identifier) that specifies its physical location: (page_number, item_offset). Secondary indexes store this ctid to find rows. The problem: when VACUUM moves a row, ALL indexes pointing to that row must be updated.</span></span>. When VACUUM compacts a table and moves rows to new locations, every single index pointing to that row must be updated — that's write amplification proportional to the number of indexes. Uber's trip tables had <strong>dozens of indexes</strong>, so a single VACUUM pass triggered massive cascading index updates.</p>
+
+      <p class="body-text">InnoDB's clustered index solves this differently. Secondary indexes store the <strong>primary key value</strong>, not a physical location. When a row moves, secondary indexes don't change — only the clustered index (which IS the table, sorted by PK) needs updating. For Uber's workload — wide tables with many indexes and heavy UPDATE traffic — this meant 10x less write amplification during maintenance.</p>
+
+      <div class="callout callout-warning">
+        <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> The Nuance</div>
+        <p class="body-text">PostgreSQL has improved since 2016. The <code>HOT</code> (Heap-Only Tuples) optimization allows updates that don't change indexed columns to avoid index updates entirely. And covering indexes (<code>INCLUDE</code> clause) reduce the need for heap fetches. But the fundamental architecture difference — physical ctid pointers vs logical PK references — remains.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: RocksDB at Facebook -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-mountain text-purple icon-gap"></i> RocksDB at Facebook — 50% Disk Savings with MyRocks</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">Facebook stores petabytes of social graph data in MySQL. Their problem: InnoDB's B+ tree storage wastes space. A B+ tree page targets ~70% fill factor after splits, meaning 30% of every page is empty. For a 10 TB database, that's 3 TB of wasted disk. Multiply by thousands of shards and it adds up to millions of dollars in SSDs.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+        <p class="body-text">InnoDB B+ trees have ~70% space utilization. LSM trees compact data periodically and achieve ~90%+ utilization. If your database fleet is 30 petabytes on InnoDB, how many petabytes could you save by switching to an LSM engine? What's that worth at $0.10/GB/month for SSD?</p>
+      </div>
+
+      <p class="body-text">The math: 30 PB × 30% waste = 9 PB of overhead with InnoDB. With LSM at ~90% utilization, overhead drops to ~3 PB. That's a 6 PB saving. At $0.10/GB/month: 6,000,000 GB × $0.10 = <strong>$600,000/month</strong> in storage costs alone. Facebook built <strong>MyRocks</strong> — MySQL with RocksDB as the storage engine — and achieved the predicted ~50% space reduction. The trade-off: read latency P99 increased from 2ms to 8ms because LSM reads might check multiple levels. For their write-heavy social graph, that was acceptable.</p>
+
+      <p class="body-text">The key compaction tuning: Facebook uses <strong>leveled compaction</strong> with a custom rate limiter that caps compaction I/O at 100 MB/s during peak hours and allows 500 MB/s during off-peak. Without rate limiting, compaction storms can consume all disk bandwidth and make foreground queries timeout.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: SQLite Everywhere -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-mobile-screen text-green icon-gap"></i> SQLite — The Most Deployed Database on Earth</span>
+    </h3>
+    <div class="card-body">
+      <p class="body-text">There are roughly 1 trillion active SQLite databases in the world right now. Every Android phone has dozens of them. Every iPhone. Every Mac. Every Chrome browser, every Firefox browser, every Electron app. It's in every Boeing 787 and every Airbus A350. SQLite is not a client-server database — it's a <strong>library</strong> linked directly into your application, reading and writing a single file on disk.</p>
+
+      <p class="body-text">Internally, SQLite uses the same fundamentals: B+ tree pages (4 KB default), a WAL for crash recovery, and an in-process page cache. But with one crucial design constraint — <strong>single writer</strong>. Only one connection can write at a time (readers never block). This eliminates all the concurrency complexity (MVCC version chains, lock managers, deadlock detection) that makes PostgreSQL and MySQL so complex. For embedded use cases — a phone app's local storage, a browser's IndexedDB, an IoT sensor's log — you don't need concurrent writers. You need a reliable, zero-configuration, single-file database. SQLite is 150,000 lines of C with 100% branch coverage in its test suite — one of the most tested software projects in history.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — THE ANTI-LESSON
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-ban"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">The Anti-Lesson — Dangerous "Advice" That Sounds Right</h2>
+    </div>
+  </div>
+
+  <p>A team sets <code>shared_buffers</code> to 80% of RAM on a 64 GB machine, and the Linux OOM-killer starts murdering PostgreSQL backends under load. Another team leaves autovacuum at defaults and watches a 2 GB table bloat to 8 GB over six months. These three "tips" sound smart but cause real damage — and the fix always comes down to the internals we just covered.</p>
+
+  <!-- Anti-lesson 1 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb text-red icon-gap"></i> "Set shared_buffers to 80% of RAM for maximum performance"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>Why it sounds right:</strong> More cache = more pages in memory = fewer disk reads. Simple logic.</p>
+        <p class="body-text"><strong>Why it's wrong:</strong> PostgreSQL reads data through the operating system's file I/O. Linux automatically caches file pages in its own page cache. When <code>shared_buffers</code> is 80% of RAM, the OS cache shrinks to almost nothing — and you end up with the same pages cached <em>twice</em>: once in PostgreSQL's buffer pool and once in the OS page cache. You've halved your effective cache, not doubled it. The PostgreSQL documentation itself recommends <strong>25% of system RAM</strong> as the starting point.</p>
+        <p class="body-text"><strong>Real consequence:</strong> A startup set <code>shared_buffers = 48 GB</code> on a 64 GB machine. Linux OOM-killer started killing PostgreSQL backends under load because the OS had almost no free memory for its own operations. Queries that should have been sub-millisecond were taking 200ms because the OS page cache was thrashing.</p>
+
+        <div class="callout callout-success">
+          <div class="callout-title"><i class="fa-solid fa-check"></i> The Right Move</div>
+          <p class="body-text"><code>shared_buffers = 25%</code> of RAM. Let the OS page cache handle the rest. Monitor with <code>pg_stat_database</code> — if your buffer hit ratio is above 99%, you're fine. If it's below 95%, investigate which tables/indexes are too large to cache, not whether <code>shared_buffers</code> is big enough.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anti-lesson 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb text-red icon-gap"></i> "B+ trees are always better than LSM trees"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>Why it sounds right:</strong> B+ trees give O(log n) reads with no amplification. LSM trees might check multiple levels. PostgreSQL and MySQL both use B+ trees. Case closed?</p>
+        <p class="body-text"><strong>Why it's wrong:</strong> It completely depends on your write:read ratio. B+ trees do random I/O on every write (seek to the correct leaf page, possibly split it). LSM trees convert all writes to sequential I/O (append to memtable, flush sorted runs). For a workload that does 90% writes and 10% reads — think time-series data, logging pipelines, social media feeds — LSM trees can sustain <strong>5-10x higher write throughput</strong> on the same hardware. Facebook's migration from InnoDB (B+ tree) to MyRocks (LSM) on their social graph wasn't because B+ trees were "bad" — it was because write volume was so high that the random I/O cost was unjustifiable.</p>
+
+        <div class="table-wrapper mt-sm">
+          <table>
+            <thead><tr><th>Workload</th><th>Better Engine</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Read-heavy (90:10 read:write)</td><td><strong>B+ tree</strong></td><td>Single-page lookup, no level checking</td></tr>
+              <tr><td>Write-heavy (10:90 read:write)</td><td><strong>LSM tree</strong></td><td>Sequential writes, no random I/O</td></tr>
+              <tr><td>Balanced (50:50)</td><td>Either — benchmark</td><td>Depends on data size, SSD vs HDD, key distribution</td></tr>
+              <tr><td>Space-constrained</td><td><strong>LSM tree</strong></td><td>Compaction achieves ~90%+ utilization vs ~70% for B+ tree</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anti-lesson 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bomb text-red icon-gap"></i> "VACUUM is automatic — don't worry about it"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>Why it sounds right:</strong> PostgreSQL has autovacuum enabled by default since version 8.1. It runs in the background. Set it and forget it.</p>
+        <p class="body-text"><strong>Why it's wrong:</strong> Autovacuum's default settings are tuned for <em>conservative, small databases</em>. The defaults trigger a vacuum when 20% of a table's rows are dead (50 + 0.2 × n_live_tuples). For a 100-million-row table, that means VACUUM won't kick in until there are <strong>20 million dead rows</strong> — by which point the table has bloated significantly, sequential scans are crawling through dead space, and your VACUUM job might take hours.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+          <p class="body-text">Your <code>orders</code> table has 50 million live rows and 12 million dead rows (from UPDATEs that created new versions). Each dead row wastes ~200 bytes. How much disk space are dead rows wasting? And if autovacuum's threshold is 20% (10 million dead rows), has it triggered yet?</p>
+        </div>
+
+        <p class="body-text">The math: 12 million dead rows × 200 bytes = <strong>2.4 GB</strong> of dead space, sitting in pages that sequential scans still have to read through. And yes, autovacuum triggered at 10 million dead rows — but by the time it finished processing all 50 million rows, another 2 million had died. For hot tables, the right approach is aggressive per-table tuning:</p>
+
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">aggressive-vacuum.sql</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- Tune autovacuum for a hot table (50M+ rows, heavy updates)
+ALTER TABLE orders SET (
+  autovacuum_vacuum_scale_factor = 0.01,     -- trigger at 1% dead rows (not 20%)
+  autovacuum_analyze_scale_factor = 0.005,   -- re-analyze stats at 0.5%
+  autovacuum_vacuum_cost_delay = 2           -- less throttling (default: 20ms)
+);
+
+-- Check current bloat
+SELECT schemaname, relname, n_live_tup, n_dead_tup,
+       round(100.0 * n_dead_tup / nullif(n_live_tup, 0), 1) AS dead_pct
+FROM pg_stat_user_tables
+WHERE n_dead_tup > 100000
+ORDER BY n_dead_tup DESC;</code></pre>
+          </div>
+        </div>
+
+        <p class="body-text"><strong>Real consequence:</strong> Sentry (the error tracking company) wrote about a PostgreSQL incident where autovacuum fell behind on a high-traffic table. Dead rows accumulated until the table was 4x its actual data size, sequential scans became 4x slower, and eventually autovacuum itself couldn't keep up because each pass was reading the bloated table. They had to do a <code>VACUUM FULL</code> during a maintenance window — which locks the entire table and rebuilds it from scratch.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — COMMON MISTAKES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-circle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — 6 Things That Quietly Kill Performance</h2>
+    </div>
+  </div>
+
+  <p>Your query took 2ms three months ago. Today it takes 12ms. Nothing changed in the code. The table grew from 5 million to 20 million rows, dead tuples accumulated, the buffer pool hit ratio dropped from 99.8% to 91%, and nobody noticed until users started complaining. These six mistakes are the usual suspects.</p>
+
+  <!-- Mistake 1 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-eye-slash text-red icon-gap"></i> Not Monitoring Buffer Cache Hit Ratio</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> You deployed your app, queries are "fast enough," and you never look at buffer pool stats. Six months later, your dataset outgrew the buffer pool and your hit ratio dropped from 99.8% to 87%. Every 13th page read now hits disk instead of RAM — that's 1,000x slower per miss. At 50K queries/sec, those misses add up to <strong>seconds</strong> of latency.</p>
+        <p class="body-text"><strong>The fix:</strong> Add this to your monitoring dashboard on day one. Alert if the hit ratio drops below 95%.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">monitor-cache.sql</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- Buffer cache hit ratio (run periodically)
+SELECT round(100.0 * sum(blks_hit) /
+  nullif(sum(blks_hit) + sum(blks_read), 0), 2) AS hit_ratio_pct
+FROM pg_stat_database WHERE datname = current_database();
+-- OLTP target: > 99%. Below 95% = investigate immediately.</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-virus text-red icon-gap"></i> Ignoring Table Bloat from Dead Tuples</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Your table has 10 million live rows but occupies the space of 40 million because VACUUM hasn't reclaimed dead tuple space. Sequential scans read 4x more pages than necessary. Indexes point to pages filled with dead tuples. You keep adding more RAM and faster SSDs, but the real problem is bloat.</p>
+        <p class="body-text"><strong>The fix:</strong> Check <code>pg_stat_user_tables</code> regularly. If <code>n_dead_tup</code> is more than 10% of <code>n_live_tup</code>, your autovacuum settings are too conservative for that table.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">check-bloat.sql</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- Find the most bloated tables
+SELECT relname, n_live_tup, n_dead_tup,
+  round(100.0 * n_dead_tup / nullif(n_live_tup + n_dead_tup, 0), 1) AS dead_pct,
+  last_autovacuum
+FROM pg_stat_user_tables
+WHERE n_dead_tup > 10000
+ORDER BY n_dead_tup DESC LIMIT 10;</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-arrows-left-right-to-line text-red icon-gap"></i> Wrong Fillfactor — Wasting Space or Causing Page Splits</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Leaving fillfactor at the default (100% for heap tables, 90% for B+ tree indexes) on a table that gets heavy UPDATEs. With fillfactor 100%, there's no room on the page for new tuple versions — PostgreSQL must put them on a different page, breaking HOT update chains and requiring index updates.</p>
+        <p class="body-text"><strong>The flip side:</strong> Setting fillfactor to 50% on a read-heavy, rarely-updated table wastes half your pages and makes scans twice as slow.</p>
+        <p class="body-text"><strong>The rule:</strong> Heavy UPDATEs → fillfactor 70-80% (leave room for new versions). Read-mostly → fillfactor 100% (pack pages tight, fewer pages to read).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 4 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-memory text-red icon-gap"></i> Not Using huge_pages for Large shared_buffers</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> You set <code>shared_buffers = 32 GB</code> but leave <code>huge_pages = off</code>. The OS manages memory in 4 KB pages. 32 GB / 4 KB = <strong>8,388,608 page table entries</strong>. Each entry consumes ~64 bytes of kernel memory — that's 512 MB of overhead just for the page table. And every TLB miss (the CPU cache for page table lookups) triggers a multi-level page table walk.</p>
+        <p class="body-text"><strong>The fix:</strong> Enable <code>huge_pages = on</code> in <code>postgresql.conf</code> and configure the OS to allocate huge pages. With 2 MB huge pages: 32 GB / 2 MB = 16,384 entries. Page table overhead drops from 512 MB to ~1 MB, and TLB coverage increases 512x.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 5 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-shuffle text-red icon-gap"></i> UUID Primary Keys in InnoDB — Random Inserts = Page Splits</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> Using UUID v4 as the primary key in MySQL/InnoDB. Remember, InnoDB's clustered index stores rows <em>sorted by primary key</em>. UUIDs are random — every INSERT goes to a random position in the B+ tree. At 10K inserts/sec, nearly every insert targets a different leaf page, causing constant <span class="tooltip-trigger">page splits<span class="tooltip-content">When a B+ tree leaf page is full and a new entry must be inserted, the database splits the page in half — creating two pages each about 50% full. This causes write amplification (extra I/O) and reduces space efficiency until the pages fill back up.</span></span>. The table ends up with pages that are 50-70% full instead of ~90%.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+          <p class="body-text">InnoDB pages are 16 KB. With auto-increment IDs, inserts always append to the rightmost leaf (sequential). With UUID v4, inserts target random leaves. If your buffer pool caches 100,000 pages but your table has 10 million leaf pages, what fraction of inserts will cause a disk read to fetch the target page? (Hint: it's not good.)</p>
+        </div>
+
+        <p class="body-text">The math: 100,000 / 10,000,000 = 1% of pages are cached. That means <strong>99% of UUID inserts require a disk read</strong> before the write, plus a page split if the target page is full. With auto-increment, inserts hit the same rightmost pages repeatedly — they stay cached. Percona benchmarks showed UUID v4 PKs causing <strong>10x worse insert throughput</strong> compared to auto-increment on large InnoDB tables. If you need UUIDs, use <strong>UUID v7</strong> (time-ordered) or <code>ULID</code> — they're roughly sequential, so inserts append instead of scattering.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake 6 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-upload text-red icon-gap"></i> Forgetting to ANALYZE After Bulk Loads</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p class="body-text"><strong>The mistake:</strong> You <code>COPY</code> 50 million rows into a table and immediately start querying. The query planner uses stale statistics — it thinks the table has 1,000 rows (from before the load) and chooses a sequential scan instead of an index scan. Your "fast" query takes 30 seconds instead of 2ms because the planner made a catastrophically wrong decision based on outdated cardinality estimates.</p>
+        <p class="body-text"><strong>The fix:</strong> Always run <code>ANALYZE</code> immediately after bulk loads. It samples ~30,000 rows and updates <code>pg_statistics</code> with column value distributions, most common values, and distinct counts. The query planner depends entirely on these statistics to choose between index scans, hash joins, merge joins, and sequential scans.</p>
+        <div class="macos-window mt-sm">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">post-load.sql</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- After any bulk load:
+COPY orders FROM '/data/orders.csv' WITH CSV HEADER;
+ANALYZE orders;  -- Update statistics NOW, don't wait for autovacuum
+
+-- Verify planner has fresh stats
+SELECT relname, last_analyze, last_autoanalyze, n_live_tup
+FROM pg_stat_user_tables WHERE relname = 'orders';</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — INTERVIEW PLAYBOOK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-user-tie"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — "Explain B+ Tree vs LSM Tree"</h2>
+    </div>
+  </div>
+
+  <p>You're in a system design round. The interviewer draws a database on the whiteboard and asks: "We're ingesting 200K writes per second of time-series data. Would you use a B+ tree or an LSM tree — and why?" Your answer reveals whether you understand storage engines or just memorize "use PostgreSQL for OLTP."</p>
+
+  <div class="callout callout-info">
+    <div class="callout-title"><i class="fa-solid fa-brain"></i> 🧠 Think First</div>
+    <p class="body-text">Before reading the model answers: write down 3 differences between B+ trees and LSM trees from memory. For each, identify which workload it favors. If you can't, go back to Sections 6 and 7.</p>
+  </div>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="dbi-s12-junior" role="tab" aria-selected="true">Junior (0-2 yrs)</button>
+      <button class="tab-btn" data-tab="dbi-s12-mid" role="tab" aria-selected="false">Mid (2-5 yrs)</button>
+      <button class="tab-btn" data-tab="dbi-s12-senior" role="tab" aria-selected="false">Senior (5+ yrs)</button>
+    </div>
+
+    <div class="tab-panel active" id="dbi-s12-junior" role="tabpanel">
+      <p class="body-text"><strong>What they want to hear:</strong> You understand both data structures at a conceptual level and know when each is used.</p>
+      <div class="callout callout-success">
+        <div class="callout-title"><i class="fa-solid fa-comment"></i> Model Answer</div>
+        <p class="body-text">"B+ trees and LSM trees are the two main ways databases organize data on disk. A B+ tree keeps data sorted in fixed-size pages with a tree structure — think of it like a book's table of contents. You follow pointers from root to leaf to find any row in 3-4 disk reads. This is great for reads. PostgreSQL and MySQL both use B+ trees for their indexes.</p>
+        <p class="body-text">An LSM tree takes a different approach: it writes everything to an in-memory buffer first, then flushes sorted batches to disk. Reads are slower because you might check multiple levels, but writes are much faster because they're all sequential — no random disk I/O. RocksDB, Cassandra, and LevelDB use LSM trees.</p>
+        <p class="body-text">Rule of thumb: B+ tree for read-heavy, LSM for write-heavy."</p>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="dbi-s12-mid" role="tabpanel">
+      <p class="body-text"><strong>What they want to hear:</strong> Trade-offs with specific numbers, real-world examples, and understanding of amplification.</p>
+      <div class="callout callout-success">
+        <div class="callout-title"><i class="fa-solid fa-comment"></i> Model Answer</div>
+        <p class="body-text">"The core trade-off is between read amplification, write amplification, and space amplification.</p>
+        <p class="body-text">B+ trees: reads hit 3-4 pages (tree depth), writes do random I/O to the target leaf page — plus potential page splits. Write amplification is moderate. Space utilization is ~70% after splits. InnoDB's clustered index sorts data by primary key, so range scans on the PK are extremely fast — the data is physically contiguous.</p>
+        <p class="body-text">LSM trees: writes go to an in-memory memtable, then flush to sorted SSTables on disk. Write amplification comes from compaction — leveled compaction in RocksDB can hit 30x. But write throughput is 5-10x higher because all disk I/O is sequential. Space utilization is ~90%+ because compaction eliminates fragmentation.</p>
+        <p class="body-text">Real example: Facebook's MyRocks replaced InnoDB with RocksDB as MySQL's storage engine and saved 50% of their SSD fleet. Their social graph is write-heavy — the LSM trade-off made sense. Bloom filters reduce LSM read amplification — each SSTable has a filter that skips it in microseconds if the key isn't there."</p>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="dbi-s12-senior" role="tabpanel">
+      <p class="body-text"><strong>What they want to hear:</strong> You've operated these in production, understand the failure modes, and can reason about compaction strategies.</p>
+      <div class="callout callout-success">
+        <div class="callout-title"><i class="fa-solid fa-comment"></i> Model Answer</div>
+        <p class="body-text">"Beyond the standard read/write amplification trade-off, the operational differences are what matter in production.</p>
+        <p class="body-text">B+ tree failure mode: page splits under random-insert workloads. InnoDB with UUID v4 primary keys is the classic — random inserts scatter across the tree, splitting pages constantly. Throughput drops 10x vs auto-increment. The fix: UUID v7 or ULID for time-ordered keys.</p>
+        <p class="body-text">LSM failure mode: compaction storms. If write ingestion outpaces compaction, levels accumulate and reads degrade. RocksDB's rate limiter caps compaction I/O — Facebook limits it to 100 MB/s during peak. Leveled compaction gives better read performance but 3x higher write amplification than size-tiered. The choice depends on your SSD endurance budget.</p>
+        <p class="body-text">Hybrid approaches exist: PostgreSQL's nbtree is a B+ tree with HOT updates to avoid index churn. TiDB and CockroachDB use RocksDB underneath but expose a SQL interface. And newer designs like BW-trees (used in Azure SQL) attempt to combine the best of both — log-structured updates with B-tree read performance.</p>
+        <p class="body-text">The real answer is always: benchmark YOUR workload. pgbench and sysbench exist for a reason."</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — EXERCISES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Practice Exercises — Hands-On with Real Database Internals</h2>
+    </div>
+  </div>
+
+  <p>You've read about 8 KB pages, B+ trees with 500 fanout, and buffer pool hit ratios. Now run the commands yourself — the difference between "I've read about pageinspect" and "I've used pageinspect to look inside a real page" is enormous in interviews. Every exercise below works on a standard PostgreSQL installation with just <code>CREATE EXTENSION pageinspect;</code>.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 1: Inspect a Real Page with pageinspect</span>
+      <span class="difficulty-tag difficulty-beginner">Beginner</span>
+    </div>
+    <p class="body-text">Install the <code>pageinspect</code> extension and examine the first page of any table. Count how many tuples (rows) fit in a single 8 KB page. Compare a narrow table (2 columns) vs a wide table (20 columns) — how does row width affect tuples per page?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Use <code>CREATE EXTENSION pageinspect;</code> then <code>SELECT * FROM heap_page_items(get_raw_page('your_table', 0));</code> to see every tuple on page 0. The <code>lp_len</code> column shows each tuple's size in bytes.</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">exercise-1.sql</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-sql">CREATE EXTENSION IF NOT EXISTS pageinspect;
+
+-- Inspect page 0 of your table
+SELECT lp, lp_off, lp_len, t_xmin, t_xmax, t_ctid
+FROM heap_page_items(get_raw_page('users', 0));
+
+-- Count tuples per page
+SELECT count(*) AS tuples_on_page_0
+FROM heap_page_items(get_raw_page('users', 0))
+WHERE lp_len > 0;
+
+-- See page header (free space, etc.)
+SELECT * FROM page_header(get_raw_page('users', 0));</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 2: Calculate B+ Tree Depth for Your Table</span>
+      <span class="difficulty-tag difficulty-medium">Medium</span>
+    </div>
+    <p class="body-text">Take a real table in your database. Calculate the theoretical B+ tree depth using the fanout formula: <code>depth = ceil(log(rows) / log(fanout))</code>. Then verify with <code>bt_metap()</code>. How close was your estimate?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">PostgreSQL B+ tree pages are 8 KB. Each index entry is roughly key_size + 8 bytes (ctid pointer). For a <code>bigint</code> key (8 bytes), each entry is ~16 bytes. Fanout = 8,192 / 16 = ~500. Use <code>SELECT * FROM bt_metap('your_index_name');</code> to see the actual tree depth in the <code>level</code> column.</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">exercise-2.sql</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- Step 1: Count rows
+SELECT reltuples::bigint AS estimated_rows
+FROM pg_class WHERE relname = 'users';
+-- Example: 10,000,000
+
+-- Step 2: Calculate theoretical depth
+-- fanout ~500 for bigint keys
+-- depth = ceil(log(10,000,000) / log(500)) = ceil(7 / 2.7) = ceil(2.59) = 3
+
+-- Step 3: Verify with pageinspect
+SELECT * FROM bt_metap('idx_users_email');
+-- level = 3 ← matches our estimate!</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 3: Measure Buffer Cache Hit Ratio Over Time</span>
+      <span class="difficulty-tag difficulty-medium">Medium</span>
+    </div>
+    <p class="body-text">Write a query that captures the buffer cache hit ratio, run it before and after a workload. Use <code>pgbench</code> to generate load. Does the ratio change as the working set exceeds <code>shared_buffers</code>?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Use <code>pg_stat_database</code> for the hit/read counters. Run <code>SELECT pg_stat_reset();</code> before your test to get clean numbers. Then run <code>pgbench -c 10 -T 60 your_database</code> and check the ratio again.</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">exercise-3.sh</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-bash"># Terminal 1: Reset stats and watch
+psql -c "SELECT pg_stat_reset();"
+# Wait for pgbench to finish, then:
+psql -c "SELECT round(100.0 * blks_hit / nullif(blks_hit + blks_read, 0), 2) AS hit_pct
+  FROM pg_stat_database WHERE datname = current_database();"
+
+# Terminal 2: Generate load
+pgbench -i -s 100 testdb          # init with 10M rows (~1.5 GB)
+pgbench -c 10 -T 60 testdb        # 10 clients, 60 seconds
+
+# Compare: if shared_buffers = 128 MB and data = 1.5 GB,
+# you'll see hit ratio around 85-90% (working set > cache).
+# Increase shared_buffers to 512 MB -> hit ratio jumps to 99%+.</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 4: Benchmark Fillfactor Impact on Write Throughput</span>
+      <span class="difficulty-tag difficulty-hard">Hard</span>
+    </div>
+    <p class="body-text">Create two identical tables — one with <code>fillfactor = 100</code> (default) and one with <code>fillfactor = 70</code>. Insert 1 million rows into each, then run 100,000 UPDATEs (changing a non-indexed column). Compare: total time, <code>n_dead_tup</code>, and table size on disk.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Create with <code>CREATE TABLE t1 (id int, val text) WITH (fillfactor = 100);</code> and similarly for t2 with fillfactor 70. After UPDATEs, check <code>pg_stat_user_tables</code> for <code>n_dead_tup</code> and <code>pg_total_relation_size()</code> for disk usage. Fillfactor 70 should have more HOT updates (check <code>n_tup_hot_upd</code>).</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">exercise-4.sql</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-sql">-- Create tables with different fillfactors
+CREATE TABLE bench_ff100 (id serial PRIMARY KEY, val text) WITH (fillfactor = 100);
+CREATE TABLE bench_ff70  (id serial PRIMARY KEY, val text) WITH (fillfactor = 70);
+
+-- Insert 1M rows each
+INSERT INTO bench_ff100 (val) SELECT md5(random()::text) FROM generate_series(1, 1000000);
+INSERT INTO bench_ff70  (val) SELECT md5(random()::text) FROM generate_series(1, 1000000);
+ANALYZE bench_ff100; ANALYZE bench_ff70;
+
+-- Run 100K updates
+\timing on
+UPDATE bench_ff100 SET val = md5(random()::text) WHERE id <= 100000;
+UPDATE bench_ff70  SET val = md5(random()::text) WHERE id <= 100000;
+
+-- Compare results
+SELECT relname, n_tup_upd, n_tup_hot_upd, n_dead_tup,
+  pg_size_pretty(pg_total_relation_size(relid))
+FROM pg_stat_user_tables WHERE relname LIKE 'bench_ff%';</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span>Exercise 5: Read WAL Records with pg_waldump</span>
+      <span class="difficulty-tag difficulty-hard">Hard</span>
+    </div>
+    <p class="body-text">Perform a single INSERT into a table with 3 indexes. Use <code>pg_waldump</code> to find all WAL records generated by that INSERT. Count: how many records? How many bytes? What's the write amplification?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p class="body-text">Use <code>SELECT pg_current_wal_lsn();</code> before and after the INSERT to know the WAL range. Then run <code>pg_waldump --start=BEFORE --end=AFTER WAL_FILE</code>. You should see 1 Heap INSERT + 3 Btree INSERT_LEAF records (one per index).</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">exercise-5.sh</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-bash"># In psql:
+SELECT pg_current_wal_lsn();        -- e.g., 0/1A8E000
+INSERT INTO users (email, name, age) VALUES ('test@example.com', 'Test', 25);
+SELECT pg_current_wal_lsn();        -- e.g., 0/1A8E400
+
+# In terminal (as postgres user):
+pg_waldump --start=0/1A8E000 --end=0/1A8E400 \
+  /var/lib/postgresql/14/main/pg_wal/000000010000000000000001
+
+# Expected output: 4 records
+# rmgr: Heap  desc: INSERT         ← the row itself
+# rmgr: Btree desc: INSERT_LEAF    ← PK index
+# rmgr: Btree desc: INSERT_LEAF    ← email index
+# rmgr: Btree desc: INSERT_LEAF    ← name index
+# Total: ~800 bytes of WAL for a ~200-byte row = 4x write amplification</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — CHEAT SHEET
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-map"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Cheat Sheet — Database Internals at a Glance</h2>
+    </div>
+  </div>
+
+  <p>Pin this. Every number below comes from the internals we covered — if any feels unfamiliar, the section reference tells you exactly where to go back.</p>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-file"></i> Page Sizes</div>
+      <div class="cheat-card-body">
+<pre>PostgreSQL:  8 KB
+MySQL/InnoDB: 16 KB
+SQLite:       4 KB (default)
+RocksDB:      4 KB (configurable)
+OS page:      4 KB (x86)
+Huge page:    2 MB (Linux)</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-sitemap"></i> B+ Tree Math</div>
+      <div class="cheat-card-body">
+<pre>Fanout ≈ page_size / entry_size
+  8 KB / 16 B = ~500 (bigint key)
+Depth = ceil(log(rows)/log(fanout))
+  500M rows → depth 3-4
+Page reads = depth + 1 (heap)</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-gauge-high"></i> Access Latencies</div>
+      <div class="cheat-card-body">
+<pre>Buffer hit (RAM):   ~0.1 μs
+SSD random read:    ~100 μs
+HDD random read:    ~10 ms
+Buffer hit vs SSD:  1,000× faster
+Buffer hit vs HDD:  100,000× faster</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-sliders"></i> Tuning Targets</div>
+      <div class="cheat-card-body">
+<pre>shared_buffers:     25% of RAM
+Buffer hit ratio:   > 99% (OLTP)
+huge_pages:         ON if > 8 GB
+checkpoint_target:  0.9
+dead_tup ratio:     < 10%</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-scale-balanced"></i> B+ Tree vs LSM</div>
+      <div class="cheat-card-body">
+<pre>B+ tree reads:      O(log_f N)
+LSM reads:          O(levels × log)
+B+ tree writes:     random I/O
+LSM writes:         sequential I/O
+B+ space util:      ~70%
+LSM space util:     ~90%+</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-terminal"></i> Key Commands</div>
+      <div class="cheat-card-body">
+<pre>bt_metap('idx')     → tree depth
+heap_page_items()   → tuples on page
+pg_stat_database    → hit ratio
+pg_stat_user_tables → dead tuples
+pg_waldump          → WAL records
+EXPLAIN (BUFFERS)   → page reads</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — CONNECTED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-circle-nodes"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where to Go Next</h2>
+    </div>
+  </div>
+
+  <p>The WAL you learned about in Section 6 is the same mechanism that powers database replication. The buffer pool from Section 6 is why Redis exists — it's an external buffer pool for when the internal one isn't enough. Every topic below connects directly to an internal you just mastered.</p>
+
+  <div class="related-grid">
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-arrows-spin"></i></div>
+      <div class="related-card-text">
+        <h4>Database Replication</h4>
+        <p>WAL records aren't just for crash recovery — streaming replication sends WAL to replicas in real-time. Understanding WAL format is key to tuning replication lag.</p>
+      </div>
+    </div>
+
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+      <div class="related-card-text">
+        <h4>Database Sharding</h4>
+        <p>When a single node's B+ tree can't hold your data in the buffer pool, sharding splits it across machines. The internal bottleneck (I/O, buffer pool, WAL throughput) determines WHEN to shard.</p>
+      </div>
+    </div>
+
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="related-card-text">
+        <h4>Caching (Redis / Memcached)</h4>
+        <p>A cache is essentially an external buffer pool. Understanding when the internal buffer pool isn't enough tells you when to add Redis — and the data structures inside Redis (skip lists, hash tables) mirror what we learned here.</p>
+      </div>
+    </div>
+
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+      <div class="related-card-text">
+        <h4>Query Optimization</h4>
+        <p>EXPLAIN ANALYZE output makes sense now — "shared hit=4" means buffer pool hits, "shared read=12M" means disk reads, "Seq Scan" means no index. Internal knowledge turns cryptic output into clear diagnosis.</p>
+      </div>
+    </div>
+
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-warehouse"></i></div>
+      <div class="related-card-text">
+        <h4>Data Warehousing</h4>
+        <p>Column stores (ClickHouse, BigQuery) use the page model too — but pages hold one column instead of full rows. Compression ratios of 10:1 are common because similar values compress well.</p>
+      </div>
+    </div>
+
+    <div class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-handshake"></i></div>
+      <div class="related-card-text">
+        <h4>Distributed Transactions</h4>
+        <p>Two-phase commit and Raft consensus ultimately produce WAL-like logs on each participant. The durability guarantee — "fsync before acknowledgment" — is the same principle as PostgreSQL's WAL.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
