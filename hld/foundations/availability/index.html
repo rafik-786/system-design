@@ -98,6 +98,59 @@
 
   <p>Engineers talk about availability using a shorthand called <span class="tooltip-trigger">"the nines"<span class="tooltip-content">A shorthand for availability percentages. "Three nines" = 99.9%. "Four nines" = 99.99%. "Five nines" = 99.999%. Each additional nine means 10x less allowed downtime &#x2014; and roughly 10x more engineering effort and cost.</span></span>. Three nines (99.9%), four nines (99.99%), five nines (99.999%). Each additional nine is 10 times harder to achieve &#x2014; it demands better architecture, more redundancy, smarter monitoring, and a lot more money. Most consumer apps aim for three or four nines. Only mission-critical systems (banks, hospitals, emergency services) push for five.</p>
 
+  <p>These aren't theoretical numbers. Every major cloud provider publishes real SLAs you can go read right now:</p>
+
+  <div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Service</th>
+        <th>Published SLA</th>
+        <th>Allowed Downtime/Year</th>
+        <th>Where to Find It</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>AWS S3</strong> (storage)</td>
+        <td>99.99%</td>
+        <td>52 min</td>
+        <td><code>aws.amazon.com/s3/sla/</code></td>
+      </tr>
+      <tr>
+        <td><strong>AWS EC2</strong> (single-AZ)</td>
+        <td>99.5%</td>
+        <td>~43 hours</td>
+        <td><code>aws.amazon.com/ec2/sla/</code></td>
+      </tr>
+      <tr>
+        <td><strong>DynamoDB</strong> (global tables)</td>
+        <td>99.999%</td>
+        <td>5.3 min</td>
+        <td><code>aws.amazon.com/dynamodb/sla/</code></td>
+      </tr>
+      <tr>
+        <td><strong>Google Cloud SQL</strong></td>
+        <td>99.95%</td>
+        <td>~4.4 hours</td>
+        <td><code>cloud.google.com/sql/sla</code></td>
+      </tr>
+      <tr>
+        <td><strong>Azure SQL Database</strong></td>
+        <td>99.99%</td>
+        <td>52 min</td>
+        <td><code>azure.microsoft.com/en-us/support/legal/sla/</code></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout callout-danger">
+    <strong>Notice the EC2 single-AZ number.</strong> A single EC2 instance only promises 99.5% &#x2014; that's <strong>43 hours of downtime per year</strong>. If you're running your entire app on one EC2 instance with no redundancy, AWS is essentially telling you: "We expect this to be unavailable for almost 2 full days a year." That's not a bug &#x2014; it's by design. AWS is pushing you toward multi-AZ architectures where the combined SLA is much higher.
+  </div>
+
+  <p>Now put dollars on those nines. Amazon generates roughly <strong>$13.8 million per hour</strong> in revenue. Google: about <strong>$8.2 million per hour</strong>. Meta: around <strong>$4.5 million per hour</strong>. A 99.9% SLA means 8.7 hours of allowed downtime per year. For Amazon, that's <strong>$120 million</strong> in lost revenue &#x2014; just from the "acceptable" downtime in their own SLA. Every extra nine they squeeze out is worth tens of millions.</p>
+
   <div class="callout callout-info">
     <strong>One-line takeaway:</strong> Availability is simple &#x2014; "was your system working when the user showed up?" Everything else on this page is about getting that answer closer to "always."
   </div>
@@ -168,6 +221,49 @@
   </svg>
 
   <p>Ten minutes. That&#x2019;s all it took. And here&#x2019;s the thing &#x2014; the site wasn&#x2019;t hacked. The code didn&#x2019;t have a bug. The servers were healthy. The only problem was that there was <strong>one database</strong> handling everything, and it got overwhelmed. A single point of failure brought down a million-dollar hour.</p>
+
+  <p>Think this is exaggerated? Real numbers from real outages tell the same story:</p>
+
+  <div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Outage</th>
+        <th>Duration</th>
+        <th>Estimated Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Amazon</strong></td>
+        <td>Prime Day 2018 crash</td>
+        <td>~63 minutes</td>
+        <td>~$72&#x2013;99 million in lost sales</td>
+      </tr>
+      <tr>
+        <td><strong>Facebook</strong></td>
+        <td>Oct 4, 2021 (BGP config)</td>
+        <td>~6 hours</td>
+        <td>~$60 million in ad revenue</td>
+      </tr>
+      <tr>
+        <td><strong>Google</strong></td>
+        <td>Dec 14, 2020 (auth outage)</td>
+        <td>~47 minutes</td>
+        <td>~$6.4 million (search + ads)</td>
+      </tr>
+      <tr>
+        <td><strong>AWS us-east-1</strong></td>
+        <td>Dec 7, 2021 (network)</td>
+        <td>~7 hours</td>
+        <td>Billions across dependent services</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The Facebook outage is particularly instructive. A routine BGP configuration change accidentally withdrew the routes to Facebook's DNS servers. The entire company &#x2014; Facebook, Instagram, WhatsApp, Messenger &#x2014; vanished from the internet for 6 hours. Engineers couldn't even get into the data centers because the door access systems ran on Facebook's own network. They had to physically send people to the data center to fix it by hand.</p>
 
   <p>This is why availability matters. It&#x2019;s not an abstract number engineers obsess over for fun. It&#x2019;s the difference between your business surviving peak moments and losing customers (and money) at the worst possible time.</p>
 
@@ -250,8 +346,44 @@
     <li><strong>One server = one point of failure.</strong> While that server is restarting &#x2014; even for 30 seconds &#x2014; every single user gets an error page. There&#x2019;s no backup to handle traffic during the gap.</li>
   </ul>
 
+  <p>In the real world, this is exactly what small teams use. They sign up for <strong>UptimeRobot</strong> (<code>uptimerobot.com</code> &#x2014; free tier monitors 50 URLs every 5 minutes) or <strong>Better Stack</strong> (<code>betterstack.com</code>). These tools ping your endpoint every few minutes and send you an SMS or Slack message when it's down. That's the entire "monitoring" setup for thousands of startups.</p>
+
+  <p>The simplest health check you can run right now from any terminal:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">terminal &#x2014; health-check.sh</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># The simplest health check — returns HTTP status code
+curl -o /dev/null -s -w "%{http_code}" https://your-api.com/health
+# Returns: 200 (healthy) or 500/503 (unhealthy) or 000 (unreachable)
+
+# Run it in a loop every 30 seconds — poor man's monitoring
+while true; do
+  STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://your-api.com/health)
+  if [ "$STATUS" != "200" ]; then
+    echo "$(date): DOWN! Status=$STATUS" | tee -a /var/log/health.log
+    # Send yourself a Slack webhook, email, etc.
+  fi
+  sleep 30
+done</code></pre>
+    </div>
+  </div>
+
+  <p>This is genuinely what people start with. But it has all the problems we listed &#x2014; when it detects a problem, a <em>human</em> still has to wake up and fix it. The tools get fancier (<strong>Pingdom</strong>, <strong>Datadog</strong>, <strong>PagerDuty</strong> for on-call scheduling) but the fundamental model is the same: detect → alert human → human fixes. The bottleneck is always the human.</p>
+
   <div class="callout callout-danger">
     <strong>The fundamental flaw:</strong> Manual monitoring creates a floor on your downtime. No matter how fast your team is, you&#x2019;ll never get below 5&#x2013;10 minutes of downtime per incident. For 99.99% availability, your <em>total</em> annual downtime budget is 52 minutes. A single manually-recovered incident can eat 80% of your entire year&#x2019;s budget.
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Real tools teams actually use at each stage:</strong><br>
+    <strong>Free/Starter:</strong> UptimeRobot (free, 50 monitors), Better Stack (free tier), <code>curl</code> cron jobs<br>
+    <strong>Growing:</strong> Pingdom ($15/mo), StatusCake, Checkly (also tests APIs)<br>
+    <strong>Scale:</strong> Datadog ($15/host/mo), New Relic, PagerDuty (on-call rotation + escalation)<br>
+    <strong>Public status pages:</strong> Atlassian Statuspage (<code>statuspage.io</code> &#x2014; used by Twilio, Cloudflare, Dropbox), Instatus, Cachet (self-hosted)
   </div>
 
   <div class="think-first-box">
@@ -332,13 +464,13 @@
     <text x="650" y="235" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Let&#x2019;s Encrypt + alerts</text>
   </svg>
 
-  <p><strong>Planned maintenance</strong> is the sneakiest killer because teams think it doesn&#x2019;t count. "We scheduled it for 2 AM, so it&#x2019;s fine." But your users in another timezone are wide awake at 2 AM. And your SLA doesn&#x2019;t care <em>why</em> you were down &#x2014; only that you were. If your system needs to go offline for patches, upgrades, or migrations, that downtime eats into your availability number just like any crash would.</p>
+  <p><strong>Planned maintenance</strong> is the sneakiest killer because teams think it doesn&#x2019;t count. "We scheduled it for 2 AM, so it&#x2019;s fine." But your users in another timezone are wide awake at 2 AM. And your SLA doesn&#x2019;t care <em>why</em> you were down &#x2014; only that you were. If your system needs to go offline for patches, upgrades, or migrations, that downtime eats into your availability number just like any crash would. AWS handles this transparently for managed services &#x2014; when they patch an RDS database, they do a <span class="tooltip-trigger">multi-AZ failover<span class="tooltip-content">RDS multi-AZ maintains a synchronous standby replica in a different Availability Zone. During maintenance, AWS patches the standby first, promotes it to primary, then patches the old primary. Downtime is typically under 60 seconds.</span></span>: patch the standby, promote it, then patch the old primary. Downtime: under 60 seconds. That's the gold standard for planned maintenance.</p>
 
-  <p><strong>Hardware failures</strong> are inevitable but relatively rare for any single machine. The problem is scale: if you run 100 servers, the probability that <em>at least one</em> fails in a given month is surprisingly high. You can&#x2019;t prevent them, only prepare for them.</p>
+  <p><strong>Hardware failures</strong> are inevitable but relatively rare for any single machine. The problem is scale: if you run 100 servers, the probability that <em>at least one</em> fails in a given month is surprisingly high. You can&#x2019;t prevent them, only prepare for them. Google published a study on their data centers: in a cluster of 10,000 servers, they see <strong>~1,000 hard drive failures per year</strong> and <strong>~5 machine reboots per day</strong> from various hardware issues. At that scale, failure isn't an exception &#x2014; it's a constant background hum.</p>
 
-  <p><strong>Software deployments</strong> are the #1 cause of outages at most companies. Studies consistently show that 60&#x2013;70% of outages are caused by <span class="tooltip-trigger">change<span class="tooltip-content">In operations, "change" means any modification to a running system &#x2014; code deployments, config updates, infrastructure changes. Change is necessary for improvement but is also the biggest source of failures. That&#x2019;s why deployment strategies (canary, blue-green) exist.</span></span> &#x2014; someone pushed new code, updated a config, or changed an infrastructure setting. The system was working fine until someone touched it.</p>
+  <p><strong>Software deployments</strong> are the #1 cause of outages at most companies. Studies consistently show that 60&#x2013;70% of outages are caused by <span class="tooltip-trigger">change<span class="tooltip-content">In operations, "change" means any modification to a running system &#x2014; code deployments, config updates, infrastructure changes. Change is necessary for improvement but is also the biggest source of failures. That&#x2019;s why deployment strategies (canary, blue-green) exist.</span></span> &#x2014; someone pushed new code, updated a config, or changed an infrastructure setting. The system was working fine until someone touched it. The Facebook BGP outage (Oct 2021, 6 hours down) was a config change. The AWS us-east-1 outage (Dec 2021, 7 hours) was triggered by an internal network automation tool. Cloudflare's June 2022 outage affecting 19 data centers? A network config change during routine maintenance.</p>
 
-  <p><strong>Certificate and config expiry</strong> is the most embarrassing category because it&#x2019;s 100% preventable. Your <span class="tooltip-trigger">TLS certificate<span class="tooltip-content">A digital certificate that encrypts traffic between users and your server (the "S" in HTTPS). Certificates have expiration dates. When one expires, browsers show scary security warnings and many users can&#x2019;t access the site at all.</span></span> expires, browsers show users a scary security warning, and nobody can reach your site. This has taken down major companies &#x2014; including Microsoft Teams, Slack, and LinkedIn &#x2014; all because someone forgot to renew a certificate.</p>
+  <p><strong>Certificate and config expiry</strong> is the most embarrassing category because it&#x2019;s 100% preventable. Your <span class="tooltip-trigger">TLS certificate<span class="tooltip-content">A digital certificate that encrypts traffic between users and your server (the "S" in HTTPS). Certificates have expiration dates. When one expires, browsers show scary security warnings and many users can&#x2019;t access the site at all.</span></span> expires, browsers show users a scary security warning, and nobody can reach your site. Microsoft Teams went down in February 2020 because a TLS certificate expired. Slack had a similar certificate outage. Ericsson's expired certificate caused a 4G outage for 32 million O2 users in the UK in 2018. These companies have thousands of engineers &#x2014; and still forgot to renew a certificate. The fix is automation: <strong>Let's Encrypt</strong> issues free 90-day certificates that auto-renew, and <strong>AWS Certificate Manager</strong> handles renewal automatically for certificates attached to ALBs and CloudFront distributions.</p>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
@@ -435,6 +567,109 @@
   <p>Notice what changed. On the left, every single component is a domino &#x2014; knock one over and the whole system falls. On the right, every layer has spares. The load balancer dies? The other one is already routing traffic. A server crashes? The remaining two absorb the load. The primary database fails? The replica takes over.</p>
 
   <p>And here&#x2019;s the key: the switchover happens <strong>automatically, in seconds</strong>. No human needed. No 3 AM phone call. The system detects the failure (via health checks), removes the dead component from the pool, and keeps running. The engineer can investigate the root cause on Monday morning with a coffee in hand.</p>
+
+  <p>What does "detects the failure" actually look like in practice? Here are three real health check configurations used in production systems today:</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="avl-hc-route53" role="tab" aria-selected="true">AWS Route 53</button>
+      <button class="tab-btn" data-tab="avl-hc-k8s" role="tab" aria-selected="false">Kubernetes</button>
+      <button class="tab-btn" data-tab="avl-hc-haproxy" role="tab" aria-selected="false">HAProxy</button>
+    </div>
+    <div class="tab-panel active" id="avl-hc-route53" role="tabpanel">
+      <p><strong>AWS Route 53</strong> can health-check your endpoints from multiple global locations. If enough checks fail, Route 53 stops sending DNS traffic to that endpoint. Here's the CLI command to create one:</p>
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">terminal &#x2014; route53-health-check.sh</span>
+        </div>
+        <div class="macos-body">
+          <pre><code class="language-bash"># Create a Route 53 health check — pings /health every 30s from 8 global locations
+aws route53 create-health-check \
+  --caller-reference "my-api-$(date +%s)" \
+  --health-check-config '{
+    "IPAddress": "203.0.113.50",
+    "Port": 443,
+    "Type": "HTTPS",
+    "ResourcePath": "/health",
+    "RequestInterval": 30,
+    "FailureThreshold": 3,
+    "EnableSNI": true
+  }'
+# FailureThreshold=3 means: 3 consecutive failures = mark unhealthy
+# Cost: $0.50/month per health check (non-AWS endpoints: $0.75/month)</code></pre>
+        </div>
+      </div>
+      <p>Once the health check detects failure, Route 53 <span class="tooltip-trigger">failover routing<span class="tooltip-content">A Route 53 routing policy where DNS queries are sent to a primary resource when it's healthy, and automatically redirected to a secondary resource when the primary fails its health check. Failover happens at the DNS level &#x2014; no load balancer needed.</span></span> automatically redirects traffic to your backup endpoint. Users see a brief DNS propagation delay (usually 60&#x2013;90 seconds), then they're hitting the healthy backup.</p>
+    </div>
+    <div class="tab-panel" id="avl-hc-k8s" role="tabpanel">
+      <p><strong>Kubernetes</strong> uses two types of probes to decide if your container is alive and ready to receive traffic:</p>
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">deployment.yaml &#x2014; readiness + liveness probes</span>
+        </div>
+        <div class="macos-body">
+          <pre><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-api
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: api
+        image: my-api:latest
+        ports:
+        - containerPort: 8080
+        # Liveness: "Is the process alive?" If not, Kubernetes restarts the container.
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 10   # wait 10s after startup before checking
+          periodSeconds: 15          # check every 15 seconds
+          failureThreshold: 3        # 3 failures = restart container
+        # Readiness: "Can it handle traffic?" If not, remove from load balancer.
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 2        # 2 failures = stop sending traffic</code></pre>
+        </div>
+      </div>
+      <p>The <strong>liveness probe</strong> answers "is the process alive?" &#x2014; if it fails, Kubernetes kills and restarts the container. The <strong>readiness probe</strong> answers "can it handle traffic right now?" &#x2014; if it fails, the pod is removed from the Service's endpoint list so no new requests are routed to it. This is how Kubernetes achieves automatic failover without any human intervention.</p>
+    </div>
+    <div class="tab-panel" id="avl-hc-haproxy" role="tabpanel">
+      <p><strong>HAProxy</strong> is one of the most widely deployed load balancers (used by GitHub, Stack Overflow, Reddit). Its health check configuration is straightforward:</p>
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">haproxy.cfg &#x2014; backend health checks</span>
+        </div>
+        <div class="macos-body">
+          <pre><code class="language-ini">backend api_servers
+    balance roundrobin
+    option httpchk GET /health          # Which endpoint to check
+    http-check expect status 200        # What "healthy" looks like
+
+    # Three backend servers — HAProxy checks each every 5 seconds
+    server api1 10.0.1.10:8080 check inter 5s fall 3 rise 2
+    server api2 10.0.1.11:8080 check inter 5s fall 3 rise 2
+    server api3 10.0.1.12:8080 check inter 5s fall 3 rise 2
+    # inter 5s  = check every 5 seconds
+    # fall 3    = 3 consecutive failures = mark DOWN (stop sending traffic)
+    # rise 2    = 2 consecutive successes = mark UP (resume sending traffic)</code></pre>
+        </div>
+      </div>
+      <p>When <code>api2</code> fails 3 consecutive health checks, HAProxy immediately stops sending it traffic. The remaining two servers absorb the load. When <code>api2</code> recovers and passes 2 checks in a row, HAProxy adds it back to the pool. Total time to remove a failed server: <strong>15 seconds</strong> (3 checks &#xd7; 5 second interval). No human involved.</p>
+    </div>
+  </div>
+
+  <p>Notice the pattern across all three tools: check a health endpoint at regular intervals, mark the target as unhealthy after N consecutive failures, and automatically reroute traffic. The details differ &#x2014; DNS-level (Route 53), container-level (Kubernetes), or load-balancer-level (HAProxy) &#x2014; but the core mechanism is identical. This is the automation that replaces the "human wakes up at 3 AM" step from Section 3.</p>
 
   <div class="callout callout-success">
     <strong>The breakthrough in one sentence:</strong> Stop trying to prevent failures &#x2014; they&#x2019;re inevitable. Instead, make sure every component has a backup that takes over automatically in seconds.

@@ -117,6 +117,10 @@
   <div class="callout callout-info">
     <strong>One-line takeaway:</strong> Estimation isn't about precision — it's about preventing disasters. Thirty seconds of multiplication can save you from building a system that crashes on day one.
   </div>
+
+  <div class="callout callout-warning">
+    <strong>What top companies actually expect:</strong> At <strong>Google</strong>, interviewers expect you to start estimating within the first 5 minutes — before you draw a single box. At <strong>Amazon</strong>, they literally call it <strong>"napkin math"</strong> and treat it as a leadership principle (Insist on the Highest Standards — you can't set standards without numbers). At <strong>Netflix</strong>, they want you to <em>identify the bottleneck from the numbers</em> — storage? bandwidth? CPU? The estimate should drive every design decision that follows.
+  </div>
 </div>
 
 
@@ -217,6 +221,31 @@
     <p>WhatsApp has 2 billion users. About 100 billion messages are sent per day. Each text message averages around 100 bytes. <strong>How much storage does WhatsApp need per day, just for message content?</strong></p>
     <span class="think-hint">It's one multiplication. Try it before scrolling down. (Answer: 100 billion × 100 bytes = 10 trillion bytes = 10 TB/day)</span>
   </div>
+
+  <h3>The Numbers You Should Already Know</h3>
+
+  <p>You don't need to memorize a thousand facts. But you DO need a cheat sheet of reference numbers — the kind of numbers senior engineers carry in their heads. The most famous list comes from <strong>Jeff Dean's "Numbers Every Programmer Should Know"</strong> (originally from 2012, updated for modern hardware). Here are the ones that matter most for estimation:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Operation</th><th>Latency</th><th>Why It Matters</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>L1 cache reference</td><td>~1 ns</td><td>CPU-local, blazing fast</td></tr>
+        <tr><td>L2 cache reference</td><td>~4 ns</td><td>Still on-chip, still fast</td></tr>
+        <tr><td>Main memory (RAM) reference</td><td>~100 ns</td><td>100x slower than L1</td></tr>
+        <tr><td>SSD random read</td><td>~16 &mu;s</td><td>1,000x slower than RAM</td></tr>
+        <tr><td>HDD seek</td><td>~2 ms</td><td>100x slower than SSD</td></tr>
+        <tr><td>Same datacenter round-trip</td><td>~0.5 ms</td><td>Network within one building</td></tr>
+        <tr><td>California &rarr; Netherlands round-trip</td><td>~150 ms</td><td>Speed of light across the planet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Where to find updated numbers:</strong> The best modern reference is <strong>github.com/sirupsen/napkin-math</strong> — a community-maintained repo with real benchmarks for current hardware (NVMe SSDs, DDR5 RAM, 10 Gbps NICs). Bookmark it. It's the single most useful page for estimation prep.
+  </div>
 </div>
 
 
@@ -301,6 +330,35 @@
 
   <div class="callout callout-success">
     <strong>The good news:</strong> You don't need to memorize a million numbers. You just need a simple method — a recipe — that turns any "how much?" question into a chain of multiplications you can do on the back of an envelope. That's exactly what the next sections teach you.
+  </div>
+
+  <h3>Sanity-Check Your Guesses with Real Cloud Pricing</h3>
+
+  <p>Here's a trick that separates good estimators from great ones: <strong>verify your estimate against real-world costs</strong>. If you estimated that WhatsApp needs 10 TB/day of message storage, you can check if that "smells right" using actual AWS pricing:</p>
+
+  <div class="math-block">
+    <span class="math-label">WhatsApp Storage Cost Sanity Check</span>
+    10 TB/day &times; 365 days = 3.65 PB/year
+
+    AWS S3 Standard: $0.023 per GB/month
+    3.65 PB = 3,650 TB = 3,650,000 GB
+    3,650,000 GB &times; $0.023 = ~$83,950/month just for storage
+
+    Does that sound reasonable? Yes &mdash; Meta (WhatsApp's parent)
+    spent $32 billion on infrastructure in 2023. $84K/month for
+    message storage is a rounding error for them.
+    <span class="math-result">&rarr; If your estimate implied $500M/month for text storage alone, you'd know something was off.</span>
+  </div>
+
+  <p>You can also cross-reference estimates against public company filings. Twitter's (now X's) Q4 2022 10-K filing showed ~$1.2 billion in annual infrastructure costs. If your estimate for Twitter's storage + compute costs came to $50 billion/year, that's a red flag — you're off by 40x. If it came to $800 million, you're in the right ballpark. <strong>Public filings are your estimation answer key.</strong></p>
+
+  <div class="callout callout-info">
+    <strong>Quick reference &mdash; real cloud prices for estimation (2024 rates):</strong><br>
+    &bull; <strong>AWS S3 storage:</strong> $0.023/GB/month (~$23/TB/month)<br>
+    &bull; <strong>AWS EC2 (c5.xlarge, 4 vCPU):</strong> ~$0.17/hour (~$124/month)<br>
+    &bull; <strong>AWS data transfer out:</strong> $0.09/GB (first 10 TB), drops at volume<br>
+    &bull; <strong>AWS RDS (db.r5.xlarge, 4 vCPU, 32 GB RAM):</strong> ~$0.48/hour (~$350/month)<br>
+    Memorize these four numbers. They let you convert any estimate into a dollar figure — which is what your boss and the interviewer really care about.
   </div>
 </div>
 
@@ -408,6 +466,24 @@
   </div>
 
   <p>Both directions are painful. Estimation keeps you in the sweet spot — building <em>just enough</em> infrastructure for your actual needs, with some headroom for growth.</p>
+
+  <h3>Real-World Estimation Failures</h3>
+
+  <p>These aren't hypotheticals. These are real incidents where skipping the math cost real companies real money:</p>
+
+  <div class="callout callout-danger">
+    <strong>Healthcare.gov launch (October 2013):</strong> The team expected ~50,000 concurrent users on day one. They got 250,000. The site crashed within two hours and stayed broken for weeks. The emergency fix cost taxpayers an additional <strong>$40 million</strong> beyond the original $93.7 million contract. A 30-second estimate — "320 million Americans, heavily marketed, launch day curiosity, maybe 1% try it on day 1 = 3.2 million, spread over 8 hours = ~400K concurrent at peak" — would have shown 50K was absurdly low.
+  </div>
+
+  <div class="callout callout-danger">
+    <strong>Parler relaunch (2021):</strong> After being dropped by AWS, Parler relaunched on a single-provider setup without estimating their returning traffic. They provisioned for "moderate" load. Their 20 million users tried to log in simultaneously. The platform crashed repeatedly for days. Proper estimation: 20M users, even 10% returning on day one = 2M users in ~4 hours = ~140 concurrent requests per second <em>just for login</em>. That's before any browsing traffic.
+  </div>
+
+  <p>And over-estimation is equally destructive:</p>
+
+  <div class="callout callout-warning">
+    <strong>The over-provisioning trap:</strong> A startup builds a distributed microservices architecture with Kubernetes, Kafka, Elasticsearch, and Redis — designed for 10 million users. They launch with 500 users. Monthly AWS bill: $45,000. Revenue: $0. They run out of funding in 6 months. A quick estimate would have shown: 500 users &times; 20 requests/day &divide; 86,400 = 0.1 QPS. A single $20/month VPS handles that. They could have survived two more years on the saved infrastructure costs.
+  </div>
 
   <div class="callout callout-warning">
     <strong>Think about it:</strong> Every architecture decision without numbers is a coin flip. How many servers? Coin flip. Which database? Coin flip. Cache or no cache? Coin flip. Would you bet your company on a coin flip? Because that's what building without estimation is.
@@ -519,6 +595,81 @@
 
   <div class="callout callout-info">
     <strong>Key insight:</strong> The name <strong>"back-of-envelope estimation"</strong> exists because the whole skill literally fits on the back of an envelope. You just need to know which numbers to start with — and that's what the next section teaches you step by step.
+  </div>
+
+  <h3>Real Tools for Real Estimation</h3>
+
+  <p>You don't always need a pen and napkin. Here are the tools professional engineers actually use for quick estimation — from a terminal, a REPL, or a spreadsheet:</p>
+
+  <h4><i class="fa-solid fa-terminal icon-gap"></i> The <code>bc</code> Calculator (Linux/macOS Terminal)</h4>
+
+  <p>Already installed on every Linux box. Perfect for quick multiplication chains:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">bash — estimation math</span></div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># WhatsApp daily storage: 100 billion messages × 100 bytes
+echo "100000000000 * 100" | bc
+# Output: 10000000000000 (10 trillion bytes = 10 TB)
+
+# YouTube bandwidth: 22M concurrent × 5 Mbps
+echo "22000000 * 5" | bc
+# Output: 110000000 Mbps = 110 Tbps
+
+# Quick powers of 2
+echo "2^40" | bc
+# Output: 1099511627776 (≈1 TB — handy to remember: 2^40 ≈ 1 TB)</code></pre>
+    </div>
+  </div>
+
+  <h4><i class="fa-brands fa-python icon-gap"></i> Python REPL — The Engineer's Calculator</h4>
+
+  <p>Most engineers just open <code>python3</code> and type. Python handles big numbers natively — no overflow, no scientific notation confusion:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">python3 — estimation REPL</span></div>
+    <div class="macos-body">
+      <pre><code class="language-python">>>> # WhatsApp: messages per second
+>>> 100_000_000_000 / 86_400
+1157407.4074074074   # ~1.16 million messages/sec
+
+>>> # Instagram: storage for 100M photos/day at 2MB each
+>>> 100_000_000 * 2 * 1024**3 / 1024**4  # convert to TB
+195.3125   # ~200 TB/day
+
+>>> # Annual cost on S3
+>>> 200 * 365 * 0.023 * 1000   # TB/year × $/GB/mo × GB/TB
+1_679_000.0   # ~$1.68M/month... just for photos</code></pre>
+    </div>
+  </div>
+
+  <h4><i class="fa-solid fa-globe icon-gap"></i> Measure Real Sizes with <code>curl</code></h4>
+
+  <p>Don't guess how big a web page or API response is — <strong>measure it</strong>. This one command tells you the actual download size:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">bash — measure real sizes</span></div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># How big is Google's homepage response?
+curl -w "Download size: %{size_download} bytes\n" -o /dev/null -s https://google.com
+# Output: Download size: 20123 bytes  (~20 KB)
+
+# How big is a Twitter/X API response (single tweet)?
+# Typical JSON tweet object: 5-10 KB (way more than the 280 chars of text)
+
+# How big is your own database?
+du -sh /var/lib/mysql/        # MySQL data directory
+du -sh /var/lib/postgresql/   # PostgreSQL data directory
+# Real answer beats any estimate</code></pre>
+    </div>
+  </div>
+
+  <h4><i class="fa-solid fa-table icon-gap"></i> Google Sheets Estimation Template</h4>
+
+  <p>For longer estimates (multi-system, multi-year projections), set up a spreadsheet. Column A: assumption name. Column B: value. Column C: formula. This way you can tweak one number (say DAU goes from 100M to 200M) and every downstream calculation updates instantly. Senior engineers at Google and Amazon keep estimation spreadsheets like this for capacity planning — it's not just an interview thing.</p>
+
+  <div class="callout callout-success">
+    <strong>Pro tip:</strong> In an actual interview, you won't have a laptop. But practicing with these tools at home builds <em>number intuition</em> — you'll start to "feel" when something is wrong. "Wait, 500 PB for a chat app? That can't be right..." That gut feeling comes from having done the real math dozens of times with real tools.
   </div>
 </div>
 

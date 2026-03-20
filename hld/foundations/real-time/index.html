@@ -927,6 +927,7 @@ ws.onclose = () => {
       <span>The WebSocket Handshake &amp; Frame Format</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Every WebSocket connection starts as a normal HTTP request with special headers asking to "upgrade" the protocol. If the server agrees, it responds with <code>101 Switching Protocols</code>, and from that moment on, the connection speaks WebSocket instead of HTTP. No more HTTP headers, no more request/response cycles — just raw binary frames.</p>
 
       <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WebSocket upgrade handshake showing HTTP headers and 101 response, then frame format">
@@ -988,6 +989,7 @@ ws.onclose = () => {
       </svg>
 
       <p>The <code>Sec-WebSocket-Key</code> in the client request is a random base64 string. The server concatenates it with a magic GUID (<code>258EAFA5-E914-47DA-95CA-C5AB0DC85B11</code>), hashes it with SHA-1, and returns the base64 result as <code>Sec-WebSocket-Accept</code>. This proves the server actually understands WebSocket (not just echoing HTTP). Open Chrome DevTools, go to a site with WebSockets (Discord, Slack), click the Network tab, filter by "WS", and you'll see these upgrade headers in the first request.</p>
+      </div>
     </div>
   </div>
 
@@ -997,6 +999,7 @@ ws.onclose = () => {
       <span>Scaling WebSockets Across Multiple Servers (Redis Pub/Sub)</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Here's the challenge nobody warns you about: <strong>WebSocket connections are <span class="tooltip-trigger">stateful<span class="tooltip-content">A stateful connection means the server remembers information about each connected client — who they are, what rooms they're in, what their last message was. This is the opposite of stateless HTTP, where each request is independent. Stateful connections make horizontal scaling much harder because you can't just add servers — you need a way to route messages between them.</span></span></strong>. Each user has a persistent TCP connection to a <em>specific</em> server. If Alice is connected to Server 1 and Bob is connected to Server 2, and Alice sends a message to Bob — how does Bob get it? Server 1 has the message, but Bob isn't on Server 1.</p>
 
       <p>The standard solution: use a <span class="tooltip-trigger">message broker<span class="tooltip-content">A middleware system (like Redis Pub/Sub, RabbitMQ, or Kafka) that sits between servers and routes messages. When Server 1 publishes a message, the broker ensures all other servers receive it so they can forward it to their connected clients. Think of it as a central post office that all servers subscribe to.</span></span> like Redis to relay messages between servers. This is what Slack, Discord, and virtually every production chat system does.</p>
@@ -1082,6 +1085,7 @@ redis-cli PUBLISH chat:room1 '{"from":"Alice","text":"Hello!"}'
       </div>
 
       <p>This pattern powers most production WebSocket systems. Slack's architecture: HAProxy load balancer, Go WebSocket servers, Redis Pub/Sub for cross-server messaging. Discord uses a similar approach but swapped Go for Rust on their voice gateway, achieving 10x memory improvement.</p>
+      </div>
     </div>
   </div>
 
@@ -1091,6 +1095,7 @@ redis-cli PUBLISH chat:room1 '{"from":"Alice","text":"Hello!"}'
       <span>Connection Limits — File Descriptors, RAM, and the 1M Connection Challenge</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Each WebSocket connection is a persistent TCP connection, which means it consumes real server resources: a <span class="tooltip-trigger">file descriptor<span class="tooltip-content">An operating system handle for an open connection (or file). Each TCP connection uses one file descriptor. Linux defaults to ~1,024 per process (check with ulimit -n). Production servers raise this to 100K-1M. Running out of file descriptors means the server can't accept new connections — new users get "connection refused."</span></span>, some memory for buffers, and a slot in the kernel's connection table.</p>
 
       <div class="macos-window">
@@ -1125,6 +1130,7 @@ cat /proc/sys/fs/file-max
       </div>
 
       <p>WhatsApp famously achieved <strong>2 million concurrent connections per server</strong> using Erlang (now Elixir), which has extremely lightweight processes (~2KB each). Discord handles 15M+ concurrent voice+text connections across their fleet. The key insight: the OS, language runtime, and per-connection memory all matter when you're at this scale.</p>
+      </div>
     </div>
   </div>
 
@@ -1134,6 +1140,7 @@ cat /proc/sys/fs/file-max
       <span>Heartbeats &amp; Reconnection — Why Connections Die Silently</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>WebSocket connections can go stale without either side knowing. A user closes their laptop lid. Their phone walks through a dead Wi-Fi zone. A <span class="tooltip-trigger">NAT gateway<span class="tooltip-content">Network Address Translation — the router between your device and the internet. NAT gateways track active connections and silently drop idle ones after a timeout (typically 30-60 seconds for TCP). If your WebSocket doesn't send data for 60 seconds, the NAT gateway may forget about it, and the next message will fail silently. Heartbeats prevent this.</span></span> between them silently drops idle connections after ~60 seconds. A corporate proxy kills long-lived connections after 5 minutes. Without heartbeats, the server thinks the user is still connected and keeps wasting resources on a dead socket.</p>
 
       <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Heartbeat ping/pong mechanism detecting dead connections">
@@ -1211,6 +1218,7 @@ connectWithBackoff();</code></pre>
 
       <div class="callout callout-info">
         <strong>Production tips:</strong> Set heartbeat intervals to 30 seconds (keeps NAT gateways alive without wasting bandwidth). Use the WebSocket protocol's built-in PING/PONG frames (opcode 0x9 and 0xA) — they're designed for this exact purpose. Always implement exponential backoff with jitter on the client. And cap your retry delay at 30 seconds — waiting longer just frustrates users.
+      </div>
       </div>
     </div>
   </div>

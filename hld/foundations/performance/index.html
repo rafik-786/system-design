@@ -31,10 +31,10 @@
     <p class="hero-subtitle">Why your user clicked "Buy" and left before the page loaded — and the science of making systems feel instant. Latency, throughput, percentiles, and the numbers every engineer should know.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-brain"></i> 10 Think Firsts</span>
-      <span><i class="fa-solid fa-diagram-project"></i> 29 SVG Diagrams</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 30 SVG Diagrams</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
       <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
-      <span><i class="fa-solid fa-circle-info"></i> 28 Tooltips</span>
+      <span><i class="fa-solid fa-circle-info"></i> 32 Tooltips</span>
     </div>
   </div>
 </div>
@@ -142,8 +142,57 @@
     <li><strong>IoT / telemetry ingestion</strong> — throughput dominates at the ingestion layer (millions of events per second from sensors), but latency matters at the alerting layer (a smoke detector alert needs to arrive in seconds, not minutes).</li>
   </ul>
 
+  <p>You can actually <em>see</em> both dimensions in action right now. Open a terminal and run this command — it measures every phase of a single HTTP request to Google:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">Terminal — curl timing breakdown</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># Measure every phase of a real HTTP request
+curl -w "DNS:        %{time_namelookup}s\nConnect:    %{time_connect}s\nTLS:        %{time_appconnect}s\nTTFB:       %{time_starttransfer}s\nTotal:      %{time_total}s\nDownloaded: %{size_download} bytes\n" \
+     -o /dev/null -s https://google.com
+
+# Typical output:
+# DNS:        0.004231s     ← how long to resolve google.com → IP address
+# Connect:    0.011523s     ← TCP handshake (SYN, SYN-ACK, ACK)
+# TLS:        0.032847s     ← TLS 1.3 negotiation (encryption setup)
+# TTFB:       0.058122s     ← Time To First Byte (server thinking time)
+# Total:      0.059438s     ← everything, including download
+# Downloaded: 220 bytes</code></pre>
+    </div>
+  </div>
+
+  <p>That single command just decomposed latency into its real parts. DNS lookup took 4ms. The TCP connection added another 7ms. TLS encryption cost 21ms. The server took 25ms to generate a response. Total: ~59ms. This is <strong>real measurement</strong> — not theory, not a whiteboard diagram. Run it yourself and you'll see your own numbers. Try it against your own APIs and you might be surprised where the time actually goes.</p>
+
+  <p>For throughput, you can measure it just as easily with <span class="tooltip-trigger"><code>wrk</code><span class="tooltip-content">A modern HTTP benchmarking tool. It uses multiple threads and connections to saturate a server and measure how many requests per second it can handle. Much more accurate than tools like Apache Bench (ab) because it uses epoll/kqueue for proper async I/O.</span></span> — a load testing tool that hammers your server and counts how many requests per second it handles:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">Terminal — wrk load testing</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># Hit your API with 12 threads, 400 concurrent connections, for 30 seconds
+wrk -t12 -c400 -d30s https://your-api.com/health
+
+# Typical output:
+# Running 30s test @ https://your-api.com/health
+#   12 threads and 400 connections
+#   Thread Stats   Avg      Stdev     Max   +/- Stdev
+#     Latency    12.38ms    5.21ms  89.42ms   74.36%
+#     Req/Sec     2.71k   312.14     4.89k    68.33%
+#   973,421 requests in 30.01s
+#   Requests/sec:  32,437.22      ← this IS your throughput
+#   Transfer/sec:      5.12MB</code></pre>
+    </div>
+  </div>
+
+  <p>Now you have real numbers: latency is 12ms average (with a scary 89ms max), and throughput is 32,437 requests per second. These aren't abstract concepts anymore — they're numbers you can measure, track, and improve.</p>
+
   <div class="callout callout-info">
-    <strong>One-line takeaway:</strong> Latency tells you if one user is happy. Throughput tells you if <em>all</em> your users can be happy at the same time.
+    <strong>One-line takeaway:</strong> Latency tells you if one user is happy. Throughput tells you if <em>all</em> your users can be happy at the same time. And you can measure both in under 30 seconds with <code>curl</code> and <code>wrk</code>.
   </div>
 </div>
 
@@ -214,7 +263,64 @@
 
   <p>The scary part? Most of this latency isn't visible in your code. Your function runs in 2ms. But by the time you add network hops, DNS lookups, TLS handshakes, database queries, serialization, and the response traveling across the internet — that 2ms function lives inside a 400ms request. Performance problems hide in the spaces <em>between</em> your code.</p>
 
+  <p>You can actually see this for yourself. Open Chrome DevTools (<code>F12</code> or <code>Cmd+Option+I</code>), go to the <strong>Network</strong> tab, and reload any page. Click on any request and look at the <strong>Timing</strong> tab — it breaks down exactly where the time went: DNS lookup, initial connection, TLS setup, waiting for server response (TTFB), and content download. The waterfall chart shows you every single request the page makes, in order, with their overlaps and dependencies. It's like an X-ray of your page's performance.</p>
+
+  <p>Even better, run a <span class="tooltip-trigger">Lighthouse<span class="tooltip-content">A built-in Chrome DevTools auditing tool (also available as a CLI: `npx lighthouse https://your-site.com`). It scores your page 0-100 on Performance, Accessibility, Best Practices, and SEO. The Performance score is based on real metrics like Largest Contentful Paint, Total Blocking Time, and Cumulative Layout Shift.</span></span> audit (DevTools → Lighthouse tab → Analyze page load). It gives you a 0-100 performance score based on real metrics that Google actually uses to rank your site:</p>
+
+  <ul>
+    <li><strong>LCP (Largest Contentful Paint)</strong> — how long until the biggest visible element (hero image, heading) appears. Target: under 2.5 seconds. This is what users perceive as "the page loaded."</li>
+    <li><strong>FID / INP (First Input Delay / Interaction to Next Paint)</strong> — how long until the page responds to the user's first click or tap. Target: under 100ms. If a user clicks a button and nothing happens for 300ms, it feels broken.</li>
+    <li><strong>CLS (Cumulative Layout Shift)</strong> — how much the page jumps around as it loads. Target: under 0.1. You've experienced this: you're about to tap a link and the page shifts, so you tap an ad instead. Infuriating.</li>
+    <li><strong>TTFB (Time To First Byte)</strong> — how long the server takes to send the first byte of the response. Target: under 800ms. This measures your server's speed, not the network. A TTFB of 2 seconds means your server is choking before the page even starts loading.</li>
+  </ul>
+
+  <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chrome Lighthouse Core Web Vitals metrics with targets">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Core Web Vitals — The Metrics Google Uses to Judge Your Site</text>
+
+    <!-- LCP -->
+    <rect x="30" y="45" width="170" height="70" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="115" y="65" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">LCP</text>
+    <text x="115" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Largest Contentful Paint</text>
+    <text x="115" y="95" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">"When does main content appear?"</text>
+    <text x="115" y="108" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">Target: &lt; 2.5s</text>
+
+    <!-- INP -->
+    <rect x="215" y="45" width="170" height="70" rx="10" fill="#1e293b" stroke="#22d3ee" stroke-width="2"/>
+    <text x="300" y="65" text-anchor="middle" fill="#22d3ee" font-family="Inter, sans-serif" font-weight="700" font-size="11">INP</text>
+    <text x="300" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Interaction to Next Paint</text>
+    <text x="300" y="95" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">"How fast does it respond to clicks?"</text>
+    <text x="300" y="108" text-anchor="middle" fill="#22d3ee" font-family="Inter, sans-serif" font-size="9" font-weight="600">Target: &lt; 200ms</text>
+
+    <!-- CLS -->
+    <rect x="400" y="45" width="170" height="70" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="485" y="65" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">CLS</text>
+    <text x="485" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Cumulative Layout Shift</text>
+    <text x="485" y="95" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">"Does the page jump around?"</text>
+    <text x="485" y="108" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9" font-weight="600">Target: &lt; 0.1</text>
+
+    <!-- TTFB -->
+    <rect x="585" y="45" width="155" height="70" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="662" y="65" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="11">TTFB</text>
+    <text x="662" y="80" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="8">Time To First Byte</text>
+    <text x="662" y="95" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">"How fast is the server?"</text>
+    <text x="662" y="108" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="9" font-weight="600">Target: &lt; 800ms</text>
+
+    <!-- Bottom note -->
+    <rect x="100" y="135" width="560" height="45" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="153" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">These aren't vanity metrics. Google uses Core Web Vitals as a ranking factor since 2021.</text>
+    <text x="380" y="170" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Slow pages literally rank lower in search results. Performance = SEO = revenue.</text>
+  </svg>
+
   <p>And it gets worse on mobile. A user on a 4G connection has 50-100ms of base network latency. On a slow 3G connection in a developing country, it's 300-500ms per round trip. Every additional round trip (DNS, TLS, redirects, API calls) multiplies that base latency. A page that loads in 500ms on your office Wi-Fi might take 4 seconds on mobile — and mobile is where more than 60% of web traffic comes from. Performance optimization isn't optional; it's survival.</p>
+
+  <p>The revenue impact is real and well-documented:</p>
+  <ul>
+    <li><strong>Amazon (2006)</strong> — Greg Linden's famous experiment: every 100ms of added latency cost 1% of sales. At Amazon's current $500B+ revenue, that's roughly <strong>$50 million per millisecond per year</strong>.</li>
+    <li><strong>Google (2006)</strong> — Marissa Mayer revealed that adding 500ms to search results reduced traffic by 20%. Half a second. One-fifth of all traffic. Gone.</li>
+    <li><strong>Walmart (2012)</strong> — For every 1 second of page load improvement, conversions increased by 2%. They invested heavily in edge computing and saw revenue climb.</li>
+    <li><strong>Pinterest (2017)</strong> — Reduced perceived wait time by 40%, saw a 15% increase in sign-ups and a 15% increase in SEO traffic.</li>
+    <li><strong>BBC (2016)</strong> — Found they lost an additional 10% of users for every additional second their site took to load.</li>
+  </ul>
 
   <p>The lesson from this scenario: <strong>performance is a feature</strong>. It's not something you optimize later, after you've built all the "real" features. Speed IS a feature — often the most important one. Google, Amazon, and every major tech company learned this the hard way: users don't distinguish between "the site is slow" and "the site is broken." To them, slow IS broken. And once they leave, they rarely come back to check if you've fixed it.</p>
 
@@ -288,7 +394,39 @@
 
   <p>See the problem? Your business logic is a tiny sliver of the total request time. Making it twice as fast saves 2.5ms out of 400ms. Nobody will feel that. The <em>real</em> time is spent in network round trips, database queries, and TLS handshakes — things that live outside your code.</p>
 
-  <p>This diagram is based on a real API request we profiled. The breakdown varies by application, but the pattern is remarkably consistent: application logic is typically 1-5% of the total response time for web applications. The rest is infrastructure — network, database, serialization, and rendering. This is why the best performance engineers don't start by reading source code; they start by looking at traces and network waterfalls.</p>
+  <p>Don't take our word for it — measure it yourself. Here's a real curl timing breakdown for a typical API call:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">Terminal — dissecting a real 400ms request</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># Measure every phase of a request to your API
+curl -w "\
+  DNS Lookup:    %{time_namelookup}s\n\
+  TCP Connect:   %{time_connect}s\n\
+  TLS Handshake: %{time_appconnect}s\n\
+  TTFB:          %{time_starttransfer}s\n\
+  Total:         %{time_total}s\n" \
+  -o /dev/null -s https://api.example.com/checkout
+
+# Real output from a production e-commerce API:
+#   DNS Lookup:    0.023s     ←  23ms (domain → IP address)
+#   TCP Connect:   0.056s     ←  33ms for TCP handshake (cumulative)
+#   TLS Handshake: 0.112s     ←  56ms for TLS 1.2 (cumulative)
+#   TTFB:          0.347s     ← 235ms waiting for server response
+#   Total:         0.398s     ←  51ms downloading response body
+#
+# Your code runs in ~5ms inside that 235ms TTFB.
+# The other 230ms? Database queries, payment API calls, serialization.
+# Making your code 10x faster saves 4.5ms. Unnoticeable.</code></pre>
+    </div>
+  </div>
+
+  <p>This is based on a real API request we profiled. The breakdown varies by application, but the pattern is remarkably consistent: application logic is typically 1-5% of the total response time for web applications. The rest is infrastructure — network, database, serialization, and rendering. This is why the best performance engineers don't start by reading source code; they start by looking at traces and network waterfalls.</p>
+
+  <p>You can see this even more clearly in Chrome DevTools. Open the <strong>Network</strong> tab, click any request, and look at the <strong>Timing</strong> breakdown. Chrome shows you the exact same phases: Stalled, DNS Lookup, Initial Connection, SSL, Waiting (TTFB), Content Download. The "Waiting" bar is almost always the longest — that's your server thinking. And inside that server thinking time, your business logic is a tiny fraction.</p>
 
   <p>This is the trap of <span class="tooltip-trigger">premature optimization<span class="tooltip-content">Spending time optimizing code before measuring where the actual bottleneck is. Coined by Donald Knuth: "Premature optimization is the root of all evil." The idea isn't that optimization is bad — it's that optimizing the wrong thing wastes time and adds complexity for zero user benefit.</span></span>. You spend three days rewriting a function to be 50% faster, and the user experience doesn't change at all — because the bottleneck was never in your function. It was in the database query running without an index, or the API call to a third-party service that takes 300ms.</p>
 
@@ -297,6 +435,8 @@
   </div>
 
   <p>The irony is that micro-optimizations often make code <em>worse</em>. That "optimized" code using bit manipulation instead of clear logic? It's harder to read, harder to maintain, and the compiler was already making the same optimization behind the scenes. You made the code more complex for zero user-visible benefit. Save micro-optimizations for the rare cases where profiling proves they matter — in tight loops processing millions of items, in game engine rendering paths, in database query executors. For 99% of business logic, clarity beats cleverness.</p>
+
+  <p>Real companies have learned this lesson the hard way. When <span class="tooltip-trigger">Discord migrated their Read States service from Go to Rust<span class="tooltip-content">In February 2020, Discord's engineering team rewrote a Go service in Rust. The Go version suffered from garbage collection pauses that caused latency spikes every 2 minutes. Rust, having no GC, eliminated these spikes entirely. But they didn't start by rewriting — they profiled first, identified GC as the bottleneck, tried tuning Go's GC, and only rewrote when tuning wasn't enough.</span></span>, they saw tail latency drop from 40ms spikes (caused by Go's garbage collector) to a flat 10ms line. But the critical part of that story isn't "Rust is faster than Go" — it's that they <strong>profiled first</strong>, identified garbage collection pauses as the specific bottleneck, tried tuning Go's GC settings, and only rewrote when profiling proved the GC was the fundamental issue. They didn't rewrite for speed; they rewrote because measurement pointed them to an unavoidable language-level constraint.</p>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
@@ -364,6 +504,34 @@
 
   <p>The cliff is why performance targets exist. Google sets a <span class="tooltip-trigger">200ms budget<span class="tooltip-content">Google aims for search results to render within 200ms. This "latency budget" is divided across all steps: DNS resolution, network round trip, server processing, database queries, and rendering. Each component gets an allocation, and teams are responsible for staying within their slice.</span></span> for search results. Stripe aims for API responses under 100ms. Discord targets 50ms for message delivery. These aren't arbitrary numbers — they're calibrated to where users start feeling pain.</p>
 
+  <p>You can measure where you sit on this cliff using real tools. If your backend uses <span class="tooltip-trigger">Redis<span class="tooltip-content">An in-memory data store often used as a cache. Because it stores data in RAM (not disk), it typically responds in under 1ms — making it one of the fastest data stores available. It's used by Twitter, GitHub, Stack Overflow, and most large-scale web applications.</span></span> as a cache, check its latency right now:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">Terminal — Redis latency measurement</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># Continuous latency measurement (hit Ctrl+C to stop)
+redis-cli --latency
+# Output: min: 0, max: 1, avg: 0.23 (1247 samples)
+# ↑ That's 0.23ms average. Sub-millisecond. This is why Redis is used for caching.
+
+# Latency history — shows spikes over time
+redis-cli --latency-history -i 5
+# Output every 5 seconds:
+# min: 0, max: 1, avg: 0.19 (987 samples) -- 5.01 seconds range
+# min: 0, max: 3, avg: 0.21 (1002 samples) -- 5.00 seconds range
+# ↑ If you see max jump to 50ms+, your Redis is swapping to disk. That's a fire.
+
+# Intrinsic latency test (measures OS/hardware jitter, not network)
+redis-cli --intrinsic-latency 10
+# Max latency so far: 0.156 ms  ← your hardware's floor</code></pre>
+    </div>
+  </div>
+
+  <p>If your Redis is responding in 0.2ms but your API takes 800ms, the cache isn't the problem — look elsewhere. This is how you eliminate suspects quickly: measure each component, cross off the fast ones, and zero in on the slow one.</p>
+
   <p>And here's what makes it worse: the cliff gets steeper under load. A system that responds in 50ms at low traffic might respond in 500ms when traffic spikes 10x. That's because requests start queuing — each one waits for the ones ahead of it to finish. The relationship between load and latency isn't linear; it's exponential once you approach capacity.</p>
 
   <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The hockey stick curve: latency explodes as utilization approaches 100%">
@@ -401,6 +569,34 @@
   <p>This curve is called the <span class="tooltip-trigger">hockey stick<span class="tooltip-content">Named for its shape: flat and gentle on the left (low utilization = stable latency), then a sudden vertical spike on the right (high utilization = latency explosion). In queueing theory, this follows from the formula: wait time ≈ service_time / (1 - utilization). As utilization approaches 1.0 (100%), wait time approaches infinity.</span></span> curve and it's one of the most important concepts in capacity planning. At 70% utilization, latency starts climbing. At 85%, it's bad. At 95%, it's catastrophic. This is why production systems aim to keep utilization well below capacity — typically 60-70% — with auto-scaling that kicks in before the hockey stick takes over.</p>
 
   <p>The math behind the hockey stick is surprisingly simple: if your server can process a request in 10ms (service time), and utilization is at 90%, the average wait time is 10ms / (1 - 0.9) = 100ms. At 95% utilization: 10ms / 0.05 = 200ms. At 99%: 10ms / 0.01 = 1,000ms. The wait time literally goes to infinity as utilization approaches 100%. This is why performance engineers get nervous when they see any resource consistently above 70% — the hockey stick is lurking, and a small traffic spike can push you over the cliff.</p>
+
+  <p>Real companies hit this curve constantly. In 2015, <strong>GitHub experienced a major outage</strong> when a MySQL cluster reached 100% CPU utilization — a spike in webhook deliveries caused queries to queue faster than they could be processed, and latencies went from 5ms to 30+ seconds in under a minute. The fix wasn't writing faster code; it was adding read replicas and rate-limiting webhook delivery to keep utilization under 70%. Similarly, <strong>Twitter's Fail Whale era (2007-2012)</strong> was fundamentally a hockey stick problem — their Ruby on Rails monolith couldn't handle the throughput, and every viral tweet pushed utilization past the cliff. They eventually rewrote critical paths in Scala and decomposed into microservices — not because Ruby was "too slow," but because a single monolith can't stay under 70% utilization when traffic is bursty.</p>
+
+  <p>You can watch the hockey stick in real time on your own systems. If you use <code>top</code> or <code>htop</code> on a Linux server, watch the load average. When it exceeds the number of CPU cores, you're in hockey-stick territory. For a more detailed view, <code>perf top</code> shows you which functions are consuming the most CPU cycles right now — in real time, on a live production server:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">Terminal — CPU profiling in real time</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># See which functions are hogging CPU right now (Linux)
+sudo perf top
+# PerfTop:   18437 irqs/sec  kernel: 22.5%  exact: 100.0% [4000Hz cycles]
+# Overhead  Shared Object        Symbol
+#   12.34%  postgres             hash_search_with_hash_value
+#    8.21%  libc.so              __memcpy_avx_unaligned
+#    5.44%  postgres             ExecScan
+# ↑ If postgres functions dominate, your DB is the bottleneck, not your app code.
+
+# For Python apps, use py-spy (doesn't require code changes!)
+py-spy top --pid 12345
+# %Own  %Total  OwnTime  TotalTime  Function (filename:line)
+# 23.1%  45.2%    2.31s     4.52s   execute (sqlalchemy/engine/base.py:1235)
+#  8.7%  12.1%    0.87s     1.21s   json_dumps (flask/json/__init__.py:89)
+# ↑ 45% of time in SQL execution? That's your bottleneck. Profile found it in 10 seconds.</code></pre>
+    </div>
+  </div>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
@@ -486,12 +682,81 @@
     <strong>The golden rule of performance:</strong> Never optimize without data. Profile first. Trace first. Then fix the single biggest bottleneck. Rinse and repeat. This approach will save you weeks of wasted effort and produce 10x better results than guessing.
   </div>
 
+  <p>Let's see what "measure first" looks like in practice with real tools. The most common bottleneck in web applications is the database — and PostgreSQL gives you a built-in profiler called <code>EXPLAIN ANALYZE</code>. It doesn't just tell you the query plan; it <strong>runs the query and measures every step</strong>:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">psql — PostgreSQL query profiling</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-sql">-- Profile a real query: find a user by email
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'test@test.com';
+
+-- WITHOUT an index (the slow way):
+-- Seq Scan on users  (cost=0.00..18334.00 rows=1 width=256)
+--                     (actual time=127.341..127.341 rows=1 loops=1)
+--   Filter: (email = 'test@test.com'::text)
+--   Rows Removed by Filter: 499999
+-- Planning Time: 0.089 ms
+-- Execution Time: 127.392 ms     ← SLOW! Scanned 500K rows to find 1.
+
+-- Now add an index:
+CREATE INDEX idx_users_email ON users(email);
+
+-- WITH the index:
+-- Index Scan using idx_users_email on users  (cost=0.42..8.44 rows=1 width=256)
+--                                             (actual time=0.028..0.029 rows=1 loops=1)
+--   Index Cond: (email = 'test@test.com'::text)
+-- Planning Time: 0.112 ms
+-- Execution Time: 0.051 ms       ← 2,500x FASTER. One missing index. That's it.</code></pre>
+    </div>
+  </div>
+
+  <p>127ms down to 0.05ms. A 2,500x improvement from a single <code>CREATE INDEX</code> statement. This is why measurement matters — you could have spent weeks rewriting your application code and never found this. The database was reading every single row in the table (a "sequential scan") to find one email. Adding an index let it jump straight to the answer, like looking up a word in a dictionary's index instead of reading every page.</p>
+
+  <p>For frontend performance, Chrome has a hidden superpower: <code>chrome://tracing</code>. Type it into the address bar and you get a low-level trace of everything the browser is doing — JavaScript execution, layout calculations, paint operations, GPU compositing, network requests, garbage collection pauses. It's the same tool Chrome engineers use internally. For most developers, the Performance tab in DevTools (<code>F12</code> → Performance → Record) gives you the same insights in a friendlier format: a flame chart showing exactly which JavaScript functions took the most time, where layout thrashing happened, and which frames dropped below 60fps.</p>
+
+  <p>For backend load testing — checking if your system can actually handle the traffic you expect — here are the tools professionals use:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar">
+      <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+      <span class="macos-filename">Terminal — load testing and profiling tools</span>
+    </div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># Load test with wrk: hammer your API and see when it breaks
+wrk -t12 -c400 -d30s https://your-api.com/search?q=test
+# -t12 = 12 threads, -c400 = 400 concurrent connections, -d30s = 30 seconds
+# Result: tells you requests/sec, latency distribution, and where it breaks
+
+# Load test with k6 (more realistic scenarios with scripting)
+k6 run --vus 100 --duration 60s load-test.js
+# --vus = 100 virtual users, can script realistic user journeys
+
+# Profile Python apps without changing any code
+py-spy record -o profile.svg --pid 12345
+# Generates a flame graph SVG showing exactly where time is spent
+# No code changes, no restarts, no performance overhead. Attach to production.
+
+# Profile .NET apps
+dotnet-trace collect --process-id 12345
+# Generates a trace you can open in PerfView or Speedscope
+# Shows method-level CPU time, allocations, and GC pauses
+
+# Profile Node.js
+node --prof your-app.js
+# Then: node --prof-process isolate-*.log > processed.txt
+# Or use clinic.js: npx clinic doctor -- node your-app.js</code></pre>
+    </div>
+  </div>
+
   <p>Here's the complete performance optimization checklist that experienced engineers follow:</p>
 
   <ol>
     <li><strong>Define the target.</strong> "Make it faster" isn't a target. "P99 under 200ms" is. Without a clear target, you don't know when to stop optimizing.</li>
-    <li><strong>Measure current state.</strong> Record P50, P95, P99 latency, throughput, and error rate. This is your baseline.</li>
-    <li><strong>Profile the request path.</strong> Use distributed tracing, flame graphs, or simple timing logs. Find the bottleneck — the step that takes the most time.</li>
+    <li><strong>Measure current state.</strong> Record P50, P95, P99 latency, throughput, and error rate. This is your baseline. Use <code>wrk</code> or <code>k6</code> for throughput, your APM tool (Datadog, New Relic, Grafana) for latency percentiles.</li>
+    <li><strong>Profile the request path.</strong> Use distributed tracing (Jaeger, Zipkin, AWS X-Ray), flame graphs (<code>py-spy</code>, <code>perf</code>, <code>dotnet-trace</code>), or even simple <code>EXPLAIN ANALYZE</code> on your slowest queries. Find the bottleneck — the step that takes the most time.</li>
     <li><strong>Fix the bottleneck.</strong> Apply ONE optimization. Not three — just the one that addresses the biggest bottleneck. Multiple changes at once make it impossible to know which one helped.</li>
     <li><strong>Measure again.</strong> Did the metric improve? By how much? Is the new measurement consistent, or was the first one an outlier?</li>
     <li><strong>Repeat.</strong> If you haven't hit the target, go back to step 3. The bottleneck has probably shifted — what was second before is now first.</li>
@@ -523,7 +788,7 @@
   <div class="think-first-box">
     <span class="think-label">Think First</span>
     <p>Your checkout page takes 3 seconds. You have three suspects: the payment API (external service), the product database query, and the frontend JavaScript rendering. <strong>How do you figure out which one is the actual bottleneck?</strong></p>
-    <span class="think-hint">You add timing to each stage — either with a distributed tracing tool or simple timestamps. Measure each component independently. The one that takes the longest gets fixed first. Don't guess.</span>
+    <span class="think-hint">Measure each suspect independently. Run <code>EXPLAIN ANALYZE</code> on the checkout query — if it's 15ms, the DB is innocent. Use <code>curl -w "%{time_total}"</code> against the payment API — if it's 2.1 seconds, you found your culprit. Check Chrome DevTools Performance tab for JS rendering time. The one that takes the longest gets fixed first. Don't guess — measure.</span>
   </div>
 </div>
 

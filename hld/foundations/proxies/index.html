@@ -790,6 +790,7 @@ server {
       <span>SSL/TLS Termination — Saving 2-4ms Per Request</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>When a browser connects to your site over HTTPS, there's a TLS handshake: certificate exchange, key negotiation, cipher suite agreement. Each handshake involves asymmetric cryptography (RSA-2048 or ECDHE), which costs roughly <strong>2ms of CPU time</strong>. With <span class="tooltip-trigger">TLS 1.3<span class="tooltip-content">The latest version of TLS (released 2018). It reduces the handshake from 2 round trips to 1, removes deprecated cipher suites, and enables 0-RTT resumption for returning clients. All modern browsers and servers support it. Nginx enables it with ssl_protocols TLSv1.3.</span></span>, a fresh handshake is 1 round trip; with TLS 1.2, it's 2. Either way, it's CPU-intensive.</p>
 
       <p>With TLS termination at the proxy, the math changes completely. The proxy handles all crypto. Backends receive plain HTTP on a private network. Here's the Nginx config:</p>
@@ -846,6 +847,7 @@ server {
         <text x="587" y="130" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Zero crypto work here</text>
         <text x="380" y="148" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Savings: 2-4ms per request. At 10K req/s = 20-40 seconds of CPU/s moved off your app servers.</text>
       </svg>
+      </div>
     </div>
   </div>
 
@@ -854,6 +856,7 @@ server {
       <span>Connection Pooling — 10K Clients, 50 Backend Connections</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Every client connection has overhead: a TCP handshake (1 round trip), possibly a TLS handshake (1-2 more), plus memory for the socket buffer and file descriptor. If 10,000 clients connect directly to your backend, that's 10,000 open connections your server must maintain — each consuming ~10KB of kernel memory for TCP buffers, plus your application's per-connection state.</p>
 
       <p>A proxy solves this with <span class="tooltip-trigger">connection pooling<span class="tooltip-content">Maintaining a small set of persistent (keep-alive) connections between the proxy and backend. The proxy accepts thousands of client connections on the front end but reuses a fixed pool of connections on the backend. 10,000 client connections might map to just 50 persistent backend connections.</span></span>. It accepts all client connections, but uses a small pool of persistent connections to talk to your backend. In Nginx:</p>
@@ -905,6 +908,7 @@ server {
         <rect x="510" y="130" width="110" height="32" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
         <text x="565" y="150" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Server 3</text>
       </svg>
+      </div>
     </div>
   </div>
 
@@ -913,6 +917,7 @@ server {
       <span>Load Balancing Algorithms — Round Robin, Least Conn, IP Hash, Weighted</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>When you have multiple backend servers, the proxy decides which one gets each request. This is <span class="tooltip-trigger">load balancing<span class="tooltip-content">Distributing incoming traffic across multiple servers so no single server is overwhelmed. The proxy tracks backend health and distributes requests based on an algorithm. If a server dies, the proxy stops sending it traffic within seconds.</span></span>. Here's every major algorithm, when to use it, and the actual Nginx config for each:</p>
 
       <div class="tab-container">
@@ -986,6 +991,7 @@ server {
         <text x="665" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Legacy server-side state</text>
         <text x="665" y="110" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="8" font-weight="600">Avoid if possible.</text>
       </svg>
+      </div>
     </div>
   </div>
 
@@ -994,6 +1000,7 @@ server {
       <span>Header Manipulation — X-Forwarded-For, X-Real-IP, X-Forwarded-Proto</span>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>When a proxy forwards a request to your backend, the backend sees the <em>proxy's</em> IP address, not the real client's. That's a problem — your app needs the real client IP for logging, rate limiting, geolocation, and analytics. Proxies solve this by injecting special HTTP headers:</p>
 
       <ul>
@@ -1023,6 +1030,7 @@ server {
       </div>
 
       <p><strong>Why at the proxy?</strong> Consistency. Instead of every backend service implementing security headers independently (and some teams forgetting), the proxy enforces them uniformly across <em>all</em> responses. One place to configure, zero chance of a team forgetting <code>Strict-Transport-Security</code>.</p>
+      </div>
     </div>
   </div>
 

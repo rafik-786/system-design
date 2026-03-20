@@ -30,11 +30,11 @@
     <h1>Reliability &amp; Fault Tolerance</h1>
     <p class="hero-subtitle">Things will break. Hardware fails, networks split, software crashes. The question isn't "will it happen?" — it's "will your system survive when it does?"</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
+      <span><i class="fa-solid fa-brain"></i> 7 Think Firsts</span>
       <span><i class="fa-solid fa-diagram-project"></i> 20 SVG Diagrams</span>
       <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
-      <span><i class="fa-solid fa-circle-info"></i> 28 Tooltips</span>
+      <span><i class="fa-solid fa-circle-info"></i> 37 Tooltips</span>
     </div>
   </div>
 </div>
@@ -57,7 +57,7 @@
     <strong>Mental Model:</strong> Reliability means your system keeps working correctly — even when things go wrong. A reliable system is like a car with a spare tire: when one tire blows, you don't abandon the car on the highway. You swap the tire and keep driving.
   </div>
 
-  <p>Here's the core idea. Every part of your system — servers, databases, networks, even the humans operating them — <em>will</em> eventually fail. Hard drives die. Software has bugs. Someone will accidentally delete a database table at 2 AM. That's not pessimism; it's just statistics. Run enough hardware for enough time, and failures are a mathematical certainty.</p>
+  <p>Here's the core idea. Every part of your system — servers, databases, networks, even the humans operating them — <em>will</em> eventually fail. Hard drives die — Google's landmark 2007 study of 100,000 drives found an annual failure rate of 1.7% for new drives, rising to over 8% after three years. Software has bugs. Someone will accidentally delete a database table at 2 AM — that's exactly what happened at <span class="tooltip-trigger">GitLab in January 2017<span class="tooltip-content">A GitLab engineer accidentally ran <code>rm -rf</code> on the production database directory instead of the replica. They lost 6 hours of data for 5,000 projects. The incident was so dramatic that GitLab live-streamed the recovery on YouTube.</span></span>, when an engineer ran <code>rm -rf</code> on the wrong database directory and wiped 300 GB of production data. That's not pessimism; it's just statistics. Run enough hardware for enough time, and failures are a mathematical certainty.</p>
 
   <p>An <strong>unreliable</strong> system treats failure as a catastrophe. When one thing breaks, users see errors, data gets lost, and someone gets paged at 3 AM to manually fix things. A <span class="tooltip-trigger">fault-tolerant<span class="tooltip-content">A system's ability to keep operating correctly even when one or more of its components fail. The system "tolerates" the fault without the user noticing.</span></span> system treats failure as <em>routine</em>. When one thing breaks, a backup takes over automatically, users don't even notice, and the engineer can fix the problem during business hours with a coffee in hand.</p>
 
@@ -111,7 +111,7 @@
     <text x="630" y="197" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">😴 Fix it Monday morning</text>
   </svg>
 
-  <p>The difference between these levels isn't magic — it's <strong>engineering choices made before the failure happens</strong>. You add backup servers. You replicate your data. You build automatic detection so your system can heal itself. Every technique in this page is about moving your system to the right side of that spectrum.</p>
+  <p>The difference between these levels isn't magic — it's <strong>engineering choices made before the failure happens</strong>. You add backup servers. You replicate your data. You build automatic detection so your system can heal itself. Netflix sits on the far right of that spectrum — they intentionally kill their own production servers every day using a tool called Chaos Monkey, and their customers never notice. Amazon's shopping cart is designed to survive entire datacenter outages. Every technique in this page is about moving your system to the right side of that spectrum.</p>
 
   <div class="callout callout-info">
     <strong>One-line takeaway:</strong> Reliability isn't about preventing failures — it's about making failures <em>boring</em>. The system handles them automatically, and nobody loses sleep.
@@ -133,7 +133,7 @@
 
   <p>It's 3:07 AM on a Saturday. Your phone screams with a <span class="tooltip-trigger">PagerDuty<span class="tooltip-content">An incident management tool that alerts on-call engineers when something goes wrong in production — often via phone call, SMS, or push notification. The sound it makes at 3 AM is universally dreaded.</span></span> alert. You stumble out of bed, squint at the screen: <strong>"CRITICAL: Primary database unreachable. 10,247 users receiving HTTP 500 errors."</strong></p>
 
-  <p>Your stomach drops. You open your laptop. The monitoring dashboard is a sea of red. Every request that hits your API tries to talk to the database, gets no response, waits 30 seconds for a timeout, and returns an error. Ten thousand users are staring at a blank screen or a cryptic error page. Your Slack channel is exploding. Your boss is asking "what's the ETA on a fix?"</p>
+  <p>Your stomach drops. You open your laptop and pull up <span class="tooltip-trigger">Grafana<span class="tooltip-content">An open-source dashboarding tool that visualizes metrics from sources like Prometheus, Datadog, or CloudWatch. Most ops teams have Grafana dashboards on wall-mounted monitors showing real-time system health.</span></span> — the monitoring dashboard is a sea of red. Every request that hits your API tries to talk to the database, gets no response, waits 30 seconds for a timeout, and returns an error. Ten thousand users are staring at a blank screen or a cryptic error page. Your <span class="tooltip-trigger">Slack<span class="tooltip-content">A workplace messaging tool commonly used by engineering teams. During outages, a dedicated #incidents channel becomes the real-time war room where engineers coordinate the response.</span></span> #incidents channel is exploding. Your boss is asking "what's the ETA on a fix?"</p>
 
   <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline of a 3 AM database outage incident">
     <defs>
@@ -204,7 +204,11 @@
 
   <p>After 42 minutes of frantic typing, you get the database back online by restoring from a backup. But the backup was 6 hours old, so the 47 orders placed between midnight and 3 AM? Gone. Those customers will never get their confirmations. Your team will spend the next week apologizing and manually reconciling records.</p>
 
-  <p>Now here's the gut punch: <strong>this didn't have to happen</strong>. If your system had a standby database that automatically took over when the primary failed, the outage wouldn't have been 42 minutes — it would have been 3 <em>seconds</em>. No phone call. No lost data. No frantic 3 AM scramble. The system would have healed itself while you slept.</p>
+  <p>Now here's the gut punch: <strong>this didn't have to happen</strong>. If your system had a standby database that automatically took over when the primary failed — like <span class="tooltip-trigger">Amazon RDS Multi-AZ<span class="tooltip-content">Amazon's managed database service with automatic failover. In Multi-AZ mode, RDS keeps a synchronous standby replica in a different datacenter. If the primary dies, it promotes the standby in 60-120 seconds with zero data loss.</span></span> or <span class="tooltip-trigger">PostgreSQL streaming replication<span class="tooltip-content">A built-in PostgreSQL feature where a standby server continuously replays the primary's write-ahead log (WAL). Combined with a tool like Patroni, it enables automatic failover in under 30 seconds.</span></span> with <code>Patroni</code> — the outage wouldn't have been 42 minutes. It would have been under 30 <em>seconds</em>. No phone call. No lost data. No frantic 3 AM scramble. The system would have healed itself while you slept.</p>
+
+  <div class="callout callout-danger">
+    <strong>This isn't hypothetical.</strong> In February 2017, Amazon S3 suffered a massive outage because a single engineer typed a command wrong while debugging a billing system. The typo removed more servers than intended, and it took S3 <strong>nearly 5 hours</strong> to fully recover. Since half the internet relies on S3 for images, files, and static assets, sites like Imgur, Trello, and the IoT platform IFTTT all went down. One typo. Five hours. Billions of requests failed. The estimated cost to S&amp;P 500 companies alone was $150 million.
+  </div>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
@@ -234,11 +238,11 @@
 
   <p>When something breaks in production, the universal instinct is: <strong>just restart it</strong>. Server crashed? Reboot it. Process hung? Kill and restart. Database unresponsive? Restart the service. And honestly, restarting works surprisingly often. Most software problems are transient — a memory leak, a deadlock, a corrupted connection pool — and a fresh start clears the slate.</p>
 
-  <p>So you build a simple playbook: when something breaks, an engineer remotely connects to the server (using a tool called <span class="tooltip-trigger">SSH<span class="tooltip-content">Secure Shell &#x2014; a way to securely log into a remote server from your own computer and run commands on it, as if you were sitting right in front of it.</span></span>), diagnoses the problem, and restarts whatever needs restarting. You might even write a little script that automates the restart. Problem solved, right?</p>
+  <p>So you build a simple playbook: when something breaks, an engineer remotely connects to the server (using a tool called <span class="tooltip-trigger">SSH<span class="tooltip-content">Secure Shell &#x2014; a way to securely log into a remote server from your own computer and run commands on it, as if you were sitting right in front of it. Usage: <code>ssh user@10.0.1.42</code></span></span>), diagnoses the problem, and restarts whatever needs restarting. The first thing they type is probably <code>systemctl status nginx</code> to check if the web server is running, or <code>journalctl -u mysql --since "1 hour ago"</code> to see what went wrong with the database. Maybe <code>dmesg | tail</code> to check for hardware errors or <code>uptime</code> to see if the server recently rebooted on its own. Then: <code>systemctl restart mysql</code>. Problem solved, right?</p>
 
   <p>Not quite. Let's look at the math of manual recovery.</p>
 
-  <p>Your system fails about once a week — that's pretty normal for a medium-sized app running on commodity hardware. Each time it fails, here's the timeline: 5 minutes for the monitoring system to detect it, 7 minutes for the alert to reach a human and for that human to wake up and open their laptop, 8 minutes to diagnose the problem, and 10 minutes to fix and verify. That's <strong>30 minutes of downtime per incident</strong>.</p>
+  <p>Your system fails about once a week — that's pretty normal for a medium-sized app running on <span class="tooltip-trigger">commodity hardware<span class="tooltip-content">Standard off-the-shelf servers (like Dell PowerEdge or HP ProLiant) as opposed to specialized mainframes. Google, Facebook, and Amazon all run on commodity hardware — they handle reliability in software, not by buying expensive machines.</span></span>. The hard drives in those servers have a <span class="tooltip-trigger">Mean Time Between Failures<span class="tooltip-content">MTBF — the average time a component runs before it fails. For enterprise SSDs it's often quoted as 2 million+ hours, but real-world annualized failure rates are 1-4% according to Google and Backblaze studies. MTBF for a typical server: 50,000-100,000 hours.</span></span> (MTBF) of 50,000-100,000 hours, but when you have a rack of 40 servers, the odds of <em>something</em> failing each week are real. Each time it fails, here's the timeline: 5 minutes for <span class="tooltip-trigger">Prometheus<span class="tooltip-content">An open-source monitoring system that scrapes metrics from your services every 15-30 seconds. It's the most popular monitoring tool in the Kubernetes ecosystem. Often paired with Grafana for dashboards and Alertmanager for notifications.</span></span> to detect it and fire an alert to <span class="tooltip-trigger">PagerDuty<span class="tooltip-content">An incident management platform that routes alerts to the right on-call engineer via phone, SMS, or push notification. It supports escalation policies — if the primary on-call doesn't respond in 5 minutes, it pages the backup.</span></span> or <span class="tooltip-trigger">OpsGenie<span class="tooltip-content">An incident management tool (now part of Atlassian) similar to PagerDuty. It integrates with monitoring tools like Datadog, Prometheus, and CloudWatch to alert on-call engineers when something goes wrong.</span></span>, 7 minutes for the on-call engineer to wake up and open their laptop, 8 minutes to diagnose the problem (reading Grafana dashboards, checking <code>journalctl</code> logs), and 10 minutes to fix and verify. That's <strong>30 minutes of downtime per incident</strong>.</p>
 
   <div class="math-block">
     <div class="math-label">Monthly downtime from manual recovery</div>
@@ -319,7 +323,7 @@
   <p>The metric we care about here is called <span class="tooltip-trigger">MTTR<span class="tooltip-content">Mean Time To Recovery — the average time it takes to restore a system after a failure. Lower MTTR = less downtime. Automatic failover can reduce MTTR from 30+ minutes to under 5 seconds.</span></span> — Mean Time To Recovery. It measures how long your system is broken after a failure. With manual recovery, your MTTR is measured in <em>minutes</em>. With automatic recovery, it's measured in <em>seconds</em>. That's not a small improvement — it's the difference between losing customers and keeping them.</p>
 
   <div class="callout callout-warning">
-    <strong>The restart trap:</strong> "Just restart it" works for the first 10 incidents. By the 50th, your team is exhausted, your users have lost trust, and your competitors are eating your lunch. Manual recovery doesn't scale. Automated recovery does.
+    <strong>The restart trap:</strong> "Just restart it" works for the first 10 incidents. By the 50th, your team is exhausted, your users have lost trust, and your competitors are eating your lunch. Manual recovery doesn't scale. Automated recovery does. This is why tools like <span class="tooltip-trigger">Kubernetes<span class="tooltip-content">An open-source container orchestration platform (originally built by Google) that automatically restarts crashed containers, reschedules workloads to healthy nodes, and scales up when traffic spikes. It's the industry standard for running services in production.</span></span> exist — they automatically restart crashed containers, reschedule work to healthy servers, and do it all without waking anyone up.
   </div>
 
   <div class="think-first-box">
@@ -415,6 +419,16 @@
     <strong>The scariest part of cascading failures:</strong> the root cause is often tiny. A single slow SQL query. A misconfigured timeout. A memory leak that takes 3 days to surface. By the time the dominoes finish falling, the root cause is buried under a mountain of secondary failures, and your team spends hours debugging the wrong thing.
   </div>
 
+  <div class="callout callout-info">
+    <strong>Real-world domino: The 2021 Facebook outage.</strong> On October 4, 2021, a routine <span class="tooltip-trigger">BGP<span class="tooltip-content">Border Gateway Protocol — the "postal system" of the internet. It tells routers how to find paths to every network. When Facebook withdrew its BGP routes, the entire internet forgot how to reach facebook.com, instagram.com, and whatsapp.com.</span></span> configuration change accidentally withdrew all of Facebook's network routes from the internet. Facebook, Instagram, and WhatsApp vanished for <strong>nearly 6 hours</strong>. But here's the cascading part: because Facebook's internal tools (including their own access badge system and internal communication) also depended on that same network, engineers couldn't get into the datacenter to fix it. They were literally locked out of their own building. The estimated revenue loss: <strong>$60 million</strong>. Root cause: one bad config update to their backbone routers.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>In the Facebook outage, engineers couldn't fix the problem because their own access tools depended on the broken system. <strong>What principle does this violate, and how would you design around it?</strong></p>
+    <span class="think-hint">Your recovery tools should NEVER depend on the system they're supposed to recover. If your monitoring, alerting, SSH access, and badge systems all run on the same infrastructure as your product, you've created a "recovery dependency loop." Keep your incident response path on a completely separate infrastructure — a different network, different DNS, different authentication.</span>
+  </div>
+
   <div class="think-first-box">
     <span class="think-label">Think First</span>
     <p>In the domino scenario above, the payment service got slow and eventually everything died. <strong>What could you put between the order service and the payment service to prevent this cascade?</strong></p>
@@ -435,7 +449,7 @@
     </div>
   </div>
 
-  <p>For decades, engineers tried to build systems that <em>don't fail</em>. Better hardware. Redundant power supplies. Enterprise-grade storage with 5-year warranties. The philosophy was: if we make each component reliable enough, the system will be reliable. Spend more money, get more reliability.</p>
+  <p>For decades, engineers tried to build systems that <em>don't fail</em>. Better hardware. Redundant power supplies. Enterprise-grade storage with 5-year warranties. Banks ran on <span class="tooltip-trigger">IBM mainframes<span class="tooltip-content">Massive, ultra-reliable computers costing $500K-$5M+ that run mission-critical workloads for banks, airlines, and governments. A single IBM z16 mainframe can process 19 billion encrypted transactions per day. They achieve 99.999% uptime but at extraordinary cost.</span></span> costing millions of dollars. Telecom companies used hardware from <span class="tooltip-trigger">Tandem<span class="tooltip-content">Tandem Computers (now part of HP) built "NonStop" servers in the 1970s-90s with redundant everything — dual CPUs, dual memory, dual I/O. They were designed so that no single hardware failure could cause downtime. Banks and stock exchanges loved them.</span></span> that literally could not be shut down. The philosophy was: if we make each component reliable enough, the system will be reliable. Spend more money, get more reliability.</p>
 
   <p>Then a company called Netflix blew that idea apart.</p>
 
@@ -483,7 +497,7 @@
 
   <p>This is the fundamental insight of modern reliability engineering: <strong>you cannot prevent all failures, so you must design systems that tolerate them</strong>. Instead of asking "how do we stop this from breaking?" you ask "when this breaks &#x2014; and it will &#x2014; what happens next?"</p>
 
-  <p>This idea goes by many names. Netflix calls it <span class="tooltip-trigger">chaos engineering<span class="tooltip-content">The practice of intentionally injecting failures into a production system to find weaknesses before real outages do. Beyond Netflix's Chaos Monkey, it includes simulating network partitions, slow disks, and even entire datacenter outages.</span></span>. Google calls it "designing for unreliable components." Amazon calls it "everything fails, all the time." But the core principle is the same: <strong>build your system so that any single component can die at any moment, and the system keeps running</strong>.</p>
+  <p>This idea goes by many names. Netflix calls it <span class="tooltip-trigger">chaos engineering<span class="tooltip-content">The practice of intentionally injecting failures into a production system to find weaknesses before real outages do. Netflix's Simian Army includes Chaos Monkey (kills instances), Latency Monkey (adds delays), and Chaos Kong (simulates entire region failures). Other tools: Gremlin, LitmusChaos, AWS Fault Injection Simulator.</span></span>. Google calls it "designing for unreliable components" — their famous <span class="tooltip-trigger">Site Reliability Engineering<span class="tooltip-content">SRE — Google's approach to operations, where software engineers build systems to run reliably at scale. Google's SRE book (free online) defines practices like error budgets, SLOs, and toil reduction that are now industry standard.</span></span> (SRE) book is built on this idea. Amazon's CTO Werner Vogels famously said: <em>"Everything fails, all the time."</em> But the core principle is the same: <strong>build your system so that any single component can die at any moment, and the system keeps running</strong>.</p>
 
   <div class="callout callout-success">
     <strong>The mindset shift in one sentence:</strong> A reliable system isn't one where nothing fails. It's one where <em>anything can fail</em> and the user never notices.
@@ -569,7 +583,11 @@
         <text x="595" y="212" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Server 4 &#x2713; ACTIVE</text>
       </svg>
 
-      <p>Redundancy applies to everything, not just servers. You add redundant network paths so one switch dying doesn't cut off a rack. You add redundant power supplies so one PSU failing doesn't take a server offline. You add redundant data centers so one building losing power doesn't affect users. The principle is always the same: <strong>no single thing should be so important that losing it breaks the system</strong>.</p>
+      <p>Redundancy applies to everything, not just servers. You add redundant network paths so one switch dying doesn't cut off a rack (AWS regions have at least two <span class="tooltip-trigger">Availability Zones<span class="tooltip-content">An Availability Zone (AZ) is a physically separate datacenter within an AWS region, with independent power, cooling, and networking. US-East-1 has 6 AZs. Spreading your servers across 2-3 AZs means a single datacenter fire or power outage won't take you offline.</span></span>, each in a separate building). You add redundant power supplies so one PSU failing doesn't take a server offline — most datacenter servers have dual PSUs connected to separate power circuits. You add redundant data centers so one building losing power doesn't affect users — that's why Google has 35+ datacenters worldwide. The principle is always the same: <strong>no single thing should be so important that losing it breaks the system</strong>.</p>
+
+      <div class="callout callout-info">
+        <strong>Real numbers:</strong> A single enterprise server has an MTBF of about 50,000-100,000 hours (roughly 6-11 years). Sounds great — until you run 1,000 servers, where you'd statistically expect a failure every 2-4 days. At Google's scale (millions of servers), they experience thousands of disk failures and dozens of machine deaths <em>every single day</em>. Redundancy isn't optional at scale — it's survival.
+      </div>
     </div>
   </div>
 
@@ -668,6 +686,10 @@
       <div class="callout callout-info">
         <strong>The trade-off in one sentence:</strong> Sync replication trades speed for safety. Async replication trades safety for speed. Most real systems use a mix &#x2014; sync for critical data (money, orders) and async for everything else (profiles, notifications).
       </div>
+
+      <div class="callout callout-success">
+        <strong>Real-world examples:</strong> <strong>PostgreSQL</strong> supports both modes — you configure <code>synchronous_commit = on</code> for sync or <code>off</code> for async, and you can even set it per-transaction. <strong>MySQL</strong> uses async replication by default, with semi-sync available via a plugin. <strong>MongoDB</strong> replicates across a 3-node replica set — the primary gets writes, secondaries replicate asynchronously, and if the primary dies, the secondaries automatically elect a new leader within 10-12 seconds. <strong>Amazon RDS</strong> Multi-AZ does synchronous replication to a standby in a different datacenter — failover takes 60-120 seconds.
+      </div>
     </div>
   </div>
 
@@ -765,6 +787,31 @@
       <p><strong>Active-passive</strong> is simpler. One server (the primary) handles all the traffic. The standby does nothing but replicate data and wait. When the primary fails, the standby takes over. The downside: you're paying for a server that sits idle 99% of the time. The upside: there's no risk of data conflicts because only one node is writing at a time.</p>
 
       <p><strong>Active-active</strong> is more efficient. Both servers handle traffic simultaneously, splitting the load between them. If one dies, the other absorbs all the traffic. No resources are wasted. But it's harder to build because both nodes are writing data at the same time, which can cause conflicts. (What happens when two users update the same record on different nodes at the same millisecond?)</p>
+
+      <div class="callout callout-info">
+        <strong>Real-world failover tools:</strong> <strong>Patroni</strong> manages PostgreSQL failover — it uses a distributed consensus store (etcd or ZooKeeper) to elect a new primary within 10-30 seconds. <strong>Redis Sentinel</strong> monitors Redis instances and promotes a replica if the master dies. <strong>Nginx</strong> has built-in failover for upstream servers — if one backend returns errors, it automatically routes to the next one:
+      </div>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">nginx.conf — upstream failover</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-nginx">upstream backend {
+    server 10.0.1.10:8080 max_fails=3 fail_timeout=30s;
+    server 10.0.1.11:8080 max_fails=3 fail_timeout=30s;
+    server 10.0.1.12:8080 backup;  # only used if both above fail
+}
+
+server {
+    location / {
+        proxy_pass http://backend;
+        proxy_next_upstream error timeout http_502 http_503;
+    }
+}</code></pre>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -808,6 +855,41 @@
       </svg>
 
       <p>But a heartbeat only tells you "the server is up." A smarter health check also verifies that the server can actually do its job. Can it connect to the database? Is the disk not full? Is the CPU not at 100%? These deeper checks are called <em>liveness probes</em> (is it alive?) and <em>readiness probes</em> (is it ready to serve traffic?). Kubernetes uses both &#x2014; a container can be alive but not ready, meaning it's still starting up or temporarily overloaded.</p>
+
+      <p>Here's what Kubernetes health checks look like in practice:</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">deployment.yaml — Kubernetes liveness &amp; readiness probes</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-yaml">containers:
+  - name: api-server
+    image: myapp:latest
+    ports:
+      - containerPort: 8080
+
+    # "Are you alive?" — if this fails 3 times, K8s kills and restarts the pod
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 15    # wait 15s after startup before checking
+      periodSeconds: 10          # check every 10 seconds
+      failureThreshold: 3        # 3 failures = restart the container
+
+    # "Can you handle traffic?" — if this fails, K8s stops sending requests
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 8080
+      periodSeconds: 5           # check every 5 seconds
+      failureThreshold: 2        # 2 failures = remove from load balancer</code></pre>
+        </div>
+      </div>
+
+      <p>The distinction matters: a container might be alive (its process is running) but not ready (it's still loading a 2 GB machine learning model into memory). Without a readiness probe, Kubernetes would send traffic to it immediately and users would get timeouts. Tools like <span class="tooltip-trigger">Datadog<span class="tooltip-content">A cloud monitoring and analytics platform that collects metrics, logs, and traces from your infrastructure and applications. It provides dashboards, alerting, and APM (Application Performance Monitoring). Pricing starts around $15/host/month.</span></span> and <span class="tooltip-trigger">Prometheus<span class="tooltip-content">An open-source monitoring toolkit that scrapes HTTP endpoints for metrics, stores time-series data, and supports powerful queries via PromQL. Combined with Alertmanager, it can page on-call engineers when metrics cross thresholds.</span></span> + <span class="tooltip-trigger">Grafana<span class="tooltip-content">An open-source visualization platform that creates real-time dashboards from data sources like Prometheus, InfluxDB, or Elasticsearch. Teams typically display Grafana dashboards on wall monitors in their office for at-a-glance system health.</span></span> give you dashboards showing the health status of every service in real time.</p>
     </div>
   </div>
 
@@ -875,6 +957,10 @@
       <p><strong>Closed</strong> (normal): calls flow through normally. The breaker counts failures. <strong>Open</strong> (tripped): when failures exceed a threshold (say, 5 failures in 10 seconds), the breaker trips. Now ALL calls to that service fail immediately &#x2014; no waiting for a 30-second timeout, no consuming threads. The caller gets an instant "service unavailable" and can show a fallback response. <strong>Half-open</strong> (testing): after a cooldown period (say, 30 seconds), the breaker lets ONE test call through. If it succeeds, the breaker closes and traffic resumes. If it fails, the breaker stays open and waits another 30 seconds.</p>
 
       <p>This is what prevents the domino effect. The order service has a circuit breaker around its calls to the payment service. When payment is slow, the breaker trips. Now the order service fails checkout requests <em>instantly</em> with a friendly "payment temporarily unavailable" message &#x2014; but it can still serve order history, product pages, and everything else. The failure is <em>contained</em>.</p>
+
+      <div class="callout callout-success">
+        <strong>Real libraries that implement this:</strong> In .NET, <strong>Polly</strong> is the go-to library — it supports circuit breakers, retries, timeouts, and bulkheads in a fluent API. In Java, <strong>Resilience4j</strong> (the successor to Netflix's Hystrix) is the standard. <strong>Envoy</strong> and <strong>Istio</strong> service meshes can add circuit breakers at the network layer without changing your code at all. Netflix's original <strong>Hystrix</strong> library pioneered this pattern — at its peak, Netflix ran millions of circuit breaker-protected calls per second.
+      </div>
     </div>
   </div>
 
@@ -953,6 +1039,10 @@
       </svg>
 
       <p>The key insight is that <strong>not all features are equally important</strong>. Checkout is critical &#x2014; if users can't pay, you lose money. Recommendations are nice-to-have &#x2014; showing "popular items" instead of personalized picks is a small quality drop, not a disaster. Graceful degradation means knowing the difference and building your system to shed non-essential features under stress, protecting the critical path at all costs.</p>
+
+      <div class="callout callout-info">
+        <strong>Real-world graceful degradation:</strong> During peak traffic events (Prime Day, Black Friday), <strong>Amazon</strong> deliberately disables personalized recommendations and shows cached "popular items" instead &#x2014; freeing up compute resources for checkout. <strong>Twitter</strong> used to show a "fail whale" error page during traffic spikes; after they redesigned for graceful degradation, they started showing a stripped-down read-only timeline instead. <strong>Netflix</strong> serves cached content and disables personalization when backend services are overloaded &#x2014; you might not see the perfect recommendations, but you can still watch your show.
+      </div>
     </div>
   </div>
 </div>
