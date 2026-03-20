@@ -1,0 +1,2899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Tuning &amp; Query Optimization — System Guide</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/ruby.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+<link rel="stylesheet" href="../../../shared/styles.css">
+<script>(function(){var t=localStorage.getItem('wiki-theme');if(t&&t!=='navy')document.documentElement.setAttribute('data-theme',t);})()</script>
+</head>
+<body data-accent="orange" style="opacity:0">
+
+<header class="top-toolbar" role="banner">
+  <a href="../../../index.html" class="fab-btn fab-home" aria-label="Home"><i class="fa-solid fa-house" aria-hidden="true"></i></a>
+  <a href="../../index.html" class="fab-btn fab-back" aria-label="Back to HLD Hub"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a>
+  <span class="toolbar-sep"></span>
+  <button class="fab-btn" id="expandAllBtn" aria-label="Expand or collapse all sections"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></button>
+  <button class="fab-btn" id="fullscreenBtn" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+     ════════════════════════════════════════════════════════════ -->
+<div class="hero" id="hero">
+  <div class="relative z-1">
+    <div class="hero-badge"><i class="fa-solid fa-magnifying-glass-chart"></i> Databases</div>
+    <h1>SQL Tuning &amp; Query Optimization</h1>
+    <p class="hero-subtitle">The single most impactful skill in backend engineering — turning a 90-second query into a 0.1ms query by changing one line. Every section has SQL you can run yourself.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-brain"></i> 4 Think Firsts</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 15 SVG Diagrams</span>
+      <span><i class="fa-solid fa-terminal"></i> Real EXPLAIN Output</span>
+      <span><i class="fa-solid fa-dumbbell"></i> 5 Hands-On Exercises</span>
+      <span><i class="fa-solid fa-circle-info"></i> 19 Tooltips</span>
+    </div>
+  </div>
+</div>
+
+<main class="wiki-container">
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 1 — TL;DR
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="tldr">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-bolt"></i></div>
+    <div>
+      <div class="section-num">Section 1</div>
+      <h2 class="section-title">TL;DR — The One-Minute Version</h2>
+    </div>
+  </div>
+
+  <div class="callout callout-orange">
+    <strong>Mental Model:</strong> A SQL query is a request. The database's <strong><span class="tooltip-trigger">query planner<span class="tooltip-content">The part of the database engine that decides HOW to execute your query — which indexes to use, which tables to scan first, which join algorithm to pick. Think of it as a GPS for your data.</span></span></strong> is a GPS — it picks the fastest route to your data. Your job as a developer isn't to write the SQL differently. It's to give the GPS better roads (indexes), cleaner maps (statistics), and shorter distances (schema design).
+  </div>
+
+  <p>Most backend performance problems aren't caused by slow servers, bad code, or too much traffic. They're caused by <strong>one bad SQL query</strong>. A single missing index can make a query read every single row in a 10-million-row table instead of jumping straight to the 47 rows it needs. That's the difference between 89 milliseconds and 0.1 milliseconds. That's <strong>699 times faster</strong> — from changing one line.</p>
+
+  <!-- TL;DR mental model SVG -->
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mental model: query is the destination, planner is GPS, indexes are highways">
+    <defs>
+      <marker id="sqt-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- Your Query box -->
+    <rect x="20" y="30" width="150" height="70" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="95" y="55" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">YOUR QUERY</text>
+    <text x="95" y="75" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">SELECT * FROM orders</text>
+    <text x="95" y="89" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">WHERE user_id = 42</text>
+
+    <!-- Arrow -->
+    <line x1="170" y1="65" x2="218" y2="65" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-tldr-arr)"/>
+    <text x="194" y="58" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">sends to</text>
+
+    <!-- Query Planner (GPS) -->
+    <rect x="225" y="20" width="170" height="90" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="2.5"/>
+    <text x="310" y="45" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">QUERY PLANNER</text>
+    <text x="310" y="63" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">The GPS</text>
+    <text x="310" y="78" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">"What's the fastest</text>
+    <text x="310" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">route to that data?"</text>
+
+    <!-- Two paths forking -->
+    <line x1="395" y1="50" x2="460" y2="30" stroke="#ef4444" stroke-width="2" marker-end="url(#sqt-tldr-arr)"/>
+    <line x1="395" y1="80" x2="460" y2="100" stroke="#10b981" stroke-width="2" marker-end="url(#sqt-tldr-arr)"/>
+
+    <!-- Bad path: Seq Scan -->
+    <rect x="465" y="8" width="270" height="50" rx="10" fill="rgba(239,68,68,0.08)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="600" y="28" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">NO INDEX → Seq Scan (dirt road)</text>
+    <text x="600" y="46" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">Reads ALL 1,000,000 rows → 89ms</text>
+
+    <!-- Good path: Index Scan -->
+    <rect x="465" y="78" width="270" height="50" rx="10" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="600" y="98" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">WITH INDEX → Index Scan (highway)</text>
+    <text x="600" y="116" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">Jumps to 47 matching rows → 0.128ms</text>
+
+    <!-- Speed comparison -->
+    <rect x="180" y="150" width="400" height="50" rx="10" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="2"/>
+    <text x="380" y="173" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="800" font-size="14">699x faster. Same query. One CREATE INDEX.</text>
+    <text x="380" y="191" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">From reading 6,334 disk pages to reading 50 disk pages.</text>
+
+    <!-- Bottom note -->
+    <text x="380" y="235" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="11">SQL tuning = giving the query planner better roads to drive on.</text>
+    <text x="380" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">You don't rewrite the query. You improve the infrastructure around it.</text>
+  </svg>
+
+  <p>This page is the most hands-on page in the entire System Guide. Every section has real SQL you can copy, paste, and run. Real <code>EXPLAIN ANALYZE</code> output. Real slow query logs. Real before/after benchmarks. By the end, you'll know how to take any slow query, diagnose exactly where the time is going, and fix it — often in under 5 minutes.</p>
+
+  <div class="callout callout-info">
+    <strong>One-line takeaway:</strong> You don't need to rewrite your SQL. You need to understand what the query planner is doing, give it the right indexes, and stop sending queries you don't need to send (N+1 problem). That covers 90% of all database performance issues.
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>What top companies actually expect:</strong> At <strong>Stripe</strong>, engineers are expected to include <code>EXPLAIN ANALYZE</code> output in pull requests that add new queries. At <strong>GitHub</strong>, a single slow query once took down github.com for 2 hours in 2012 — a <span class="tooltip-trigger">sequential scan<span class="tooltip-content">When the database reads every single row in a table from start to finish, checking each one against your WHERE clause. Like reading every page of a phone book to find one name.</span></span> on the repositories table during a schema migration. At <strong>Shopify</strong>, their internal "query cop" tool automatically rejects any migration that adds a query without a matching index. SQL tuning isn't an optional skill — it's table stakes.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 2 — THE SCENARIO
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-scenario">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-face-dizzy"></i></div>
+    <div>
+      <div class="section-num">Section 2</div>
+      <h2 class="section-title">The Scenario — 50ms to 3 Seconds Overnight</h2>
+    </div>
+  </div>
+
+  <p>You're on call for an e-commerce platform. It's Tuesday morning. Your <span class="tooltip-trigger">P95 latency<span class="tooltip-content">The 95th percentile response time — 95% of requests are faster than this number. If your P95 is 200ms, then 95 out of 100 requests complete in under 200ms. The remaining 5% are slower.</span></span> has been a comfortable 50ms for months. You grab your coffee, open Grafana, and see this:</p>
+
+  <!-- SVG: Latency spike chart -->
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="API latency graph showing a sudden spike from 50ms to 3000ms overnight">
+    <defs>
+      <marker id="sqt-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- Chart background -->
+    <rect x="60" y="20" width="680" height="220" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+
+    <!-- Y-axis labels -->
+    <text x="52" y="45" text-anchor="end" fill="#64748b" font-family="Inter, sans-serif" font-size="9">3000ms</text>
+    <text x="52" y="100" text-anchor="end" fill="#64748b" font-family="Inter, sans-serif" font-size="9">1500ms</text>
+    <text x="52" y="155" text-anchor="end" fill="#64748b" font-family="Inter, sans-serif" font-size="9">500ms</text>
+    <text x="52" y="200" text-anchor="end" fill="#64748b" font-family="Inter, sans-serif" font-size="9">200ms</text>
+    <text x="52" y="230" text-anchor="end" fill="#64748b" font-family="Inter, sans-serif" font-size="9">50ms</text>
+
+    <!-- Y-axis title -->
+    <text x="15" y="135" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10" transform="rotate(-90 15 135)">P95 Latency</text>
+
+    <!-- Grid lines -->
+    <line x1="60" y1="40" x2="740" y2="40" stroke="#334155" stroke-width="0.5" stroke-dasharray="4,4"/>
+    <line x1="60" y1="95" x2="740" y2="95" stroke="#334155" stroke-width="0.5" stroke-dasharray="4,4"/>
+    <line x1="60" y1="150" x2="740" y2="150" stroke="#334155" stroke-width="0.5" stroke-dasharray="4,4"/>
+    <line x1="60" y1="195" x2="740" y2="195" stroke="#334155" stroke-width="0.5" stroke-dasharray="4,4"/>
+    <line x1="60" y1="225" x2="740" y2="225" stroke="#334155" stroke-width="0.5" stroke-dasharray="4,4"/>
+
+    <!-- X-axis labels -->
+    <text x="120" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Mon</text>
+    <text x="230" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Tue</text>
+    <text x="340" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Wed</text>
+    <text x="450" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Thu</text>
+    <text x="560" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Fri</text>
+    <text x="670" y="252" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Sat</text>
+
+    <!-- Flat line at ~50ms (good period) -->
+    <polyline points="70,225 120,224 170,225 220,224 270,225 320,224 370,225 410,225"
+              fill="none" stroke="#10b981" stroke-width="2.5"/>
+
+    <!-- Sudden spike -->
+    <polyline points="410,225 420,200 435,150 445,95 455,55 465,42 480,40 500,42 520,44 560,45 600,43 650,44 700,42 730,43"
+              fill="none" stroke="#ef4444" stroke-width="2.5"/>
+
+    <!-- Annotation: Deploy marker -->
+    <line x1="410" y1="225" x2="410" y2="30" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <rect x="385" y="258" width="50" height="18" rx="4" fill="#f97316"/>
+    <text x="410" y="271" text-anchor="middle" fill="#0f172a" font-family="Inter, sans-serif" font-size="9" font-weight="700">deploy</text>
+
+    <!-- Annotation arrow to spike -->
+    <rect x="490" y="60" width="180" height="40" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1"/>
+    <text x="580" y="76" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">P95: 50ms → 3,100ms</text>
+    <text x="580" y="92" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">62x slower. Users timing out.</text>
+  </svg>
+
+  <p>The deploy log shows a new feature went out Monday night: an "Order History" page that lets users see all their past orders. The feature works perfectly — it shows the right data, the UI looks great, the tests all pass. But behind that innocent-looking page is this query:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">order-history.sql — the guilty query</span></div>
+    <div class="macos-body">
+      <pre><code class="language-sql">SELECT o.id, o.total, o.created_at, o.status,
+       oi.product_name, oi.quantity, oi.price
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+WHERE o.user_id = $1
+ORDER BY o.created_at DESC
+LIMIT 20;</code></pre>
+    </div>
+  </div>
+
+  <p>Looks completely reasonable, right? A simple join, a WHERE clause, a LIMIT. Every junior developer would write exactly this. And it runs fine in development with 500 rows. But production has <strong>10 million orders</strong> and <strong>45 million order items</strong>. Without an index on <code>orders.user_id</code>, the database has to read <strong>every single row in the orders table</strong> to find the ones belonging to user 42. That's a <span class="tooltip-trigger">sequential scan<span class="tooltip-content">Also called a "full table scan." The database reads the table from the first page to the last page, checking every row against your WHERE condition. On a 10-million-row table, this means reading ~6,300 disk pages. Even with caching, it's orders of magnitude slower than an index scan.</span></span> on 10 million rows. Every. Single. Request.</p>
+
+  <div class="callout callout-danger">
+    <strong>The math is brutal:</strong> Your orders table is ~1.2 GB on disk, spread across ~6,300 <span class="tooltip-trigger">pages<span class="tooltip-content">PostgreSQL stores data in 8 KB chunks called "pages" (also called "blocks"). A table with 1.2 GB of data needs about 150,000 pages. When the database does a sequential scan, it reads these pages one by one.</span></span>. Each request triggers a sequential scan that touches all 6,300 pages. At 200 requests per second, that's 1,260,000 page reads per second — way more than your <span class="tooltip-trigger">shared buffer pool<span class="tooltip-content">A region of RAM where PostgreSQL caches frequently-accessed disk pages. Default is 128 MB (about 16,384 pages). Once this fills up, the database starts evicting older pages and reading from disk — which is 100x slower.</span></span> can handle. The buffer pool thrashes, disk I/O spikes, and every query slows down — not just this one. One bad query is poisoning the entire database.
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You have a table with 10 million rows. Your query needs 47 of them. Without an index, the database reads all 10 million. <strong>What percentage of the work is wasted?</strong> And if you added an index, roughly how many disk pages would the database need to read instead of 6,334?</p>
+    <span class="think-hint">For the first part: 47 / 10,000,000 = ? For the second: think about how a B-tree index works. It's a tree with ~3 levels. You traverse 3-4 tree nodes, then read the matching data pages. 47 rows across ~8 KB pages...</span>
+  </div>
+
+  <p>The answer: 99.9995% of the work is wasted. The database reads 10 million rows to return 47. And with a B-tree index, it would read about 3 index pages (to traverse the tree) plus ~47 data pages — roughly <strong>50 page reads</strong> instead of 6,334. That's what we'll fix in this page.</p>
+
+  <h3>What Made This Hard to Catch</h3>
+
+  <p>This query passed every code review, every test, every staging environment check. Why? Because the staging database had 500 orders. At 500 rows, a sequential scan takes 0.05ms — perfectly fast. The problem only appears when the table has millions of rows. This is the fundamental trap of SQL performance: <strong>queries that are correct and fast on small data can be catastrophically slow on production data.</strong></p>
+
+  <!-- SVG: Same query, different data sizes -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Same query performance: 500 rows in dev fast, 10M rows in production slow">
+    <defs>
+      <marker id="sqt-s2b-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+      </marker>
+    </defs>
+
+    <!-- Dev environment -->
+    <rect x="30" y="20" width="320" height="80" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="190" y="43" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">STAGING: 500 rows</text>
+    <text x="190" y="62" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Seq Scan on orders → 0.05ms</text>
+    <text x="190" y="80" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">"Looks great! Ship it."</text>
+    <text x="190" y="94" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Tests pass. Code review approved.</text>
+
+    <!-- Arrow -->
+    <line x1="350" y1="60" x2="405" y2="60" stroke="#94a3b8" stroke-width="2" marker-end="url(#sqt-s2b-arr)"/>
+    <text x="378" y="52" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="9" font-weight="600">deploy</text>
+
+    <!-- Prod environment -->
+    <rect x="410" y="20" width="320" height="80" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="570" y="43" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">PRODUCTION: 10M rows</text>
+    <text x="570" y="62" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Seq Scan on orders → 89ms per query</text>
+    <text x="570" y="80" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">"P95 at 3 seconds. Page down."</text>
+    <text x="570" y="94" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Same exact query. Same exact code.</text>
+
+    <!-- Bottom lesson -->
+    <rect x="130" y="125" width="500" height="55" rx="10" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+    <text x="380" y="147" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">The query didn't change. The data grew.</text>
+    <text x="380" y="167" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">SQL performance is not about the query being "right." It's about the query being right AT SCALE.</text>
+  </svg>
+
+  <div class="callout callout-info">
+    <strong>How to reproduce this yourself right now:</strong> Spin up a PostgreSQL container (<code>docker run -e POSTGRES_PASSWORD=test -p 5432:5432 postgres:16</code>), create a table with <code>generate_series(1, 10000000)</code>, and run the same query with and without an index. You'll see the exact same spike. We'll do exactly this in Section 5.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 3 — THE FIRST ATTEMPT
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="first-attempt">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-server"></i></div>
+    <div>
+      <div class="section-num">Section 3</div>
+      <h2 class="section-title">The First Attempt — Throw More Servers at It</h2>
+    </div>
+  </div>
+
+  <p>Your API is slow. Your instinct — and the instinct of every team under pressure — is to scale horizontally. Add more app servers. Bump the instance count from 4 to 8. Double the capacity, halve the problem, right?</p>
+
+  <p>So you spin up four more API servers behind your load balancer. Each server now handles half the requests it used to. Your <span class="tooltip-trigger">CPU utilization<span class="tooltip-content">The percentage of processing power being used. If your app servers show 30% CPU, the bottleneck isn't the app server — it's somewhere else (usually the database).</span></span> on the app servers drops from 80% to 40%. You check the dashboard. Response times are... still 3 seconds.</p>
+
+  <!-- SVG: Adding servers doesn't help when DB is the bottleneck -->
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Adding app servers doesn't help when the database is the bottleneck">
+    <defs>
+      <marker id="sqt-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+      </marker>
+      <marker id="sqt-s3-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Adding More App Servers — What Actually Happens</text>
+
+    <!-- Users -->
+    <rect x="20" y="50" width="100" height="40" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="1.5"/>
+    <text x="70" y="74" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">200 req/sec</text>
+
+    <!-- Load Balancer -->
+    <rect x="165" y="50" width="90" height="40" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+    <text x="210" y="74" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Load Bal.</text>
+    <line x1="120" y1="70" x2="165" y2="70" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#sqt-s3-arr)"/>
+
+    <!-- App servers (8 of them, shown as 4 with label) -->
+    <rect x="310" y="35" width="80" height="30" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="350" y="54" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">App 1</text>
+    <rect x="310" y="70" width="80" height="30" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="350" y="89" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">App 2</text>
+    <rect x="310" y="105" width="80" height="30" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="350" y="124" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">App 3 (new)</text>
+    <rect x="310" y="140" width="80" height="30" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="350" y="159" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">App 4 (new)</text>
+
+    <!-- Lines from LB to app servers -->
+    <line x1="255" y1="65" x2="310" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="255" y1="70" x2="310" y2="85" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="255" y1="75" x2="310" y2="120" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="255" y1="78" x2="310" y2="155" stroke="#94a3b8" stroke-width="1"/>
+
+    <!-- Arrow from app servers to database — the bottleneck -->
+    <line x1="390" y1="50" x2="490" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#sqt-s3-arr-r)"/>
+    <line x1="390" y1="85" x2="490" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#sqt-s3-arr-r)"/>
+    <line x1="390" y1="120" x2="490" y2="105" stroke="#ef4444" stroke-width="2" marker-end="url(#sqt-s3-arr-r)"/>
+    <line x1="390" y1="155" x2="490" y2="110" stroke="#ef4444" stroke-width="2" marker-end="url(#sqt-s3-arr-r)"/>
+
+    <!-- Database — the bottleneck -->
+    <rect x="490" y="75" width="130" height="60" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="3"/>
+    <text x="555" y="97" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">PostgreSQL</text>
+    <text x="555" y="113" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">CPU: 97%</text>
+    <text x="555" y="127" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">I/O wait: 340ms</text>
+
+    <!-- Bottleneck annotation -->
+    <rect x="640" y="78" width="105" height="55" rx="8" fill="rgba(239,68,68,0.12)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="692" y="97" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="10">BOTTLENECK</text>
+    <text x="692" y="113" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">Still 200 req/sec</text>
+    <text x="692" y="127" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">hitting the SAME DB</text>
+
+    <!-- App server stats -->
+    <rect x="310" y="180" width="80" height="30" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+    <text x="350" y="196" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">CPU: 40%</text>
+    <text x="350" y="208" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">was 80%</text>
+
+    <!-- Explanation boxes at bottom -->
+    <rect x="40" y="240" width="320" height="75" rx="10" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="200" y="261" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">What you fixed</text>
+    <text x="200" y="280" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">App server CPU dropped 80% → 40%</text>
+    <text x="200" y="296" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Each server handles fewer requests</text>
+
+    <rect x="400" y="240" width="320" height="75" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="560" y="261" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">What you didn't fix</text>
+    <text x="560" y="280" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Database still runs the same slow query</text>
+    <text x="560" y="296" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">Response time: still 3 seconds</text>
+  </svg>
+
+  <p>Why didn't it work? Because the app servers weren't the bottleneck. They were sitting at 30% CPU, happily waiting for the database to respond. The database was the bottleneck. Every one of those 200 requests per second triggers the same sequential scan on the same 10-million-row table. Adding more app servers just means <strong>more connections all hammering the same slow database</strong>.</p>
+
+  <p>This is one of the most common mistakes in backend engineering: <strong>scaling the wrong layer</strong>. The app servers are fine. The network is fine. The load balancer is fine. The problem is a single SQL query doing a full table scan, and no amount of horizontal scaling on the app tier will fix it.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>If adding more app servers doesn't help (because the DB is the bottleneck), what about adding <strong>read replicas</strong>? You set up 3 read replicas and route all SELECT queries to them. Does this fix the problem? <strong>Think about what each replica has to do when it receives the same query.</strong></p>
+    <span class="think-hint">Each replica has the same data, same table, same missing index. What does each replica do when it gets SELECT * FROM orders WHERE user_id = 42?</span>
+  </div>
+
+  <p>Read replicas don't fix it either — not really. Each replica has the <em>exact same table without an index</em>. Each one still does a sequential scan on 10 million rows. You've spread the load across 3 databases instead of 1, so each handles ~67 requests per second instead of 200. That buys you some breathing room, but each request still takes 89ms of pure scan time. You've spent $3,000/month on three new database instances to treat a symptom instead of fixing the cause.</p>
+
+  <h3>The Real Numbers</h3>
+
+  <p>Let's look at exactly what you're paying for the "throw hardware at it" approach versus fixing the actual query:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Approach</th><th>Monthly Cost</th><th>P95 Latency</th><th>Time to Implement</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Do nothing (1 DB)</td>
+          <td>$350/month</td>
+          <td style="color:#ef4444; font-weight:700;">3,100ms</td>
+          <td>0 minutes</td>
+        </tr>
+        <tr>
+          <td>Add 3 read replicas</td>
+          <td>$1,400/month</td>
+          <td style="color:#f59e0b; font-weight:700;">890ms</td>
+          <td>2 hours setup</td>
+        </tr>
+        <tr>
+          <td>Scale app tier 4→8</td>
+          <td>$600/month (extra)</td>
+          <td style="color:#ef4444; font-weight:700;">3,100ms (unchanged)</td>
+          <td>20 minutes</td>
+        </tr>
+        <tr>
+          <td style="color:#10b981; font-weight:600;">CREATE INDEX</td>
+          <td style="color:#10b981; font-weight:600;">$0 extra</td>
+          <td style="color:#10b981; font-weight:700;">0.128ms</td>
+          <td style="color:#10b981; font-weight:600;">30 seconds</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>One line of SQL — <code>CREATE INDEX idx_orders_user_id ON orders (user_id);</code> — does more than $2,000/month of additional hardware. This is the entire argument for SQL tuning in one table: <strong>fix the query, not the infrastructure</strong>.</p>
+
+  <div class="callout callout-success">
+    <strong>The lesson:</strong> Before you scale anything — before you add servers, replicas, caches, or CDNs — run <code>EXPLAIN ANALYZE</code> on your slowest queries. Nine times out of ten, the fix is a missing index, not a missing server. The next section shows you exactly what was happening under the hood and why it broke.
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 4 — WHERE IT BREAKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="where-it-breaks">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-explosion"></i></div>
+    <div>
+      <div class="section-num">Section 4</div>
+      <h2 class="section-title">Where It Breaks — The Four Horsemen of Slow Queries</h2>
+    </div>
+  </div>
+
+  <p>The "add servers" approach failed because the problem was never the servers. It was the database. Specifically, it was one (or more) of four problems that cause 95% of all database performance issues. Let's meet all four — because you'll encounter every single one of them in your career.</p>
+
+  <!-- SVG: Four horsemen overview -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four horsemen of slow queries: sequential scan, N+1, missing indexes, connection exhaustion">
+    <defs>
+      <marker id="sqt-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The Four Horsemen of Slow Queries</text>
+
+    <!-- 1. Sequential Scan -->
+    <rect x="20" y="45" width="165" height="100" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="102" y="68" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">SEQ SCAN</text>
+    <text x="102" y="85" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Reading every row</text>
+    <text x="102" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">in the table because</text>
+    <text x="102" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">there's no index.</text>
+    <text x="102" y="135" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">89ms → 0.1ms with index</text>
+
+    <!-- 2. N+1 Queries -->
+    <rect x="205" y="45" width="165" height="100" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="287" y="68" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">N+1 QUERIES</text>
+    <text x="287" y="85" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">1 query to get users,</text>
+    <text x="287" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">then 1 query PER user</text>
+    <text x="287" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">to get their orders.</text>
+    <text x="287" y="135" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9" font-weight="600">1001 queries → 2 queries</text>
+
+    <!-- 3. Missing / Wrong Indexes -->
+    <rect x="390" y="45" width="165" height="100" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+    <text x="472" y="68" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="11">WRONG INDEX</text>
+    <text x="472" y="85" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Index exists but query</text>
+    <text x="472" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">can't use it. Wrong</text>
+    <text x="472" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">column order, func call.</text>
+    <text x="472" y="135" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-size="9" font-weight="600">Invisible until EXPLAIN</text>
+
+    <!-- 4. Connection Exhaustion -->
+    <rect x="575" y="45" width="165" height="100" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="657" y="68" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">CONN EXHAUSTION</text>
+    <text x="657" y="85" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Too many open</text>
+    <text x="657" y="100" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">connections. DB refuses</text>
+    <text x="657" y="115" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">new ones. App hangs.</text>
+    <text x="657" y="135" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="9" font-weight="600">PgBouncer: 1000 → 25</text>
+
+    <!-- Bottom combined damage -->
+    <rect x="80" y="175" width="600" height="80" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="380" y="198" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Combined damage at scale</text>
+    <text x="380" y="216" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">A missing index causes slow queries → slow queries hold connections longer →</text>
+    <text x="380" y="232" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">connection pool fills up → new requests queue → timeout cascade → entire app goes down.</text>
+    <text x="380" y="248" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">These four problems feed each other. Fix any one and the others often resolve too.</text>
+  </svg>
+
+  <h3>Horseman #1: Sequential Scan on a Big Table</h3>
+
+  <p>We've already met this one. When you write <code>WHERE user_id = 42</code> and there's no index on <code>user_id</code>, the database has no choice but to read the entire table. It starts at page 1 and reads every page until the end. On a 10-million-row table, that's thousands of disk pages.</p>
+
+  <p>Here's what that looks like in real <code>EXPLAIN ANALYZE</code> output — the exact output PostgreSQL gives you:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — EXPLAIN ANALYZE without index</span></div>
+    <div class="macos-body">
+      <pre><code class="language-sql">EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT * FROM orders WHERE user_id = 42;
+
+-- Output:
+-- Seq Scan on orders  (cost=0.00..18334.00 rows=50 width=96)
+--                     (actual time=0.031..89.442 rows=47 loops=1)
+--   Filter: (user_id = 42)
+--   Rows Removed by Filter: 999953
+--   Buffers: shared hit=6334
+-- Planning Time: 0.089 ms
+-- Execution Time: 89.521 ms</code></pre>
+    </div>
+  </div>
+
+  <p>Let's read that output like a doctor reads a blood test. Every line tells you something:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Line</th><th>What it means</th><th>Is it bad?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Seq Scan on orders</code></td><td>Full table scan — reading every row, start to finish</td><td style="color:#ef4444; font-weight:600;">Yes. This is the problem.</td></tr>
+        <tr><td><code>rows=50</code> (estimated) vs <code>rows=47</code> (actual)</td><td>Planner guessed ~50 rows, found 47. Estimate is good.</td><td style="color:#10b981;">No, estimates are close.</td></tr>
+        <tr><td><code>Rows Removed by Filter: 999953</code></td><td>Read 1,000,000 rows, kept 47, threw away 999,953</td><td style="color:#ef4444; font-weight:600;">Yes. 99.995% waste.</td></tr>
+        <tr><td><code>Buffers: shared hit=6334</code></td><td>Read 6,334 pages from the <span class="tooltip-trigger">buffer pool<span class="tooltip-content">PostgreSQL's in-memory cache of disk pages. "shared hit" means the page was already in RAM. "shared read" means it had to go to disk — much slower.</span></span> (RAM cache)</td><td style="color:#ef4444; font-weight:600;">Yes. Way too many pages.</td></tr>
+        <tr><td><code>Execution Time: 89.521 ms</code></td><td>Wall clock time for the query</td><td style="color:#ef4444; font-weight:600;">Yes. 89ms per request = trouble.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The smoking gun is <code>Rows Removed by Filter: 999953</code>. The database read a million rows and threw away 999,953 of them. That's like reading an entire phone book to find one person's number.</p>
+
+  <h3>Horseman #2: The N+1 Query Problem</h3>
+
+  <p>This one is sneaky because it doesn't show up as one slow query. It shows up as <strong>a thousand fast queries</strong> where you only needed two.</p>
+
+  <p>Here's the classic example. You want to show a list of users and how many orders each one has. The "obvious" code does this:</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="sqt-n1-ruby" role="tab" aria-selected="true">Ruby (Rails)</button>
+      <button class="tab-btn" data-tab="sqt-n1-python" role="tab" aria-selected="false">Python (Django)</button>
+      <button class="tab-btn" data-tab="sqt-n1-sql" role="tab" aria-selected="false">Raw SQL</button>
+    </div>
+    <div class="tab-panel active" id="sqt-n1-ruby" role="tabpanel">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">app/controllers/users_controller.rb — N+1 problem</span></div>
+        <div class="macos-body">
+          <pre><code class="language-ruby"># BAD: N+1 — fires 1001 queries for 1000 users
+users = User.all                    # Query 1: SELECT * FROM users
+users.each do |user|
+  puts user.orders.count            # Query 2..1001: SELECT COUNT(*)
+end                                 #   FROM orders WHERE user_id = ?
+# Total: 1 + 1000 = 1001 queries.
+# At 1ms per query = 1001ms = over 1 SECOND just for DB calls.
+
+# FIXED: eager loading — 2 queries total
+users = User.includes(:orders).all  # Query 1: SELECT * FROM users
+                                    # Query 2: SELECT * FROM orders
+                                    #          WHERE user_id IN (1,2,3...)
+users.each do |user|
+  puts user.orders.size             # No query — already loaded
+end
+# Total: 2 queries. ~3ms.</code></pre>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" id="sqt-n1-python" role="tabpanel">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">views.py — N+1 in Django</span></div>
+        <div class="macos-body">
+          <pre><code class="language-python"># BAD: N+1
+users = User.objects.all()           # 1 query
+for user in users:
+    print(user.order_set.count())    # N queries
+
+# FIXED: prefetch_related
+users = User.objects.prefetch_related('order_set').all()  # 2 queries
+for user in users:
+    print(len(user.order_set.all())) # No query — already loaded</code></pre>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" id="sqt-n1-sql" role="tabpanel">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">The raw SQL happening behind the scenes</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- BAD: N+1 (what the ORM generates)
+SELECT * FROM users;                           -- query 1
+SELECT COUNT(*) FROM orders WHERE user_id = 1; -- query 2
+SELECT COUNT(*) FROM orders WHERE user_id = 2; -- query 3
+SELECT COUNT(*) FROM orders WHERE user_id = 3; -- query 4
+-- ... 997 more queries ...
+
+-- FIXED: One query with JOIN
+SELECT u.id, u.name, COUNT(o.id) AS order_count
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP BY u.id, u.name;</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p>The N+1 problem is the most common performance bug in web applications using <span class="tooltip-trigger">ORMs<span class="tooltip-content">Object-Relational Mappers — libraries like ActiveRecord (Rails), Django ORM, SQLAlchemy (Python), or Entity Framework (.NET) that let you write code instead of SQL. They're convenient but can generate inefficient queries if you're not careful.</span></span>. It's called "N+1" because you fire 1 query to get N records, then 1 more query for EACH record. For 1,000 users, that's 1,001 database round trips instead of 2.</p>
+
+  <h3>Horseman #3: Missing or Wrong Indexes</h3>
+
+  <p>Sometimes you have an index, but the query can't use it. This is more frustrating than having no index at all, because you <em>think</em> you've solved the problem.</p>
+
+  <p>The three most common ways your index becomes useless:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Three ways to accidentally disable your index</span></div>
+    <div class="macos-body">
+      <pre><code class="language-sql">-- You created this index:
+CREATE INDEX idx_orders_created ON orders (created_at);
+
+-- ❌ BROKEN: Function call on indexed column
+-- The index stores raw dates, not YEAR(dates). Can't use the index.
+SELECT * FROM orders WHERE YEAR(created_at) = 2024;
+
+-- ✅ FIXED: Rewrite to use the column directly
+SELECT * FROM orders
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01';
+
+-- ❌ BROKEN: Implicit type cast
+-- user_id is an integer column, but you pass a string.
+-- Some databases cast the COLUMN to match, disabling the index.
+SELECT * FROM orders WHERE user_id = '42';
+
+-- ✅ FIXED: Use the correct type
+SELECT * FROM orders WHERE user_id = 42;
+
+-- ❌ BROKEN: Wrong column order in composite index
+-- Index is (status, created_at) but you query by created_at only.
+-- A composite index is like a phone book sorted by (last_name, first_name).
+-- You can't look up by first_name alone — the book isn't sorted that way.
+CREATE INDEX idx_status_date ON orders (status, created_at);
+SELECT * FROM orders WHERE created_at > '2024-01-01'; -- Can't use index!
+
+-- ✅ FIXED: Create index with the column you actually filter on FIRST
+CREATE INDEX idx_date ON orders (created_at);
+-- Or: query includes the leading column
+SELECT * FROM orders WHERE status = 'shipped' AND created_at > '2024-01-01';</code></pre>
+    </div>
+  </div>
+
+  <h3>Horseman #4: Connection Exhaustion</h3>
+
+  <p>Every database has a maximum number of simultaneous connections. PostgreSQL defaults to <code>max_connections = 100</code>. That sounds like a lot until you realize that slow queries hold connections open longer. If each query takes 89ms instead of 0.1ms, connections are occupied 890x longer. Your pool drains instantly.</p>
+
+  <p>Here's the real config you'd see in a PostgreSQL setup with <span class="tooltip-trigger">PgBouncer<span class="tooltip-content">A lightweight connection pooler for PostgreSQL. It sits between your app and the database, maintaining a small pool of real DB connections and multiplexing thousands of app connections through them. Essential for any production PostgreSQL deployment.</span></span>:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">pgbouncer.ini — real production config</span></div>
+    <div class="macos-body">
+      <pre><code class="language-yaml">[databases]
+myapp = host=127.0.0.1 port=5432 dbname=myapp_production
+
+[pgbouncer]
+listen_port = 6432
+max_client_conn = 1000     # App servers can open up to 1000 connections
+default_pool_size = 25     # But only 25 real DB connections are open
+reserve_pool_size = 5      # 5 extra for emergencies
+pool_mode = transaction    # Return connection to pool after each transaction
+
+# The math: 1000 app connections funnel into 25 DB connections.
+# Each DB connection handles ~40 short queries per second.
+# 25 × 40 = 1000 queries/sec capacity.
+# Without PgBouncer: 1000 app connections = 1000 DB connections = PostgreSQL OOM.</code></pre>
+    </div>
+  </div>
+
+  <p>Without a connection pooler, if you have 8 app servers each opening 125 connections, that's 1,000 connections to PostgreSQL. Each connection consumes about <strong>10 MB of memory</strong> on the database server. That's 10 GB just for connection overhead — before your database stores a single byte of data. PgBouncer funnels those 1,000 app connections through just 25 real database connections, cutting memory usage by 97%.</p>
+
+  <div class="callout callout-warning">
+    <strong>The cascade effect:</strong> These four problems amplify each other. A missing index (Horseman #1) makes queries slow. Slow queries hold connections longer (Horseman #4). The connection pool fills up. New requests wait in a queue. Timeouts cascade. The entire application goes down — not because of one bug, but because of a chain reaction started by a single missing index.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 5 — THE BREAKTHROUGH
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="the-breakthrough">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+    <div>
+      <div class="section-num">Section 5</div>
+      <h2 class="section-title">The Breakthrough — EXPLAIN ANALYZE Changes Everything</h2>
+    </div>
+  </div>
+
+  <p>All four horsemen have one thing in common: you can't fix what you can't see. You can stare at your SQL all day and it looks fine. The query is correct. It returns the right data. The problem is invisible in the code — it's in the <strong>execution plan</strong> the database chose.</p>
+
+  <p>That's what <code>EXPLAIN ANALYZE</code> gives you. It's like an X-ray for your query. Instead of just running the query and giving you results, the database also tells you <strong>exactly how it found those results</strong> — which tables it scanned, which indexes it used (or didn't), how many rows it read, and how long each step took.</p>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You have the slow query from Section 2. Before reading further, <strong>what would you add to the database to make it fast?</strong> And how would you verify that your fix actually worked — that the database is using the fix you created?</p>
+    <span class="think-hint">You need two things: something to CREATE, and something to ask the database to EXPLAIN.</span>
+  </div>
+
+  <p>The fix is two commands. One to create the index, and one to verify the database uses it:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — the fix (30 seconds)</span></div>
+    <div class="macos-body">
+      <pre><code class="language-sql">-- Step 1: Create the index (takes ~5 seconds on 10M rows)
+CREATE INDEX CONCURRENTLY idx_orders_user_id ON orders (user_id);
+-- CONCURRENTLY = don't lock the table while building the index.
+-- Without it, your table is locked for writes during index creation.
+
+-- Step 2: Verify the fix
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT * FROM orders WHERE user_id = 42;
+
+-- Output (AFTER index):
+-- Index Scan using idx_orders_user_id on orders
+--   (cost=0.42..52.18 rows=50 width=96)
+--   (actual time=0.028..0.089 rows=47 loops=1)
+--   Index Cond: (user_id = 42)
+--   Buffers: shared hit=50
+-- Planning Time: 0.113 ms
+-- Execution Time: 0.128 ms</code></pre>
+    </div>
+  </div>
+
+  <!-- SVG: Before vs After comparison -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Before and after index: 89ms vs 0.128ms, 6334 pages vs 50 pages">
+    <defs>
+      <marker id="sqt-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Before vs After: One CREATE INDEX</text>
+
+    <!-- BEFORE column -->
+    <rect x="30" y="40" width="330" height="180" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="195" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">BEFORE (No Index)</text>
+
+    <text x="55" y="90" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Scan Type:</text>
+    <text x="190" y="90" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">Seq Scan (full table)</text>
+
+    <text x="55" y="112" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Pages Read:</text>
+    <text x="190" y="112" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">6,334 pages</text>
+
+    <text x="55" y="134" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Rows Scanned:</text>
+    <text x="190" y="134" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">1,000,000 rows</text>
+
+    <text x="55" y="156" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Rows Returned:</text>
+    <text x="190" y="156" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">47 rows</text>
+
+    <text x="55" y="178" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Rows Wasted:</text>
+    <text x="190" y="178" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="10">999,953 (99.995%)</text>
+
+    <rect x="55" y="190" width="280" height="22" rx="5" fill="rgba(239,68,68,0.15)"/>
+    <text x="195" y="205" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Execution: 89.521 ms</text>
+
+    <!-- AFTER column -->
+    <rect x="400" y="40" width="330" height="180" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="565" y="65" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">AFTER (With Index)</text>
+
+    <text x="425" y="90" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Scan Type:</text>
+    <text x="560" y="90" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Index Scan (direct lookup)</text>
+
+    <text x="425" y="112" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Pages Read:</text>
+    <text x="560" y="112" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">50 pages</text>
+
+    <text x="425" y="134" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Rows Scanned:</text>
+    <text x="560" y="134" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">47 rows (only matches)</text>
+
+    <text x="425" y="156" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Rows Returned:</text>
+    <text x="560" y="156" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">47 rows</text>
+
+    <text x="425" y="178" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Rows Wasted:</text>
+    <text x="560" y="178" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">0 (0%)</text>
+
+    <rect x="425" y="190" width="280" height="22" rx="5" fill="rgba(16,185,129,0.15)"/>
+    <text x="565" y="205" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Execution: 0.128 ms</text>
+
+    <!-- Bottom comparison -->
+    <rect x="150" y="238" width="460" height="30" rx="8" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="2"/>
+    <text x="380" y="258" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="800" font-size="13">699× faster. 6,334 pages → 50 pages. Zero code change.</text>
+  </svg>
+
+  <p>Read those two outputs side by side. Same query. Same data. Same server. The only difference is one <code>CREATE INDEX</code> statement. The planner went from "I guess I'll read everything" to "I know exactly where that data is." From 89.5ms to 0.128ms. From 6,334 page reads to 50.</p>
+
+  <h3>Try It Yourself — Right Now</h3>
+
+  <p>This is the most important hands-on exercise on this page. Copy these commands, run them, and see the difference with your own eyes:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">bash + psql — reproduce the 699x improvement</span></div>
+    <div class="macos-body">
+      <pre><code class="language-bash"># 1. Start PostgreSQL (Docker)
+docker run --name pg-tuning -e POSTGRES_PASSWORD=test \
+  -p 5432:5432 -d postgres:16
+
+# 2. Connect
+docker exec -it pg-tuning psql -U postgres
+
+# 3. Create table with 1M rows (takes ~3 seconds)
+CREATE TABLE orders (
+  id         SERIAL PRIMARY KEY,
+  user_id    INT NOT NULL,
+  total      NUMERIC(10,2),
+  status     TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO orders (user_id, total, status)
+SELECT
+  (random() * 20000)::int,          -- 20K distinct users
+  (random() * 500 + 5)::numeric(10,2),
+  (ARRAY['pending','shipped','delivered','cancelled'])[floor(random()*4+1)::int]
+FROM generate_series(1, 1000000);
+
+-- 4. Run BEFORE (no index) — note the Seq Scan and time
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM orders WHERE user_id = 42;
+
+-- 5. Create the index
+CREATE INDEX idx_orders_user_id ON orders (user_id);
+
+-- 6. Run AFTER (with index) — note the Index Scan and time
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM orders WHERE user_id = 42;
+
+-- 7. Compare the two outputs. You'll see:
+--    Seq Scan → Index Scan
+--    ~80ms   → ~0.1ms
+--    ~6000 buffers → ~50 buffers</code></pre>
+    </div>
+  </div>
+
+  <h3>Finding Your Slow Queries in Production</h3>
+
+  <p>You can't run <code>EXPLAIN ANALYZE</code> on queries you don't know about. In production, you need to find the slow ones first. Here are the real tools:</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="sqt-slow-pg" role="tab" aria-selected="true">PostgreSQL</button>
+      <button class="tab-btn" data-tab="sqt-slow-mysql" role="tab" aria-selected="false">MySQL</button>
+    </div>
+    <div class="tab-panel active" id="sqt-slow-pg" role="tabpanel">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">postgresql.conf + pg_stat_statements</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- Method 1: Slow query log
+-- In postgresql.conf:
+-- log_min_duration_statement = 100
+-- This logs every query that takes more than 100ms.
+-- Check your PostgreSQL log file for the output.
+
+-- Method 2: pg_stat_statements (MUCH better)
+-- Enable it first:
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+-- Then find your 10 slowest queries RIGHT NOW:
+SELECT
+  query,
+  calls,
+  round(mean_exec_time::numeric, 2) AS avg_ms,
+  round(total_exec_time::numeric, 2) AS total_ms,
+  rows
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+
+-- This shows you EXACTLY which queries are slow,
+-- how often they run, and how much total time they consume.
+-- The "total_ms" column is the most important —
+-- a query averaging 5ms that runs 1M times
+-- is worse than a query averaging 500ms that runs once.</code></pre>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" id="sqt-slow-mysql" role="tabpanel">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MySQL slow query log</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- Enable slow query log (run as admin):
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 0.1;  -- log queries > 100ms
+SET GLOBAL log_queries_not_using_indexes = 'ON';
+
+-- Check it's enabled:
+SHOW VARIABLES LIKE 'slow_query%';
+
+-- Find slow queries:
+-- The log file is at: /var/lib/mysql/hostname-slow.log
+-- Or use mysqldumpslow to summarize:
+-- mysqldumpslow -s t /var/lib/mysql/hostname-slow.log
+
+-- MySQL equivalent of pg_stat_statements:
+-- Enable Performance Schema (usually on by default):
+SELECT
+  DIGEST_TEXT AS query,
+  COUNT_STAR AS calls,
+  ROUND(AVG_TIMER_WAIT / 1000000000, 2) AS avg_ms,
+  SUM_ROWS_EXAMINED AS rows_scanned,
+  SUM_ROWS_SENT AS rows_returned
+FROM performance_schema.events_statements_summary_by_digest
+ORDER BY AVG_TIMER_WAIT DESC
+LIMIT 10;</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>The workflow:</strong> Step 1 — Find slow queries (<code>pg_stat_statements</code>). Step 2 — Understand WHY they're slow (<code>EXPLAIN ANALYZE</code>). Step 3 — Fix the root cause (usually: add an index). Step 4 — Verify the fix (<code>EXPLAIN ANALYZE</code> again). This four-step loop is the entire discipline of SQL tuning. Everything else on this page is details.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 6 — HOW IT WORKS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="how-it-works">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-gears"></i></div>
+    <div>
+      <div class="section-num">Section 6</div>
+      <h2 class="section-title">How It Works — The Complete Toolkit</h2>
+    </div>
+  </div>
+
+  <p>You now know the four problems and the breakthrough tool (<code>EXPLAIN ANALYZE</code>). This section is the reference manual — six essential topics, each with real commands you can run. Think of these as the six tools in your SQL tuning toolbox.</p>
+
+  <!-- Tool 1: EXPLAIN ANALYZE Deep Dive -->
+  <div class="card open">
+    <h3 class="card-title"><i class="fa-solid fa-stethoscope icon-gap"></i> Tool 1: Reading EXPLAIN ANALYZE Like a Pro</h3>
+    <div class="card-body">
+
+      <p><code>EXPLAIN ANALYZE</code> is the single most important command in database performance. It runs your query AND tells you exactly how the database executed it. The key is knowing which parts to look at.</p>
+
+      <p>Here's a more complex query with a real plan — a join across two tables:</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — EXPLAIN ANALYZE on a JOIN query</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT o.id, o.total, oi.product_name, oi.quantity
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+WHERE o.user_id = 42
+ORDER BY o.created_at DESC
+LIMIT 20;
+
+-- Limit  (cost=298.15..298.20 rows=20 width=52)
+--        (actual time=0.192..0.198 rows=20 loops=1)
+--   -> Sort  (cost=298.15..298.28 rows=50 width=52)
+--            (actual time=0.190..0.193 rows=20 loops=1)
+--         Sort Key: o.created_at DESC
+--         Sort Method: top-N heapsort  Memory: 27kB
+--         -> Nested Loop  (cost=0.85..297.05 rows=50 width=52)
+--                         (actual time=0.038..0.158 rows=47 loops=1)
+--               -> Index Scan using idx_orders_user_id on orders o
+--                  (cost=0.42..52.18 rows=50 width=24)
+--                  (actual time=0.025..0.055 rows=47 loops=1)
+--                     Index Cond: (user_id = 42)
+--                     Buffers: shared hit=50
+--               -> Index Scan using idx_order_items_order_id on order_items oi
+--                  (cost=0.43..4.87 rows=1 width=36)
+--                  (actual time=0.001..0.002 rows=1 loops=47)
+--                     Index Cond: (order_id = o.id)
+--                     Buffers: shared hit=94
+-- Planning Time: 0.324 ms
+-- Execution Time: 0.241 ms</code></pre>
+        </div>
+      </div>
+
+      <p>Read this plan from the <strong>inside out</strong>, bottom to top. The innermost nodes execute first:</p>
+
+      <!-- SVG: How to read an EXPLAIN plan -->
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reading an EXPLAIN plan inside-out: index scan, nested loop, sort, limit">
+        <defs>
+          <marker id="sqt-s6-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Read EXPLAIN Plans Inside-Out</text>
+
+        <!-- Step 1: Index Scan on orders -->
+        <rect x="40" y="220" width="300" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <circle cx="55" cy="237" r="12" fill="#10b981"/>
+        <text x="55" y="241" text-anchor="middle" fill="#0f172a" font-family="Inter, sans-serif" font-weight="700" font-size="10">1</text>
+        <text x="75" y="240" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Index Scan on orders</text>
+        <text x="75" y="258" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Find 47 rows where user_id=42. Reads 50 pages.</text>
+        <text x="75" y="270" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Time: 0.055ms</text>
+
+        <!-- Step 2: Index Scan on order_items (per row) -->
+        <rect x="400" y="220" width="330" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <circle cx="415" cy="237" r="12" fill="#10b981"/>
+        <text x="415" y="241" text-anchor="middle" fill="#0f172a" font-family="Inter, sans-serif" font-weight="700" font-size="10">2</text>
+        <text x="435" y="240" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Index Scan on order_items (×47)</text>
+        <text x="435" y="258" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">For each of the 47 orders, find items. 94 pages.</text>
+        <text x="435" y="270" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Time: 0.002ms × 47 loops</text>
+
+        <!-- Step 3: Nested Loop -->
+        <rect x="150" y="140" width="460" height="50" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+        <circle cx="165" cy="157" r="12" fill="#f97316"/>
+        <text x="165" y="161" text-anchor="middle" fill="#0f172a" font-family="Inter, sans-serif" font-weight="700" font-size="10">3</text>
+        <text x="185" y="158" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="10">Nested Loop Join</text>
+        <text x="185" y="175" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Combine orders + order_items. 47 result rows. Total: 0.158ms</text>
+
+        <!-- Step 4: Sort -->
+        <rect x="210" y="70" width="340" height="45" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+        <circle cx="225" cy="87" r="12" fill="#a855f7"/>
+        <text x="225" y="91" text-anchor="middle" fill="#0f172a" font-family="Inter, sans-serif" font-weight="700" font-size="10">4</text>
+        <text x="245" y="87" fill="#a855f7" font-family="Inter, sans-serif" font-weight="600" font-size="10">Sort by created_at DESC</text>
+        <text x="245" y="103" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">In-memory heapsort (27 KB). Only needs top 20.</text>
+
+        <!-- Step 5: Limit -->
+        <rect x="260" y="35" width="240" height="25" rx="6" fill="rgba(249,115,22,0.1)" stroke="#f97316" stroke-width="1.5"/>
+        <text x="380" y="52" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="10">LIMIT 20 → return to client (0.241ms total)</text>
+
+        <!-- Arrows going up -->
+        <line x1="190" y1="220" x2="300" y2="190" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#sqt-s6-arr)"/>
+        <line x1="565" y1="220" x2="460" y2="190" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#sqt-s6-arr)"/>
+        <line x1="380" y1="140" x2="380" y2="115" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#sqt-s6-arr)"/>
+        <line x1="380" y1="70" x2="380" y2="60" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#sqt-s6-arr)"/>
+
+        <!-- Bottom note -->
+        <text x="380" y="305" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="10">Total: 0.241ms. 144 buffer hits. Zero disk reads. Both indexes working perfectly.</text>
+      </svg>
+
+      <p>The key numbers to check in every <code>EXPLAIN ANALYZE</code> output:</p>
+      <ul>
+        <li><strong>Scan type</strong> — <code>Seq Scan</code> on a large table = problem. <code>Index Scan</code> = good.</li>
+        <li><strong>Rows Removed by Filter</strong> — If this is large, you're reading rows you don't need.</li>
+        <li><strong>Buffers: shared hit vs shared read</strong> — "hit" means RAM cache. "read" means disk. Disk reads are 100x slower.</li>
+        <li><strong>loops</strong> — If a node says <code>loops=47</code>, multiply its time by 47 to get the real cost.</li>
+        <li><strong>actual time vs estimated cost</strong> — If these differ wildly, your <span class="tooltip-trigger">statistics<span class="tooltip-content">PostgreSQL maintains statistics about your data — how many distinct values each column has, the distribution of values, etc. These stats feed the query planner. If they're outdated (e.g., after a big bulk insert), the planner makes bad decisions. Fix with ANALYZE tablename.</span></span> are stale. Run <code>ANALYZE tablename;</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Tool 2: Scan Types -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-binoculars icon-gap"></i> Tool 2: Scan Types — How the Database Reads Data</h3>
+    <div class="card-body">
+
+      <p>When the query planner decides how to find your data, it picks one of several scan strategies. Each has different performance characteristics. Think of these like different ways to find a word in a book:</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Scan Type</th><th>Analogy</th><th>When Used</th><th>Speed</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Seq Scan</strong></td>
+              <td>Reading every page of a book</td>
+              <td>No usable index, or table is tiny</td>
+              <td style="color:#ef4444;">Slowest on large tables</td>
+            </tr>
+            <tr>
+              <td><strong>Index Scan</strong></td>
+              <td>Using the book's index, then flipping to the page</td>
+              <td>Index exists, few matching rows</td>
+              <td style="color:#10b981;">Fast for selective queries</td>
+            </tr>
+            <tr>
+              <td><strong><span class="tooltip-trigger">Bitmap Index Scan<span class="tooltip-content">A two-step process: first, scan the index to build a bitmap of which pages contain matching rows. Then, read those pages in sequential order. Faster than Index Scan when you're fetching many rows (say 5-20% of the table) because it avoids random I/O.</span></span></strong></td>
+              <td>Marking all matching pages first, then reading them in order</td>
+              <td>Index exists, moderate number of matching rows (5-20%)</td>
+              <td style="color:#f59e0b;">Middle ground</td>
+            </tr>
+            <tr>
+              <td><strong><span class="tooltip-trigger">Index Only Scan<span class="tooltip-content">The best possible scan. The index itself contains ALL the columns the query needs, so the database never touches the table at all. Only possible with "covering indexes" that include all selected columns.</span></span></strong></td>
+              <td>Finding your answer in the index itself without opening the book</td>
+              <td>All requested columns are in the index</td>
+              <td style="color:#10b981;">Fastest — skips table entirely</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The planner picks the scan type based on math. If your query matches 0.01% of the table, Index Scan wins. If it matches 60% of the table, Seq Scan is actually faster (because sequential disk reads are much faster than random reads). The planner knows the tipping point — usually around 5-15% of the table.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — see the planner choose different scans</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- Selective query (few rows) → Index Scan
+EXPLAIN SELECT * FROM orders WHERE user_id = 42;
+-- Index Scan using idx_orders_user_id on orders
+-- (the planner knows user_id=42 matches ~50 rows out of 1M)
+
+-- Non-selective query (many rows) → Seq Scan
+EXPLAIN SELECT * FROM orders WHERE status = 'shipped';
+-- Seq Scan on orders  Filter: (status = 'shipped')
+-- (the planner knows 'shipped' matches ~250K rows = 25% of table.
+--  Seq Scan is FASTER here because sequential I/O beats random I/O)
+
+-- Index Only Scan — create a covering index:
+CREATE INDEX idx_orders_covering ON orders (user_id) INCLUDE (total, created_at);
+EXPLAIN SELECT total, created_at FROM orders WHERE user_id = 42;
+-- Index Only Scan using idx_orders_covering on orders
+-- (everything the query needs is IN the index — no table access!)</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 3: Index Strategies -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-layer-group icon-gap"></i> Tool 3: Index Strategies — Single, Composite, Partial, Covering</h3>
+    <div class="card-body">
+
+      <p>Knowing that indexes make queries fast is step one. Knowing <em>which type of index</em> to create is step two. There are four types you'll use in practice, and choosing the right one makes the difference between a good index and a great one.</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="sqt-idx-single" role="tab" aria-selected="true">Single Column</button>
+          <button class="tab-btn" data-tab="sqt-idx-composite" role="tab" aria-selected="false">Composite</button>
+          <button class="tab-btn" data-tab="sqt-idx-partial" role="tab" aria-selected="false">Partial</button>
+          <button class="tab-btn" data-tab="sqt-idx-covering" role="tab" aria-selected="false">Covering</button>
+        </div>
+        <div class="tab-panel active" id="sqt-idx-single" role="tabpanel">
+          <p><strong>Single-column index</strong> — the most common. One index on one column. Perfect when your WHERE clause filters on one thing.</p>
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Single column index</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- Simple: index on the column you filter by
+CREATE INDEX idx_orders_user_id ON orders (user_id);
+
+-- Now this query uses the index:
+SELECT * FROM orders WHERE user_id = 42;
+
+-- But this query CANNOT use it:
+SELECT * FROM orders WHERE status = 'shipped';
+-- (different column — needs its own index)</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-idx-composite" role="tabpanel">
+          <p><strong>Composite index</strong> — index on multiple columns. Column order matters. Think of it like a phone book sorted by (last_name, first_name). You can search by last_name alone, or by (last_name AND first_name), but NOT by first_name alone.</p>
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Composite index</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- Index on (user_id, status) — order matters!
+CREATE INDEX idx_orders_user_status ON orders (user_id, status);
+
+-- ✅ Can use index (leading column):
+SELECT * FROM orders WHERE user_id = 42;
+
+-- ✅ Can use index (both columns):
+SELECT * FROM orders WHERE user_id = 42 AND status = 'shipped';
+
+-- ❌ CANNOT use index (skips leading column):
+SELECT * FROM orders WHERE status = 'shipped';
+
+-- Rule: the "leftmost prefix" rule.
+-- Index on (A, B, C) supports:
+--   WHERE A = ?          ✅
+--   WHERE A = ? AND B = ? ✅
+--   WHERE A = ? AND B = ? AND C = ? ✅
+--   WHERE B = ?          ❌ (skips A)
+--   WHERE C = ?          ❌ (skips A and B)</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-idx-partial" role="tabpanel">
+          <p><strong>Partial index</strong> — indexes only the rows that match a condition. Smaller, faster, cheaper. Perfect when you only ever query a subset of the data.</p>
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Partial index</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- You only ever query "active" orders. Why index the other 90%?
+CREATE INDEX idx_active_orders ON orders (user_id)
+WHERE status != 'cancelled' AND status != 'archived';
+
+-- Index size: covers ~10% of the table = 90% smaller!
+-- Works for:
+SELECT * FROM orders WHERE user_id = 42 AND status = 'pending';
+
+-- Doesn't work for:
+SELECT * FROM orders WHERE user_id = 42 AND status = 'cancelled';
+-- (cancelled rows aren't in the index)
+
+-- Real-world example: soft-deleted rows
+CREATE INDEX idx_non_deleted_users ON users (email)
+WHERE deleted_at IS NULL;
+-- Most queries filter WHERE deleted_at IS NULL anyway.
+-- This index is tiny and blazing fast.</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-idx-covering" role="tabpanel">
+          <p><strong>Covering index</strong> (PostgreSQL: <code>INCLUDE</code>, MySQL: "covering") — the index contains all columns the query needs, so the database never reads the actual table. This enables <strong>Index Only Scan</strong> — the fastest possible scan type.</p>
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Covering index</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- Your dashboard shows: user's recent orders with totals
+SELECT total, created_at FROM orders
+WHERE user_id = 42 ORDER BY created_at DESC LIMIT 10;
+
+-- Regular index → Index Scan (looks up index, then reads table):
+CREATE INDEX idx_orders_user_id ON orders (user_id);
+
+-- Covering index → Index Only Scan (never touches table):
+CREATE INDEX idx_orders_user_covering
+ON orders (user_id, created_at DESC) INCLUDE (total);
+
+-- The INCLUDE columns are stored IN the index but not used for sorting.
+-- The database finds user_id=42 in the index, grabs total + created_at
+-- from the index itself, and returns. Zero table access.
+
+-- Verify with EXPLAIN:
+-- "Index Only Scan using idx_orders_user_covering"
+-- (If you see "Index Scan" instead, run VACUUM on the table first.
+--  PostgreSQL needs visibility info to be sure the index-only path is safe.)</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 4: N+1 Detection and Fix -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-bug icon-gap"></i> Tool 4: N+1 Detection and Fix</h3>
+    <div class="card-body">
+
+      <p>You already saw the N+1 problem in Section 4. But how do you <em>find</em> N+1 queries in a real application? You can't just read the code — ORMs hide the actual SQL. Here are the tools that catch them:</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="sqt-n1-detect-rails" role="tab" aria-selected="true">Rails (Bullet gem)</button>
+          <button class="tab-btn" data-tab="sqt-n1-detect-django" role="tab" aria-selected="false">Django (nplusone)</button>
+          <button class="tab-btn" data-tab="sqt-n1-detect-pg" role="tab" aria-selected="false">PostgreSQL Logs</button>
+        </div>
+        <div class="tab-panel active" id="sqt-n1-detect-rails" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Gemfile + config</span></div>
+            <div class="macos-body">
+              <pre><code class="language-ruby"># Gemfile
+gem 'bullet', group: :development
+
+# config/environments/development.rb
+config.after_initialize do
+  Bullet.enable = true
+  Bullet.alert  = true   # Browser popup when N+1 detected
+  Bullet.console = true   # Console warning
+  Bullet.rails_logger = true
+end
+
+# Now when you load a page with N+1 queries,
+# Bullet pops up a warning:
+#
+# "N+1 Query detected:
+#  User => [:orders]
+#  Add to your query: .includes(:orders)"</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-n1-detect-django" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">pip install + settings.py</span></div>
+            <div class="macos-body">
+              <pre><code class="language-python"># pip install nplusone
+
+# settings.py
+INSTALLED_APPS += ['nplusone.ext.django']
+MIDDLEWARE += ['nplusone.ext.django.NPlusOneMiddleware']
+NPLUSONE_RAISE = True  # Raise exception on N+1 (dev only!)
+
+# Output when N+1 detected:
+# nplusone.core.exceptions.NPlusOneError:
+#   Potential N+1 query detected on `User.order_set`</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-n1-detect-pg" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — spot N+1 from pg_stat_statements</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- N+1 queries show up as a query with VERY high "calls" count
+-- relative to other queries.
+
+SELECT query, calls, mean_exec_time, rows
+FROM pg_stat_statements
+WHERE query LIKE '%orders%'
+ORDER BY calls DESC LIMIT 5;
+
+-- If you see:
+--   "SELECT COUNT(*) FROM orders WHERE user_id = $1"
+--   calls: 847,293
+--   mean_exec_time: 0.4ms
+--
+-- That's 847K calls doing the same parameterized query.
+-- Classic N+1. Total time: 847K × 0.4ms = 339 seconds of DB time.
+-- Fix: one JOIN query, ~2ms total.</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 5: Connection Pooling -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-water icon-gap"></i> Tool 5: Connection Pooling with PgBouncer</h3>
+    <div class="card-body">
+
+      <p>Every database connection costs memory — about 10 MB per connection in PostgreSQL. If you have 8 app servers each opening 100 connections, that's 800 connections consuming 8 GB of RAM just for connection overhead. <span class="tooltip-trigger">PgBouncer<span class="tooltip-content">A lightweight connection pooler that sits between your app servers and PostgreSQL. Your app connects to PgBouncer (which accepts thousands of connections cheaply), and PgBouncer maintains a small pool of real connections to PostgreSQL. Think of it as a receptionist who takes calls from 1000 people but only has 25 phone lines to the back office.</span></span> solves this by multiplexing many app connections through a small pool of real database connections.</p>
+
+      <!-- SVG: PgBouncer connection pooling -->
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PgBouncer funneling 1000 app connections into 25 real database connections">
+        <defs>
+          <marker id="sqt-s6-pg-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+
+        <!-- App servers -->
+        <rect x="20" y="30" width="130" height="160" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+        <text x="85" y="52" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">8 App Servers</text>
+        <text x="85" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">125 conn each</text>
+        <text x="85" y="95" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="16">1,000</text>
+        <text x="85" y="112" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-size="10">connections</text>
+        <text x="85" y="135" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Memory cost:</text>
+        <text x="85" y="150" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="600" font-size="9">~50 KB each (cheap)</text>
+        <text x="85" y="170" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">= 50 MB total</text>
+
+        <!-- Arrow -->
+        <line x1="150" y1="110" x2="240" y2="110" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-s6-pg-arr)"/>
+        <text x="195" y="100" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">1000 conns</text>
+
+        <!-- PgBouncer -->
+        <rect x="250" y="50" width="160" height="120" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2.5"/>
+        <text x="330" y="75" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="13">PgBouncer</text>
+        <text x="330" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Connection Pooler</text>
+        <text x="330" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">1000 in → 25 out</text>
+        <text x="330" y="135" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">RAM: ~2 MB total</text>
+        <text x="330" y="155" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="8">pool_mode = transaction</text>
+
+        <!-- Arrow -->
+        <line x1="410" y1="110" x2="500" y2="110" stroke="#10b981" stroke-width="2" marker-end="url(#sqt-s6-pg-arr)"/>
+        <text x="455" y="100" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">25 conns</text>
+
+        <!-- PostgreSQL -->
+        <rect x="510" y="30" width="220" height="160" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="620" y="55" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="13">PostgreSQL</text>
+        <text x="620" y="78" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">max_connections = 100</text>
+        <text x="620" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Only 25 actually used</text>
+        <text x="620" y="125" text-anchor="middle" fill="#64748b" font-family="Inter, sans-serif" font-size="9">Memory per connection:</text>
+        <text x="620" y="142" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">~10 MB each</text>
+        <text x="620" y="162" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">25 × 10 MB = 250 MB</text>
+        <text x="620" y="178" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">(vs 10 GB without PgBouncer)</text>
+      </svg>
+
+      <p>You can benchmark PgBouncer's impact with <code>pgbench</code> — PostgreSQL's built-in benchmarking tool:</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">bash — benchmark with pgbench</span></div>
+        <div class="macos-body">
+          <pre><code class="language-bash"># Initialize pgbench tables
+pgbench -i -s 50 mydb
+
+# Benchmark WITHOUT PgBouncer (direct to PostgreSQL)
+pgbench -c 100 -j 4 -T 60 -h localhost -p 5432 mydb
+# Result: tps = 1,847 (including connections establishing)
+# Many "connection refused" errors at high concurrency
+
+# Benchmark WITH PgBouncer (connect through pooler)
+pgbench -c 100 -j 4 -T 60 -h localhost -p 6432 mydb
+# Result: tps = 4,213 (including connections establishing)
+# Zero connection errors. 2.3x throughput.</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool 6: Prepared Statements -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-file-code icon-gap"></i> Tool 6: Prepared Statements</h3>
+    <div class="card-body">
+
+      <p>Every time you send a SQL query, the database does two things: <strong>parse + plan</strong> the query, then <strong>execute</strong> it. For simple queries, planning takes 0.1-0.5ms. If you run the same query 10,000 times per second (with different parameter values), that's 1-5 seconds wasted on planning alone.</p>
+
+      <p><span class="tooltip-trigger">Prepared statements<span class="tooltip-content">A query that's parsed and planned once, then executed many times with different parameter values. The database caches the execution plan, saving the parse+plan overhead on every subsequent call. Most ORMs use them automatically.</span></span> solve this by parsing and planning the query once, then re-executing the cached plan with different parameters:</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — prepared statement example</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- Without prepared statement: parse + plan EVERY time
+SELECT * FROM orders WHERE user_id = 42;   -- plan: 0.1ms + exec: 0.1ms
+SELECT * FROM orders WHERE user_id = 99;   -- plan: 0.1ms + exec: 0.1ms
+SELECT * FROM orders WHERE user_id = 7;    -- plan: 0.1ms + exec: 0.1ms
+-- 10,000 calls = 10,000 × 0.1ms planning = 1 second wasted
+
+-- With prepared statement: plan ONCE, execute many
+PREPARE get_orders (int) AS
+  SELECT * FROM orders WHERE user_id = $1;
+
+EXECUTE get_orders(42);  -- plan: 0ms (cached) + exec: 0.1ms
+EXECUTE get_orders(99);  -- plan: 0ms (cached) + exec: 0.1ms
+EXECUTE get_orders(7);   -- plan: 0ms (cached) + exec: 0.1ms
+-- 10,000 calls = 0ms planning + 10,000 × 0.1ms = 1 second total
+-- Saved: 1 second of pure planning overhead.
+
+-- Most ORMs do this automatically. Check yours:
+-- Rails: config.active_record.prepared_statements = true (default)
+-- Django: uses server-side prepared statements with psycopg2
+-- SQLAlchemy: use_native_hstore=True, use prepared by default</code></pre>
+        </div>
+      </div>
+
+      <div class="callout callout-info">
+        <strong>Gotcha with PgBouncer:</strong> If you use PgBouncer in <code>transaction</code> mode (recommended), prepared statements break — because each transaction might use a different backend connection, and the prepared plan is per-connection. Fix: use PgBouncer's <code>prepared_statement_cache_enabled</code> option (available in PgBouncer 1.21+), or switch to <code>session</code> mode for apps that rely heavily on prepared statements.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 7 — GOING DEEPER
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="going-deeper">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-microscope"></i></div>
+    <div>
+      <div class="section-num">Section 7</div>
+      <h2 class="section-title">Going Deeper — Under the Hood</h2>
+    </div>
+  </div>
+
+  <p>Section 6 gave you the tools. This section explains the engine behind them — the internals that determine <em>why</em> the planner picks one plan over another, why your table gets slower over time even without schema changes, and how to handle tables that outgrow a single machine.</p>
+
+  <!-- Collapsible 1: Query Planner Internals -->
+  <div class="collapsible">
+    <div class="collapsible-header"><i class="fa-solid fa-brain icon-gap"></i> Query Planner Internals — The Cost Model</div>
+    <div class="collapsible-content">
+
+      <p>The query planner doesn't guess. It <strong>calculates a cost</strong> for every possible execution strategy and picks the cheapest one. The "cost" is a unitless number — think of it as "estimated effort." Lower cost = faster plan.</p>
+
+      <p>The planner's cost formula depends on a few key settings you can actually see and tune:</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — see the planner's cost parameters</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- These are the knobs the planner uses to estimate costs:
+SHOW seq_page_cost;          -- 1.0 (cost of reading one sequential page)
+SHOW random_page_cost;       -- 4.0 (cost of reading one random page)
+SHOW cpu_tuple_cost;         -- 0.01 (cost of processing one row)
+SHOW cpu_index_tuple_cost;   -- 0.005 (cost of processing one index entry)
+
+-- The ratio matters: random_page_cost / seq_page_cost = 4.0
+-- This tells the planner: "random I/O is 4x more expensive than sequential I/O."
+-- On SSDs, this gap is smaller. Many production setups change it:
+SET random_page_cost = 1.1;  -- For SSD-backed databases
+-- This makes the planner MORE willing to use Index Scan
+-- (because random I/O on SSD is almost as fast as sequential).</code></pre>
+        </div>
+      </div>
+
+      <p>The planner also uses <strong>statistics</strong> about your data to estimate how many rows each operation will return. These stats live in <code>pg_stats</code> and are updated by <code>ANALYZE</code>:</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — inspect planner statistics</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- See what the planner knows about your orders table:
+SELECT
+  attname AS column,
+  n_distinct,        -- How many distinct values (-1 = all unique)
+  most_common_vals,  -- Most frequent values
+  most_common_freqs, -- How frequent each is
+  correlation        -- How physically ordered the data is (1.0 = perfectly sorted)
+FROM pg_stats
+WHERE tablename = 'orders' AND attname = 'user_id';
+
+-- If n_distinct is wrong, the planner makes bad row estimates,
+-- which leads to bad plan choices (e.g., Seq Scan when Index Scan is better).
+
+-- Force a statistics refresh:
+ANALYZE orders;
+
+-- For columns with unusual distributions, increase the sample size:
+ALTER TABLE orders ALTER COLUMN user_id SET STATISTICS 1000;
+-- Default is 100. Higher = more accurate stats, slower ANALYZE.</code></pre>
+        </div>
+      </div>
+
+      <!-- SVG: Planner decision flow -->
+      <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Query planner decision flow: statistics plus cost model equals execution plan">
+        <defs>
+          <marker id="sqt-s7-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+        </defs>
+
+        <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">How the Planner Picks an Execution Plan</text>
+
+        <!-- Input 1: Your Query -->
+        <rect x="20" y="45" width="140" height="55" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+        <text x="90" y="68" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="10">YOUR QUERY</text>
+        <text x="90" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">SELECT ... WHERE ...</text>
+
+        <!-- Input 2: Statistics -->
+        <rect x="20" y="120" width="140" height="55" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+        <text x="90" y="143" text-anchor="middle" fill="#a855f7" font-family="Inter, sans-serif" font-weight="700" font-size="10">STATISTICS</text>
+        <text x="90" y="160" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">pg_stats, n_distinct</text>
+
+        <!-- Input 3: Cost Settings -->
+        <rect x="20" y="195" width="140" height="45" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+        <text x="90" y="215" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="10">COST SETTINGS</text>
+        <text x="90" y="230" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">random_page_cost etc</text>
+
+        <!-- Arrows into planner -->
+        <line x1="160" y1="72" x2="230" y2="120" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s7-arr)"/>
+        <line x1="160" y1="147" x2="230" y2="135" stroke="#a855f7" stroke-width="1.5" marker-end="url(#sqt-s7-arr)"/>
+        <line x1="160" y1="217" x2="230" y2="150" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#sqt-s7-arr)"/>
+
+        <!-- Planner box -->
+        <rect x="240" y="95" width="200" height="80" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="2.5"/>
+        <text x="340" y="120" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">QUERY PLANNER</text>
+        <text x="340" y="140" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Generates candidate plans</text>
+        <text x="340" y="155" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Estimates cost of each</text>
+        <text x="340" y="168" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Picks the cheapest</text>
+
+        <!-- Arrow out -->
+        <line x1="440" y1="135" x2="500" y2="135" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-s7-arr)"/>
+
+        <!-- Output: Execution Plan -->
+        <rect x="510" y="70" width="220" height="130" rx="12" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="2"/>
+        <text x="620" y="95" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">CHOSEN PLAN</text>
+        <text x="620" y="115" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Plan A: Index Scan → cost=52</text>
+        <text x="620" y="132" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" text-decoration="line-through">Plan B: Seq Scan → cost=18334</text>
+        <text x="620" y="149" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" text-decoration="line-through">Plan C: Bitmap → cost=487</text>
+        <text x="620" y="172" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Winner: Index Scan (lowest cost)</text>
+      </svg>
+
+      <div class="callout callout-info">
+        <strong>When the planner gets it wrong:</strong> If you know the planner is picking a bad plan, you can <strong>hint</strong> at a better one. PostgreSQL doesn't have query hints like Oracle, but you can disable strategies to force a choice: <code>SET enable_seqscan = off;</code> temporarily disables Seq Scan, forcing the planner to use an index. <strong>Only use this for debugging</strong> — never in production code.
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2: VACUUM and Bloat -->
+  <div class="collapsible">
+    <div class="collapsible-header"><i class="fa-solid fa-broom icon-gap"></i> VACUUM and Bloat — Why Tables Get Slower Over Time</div>
+    <div class="collapsible-content">
+
+      <p>PostgreSQL uses a system called <span class="tooltip-trigger">MVCC<span class="tooltip-content">Multi-Version Concurrency Control. Instead of locking rows during updates, PostgreSQL creates a NEW version of the row and marks the old one as "dead." This means readers never block writers. The downside: dead rows pile up and need to be cleaned.</span></span> for concurrency. When you UPDATE a row, PostgreSQL doesn't modify it in place — it creates a brand new copy and marks the old one as "dead." When you DELETE a row, it's just marked dead, not actually removed.</p>
+
+      <p>These dead rows — called <strong>bloat</strong> — pile up over time. A table with 1 million live rows might actually have 3 million rows on disk if you've been doing lots of updates and deletes. Your sequential scans read all 3 million. Your index scans have to check if rows are "visible" to the current transaction.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — check bloat and run VACUUM</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- Check how many dead rows your table has:
+SELECT
+  relname AS table,
+  n_live_tup AS live_rows,
+  n_dead_tup AS dead_rows,
+  round(n_dead_tup::numeric / greatest(n_live_tup, 1) * 100, 1) AS dead_pct,
+  last_vacuum,
+  last_autovacuum
+FROM pg_stat_user_tables
+WHERE relname = 'orders';
+
+-- If dead_pct > 20%, you have a bloat problem.
+
+-- Manual VACUUM (reclaims dead rows for reuse):
+VACUUM orders;
+
+-- VACUUM ANALYZE (also updates planner statistics):
+VACUUM ANALYZE orders;
+
+-- Nuclear option — VACUUM FULL (rewrites entire table, locks it):
+-- Only use this during maintenance windows!
+VACUUM FULL orders;
+-- This reclaims disk space. Regular VACUUM just marks dead rows as reusable
+-- but doesn't shrink the file on disk.
+
+-- Check autovacuum settings:
+SHOW autovacuum_vacuum_threshold;       -- default: 50
+SHOW autovacuum_vacuum_scale_factor;    -- default: 0.2
+-- Autovacuum runs when: dead rows > threshold + scale_factor × live_rows
+-- For a 1M row table: 50 + 0.2 × 1M = 200,050 dead rows before autovacuum.
+-- For high-write tables, lower the scale factor:
+ALTER TABLE orders SET (autovacuum_vacuum_scale_factor = 0.05);</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3: Partitioning -->
+  <div class="collapsible">
+    <div class="collapsible-header"><i class="fa-solid fa-table-columns icon-gap"></i> Partitioning — When One Table Gets Too Big</div>
+    <div class="collapsible-content">
+
+      <p>When your table reaches hundreds of millions of rows, even indexed queries slow down because the <span class="tooltip-trigger">B-tree<span class="tooltip-content">The most common index structure. A balanced tree where each level narrows down the search space. For 10M rows, a B-tree has ~3 levels, so any lookup needs at most 3-4 page reads. For 1 billion rows, it's still only ~4-5 levels. B-trees scale beautifully.</span></span> gets deeper, VACUUM takes longer, and maintenance operations become painful. The solution: split the table into smaller chunks called <strong>partitions</strong>.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">psql — range partitioning by date</span></div>
+        <div class="macos-body">
+          <pre><code class="language-sql">-- Create a partitioned table (PostgreSQL 10+):
+CREATE TABLE orders (
+  id          BIGSERIAL,
+  user_id     INT NOT NULL,
+  total       NUMERIC(10,2),
+  status      TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+) PARTITION BY RANGE (created_at);
+
+-- Create monthly partitions:
+CREATE TABLE orders_2024_01 PARTITION OF orders
+  FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+CREATE TABLE orders_2024_02 PARTITION OF orders
+  FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
+-- ... one per month
+
+-- Now when you query:
+SELECT * FROM orders WHERE created_at >= '2024-03-01' AND created_at < '2024-04-01';
+-- PostgreSQL ONLY scans the orders_2024_03 partition.
+-- The other 11 months are never touched. This is called "partition pruning."
+
+-- Verify pruning is working:
+EXPLAIN SELECT * FROM orders WHERE created_at >= '2024-03-01' AND created_at < '2024-04-01';
+-- Should show: "Append" with only orders_2024_03 listed.
+-- If all partitions appear, pruning failed (check your WHERE clause).</code></pre>
+        </div>
+      </div>
+
+      <p>Partitioning is most useful when your queries naturally filter on the partition key (usually date). If your queries filter by <code>user_id</code>, you'd partition by user_id ranges or use hash partitioning instead. The key insight: <strong>partition on the column you filter by most often</strong>.</p>
+    </div>
+  </div>
+
+  <!-- Collapsible 4: CTEs vs Subqueries -->
+  <div class="collapsible">
+    <div class="collapsible-header"><i class="fa-solid fa-code-compare icon-gap"></i> CTEs vs Subqueries — The Hidden Performance Trap</div>
+    <div class="collapsible-content">
+
+      <p>A <span class="tooltip-trigger">CTE<span class="tooltip-content">Common Table Expression — a named temporary result set defined with the WITH keyword. Looks like: WITH cte_name AS (SELECT ...) SELECT * FROM cte_name. Often used for readability.</span></span> (Common Table Expression) looks cleaner than a subquery. But in PostgreSQL 11 and earlier, CTEs are <strong>optimization barriers</strong> — the planner can't push filters from the outer query into the CTE. This was fixed in PostgreSQL 12+ with "CTE inlining," but it's still a gotcha if you're on an older version or using a <code>MATERIALIZED</code> CTE.</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="sqt-cte-slow" role="tab" aria-selected="true">Slow (Materialized CTE)</button>
+          <button class="tab-btn" data-tab="sqt-cte-fast" role="tab" aria-selected="false">Fast (Subquery / Inlined CTE)</button>
+        </div>
+        <div class="tab-panel active" id="sqt-cte-slow" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Materialized CTE — optimization barrier</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- This CTE materializes ALL orders first, THEN filters.
+-- On PG11 or with MATERIALIZED keyword:
+WITH all_orders AS MATERIALIZED (
+  SELECT * FROM orders            -- reads ALL 10M rows
+)
+SELECT * FROM all_orders
+WHERE user_id = 42;               -- filters AFTER reading everything
+
+-- EXPLAIN shows:
+-- CTE Scan on all_orders
+--   Filter: (user_id = 42)
+--   Rows Removed by Filter: 999953
+-- The CTE read the ENTIRE table. The WHERE clause was NOT pushed down.</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-cte-fast" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Subquery or PG12+ inlined CTE — optimized</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- Option 1: Use a subquery
+SELECT * FROM (
+  SELECT * FROM orders
+) sub
+WHERE user_id = 42;
+-- Planner pushes the filter INTO the subquery → Index Scan.
+
+-- Option 2: PG12+ non-materialized CTE (default behavior)
+WITH user_orders AS (           -- NOT MATERIALIZED (default in PG12+)
+  SELECT * FROM orders
+)
+SELECT * FROM user_orders
+WHERE user_id = 42;
+-- PG12+ inlines the CTE → same as subquery → Index Scan.
+
+-- Option 3: Just write the simple query
+SELECT * FROM orders WHERE user_id = 42;
+-- The simplest is almost always the fastest.</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>Rule of thumb:</strong> Use CTEs for readability when they reference the same result multiple times. For single-use CTEs, a subquery is safer. If you're on PostgreSQL 12+, non-materialized CTEs perform identically to subqueries. Always check with <code>EXPLAIN</code> to verify.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 8 — THE VARIATIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="variations">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-shuffle"></i></div>
+    <div>
+      <div class="section-num">Section 8</div>
+      <h2 class="section-title">Variations — Different Databases, Different Tools</h2>
+    </div>
+  </div>
+
+  <p>Everything so far has been PostgreSQL-focused. But the principles — EXPLAIN ANALYZE, indexes, N+1 detection, connection pooling — apply to every relational database. The <em>syntax</em> changes. The <em>thinking</em> doesn't. Here are the three most common variations you'll encounter.</p>
+
+  <!-- Variation 1: PostgreSQL vs MySQL EXPLAIN -->
+  <div class="card open">
+    <h3 class="card-title"><i class="fa-solid fa-code-compare icon-gap"></i> PostgreSQL vs MySQL EXPLAIN</h3>
+    <div class="card-body">
+
+      <p>Both databases have EXPLAIN, but the output format is different. Here's the same concept in both:</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="sqt-var-pg" role="tab" aria-selected="true">PostgreSQL</button>
+          <button class="tab-btn" data-tab="sqt-var-mysql" role="tab" aria-selected="false">MySQL</button>
+        </div>
+        <div class="tab-panel active" id="sqt-var-pg" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PostgreSQL EXPLAIN</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- PostgreSQL: tree-structured output
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT * FROM orders WHERE user_id = 42;
+
+-- Key output:
+-- Index Scan using idx_orders_user_id on orders
+--   Index Cond: (user_id = 42)
+--   Buffers: shared hit=50
+--   Execution Time: 0.128 ms
+
+-- Pro tip: use FORMAT JSON for programmatic parsing:
+EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+SELECT * FROM orders WHERE user_id = 42;
+
+-- Or paste your plan into: https://explain.dalibo.com/
+-- for a beautiful visual breakdown.</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-var-mysql" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MySQL EXPLAIN</span></div>
+            <div class="macos-body">
+              <pre><code class="language-sql">-- MySQL: tabular output
+EXPLAIN SELECT * FROM orders WHERE user_id = 42;
+
+-- Key columns to read:
+-- +----+------+------+---------+------+------+----------+-------+
+-- | id | type | key  | key_len | ref  | rows | filtered | Extra |
+-- +----+------+------+---------+------+------+----------+-------+
+-- |  1 | ref  | idx_user | 4   | const|   47 |  100.00  | NULL  |
+-- +----+------+------+---------+------+------+----------+-------+
+
+-- type = "ref" means index lookup (good).
+-- type = "ALL" means full table scan (bad).
+-- key = which index was used (NULL = no index used).
+-- rows = estimated rows to examine.
+-- filtered = what % of rows pass the WHERE filter.
+
+-- MySQL 8.0+: EXPLAIN ANALYZE (like PostgreSQL):
+EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 42;
+-- Shows actual execution times, not just estimates.
+
+-- MySQL-specific: EXPLAIN FORMAT=TREE (cleaner than table):
+EXPLAIN FORMAT=TREE SELECT * FROM orders WHERE user_id = 42;</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>PostgreSQL</th><th>MySQL (InnoDB)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>EXPLAIN with actual timing</td><td><code>EXPLAIN ANALYZE</code></td><td><code>EXPLAIN ANALYZE</code> (8.0+)</td></tr>
+            <tr><td>Buffer/page stats</td><td><code>BUFFERS</code> option</td><td>Not directly available</td></tr>
+            <tr><td>Slow query log</td><td><code>log_min_duration_statement</code></td><td><code>slow_query_log</code></td></tr>
+            <tr><td>Query stats extension</td><td><code>pg_stat_statements</code></td><td><code>performance_schema</code></td></tr>
+            <tr><td>Partial indexes</td><td>Yes (<code>WHERE</code> clause)</td><td>No (use generated columns workaround)</td></tr>
+            <tr><td>Covering index syntax</td><td><code>INCLUDE (cols)</code></td><td>Automatic if all cols in index</td></tr>
+            <tr><td>Online index creation</td><td><code>CREATE INDEX CONCURRENTLY</code></td><td><code>ALTER TABLE ... ADD INDEX</code> (online by default in 5.6+)</td></tr>
+            <tr><td>Connection pooler</td><td>PgBouncer</td><td>ProxySQL / MySQL Router</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Variation 2: ORM-generated SQL -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-robot icon-gap"></i> ORM-Generated SQL — Rails, Django, SQLAlchemy</h3>
+    <div class="card-body">
+
+      <p>Most web applications don't write raw SQL. They use an <span class="tooltip-trigger">ORM<span class="tooltip-content">Object-Relational Mapper — a library that lets you interact with the database using your programming language's objects instead of raw SQL strings. ActiveRecord (Ruby on Rails), Django ORM (Python), SQLAlchemy (Python), and Entity Framework (.NET) are the most popular ones.</span></span> that generates SQL behind the scenes. The SQL it generates is usually correct but sometimes inefficient. The key skill is knowing how to <strong>see the SQL your ORM is generating</strong> and how to fix it when it's slow.</p>
+
+      <div class="tab-container">
+        <div class="tab-header" role="tablist">
+          <button class="tab-btn active" data-tab="sqt-orm-rails" role="tab" aria-selected="true">Rails</button>
+          <button class="tab-btn" data-tab="sqt-orm-django" role="tab" aria-selected="false">Django</button>
+          <button class="tab-btn" data-tab="sqt-orm-sqla" role="tab" aria-selected="false">SQLAlchemy</button>
+        </div>
+        <div class="tab-panel active" id="sqt-orm-rails" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Rails — see + fix ORM queries</span></div>
+            <div class="macos-body">
+              <pre><code class="language-ruby"># See the SQL Rails generates:
+Order.where(user_id: 42).to_sql
+# => "SELECT \"orders\".* FROM \"orders\" WHERE \"orders\".\"user_id\" = 42"
+
+# See EXPLAIN output from Rails:
+Order.where(user_id: 42).explain
+# => EXPLAIN for: SELECT ...
+#    Index Scan using idx_orders_user_id ...
+
+# Add index via migration:
+class AddUserIdIndexToOrders < ActiveRecord::Migration[7.1]
+  def change
+    add_index :orders, :user_id, algorithm: :concurrently
+  end
+end
+# algorithm: :concurrently → non-blocking (requires disable_ddl_transaction!)
+
+# Fix N+1 with includes:
+User.includes(:orders).where(active: true).each do |user|
+  user.orders.size  # No extra query — already loaded
+end
+
+# Fix N+1 with joins (when you need to filter):
+User.joins(:orders).where(orders: { status: 'pending' }).distinct</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-orm-django" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Django — see + fix ORM queries</span></div>
+            <div class="macos-body">
+              <pre><code class="language-python"># See the SQL Django generates:
+qs = Order.objects.filter(user_id=42)
+print(qs.query)
+# SELECT ... FROM "orders" WHERE "orders"."user_id" = 42
+
+# See all queries executed in a view (debug toolbar):
+# pip install django-debug-toolbar
+# Shows every SQL query, timing, and duplicates.
+
+# Add index in the model:
+class Order(models.Model):
+    user_id = models.IntegerField(db_index=True)  # single column
+    # Or composite:
+    class Meta:
+        indexes = [
+            models.Index(fields=['user_id', 'status']),
+        ]
+
+# Fix N+1 with select_related (ForeignKey) or prefetch_related (M2M):
+users = User.objects.prefetch_related('order_set').filter(active=True)
+for user in users:
+    len(user.order_set.all())  # No extra query
+
+# Use .only() to select specific columns (avoid SELECT *):
+Order.objects.filter(user_id=42).only('id', 'total', 'created_at')</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="sqt-orm-sqla" role="tabpanel">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">SQLAlchemy — see + fix ORM queries</span></div>
+            <div class="macos-body">
+              <pre><code class="language-python"># See the SQL SQLAlchemy generates:
+from sqlalchemy import create_engine
+engine = create_engine("postgresql://...", echo=True)  # echo=True logs all SQL
+
+# Or compile a query object:
+stmt = select(Order).where(Order.user_id == 42)
+print(stmt.compile(compile_kwargs={"literal_binds": True}))
+
+# Add index:
+from sqlalchemy import Index
+Index('idx_orders_user_id', Order.user_id)
+
+# Fix N+1 with joinedload or subqueryload:
+from sqlalchemy.orm import joinedload
+session.query(User).options(
+    joinedload(User.orders)  # JOIN in single query
+).filter(User.active == True).all()
+
+# Or selectinload (separate SELECT IN query — often better):
+from sqlalchemy.orm import selectinload
+session.query(User).options(
+    selectinload(User.orders)  # SELECT * FROM orders WHERE user_id IN (...)
+).all()</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-info">
+        <strong>Universal rule:</strong> No matter which ORM you use, always check the SQL it generates for your critical paths. Enable query logging in development. Use N+1 detection tools (<code>bullet</code> for Rails, <code>nplusone</code> for Django). And always add indexes through migrations — don't rely on the ORM to create them automatically.
+      </div>
+    </div>
+  </div>
+
+  <!-- Variation 3: Read Replica Routing -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-route icon-gap"></i> Read Replica Query Routing</h3>
+    <div class="card-body">
+
+      <p>Once you've optimized your queries, the next scaling step is splitting read and write traffic. Writes go to the primary database. Reads go to one or more <span class="tooltip-trigger">read replicas<span class="tooltip-content">A copy of your primary database that receives all changes via replication (usually asynchronous). It handles read queries, offloading the primary. The downside: replicas can be slightly behind the primary (replication lag), so you might read slightly stale data.</span></span>. This is called <strong>read/write splitting</strong>.</p>
+
+      <!-- SVG: Read/write splitting -->
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read write splitting: writes to primary, reads to replicas">
+        <defs>
+          <marker id="sqt-s8-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+          </marker>
+          <marker id="sqt-s8-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+          </marker>
+          <marker id="sqt-s8-arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+          </marker>
+        </defs>
+
+        <!-- App -->
+        <rect x="20" y="70" width="120" height="60" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+        <text x="80" y="95" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">APP SERVER</text>
+        <text x="80" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">200 req/sec</text>
+
+        <!-- Write arrow to primary -->
+        <line x1="140" y1="85" x2="260" y2="55" stroke="#ef4444" stroke-width="2" marker-end="url(#sqt-s8-arr)"/>
+        <text x="195" y="62" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">WRITES (20%)</text>
+
+        <!-- Read arrow to replicas -->
+        <line x1="140" y1="115" x2="260" y2="145" stroke="#10b981" stroke-width="2" marker-end="url(#sqt-s8-arr-g)"/>
+        <text x="195" y="142" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">READS (80%)</text>
+
+        <!-- Primary -->
+        <rect x="270" y="25" width="140" height="60" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+        <text x="340" y="50" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">PRIMARY</text>
+        <text x="340" y="68" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Handles writes only</text>
+
+        <!-- Replication arrows -->
+        <line x1="410" y1="55" x2="500" y2="55" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#sqt-s8-arr-b)"/>
+        <line x1="410" y1="55" x2="500" y2="125" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#sqt-s8-arr-b)"/>
+        <text x="455" y="45" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-size="8">replication</text>
+
+        <!-- Replica 1 -->
+        <rect x="510" y="25" width="130" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="575" y="48" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">REPLICA 1</text>
+        <text x="575" y="65" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~80 reads/sec</text>
+
+        <!-- Replica 2 -->
+        <rect x="510" y="100" width="130" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="575" y="123" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">REPLICA 2</text>
+        <text x="575" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~80 reads/sec</text>
+
+        <!-- Read line from LB area to replicas -->
+        <rect x="270" y="115" width="140" height="55" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="340" y="138" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">READ LB</text>
+        <text x="340" y="155" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">round-robin</text>
+
+        <line x1="410" y1="135" x2="510" y2="52" stroke="#10b981" stroke-width="1" marker-end="url(#sqt-s8-arr-g)"/>
+        <line x1="410" y1="145" x2="510" y2="127" stroke="#10b981" stroke-width="1" marker-end="url(#sqt-s8-arr-g)"/>
+
+        <!-- Caveat -->
+        <rect x="510" y="170" width="230" height="35" rx="6" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="625" y="185" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-size="9" font-weight="600">Caveat: replication lag (1-100ms)</text>
+        <text x="625" y="198" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Reads may return slightly stale data</text>
+      </svg>
+
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Rails 6+ — automatic read/write splitting</span></div>
+        <div class="macos-body">
+          <pre><code class="language-ruby"># config/database.yml (Rails 6+):
+production:
+  primary:
+    adapter: postgresql
+    host: primary-db.internal
+    database: myapp
+  primary_replica:
+    adapter: postgresql
+    host: replica-db.internal
+    database: myapp
+    replica: true
+
+# Rails automatically routes:
+# - GET requests → replica
+# - POST/PUT/DELETE → primary
+# - After a write, reads stick to primary for 2 seconds
+#   (to avoid reading stale data from replica lag)
+
+# Manual control:
+ActiveRecord::Base.connected_to(role: :reading) do
+  Order.where(user_id: 42)  # Guaranteed to hit replica
+end
+
+ActiveRecord::Base.connected_to(role: :writing) do
+  Order.create!(user_id: 42, total: 99.99)  # Guaranteed to hit primary
+end</code></pre>
+        </div>
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>The replication lag trap:</strong> User creates an order (writes to primary). Page redirects to "My Orders" (reads from replica). The replica is 50ms behind. User doesn't see their new order. Panic. The fix: after any write, read from the primary for the next 2-5 seconds. Every major framework handles this, but you need to know it's happening.
+      </div>
+    </div>
+  </div>
+
+  <div class="think-first-box">
+    <span class="think-label">Think First</span>
+    <p>You have a PostgreSQL database with 50M rows in the <code>events</code> table. Your most common query filters by <code>user_id</code> and <code>event_type</code>, and orders by <code>created_at DESC</code>. You only ever query events from the last 90 days. <strong>What type of index would you create?</strong> Think about: single vs composite, column order, partial index, covering index.</p>
+    <span class="think-hint">Think about the "leftmost prefix" rule for composite indexes. Think about whether a partial index on <code>created_at > now() - interval '90 days'</code> would help. Would including <code>created_at</code> in the index help with the ORDER BY?</span>
+  </div>
+
+  <p>The ideal index for that scenario: a <strong>composite partial index</strong>. Something like: <code>CREATE INDEX idx_events_user_type_date ON events (user_id, event_type, created_at DESC) WHERE created_at > now() - interval '90 days';</code> This gives you: the leftmost prefix for filtering (user_id, event_type), the sort order in the index (created_at DESC — avoiding a separate sort step), and a partial index that only covers recent data (90% smaller than a full index). If you also INCLUDE the columns your query SELECTs, you get an Index Only Scan — the fastest possible path.</p>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 — AT SCALE
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale — How Real Companies Tune SQL</h2>
+    </div>
+  </div>
+
+  <p>Everything we've covered works great on a single database. But what happens when your product has millions of users and billions of rows? Let's look at four companies that deal with massive SQL workloads every single day — and how they keep things fast.</p>
+
+  <!-- SVG: Scale overview — 4 companies at a glance -->
+  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four companies and their SQL scale: Stack Overflow, GitHub, Shopify, Netflix">
+    <defs>
+      <marker id="sqt-s9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">SQL at Massive Scale</text>
+
+    <!-- Stack Overflow -->
+    <rect x="20" y="50" width="170" height="130" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="105" y="75" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="12">Stack Overflow</text>
+    <text x="105" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">2 SQL Servers</text>
+    <text x="105" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">1.3B page views/month</text>
+    <text x="105" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Dapper micro-ORM</text>
+    <text x="105" y="145" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">"Fewer servers,</text>
+    <text x="105" y="158" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">faster queries"</text>
+
+    <!-- GitHub -->
+    <rect x="210" y="50" width="170" height="130" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="295" y="75" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="12">GitHub</text>
+    <text x="295" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">MySQL + ProxySQL</text>
+    <text x="295" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">10K+ queries/sec</text>
+    <text x="295" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Connection pooling layer</text>
+    <text x="295" y="145" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">"Pool connections,</text>
+    <text x="295" y="158" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">route queries"</text>
+
+    <!-- Shopify -->
+    <rect x="400" y="50" width="170" height="130" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="485" y="75" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Shopify</text>
+    <text x="485" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">MySQL + Vitess</text>
+    <text x="485" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Query routing + sharding</text>
+    <text x="485" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Millions of merchants</text>
+    <text x="485" y="145" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">"Shard per tenant,</text>
+    <text x="485" y="158" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">route at the proxy"</text>
+
+    <!-- Netflix -->
+    <rect x="590" y="50" width="150" height="130" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+    <text x="665" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">Netflix</text>
+    <text x="665" y="95" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="9">Cassandra + PostgreSQL</text>
+    <text x="665" y="110" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">PG for billing</text>
+    <text x="665" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Aggressive PG tuning</text>
+    <text x="665" y="145" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">"Right DB for</text>
+    <text x="665" y="158" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9" font-weight="600">the right job"</text>
+  </svg>
+
+  <!-- Card 1: Stack Overflow -->
+  <div class="card open">
+    <h3 class="card-title"><i class="fa-solid fa-layer-group icon-gap"></i> Stack Overflow — 1.3 Billion Page Views on 2 SQL Servers</h3>
+    <div class="card-body">
+      <p>This one blows people's minds. Stack Overflow serves <strong>1.3 billion page views per month</strong> — and they do it with just <strong>two SQL Server instances</strong> (a primary and a replica). No distributed database. No sharding. No microservices. Just fast SQL.</p>
+
+      <p>Their secret? <strong>Dapper</strong> — a micro-ORM that generates lean, predictable SQL. Unlike heavy ORMs that create 17-table JOINs behind your back, Dapper gives you full control over what SQL runs. Their developers write raw parameterized SQL and use Dapper to map results to C# objects. Every query is hand-tuned, every execution plan is reviewed, and they run <code>EXPLAIN</code> equivalent (SQL Server's execution plans) before any query hits production.</p>
+
+      <div class="callout callout-info">
+        <strong>The lesson:</strong> You don't need hundreds of servers if your queries are fast. Stack Overflow's entire philosophy is "make the query fast, not the infrastructure big." They've publicly said their biggest performance wins came from fixing <strong>N+1 queries</strong> and adding <strong>missing indexes</strong> — the exact things we covered in Sections 5 and 6.
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: GitHub -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-brands fa-github icon-gap"></i> GitHub — MySQL + ProxySQL for 10K+ Queries/sec</h3>
+    <div class="card-body">
+      <p>GitHub runs on <strong>MySQL</strong> — yes, the same MySQL you can install on your laptop. But at their scale (100+ million repositories, 10,000+ queries per second), a raw MySQL connection isn't enough. The problem: MySQL has a per-connection cost. If you have 200 app servers each opening 50 connections, that's 10,000 connections hitting your database. Most of those connections are idle most of the time, but MySQL still allocates memory for each one.</p>
+
+      <p>Their solution: <strong>ProxySQL</strong> — a lightweight proxy that sits between app servers and MySQL. It pools connections (so 10,000 app connections become ~200 database connections), routes read queries to replicas, and can even cache frequent queries. Think of it as a traffic cop for SQL — it makes sure the database never gets overwhelmed, even when thousands of app servers are talking to it simultaneously.</p>
+
+      <div class="callout callout-warning">
+        <strong>Why this matters for you:</strong> Connection pooling isn't just a "big company" thing. If you're running a Rails or Django app with 20+ workers and a single PostgreSQL database, you <em>already</em> need a connection pooler (PgBouncer for PostgreSQL, ProxySQL for MySQL). Without one, every worker holds a persistent connection, and you'll run out of database connections at ~100 concurrent users.
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Shopify -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-store icon-gap"></i> Shopify — MySQL + Vitess for Millions of Merchants</h3>
+    <div class="card-body">
+      <p>Shopify powers millions of online stores. Each merchant has orders, products, customers, and inventory — and it all lives in <strong>MySQL</strong>. But one MySQL instance can't hold data for millions of merchants. Their answer: <strong>Vitess</strong>, a sharding middleware originally built by YouTube.</p>
+
+      <p>Vitess sits between the application and MySQL. It looks like a single database to your application, but behind the scenes it routes queries to the right shard based on the merchant ID. When you run <code>SELECT * FROM orders WHERE shop_id = 12345</code>, Vitess knows that shop 12345 lives on shard 7, and routes the query there — without your application code knowing anything about sharding. The app just writes normal SQL.</p>
+
+      <p>The tuning challenge? Each shard still needs optimized queries. A slow query on one shard affects every merchant on that shard. So Shopify runs automated slow-query detection across all shards, flagging any query that crosses a latency threshold. Their internal tooling is essentially a scaled-up version of <code>pg_stat_statements</code> — tracking the top slow queries per shard and alerting on regressions.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: Netflix -->
+  <div class="card">
+    <h3 class="card-title"><i class="fa-solid fa-film icon-gap"></i> Netflix — Cassandra for Scale, PostgreSQL for Money</h3>
+    <div class="card-body">
+      <p>Netflix is famous for using <strong>Cassandra</strong> — a NoSQL database designed for massive write throughput. But here's what most people don't know: Netflix uses <strong>PostgreSQL for billing</strong>. When you're handling credit card charges for 250+ million subscribers, you need ACID transactions, not eventual consistency. You need to know that a charge happened <em>exactly once</em>, not "probably once, eventually."</p>
+
+      <p>And they <strong>tune PostgreSQL aggressively</strong>. Their billing database has custom index strategies, partitioned tables (by month — old billing records get archived), and hand-optimized queries. They run their own <code>pg_stat_statements</code> dashboards, alert on query plan changes (if the planner suddenly switches from an index scan to a sequential scan, that's a red flag), and test every schema migration against production-scale data before deploying.</p>
+
+      <div class="callout callout-info">
+        <strong>The pattern:</strong> Use the right database for the right job. Cassandra for high-write, eventually-consistent workloads (viewing history, recommendations). PostgreSQL for low-volume, must-be-correct workloads (billing, payments). And <em>tune both</em>. NoSQL doesn't mean "no tuning."
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 — ANTI-LESSONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lessons">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-skull-crossbones"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Anti-Lessons — "Best Practices" That Backfire</h2>
+    </div>
+  </div>
+
+  <p>Some SQL tuning advice gets repeated so often that people assume it's true. It's not. These three "best practices" sound reasonable but will actively hurt you in production. Learn to spot them so you don't fall for them on your next project (or in your next interview).</p>
+
+  <!-- Collapsible 1 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i> "Add an index on every column"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>This sounds logical — if indexes make reads faster, why not index everything? The problem: <strong>every index has a write cost</strong>. When you INSERT a row, the database doesn't just write to the table — it updates <em>every index on that table</em>. Ten indexes means ten extra writes per INSERT.</p>
+
+        <p>Let's put real numbers on this. A table with 10 million rows and <strong>10 indexes</strong> will have roughly <strong>5 GB+ of index storage</strong> — sometimes more than the table data itself. Every INSERT now updates 10 B-tree structures. Every UPDATE that touches an indexed column triggers index maintenance. Your writes slow down by 30-60%, your storage doubles, and <code>VACUUM</code> takes three times as long because it has to clean up dead tuples in every index.</p>
+
+        <!-- SVG: Write amplification with too many indexes -->
+        <svg viewBox="0 0 760 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One INSERT causes writes to every index on the table">
+          <defs>
+            <marker id="sqt-s10a-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+            </marker>
+          </defs>
+          <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">One INSERT → Writes to Every Index</text>
+
+          <rect x="20" y="55" width="130" height="50" rx="8" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+          <text x="85" y="77" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">INSERT 1 row</text>
+          <text x="85" y="93" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">into orders</text>
+
+          <line x1="150" y1="70" x2="210" y2="45" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sqt-s10a-arr)"/>
+          <line x1="150" y1="75" x2="210" y2="65" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sqt-s10a-arr)"/>
+          <line x1="150" y1="80" x2="210" y2="85" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sqt-s10a-arr)"/>
+          <line x1="150" y1="85" x2="210" y2="105" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sqt-s10a-arr)"/>
+          <line x1="150" y1="90" x2="210" y2="125" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sqt-s10a-arr)"/>
+          <line x1="150" y1="95" x2="210" y2="145" stroke="#ef4444" stroke-width="1.5" marker-end="url(#sqt-s10a-arr)"/>
+
+          <rect x="215" y="32" width="130" height="24" rx="5" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="280" y="48" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">idx_user_id</text>
+          <rect x="215" y="58" width="130" height="24" rx="5" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="280" y="74" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">idx_status</text>
+          <rect x="215" y="84" width="130" height="24" rx="5" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="280" y="100" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">idx_created_at</text>
+          <rect x="215" y="110" width="130" height="24" rx="5" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="280" y="126" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">idx_total</text>
+          <rect x="215" y="136" width="130" height="24" rx="5" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+          <text x="280" y="152" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9">idx_email... +5 more</text>
+
+          <rect x="410" y="55" width="330" height="100" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="575" y="77" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">The cost of 10 indexes</text>
+          <text x="575" y="97" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Table data: ~3.2 GB</text>
+          <text x="575" y="113" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Index storage: ~5.1 GB (1.6x the data!)</text>
+          <text x="575" y="129" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-size="10">Write speed: 30-60% slower per INSERT</text>
+          <text x="575" y="145" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">VACUUM time: 3x longer</text>
+        </svg>
+
+        <div class="callout callout-info">
+          <strong>The right approach:</strong> Only index columns that appear in <code>WHERE</code>, <code>JOIN</code>, or <code>ORDER BY</code> clauses of your <em>actual</em> queries. Use <code>pg_stat_user_indexes</code> to find unused indexes and drop them. A good rule of thumb: 3-5 well-chosen indexes per table is usually plenty.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i> "SELECT * is fine for development"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>During development, <code>SELECT *</code> feels harmless — you get all the columns, you pick what you need in your application code. But in production, that "convenient" asterisk can be devastating.</p>
+
+        <p>Imagine your <code>users</code> table has 20 columns. Your API only needs <code>id</code>, <code>name</code>, and <code>email</code> — that's 3 columns. With <code>SELECT *</code>, you're fetching all 20 columns: the <code>bio</code> (a TEXT field averaging 2 KB), the <code>profile_image_url</code>, the <code>settings_json</code> (5 KB blob), and 14 other columns you'll never use. Instead of reading ~100 bytes per row, you're reading ~8 KB per row. That's <strong>80x more data transferred</strong> from the database to your application.</p>
+
+        <p>It gets worse: with <code>SELECT *</code>, you <em>can't</em> use a covering index. If you had an index on <code>(user_id) INCLUDE (name, email)</code>, a query for just those three columns would be an <strong>Index Only Scan</strong> — the fastest possible path, no table access at all. But <code>SELECT *</code> forces the database to hit the heap (the actual table) because no index covers all 20 columns. You throw away the best optimization PostgreSQL has.</p>
+
+        <div class="callout callout-warning">
+          <strong>Fix it now:</strong> Replace <code>SELECT *</code> with explicit column lists in every query that reaches production. Your ORM probably has a method for this — <code>.select(:id, :name, :email)</code> in Rails, <code>.only('id', 'name', 'email')</code> in Django, <code>.options(load_only(...))</code> in SQLAlchemy.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-circle-xmark icon-gap"></i> "ORMs handle optimization"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>ORMs like ActiveRecord, Django ORM, and SQLAlchemy are fantastic for developer productivity. They generate correct SQL. But "correct" and "optimized" are not the same thing. ORMs optimize for <em>developer convenience</em>, not <em>database performance</em>.</p>
+
+        <p>Here's what ORMs typically do that hurts performance:</p>
+        <ul>
+          <li><strong>N+1 queries by default</strong> — lazy-loading related records one at a time instead of batching</li>
+          <li><strong>SELECT * everywhere</strong> — fetching all columns even when the template only displays two</li>
+          <li><strong>Unnecessary subqueries</strong> — some ORMs generate nested subqueries where a JOIN would be faster</li>
+          <li><strong>No index awareness</strong> — the ORM has no idea which indexes exist, so it can't generate queries that leverage them</li>
+        </ul>
+
+        <p>The fix isn't to abandon ORMs — it's to <strong>always check the SQL they generate</strong>. Every major ORM has a way to log or print the SQL it creates. Make it a habit: write the ORM code, check the SQL, run EXPLAIN, and fix anything that doesn't use an index. The ORM is your co-pilot, not your autopilot.</p>
+
+        <div class="callout callout-danger">
+          <strong>Real example:</strong> A Django app loading a user's dashboard was making <strong>147 queries per page load</strong> — all generated by the ORM through lazy-loaded relationships. After adding <code>select_related()</code> and <code>prefetch_related()</code>, it dropped to <strong>4 queries</strong>. Same page, same data, same ORM — just one line added. The page went from 2.3 seconds to 180ms.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 — COMMON MISTAKES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes — The Six That Hit Every Team</h2>
+    </div>
+  </div>
+
+  <p>These aren't hypothetical. These are the mistakes that show up in <em>every</em> production postmortem, every performance review, every "why is the database slow" Slack thread. If you can avoid all six, you're already ahead of 90% of backend developers.</p>
+
+  <!-- Collapsible 1 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug icon-gap"></i> Not using EXPLAIN before deploying</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>This is mistake number one for a reason. Developers write a query, test it on a dev database with 500 rows, see it returns in 2ms, and ship it. On production with 15 million rows, that same query takes 4 seconds because it's doing a sequential scan instead of an index scan.</p>
+        <p>The fix is dead simple: <strong>run <code>EXPLAIN ANALYZE</code> on every new query before it hits production</strong>. Not just EXPLAIN (which shows the <em>plan</em>) — EXPLAIN ANALYZE (which <em>actually runs the query</em> and shows real timing). If you see "Seq Scan" on a large table, stop and add an index. This should be as automatic as running tests before merging a PR.</p>
+        <div class="callout callout-info">
+          <strong>Pro tip:</strong> Add an EXPLAIN step to your CI pipeline. Tools like <code>sqlcheck</code> or custom scripts can flag any new SQL migration that doesn't have a corresponding EXPLAIN output reviewed.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 2 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug icon-gap"></i> Missing indexes on foreign keys</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Here's a surprise for PostgreSQL users: when you add a foreign key constraint, <strong>PostgreSQL does NOT automatically create an index on the foreign key column</strong>. MySQL does (InnoDB requires it). But PostgreSQL silently lets you run without one.</p>
+        <p>So when you have <code>orders.user_id</code> referencing <code>users.id</code>, every JOIN on <code>orders.user_id</code> does a sequential scan unless you manually create an index. Worse: every time you DELETE a user, PostgreSQL has to scan the <code>orders</code> table to check for referencing rows — and without an index, that's a full table scan per delete.</p>
+        <p><strong>Rule:</strong> Every foreign key column needs an index. No exceptions. Check yours right now:</p>
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">find unindexed foreign keys</span></div>
+          <div class="macos-body">
+            <pre><code class="language-sql">-- Find foreign keys without matching indexes
+SELECT conrelid::regclass AS table_name,
+       a.attname AS fk_column,
+       confrelid::regclass AS referenced_table
+FROM pg_constraint c
+JOIN pg_attribute a ON a.attnum = ANY(c.conkey)
+  AND a.attrelid = c.conrelid
+WHERE c.contype = 'f'
+  AND NOT EXISTS (
+    SELECT 1 FROM pg_index i
+    WHERE i.indrelid = c.conrelid
+      AND a.attnum = ANY(i.indkey)
+  );</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 3 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug icon-gap"></i> N+1 queries in ORMs</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>We covered N+1 in Section 6, but it deserves a spot here because it's the single most common performance bug in web applications. The pattern: you load a list of items, then loop through them and load related data one-by-one. 1 query for the list + N queries for the details = N+1.</p>
+        <p>The trap is that ORMs make it <em>invisible</em>. You write <code>user.orders</code> in a loop and it looks like a property access — but it's actually a SQL query. Every iteration of the loop fires another <code>SELECT * FROM orders WHERE user_id = ?</code>. With 100 users on the page, that's 101 queries instead of 2.</p>
+        <p><strong>Detection:</strong> Use your ORM's query logger. In Rails: <code>ActiveRecord::Base.logger = Logger.new(STDOUT)</code>. In Django: <code>django-debug-toolbar</code>. In SQLAlchemy: <code>echo=True</code>. If you see the same query repeated with different IDs, that's an N+1.</p>
+        <p><strong>Fix:</strong> Eager-load the relationship. Every ORM has a method for this — <code>includes</code> (Rails), <code>select_related</code> / <code>prefetch_related</code> (Django), <code>joinedload</code> / <code>subqueryload</code> (SQLAlchemy).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 4 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug icon-gap"></i> Connection pool exhaustion</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Your database has a maximum number of connections it can handle at once. PostgreSQL defaults to <code>max_connections = 100</code>. If your application has 10 workers, each with a pool of 10 connections, that's already 100 — the entire limit. Add a background job processor and a cron job, and you're over the limit. New connections get rejected. Your application crashes.</p>
+        <p>The real danger: during a traffic spike, every request opens a connection and holds it while the slow query runs. Connections pile up, the pool fills, new requests queue, timeouts cascade, and suddenly your entire application is down — not because the database is slow, but because it <em>ran out of connections</em>.</p>
+        <p><strong>Fix:</strong> Use an external connection pooler. <strong>PgBouncer</strong> for PostgreSQL, <strong>ProxySQL</strong> for MySQL. These sit between your app and the database, multiplexing hundreds of app connections into a small pool of real database connections. PgBouncer in <code>transaction</code> mode can serve 1,000+ app connections through just 20 real database connections.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 5 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug icon-gap"></i> Not running VACUUM / ANALYZE</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>PostgreSQL uses a system called <strong>MVCC</strong> (Multi-Version Concurrency Control) — when you UPDATE or DELETE a row, it doesn't actually remove the old version. It marks it as "dead" and creates a new version. This is great for concurrent reads, but it means dead rows accumulate over time, making the table (and its indexes) larger than they need to be.</p>
+        <p><strong>VACUUM</strong> cleans up those dead rows. <strong>ANALYZE</strong> updates the statistics the query planner uses to pick execution plans. If you don't run them, two things happen: (1) your table bloats — a 2 GB table becomes 8 GB of mostly dead rows, and (2) the query planner makes bad decisions because its statistics are stale.</p>
+        <p>PostgreSQL has <strong>autovacuum</strong> built in, and it's on by default. But on high-write tables (anything with thousands of UPDATEs per minute), autovacuum can fall behind. Check its activity:</p>
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">check autovacuum status</span></div>
+          <div class="macos-body">
+            <pre><code class="language-sql">-- Check when VACUUM and ANALYZE last ran
+SELECT relname, n_dead_tup, last_vacuum, last_autovacuum,
+       last_analyze, last_autoanalyze
+FROM pg_stat_user_tables
+WHERE n_dead_tup > 10000
+ORDER BY n_dead_tup DESC;</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible 6 -->
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-bug icon-gap"></i> Ignoring index bloat</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p>Tables bloat, and so do indexes. After millions of UPDATEs and DELETEs, a B-tree index can have large sections of empty or nearly-empty pages. A 500 MB index might only have 200 MB of actual data — the rest is wasted space that the database still has to read through during scans.</p>
+        <p>Check your index sizes and compare them to what you'd expect:</p>
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">check index bloat</span></div>
+          <div class="macos-body">
+            <pre><code class="language-sql">-- Check index sizes for a specific table
+SELECT pg_size_pretty(pg_indexes_size('orders')) AS total_index_size;
+
+-- See individual indexes and their sizes
+SELECT indexrelname AS index_name,
+       pg_size_pretty(pg_relation_size(indexrelid)) AS index_size,
+       idx_scan AS times_used
+FROM pg_stat_user_indexes
+WHERE relname = 'orders'
+ORDER BY pg_relation_size(indexrelid) DESC;</code></pre>
+          </div>
+        </div>
+        <p>If an index is much larger than expected, rebuild it with <code>REINDEX CONCURRENTLY</code> (PostgreSQL 12+). This rebuilds the index without locking the table. For older versions, use <code>CREATE INDEX CONCURRENTLY</code> with a new name, then drop the old one.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 — INTERVIEW PLAYBOOK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-user-tie"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook — "This Query Is Slow. How Do You Debug It?"</h2>
+    </div>
+  </div>
+
+  <p>This is the most common database question in system design and backend interviews. It sounds simple, but the depth of your answer reveals your experience level instantly. Here's what interviewers expect at each level — with sample answers you can adapt.</p>
+
+  <!-- SVG: Debug flow -->
+  <svg viewBox="0 0 760 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Slow query debugging flow: reproduce, EXPLAIN, index, test, monitor">
+    <defs>
+      <marker id="sqt-s12-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Slow Query Debugging — The Mental Framework</text>
+
+    <rect x="15" y="50" width="130" height="55" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+    <text x="80" y="72" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="700" font-size="11">1. Reproduce</text>
+    <text x="80" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Find the exact SQL</text>
+    <line x1="145" y1="77" x2="165" y2="77" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-s12-arr)"/>
+
+    <rect x="170" y="50" width="130" height="55" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="235" y="72" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="11">2. EXPLAIN</text>
+    <text x="235" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Read the query plan</text>
+    <line x1="300" y1="77" x2="320" y2="77" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-s12-arr)"/>
+
+    <rect x="325" y="50" width="130" height="55" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+    <text x="390" y="72" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="11">3. Fix</text>
+    <text x="390" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Index / rewrite / cache</text>
+    <line x1="455" y1="77" x2="475" y2="77" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-s12-arr)"/>
+
+    <rect x="480" y="50" width="130" height="55" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <text x="545" y="72" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="700" font-size="11">4. Verify</text>
+    <text x="545" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">EXPLAIN again + load test</text>
+    <line x1="610" y1="77" x2="630" y2="77" stroke="#f97316" stroke-width="2" marker-end="url(#sqt-s12-arr)"/>
+
+    <rect x="635" y="50" width="110" height="55" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <text x="690" y="72" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="700" font-size="11">5. Monitor</text>
+    <text x="690" y="90" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">pg_stat_statements</text>
+
+    <rect x="80" y="130" width="600" height="40" rx="8" fill="rgba(249,115,22,0.06)" stroke="#f97316" stroke-width="1.5"/>
+    <text x="380" y="150" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="600" font-size="11">The key insight: don't guess. Measure, diagnose with EXPLAIN, fix with evidence, verify the fix.</text>
+    <text x="380" y="164" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Interviewers want to see a systematic approach, not "add an index and hope."</text>
+  </svg>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="sqt-s12-junior" role="tab" aria-selected="true">Junior</button>
+      <button class="tab-btn" data-tab="sqt-s12-mid" role="tab" aria-selected="false">Mid-Level</button>
+      <button class="tab-btn" data-tab="sqt-s12-senior" role="tab" aria-selected="false">Senior</button>
+    </div>
+    <div class="tab-panel active" id="sqt-s12-junior" role="tabpanel">
+      <p><strong>What they expect you to know:</strong></p>
+      <ul>
+        <li>How to find the slow query (slow query log, application logs)</li>
+        <li>What EXPLAIN does and how to read the basics (Seq Scan = bad, Index Scan = good)</li>
+        <li>How to add an index and verify it worked</li>
+        <li>What an N+1 query is and how to fix it with eager loading</li>
+      </ul>
+      <p><strong>Sample answer:</strong> "First, I'd identify the exact SQL query that's slow — either from the application logs or the slow query log. Then I'd run EXPLAIN ANALYZE on it to see the execution plan. I'm looking for sequential scans on large tables — that usually means a missing index. If the WHERE clause filters by a column like user_id, I'd add a B-tree index on that column and run EXPLAIN again to confirm it switched to an Index Scan. I'd also check if it's an N+1 problem — if the same query runs hundreds of times with different IDs, I'd fix it with eager loading in the ORM."</p>
+    </div>
+    <div class="tab-panel" id="sqt-s12-mid" role="tabpanel">
+      <p><strong>What they expect you to know (everything from Junior, plus):</strong></p>
+      <ul>
+        <li><strong>Query plan analysis</strong> — reading nested loops vs hash joins, understanding actual vs estimated rows, spotting the "rows removed by filter" anti-pattern</li>
+        <li><strong>Index selection</strong> — composite indexes vs single-column, the leftmost prefix rule, partial indexes for time-scoped data, covering indexes with INCLUDE</li>
+        <li><strong>pg_stat_statements</strong> — how to find the top 10 slowest queries by total time, not just single execution time</li>
+        <li><strong>Connection pooling</strong> — why you need PgBouncer/ProxySQL and when pool exhaustion causes slowdowns</li>
+      </ul>
+      <p><strong>Sample answer (add to Junior):</strong> "Beyond the basic index, I'd look at the full query plan. If I see a Nested Loop with a high row count, maybe a Hash Join would be better — sometimes adding <code>SET enable_nestloop = off</code> in a test session reveals a faster plan. For composite queries, I'd consider a multi-column index with the right column order — most selective column first. I'd also check pg_stat_statements to see if this query is a one-off or if it's the top consumer of total database time. Sometimes the slowest single query isn't the biggest problem — it's the medium-slow query that runs 10,000 times per minute."</p>
+    </div>
+    <div class="tab-panel" id="sqt-s12-senior" role="tabpanel">
+      <p><strong>What they expect you to know (everything from Mid, plus):</strong></p>
+      <ul>
+        <li><strong>Query plan analysis at depth</strong> — understanding parallel query execution, bitmap heap scans vs index scans, cost model parameters (<code>random_page_cost</code>, <code>effective_cache_size</code>), and when the planner makes wrong choices</li>
+        <li><strong>Partitioning strategy</strong> — range partitioning for time-series data, hash partitioning for even distribution, partition pruning in query plans</li>
+        <li><strong>Read replica routing</strong> — directing read queries to replicas, handling replication lag, write-after-read consistency</li>
+        <li><strong>Caching layer</strong> — when to put a Redis/Memcached layer in front of the database, cache invalidation strategies, read-through vs write-through</li>
+        <li><strong>Schema-level optimizations</strong> — denormalization trade-offs, materialized views for complex aggregations, pre-computed rollup tables</li>
+      </ul>
+      <p><strong>Sample answer (add to Mid):</strong> "At senior scale, I'd take a broader view. First: is this query even hitting the right database? Read queries should go to replicas. If the query is an aggregation (dashboard, report), maybe it shouldn't hit the OLTP database at all — a materialized view refreshed every 5 minutes might be the right answer. For tables over 100M rows, I'd evaluate partitioning — range partition by month for time-series data so the planner only scans the relevant partitions. I'd also look at the caching layer — can we cache the result in Redis with a 60-second TTL and avoid the database entirely for repeated queries? And for the long term, I'd set up pg_stat_statements dashboards with alerting on p95 query latency regression, so we catch slow queries before users do."</p>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Interview tip:</strong> Start with the basics and say "I can go deeper on any of these — query plan analysis, index strategy, caching, or partitioning." Let the interviewer choose. This shows breadth and lets them steer toward what they care about.
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 — EXERCISES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Exercises — Hands-On Practice</h2>
+    </div>
+  </div>
+
+  <p>Reading about SQL tuning is useful, but running real queries is what makes it stick. These five exercises go from "run one command" to "design an indexing strategy for a real schema." Try each one before opening the hints.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Run EXPLAIN ANALYZE and Interpret the Output <span class="difficulty-tag difficulty-beginner">Beginner</span></div>
+    <p>Spin up a PostgreSQL instance (Docker: <code>docker run -e POSTGRES_PASSWORD=test -p 5432:5432 postgres:16</code>). Create a table with 1 million rows using <code>generate_series</code>. Run a SELECT with a WHERE clause, then run <code>EXPLAIN ANALYZE</code> on it. Identify: Is it a Seq Scan or Index Scan? What's the execution time? How many rows were scanned vs returned?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Create the table: <code>CREATE TABLE test_orders AS SELECT g AS id, (random()*10000)::int AS user_id, now() - (random()*365)::int * interval '1 day' AS created_at FROM generate_series(1, 1000000) g;</code></p>
+          <p>Query: <code>EXPLAIN ANALYZE SELECT * FROM test_orders WHERE user_id = 42;</code></p>
+          <p>Look for: "Seq Scan" (no index yet), "actual rows" vs "rows planned", and "Execution Time" at the bottom.</p>
+        </div>
+      </div>
+    </div>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Without an index, you'll see <code>Seq Scan on test_orders</code> with ~1,000,000 rows scanned. Add the index: <code>CREATE INDEX idx_test_user_id ON test_orders(user_id);</code> Run EXPLAIN ANALYZE again — you should see <code>Index Scan using idx_test_user_id</code> with ~100 rows scanned and execution time dropping from ~150ms to ~0.5ms.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Find and Fix an N+1 Query <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>In your web application (or a sample app), enable query logging. Load a page that displays a list with related data (e.g., users with their orders). Count the queries. If you see the same SELECT repeated with different IDs, that's an N+1. Fix it using eager loading and compare the query count before and after.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Rails: <code>ActiveRecord::Base.logger = Logger.new(STDOUT)</code> then look for repeated queries. Fix with <code>.includes(:orders)</code>.</p>
+          <p>Django: Install <code>django-debug-toolbar</code> and check the SQL panel. Fix with <code>select_related()</code> for FK relationships or <code>prefetch_related()</code> for reverse/M2M.</p>
+          <p>SQLAlchemy: Set <code>echo=True</code> on the engine. Fix with <code>joinedload()</code> or <code>subqueryload()</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Set Up pg_stat_statements and Find Top 5 Slow Queries <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>Enable the <code>pg_stat_statements</code> extension in your PostgreSQL instance. Run a mix of queries (some fast, some slow). Then query <code>pg_stat_statements</code> to find the top 5 queries by total execution time. Which query consumes the most total time? Is it slow per-call or just called a lot?</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Enable: add <code>shared_preload_libraries = 'pg_stat_statements'</code> to <code>postgresql.conf</code> and restart. Then: <code>CREATE EXTENSION pg_stat_statements;</code></p>
+          <p>Query: <code>SELECT query, calls, total_exec_time, mean_exec_time, rows FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 5;</code></p>
+          <p>A query with high <code>total_exec_time</code> but low <code>mean_exec_time</code> runs fast but is called thousands of times — optimization here has big cumulative impact.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Benchmark with pgbench: Before and After Index <span class="difficulty-tag difficulty-intermediate">Intermediate</span></div>
+    <p>Use <code>pgbench</code> (ships with PostgreSQL) to benchmark a query before and after adding an index. Initialize a test database with <code>pgbench -i -s 100</code> (10 million rows). Write a custom SQL file with a parameterized SELECT, run it with <code>pgbench -f query.sql -c 10 -T 30</code>, record the TPS. Add an index, run again, compare.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hints</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Custom file (<code>query.sql</code>): <code>SELECT * FROM pgbench_accounts WHERE aid = :aid \gset</code>. The <code>:aid</code> is randomized by pgbench.</p>
+          <p>Before: <code>DROP INDEX IF EXISTS pgbench_accounts_pkey;</code> (careful — restore after!)</p>
+          <p>Run: <code>pgbench -f query.sql -c 10 -T 30 -r mydb</code>. The <code>-r</code> flag shows per-statement latency.</p>
+          <p>You should see TPS increase by 10-100x after restoring the primary key index.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">Design an Index Strategy for a Given Schema <span class="difficulty-tag difficulty-advanced">Advanced</span></div>
+    <p>Given this schema: an e-commerce app with <code>users</code>, <code>orders</code>, <code>order_items</code>, and <code>products</code> tables. The top queries are: (1) find orders by user, sorted by date; (2) find order items for an order; (3) search products by name; (4) aggregate total revenue per day. Design the index strategy. Consider: composite indexes, partial indexes, covering indexes, and when a full-text search index (GIN) beats a B-tree for the product search.</p>
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Query 1:</strong> <code>CREATE INDEX idx_orders_user_date ON orders (user_id, created_at DESC);</code> — composite index matches the filter + sort. Add <code>INCLUDE (total, status)</code> if your SELECT only needs those columns (covering index → Index Only Scan).</p>
+          <p><strong>Query 2:</strong> <code>CREATE INDEX idx_order_items_order ON order_items (order_id);</code> — standard FK index. Consider INCLUDE for frequently selected columns.</p>
+          <p><strong>Query 3:</strong> For <code>LIKE '%keyword%'</code>, B-tree can't help (leading wildcard). Use: <code>CREATE INDEX idx_products_name_gin ON products USING gin (name gin_trgm_ops);</code> — requires <code>pg_trgm</code> extension. Handles substring matches efficiently.</p>
+          <p><strong>Query 4:</strong> Don't index for this — create a materialized view: <code>CREATE MATERIALIZED VIEW daily_revenue AS SELECT date_trunc('day', created_at) AS day, SUM(total) AS revenue FROM orders GROUP BY 1;</code> Refresh it on a schedule. The dashboard query hits the materialized view, not the 50M-row orders table.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 — CHEAT SHEET
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-sheet">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-rectangle-list"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Cheat Sheet — Bookmark This Section</h2>
+    </div>
+  </div>
+
+  <p>Six cards with everything you need when you're debugging a slow query, tuning a database, or prepping for an interview. All real commands — copy-paste ready.</p>
+
+  <div class="grid-3">
+    <!-- Card 1: EXPLAIN Cheat Sheet -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">EXPLAIN Cheat Sheet</div>
+      <div class="cheat-card-body"><pre>-- Basic plan (estimated)
+EXPLAIN SELECT ...;
+
+-- Actual timing + buffers
+EXPLAIN (ANALYZE, BUFFERS) SELECT ...;
+
+-- JSON for tools
+EXPLAIN (ANALYZE, FORMAT JSON) SELECT ...;
+
+-- Visual: explain.dalibo.com
+-- Key: look for Seq Scan on large tables
+-- Key: actual rows ≫ estimated = stale stats</pre></div>
+    </div>
+
+    <!-- Card 2: Scan Types -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Scan Types — Good vs Bad</div>
+      <div class="cheat-card-body"><pre>Index Scan        → best for selective queries
+Index Only Scan   → even better (no table hit)
+Bitmap Index Scan → good for medium selectivity
+Seq Scan (small)  → fine on &lt;10K rows
+Seq Scan (large)  → RED FLAG — add an index
+
+Nested Loop  → good for small inner table
+Hash Join    → good for large equi-joins
+Merge Join   → good when both sides sorted</pre></div>
+    </div>
+
+    <!-- Card 3: Index Rules -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Index Rules of Thumb</div>
+      <div class="cheat-card-body"><pre>WHERE col = ?    → B-tree on col
+WHERE a = ? AND b = ? → composite (a, b)
+ORDER BY col DESC → include col in index
+LIKE 'abc%'      → B-tree works
+LIKE '%abc%'     → GIN + pg_trgm
+Partial:  WHERE active = true
+Covering: INCLUDE (col1, col2)
+
+Leftmost prefix rule:
+  idx(a, b, c) supports:
+  WHERE a = ?  ✓
+  WHERE a = ? AND b = ?  ✓
+  WHERE b = ?  ✗ (can't skip a)</pre></div>
+    </div>
+
+    <!-- Card 4: pg_stat_statements Queries -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">pg_stat_statements Queries</div>
+      <div class="cheat-card-body"><pre>-- Top 5 by total time
+SELECT query, calls,
+  total_exec_time::int AS total_ms,
+  mean_exec_time::int AS avg_ms
+FROM pg_stat_statements
+ORDER BY total_exec_time DESC
+LIMIT 5;
+
+-- Top 5 by call count
+...ORDER BY calls DESC LIMIT 5;
+
+-- Reset stats
+SELECT pg_stat_statements_reset();</pre></div>
+    </div>
+
+    <!-- Card 5: PgBouncer Config -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">PgBouncer Config</div>
+      <div class="cheat-card-body"><pre># pgbouncer.ini
+[databases]
+mydb = host=127.0.0.1 port=5432 dbname=mydb
+
+[pgbouncer]
+pool_mode = transaction
+max_client_conn = 1000
+default_pool_size = 20
+reserve_pool_size = 5
+reserve_pool_timeout = 3
+
+# transaction mode = best for web apps
+# session mode = needed for prepared stmts
+# statement mode = most aggressive pooling</pre></div>
+    </div>
+
+    <!-- Card 6: Slow Query Detection -->
+    <div class="cheat-card">
+      <div class="cheat-card-title">Slow Query Detection</div>
+      <div class="cheat-card-body"><pre># postgresql.conf
+log_min_duration_statement = 200
+# Logs any query slower than 200ms
+
+# Find currently running slow queries:
+SELECT pid, now() - query_start AS duration,
+  query, state
+FROM pg_stat_activity
+WHERE state != 'idle'
+  AND now() - query_start > '1 second'::interval
+ORDER BY duration DESC;
+
+# Kill a stuck query:
+SELECT pg_cancel_backend(pid);</pre></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 — CONNECTED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon orange"><i class="fa-solid fa-diagram-project"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics — Where SQL Tuning Leads Next</h2>
+    </div>
+  </div>
+
+  <p>SQL tuning doesn't live in isolation. It connects to almost every part of backend engineering — from how you design schemas to how you scale entire systems. Here's how the skills you've learned here map to the bigger picture.</p>
+
+  <!-- SVG: Connection map -->
+  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How SQL tuning connects to related system design topics">
+    <defs>
+      <marker id="sqt-s15-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- Center: SQL Tuning -->
+    <rect x="280" y="100" width="200" height="70" rx="14" fill="rgba(249,115,22,0.2)" stroke="#f97316" stroke-width="2.5"/>
+    <text x="380" y="128" text-anchor="middle" fill="#f97316" font-family="Inter, sans-serif" font-weight="800" font-size="14">SQL Tuning</text>
+    <text x="380" y="150" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">EXPLAIN → Index → Pool → Scale</text>
+
+    <!-- Schema Design (top-left) -->
+    <rect x="20" y="15" width="170" height="50" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="105" y="36" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="600" font-size="12">Schema Design</text>
+    <text x="105" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"Good schema = less tuning"</text>
+    <line x1="287" y1="108" x2="188" y2="57" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s15-arr)"/>
+
+    <!-- ACID vs BASE (top-right) -->
+    <rect x="570" y="15" width="170" height="50" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="655" y="36" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="12">ACID vs BASE</text>
+    <text x="655" y="52" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"When to abandon SQL"</text>
+    <line x1="473" y1="108" x2="572" y2="57" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s15-arr)"/>
+
+    <!-- Caching (right) -->
+    <rect x="570" y="105" width="170" height="50" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="655" y="126" text-anchor="middle" fill="#f59e0b" font-family="Inter, sans-serif" font-weight="600" font-size="12">Caching</text>
+    <text x="655" y="142" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"Skip the query entirely"</text>
+    <line x1="480" y1="135" x2="568" y2="132" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s15-arr)"/>
+
+    <!-- Scalability (bottom-right) -->
+    <rect x="570" y="205" width="170" height="50" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="655" y="226" text-anchor="middle" fill="#3b82f6" font-family="Inter, sans-serif" font-weight="600" font-size="12">Scalability</text>
+    <text x="655" y="242" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"Replicas, sharding, partitioning"</text>
+    <line x1="473" y1="162" x2="572" y2="213" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s15-arr)"/>
+
+    <!-- Isolation Levels (bottom-left) -->
+    <rect x="20" y="205" width="170" height="50" rx="10" fill="#1e293b" stroke="#ec4899" stroke-width="1.5"/>
+    <text x="105" y="226" text-anchor="middle" fill="#ec4899" font-family="Inter, sans-serif" font-weight="600" font-size="12">Isolation Levels</text>
+    <text x="105" y="242" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"Locking affects query speed"</text>
+    <line x1="287" y1="162" x2="188" y2="213" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s15-arr)"/>
+
+    <!-- Performance (left) -->
+    <rect x="20" y="105" width="170" height="50" rx="10" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+    <text x="105" y="126" text-anchor="middle" fill="#f43f5e" font-family="Inter, sans-serif" font-weight="600" font-size="12">Performance</text>
+    <text x="105" y="142" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">"SQL is often the real bottleneck"</text>
+    <line x1="280" y1="135" x2="192" y2="132" stroke="#f97316" stroke-width="1.5" marker-end="url(#sqt-s15-arr)"/>
+  </svg>
+
+  <div class="related-grid">
+    <a class="related-card" href="../schema-design/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-table-columns"></i></div>
+      <div class="related-card-text">
+        <h4>Schema Design</h4>
+        <p>A well-normalized schema with the right data types needs less tuning. Start here if your queries are fundamentally fighting the schema.</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../isolation-levels/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-lock"></i></div>
+      <div class="related-card-text">
+        <h4>Isolation Levels &amp; Locking</h4>
+        <p>Row locks and transaction isolation directly affect query speed. A Serializable transaction holds locks longer — understand the trade-offs.</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../acid-vs-base/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+      <div class="related-card-text">
+        <h4>ACID vs BASE</h4>
+        <p>When SQL tuning isn't enough, sometimes the answer is a different data model entirely — eventual consistency, NoSQL, or CQRS.</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../scalability/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-arrows-up-down-left-right"></i></div>
+      <div class="related-card-text">
+        <h4>Scalability</h4>
+        <p>Read replicas, horizontal sharding, and partitioning are the next steps when single-server tuning reaches its limit.</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../performance/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-gauge-high"></i></div>
+      <div class="related-card-text">
+        <h4>Performance Engineering</h4>
+        <p>SQL tuning is one piece of the performance puzzle — latency budgets, profiling, and system-wide bottleneck analysis complete the picture.</p>
+      </div>
+    </a>
+
+    <a class="related-card" href="../relational-databases/index.html">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Relational Databases</h4>
+        <p>Understand how PostgreSQL and MySQL work under the hood — storage engines, WAL, MVCC — to make your tuning decisions smarter.</p>
+      </div>
+    </a>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design — from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+
+<button class="back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
+<script src="../../../shared/scripts.js"></script>
+</body>
+</html>
