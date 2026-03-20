@@ -1425,8 +1425,9 @@ EXECUTE get_orders(7);   -- plan: 0ms (cached) + exec: 0.1ms
 
   <!-- Collapsible 1: Query Planner Internals -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-brain icon-gap"></i> Query Planner Internals — The Cost Model</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-brain icon-gap"></i> Query Planner Internals — The Cost Model</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>The query planner doesn't guess. It <strong>calculates a cost</strong> for every possible execution strategy and picks the cheapest one. The "cost" is a unitless number — think of it as "estimated effort." Lower cost = faster plan.</p>
 
@@ -1529,13 +1530,15 @@ ALTER TABLE orders ALTER COLUMN user_id SET STATISTICS 1000;
       <div class="callout callout-info">
         <strong>When the planner gets it wrong:</strong> If you know the planner is picking a bad plan, you can <strong>hint</strong> at a better one. PostgreSQL doesn't have query hints like Oracle, but you can disable strategies to force a choice: <code>SET enable_seqscan = off;</code> temporarily disables Seq Scan, forcing the planner to use an index. <strong>Only use this for debugging</strong> — never in production code.
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 2: VACUUM and Bloat -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-broom icon-gap"></i> VACUUM and Bloat — Why Tables Get Slower Over Time</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-broom icon-gap"></i> VACUUM and Bloat — Why Tables Get Slower Over Time</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>PostgreSQL uses a system called <span class="tooltip-trigger">MVCC<span class="tooltip-content">Multi-Version Concurrency Control. Instead of locking rows during updates, PostgreSQL creates a NEW version of the row and marks the old one as "dead." This means readers never block writers. The downside: dead rows pile up and need to be cleaned.</span></span> for concurrency. When you UPDATE a row, PostgreSQL doesn't modify it in place — it creates a brand new copy and marks the old one as "dead." When you DELETE a row, it's just marked dead, not actually removed.</p>
 
@@ -1578,13 +1581,15 @@ SHOW autovacuum_vacuum_scale_factor;    -- default: 0.2
 ALTER TABLE orders SET (autovacuum_vacuum_scale_factor = 0.05);</code></pre>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 3: Partitioning -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-table-columns icon-gap"></i> Partitioning — When One Table Gets Too Big</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-table-columns icon-gap"></i> Partitioning — When One Table Gets Too Big</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>When your table reaches hundreds of millions of rows, even indexed queries slow down because the <span class="tooltip-trigger">B-tree<span class="tooltip-content">The most common index structure. A balanced tree where each level narrows down the search space. For 10M rows, a B-tree has ~3 levels, so any lookup needs at most 3-4 page reads. For 1 billion rows, it's still only ~4-5 levels. B-trees scale beautifully.</span></span> gets deeper, VACUUM takes longer, and maintenance operations become painful. The solution: split the table into smaller chunks called <strong>partitions</strong>.</p>
 
@@ -1620,13 +1625,15 @@ EXPLAIN SELECT * FROM orders WHERE created_at >= '2024-03-01' AND created_at < '
       </div>
 
       <p>Partitioning is most useful when your queries naturally filter on the partition key (usually date). If your queries filter by <code>user_id</code>, you'd partition by user_id ranges or use hash partitioning instead. The key insight: <strong>partition on the column you filter by most often</strong>.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 4: CTEs vs Subqueries -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-code-compare icon-gap"></i> CTEs vs Subqueries — The Hidden Performance Trap</div>
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-code-compare icon-gap"></i> CTEs vs Subqueries — The Hidden Performance Trap</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>A <span class="tooltip-trigger">CTE<span class="tooltip-content">Common Table Expression — a named temporary result set defined with the WITH keyword. Looks like: WITH cte_name AS (SELECT ...) SELECT * FROM cte_name. Often used for readability.</span></span> (Common Table Expression) looks cleaner than a subquery. But in PostgreSQL 11 and earlier, CTEs are <strong>optimization barriers</strong> — the planner can't push filters from the outer query into the CTE. This was fixed in PostgreSQL 12+ with "CTE inlining," but it's still a gotcha if you're on an older version or using a <code>MATERIALIZED</code> CTE.</p>
 
@@ -1684,6 +1691,7 @@ SELECT * FROM orders WHERE user_id = 42;
 
       <div class="callout callout-warning">
         <strong>Rule of thumb:</strong> Use CTEs for readability when they reference the same result multiple times. For single-use CTEs, a subquery is safer. If you're on PostgreSQL 12+, non-materialized CTEs perform identically to subqueries. Always check with <code>EXPLAIN</code> to verify.
+      </div>
       </div>
     </div>
   </div>

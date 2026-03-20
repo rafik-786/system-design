@@ -844,7 +844,7 @@ COMMIT;
       </tbody>
     </table>
   </div>
-  <p style="margin-top:0.3rem;"><small>*PostgreSQL silently upgrades READ UNCOMMITTED to READ COMMITTED. **PostgreSQL also prevents phantoms at REPEATABLE READ (goes beyond the SQL standard).</small></p>
+  <p><small>*PostgreSQL silently upgrades READ UNCOMMITTED to READ COMMITTED. **PostgreSQL also prevents phantoms at REPEATABLE READ (goes beyond the SQL standard).</small></p>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1699,10 +1699,12 @@ WHERE relname = 'tickets';
 
   <!-- Collapsible 1: Deadlocks -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Deadlocks &mdash; When Two Transactions Wait for Each Other Forever</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>A <span class="tooltip-trigger">deadlock<span class="tooltip-content">When two or more transactions form a circular wait: A holds a lock that B needs, and B holds a lock that A needs. Neither can proceed. Without intervention, they'd wait forever. All modern databases detect deadlocks automatically and kill one transaction (the "victim") so the other can proceed. PostgreSQL checks for deadlocks every <code>deadlock_timeout</code> interval (default: 1 second).</span></span> is the database equivalent of two people meeting in a narrow hallway &mdash; each waiting for the other to step aside, neither willing to move first. Transaction A locks row 1 and needs row 2. Transaction B locks row 2 and needs row 1. Neither can proceed. They're stuck.</p>
 
       <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Deadlock: Transaction A holds row 1 and waits for row 2, Transaction B holds row 2 and waits for row 1, forming a cycle">
@@ -1791,15 +1793,18 @@ SET deadlock_timeout = '1s';  -- default is 1 second</code></pre>
       </div>
 
       <p>The fix is simple in theory: <strong>always lock rows in the same order</strong>. If every transaction locks row 1 before row 2, no circular wait can form. In practice, this means sorting your operations by primary key before executing them.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 2: Gap Locks -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Gap Locks (MySQL InnoDB) &mdash; Locking Empty Space</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>MySQL has a locking concept that doesn't exist in PostgreSQL: <span class="tooltip-trigger">gap locks<span class="tooltip-content">An InnoDB-specific lock that locks the "gap" between two index entries, preventing any INSERT into that range. If your index has entries at 100 and 200, a gap lock locks the space between them, so nobody can insert a row with a value of 150 while your transaction is running. Gap locks are used at REPEATABLE READ and SERIALIZABLE to prevent phantom reads. PostgreSQL uses SSI (Serializable Snapshot Isolation) instead, which achieves the same goal without locking gaps.</span></span>. Instead of just locking existing rows, MySQL also locks the <em>spaces between</em> index entries. This prevents other transactions from inserting new rows into those gaps &mdash; which is how InnoDB prevents <span class="tooltip-trigger">phantom reads<span class="tooltip-content">When a transaction re-runs a range query (like SELECT WHERE amount BETWEEN 100 AND 200) and gets different rows the second time because another transaction inserted a new row into that range. Gap locks prevent this by locking the range itself, not just the existing rows in it.</span></span>.</p>
 
       <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gap lock: MySQL locks the space between index values 100 and 200, preventing inserts in that range">
@@ -1859,15 +1864,18 @@ WHERE LOCK_TYPE = 'RECORD';</code></pre>
       </div>
 
       <p>Gap locks are one of the biggest differences between MySQL and PostgreSQL internals. If you're used to PostgreSQL and switch to MySQL, unexpected blocking from gap locks is one of the first things that trips people up.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 3: Advisory Locks -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Advisory Locks &mdash; Application-Level Locks in the Database</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Sometimes you need to lock a <em>concept</em>, not a row. "Only one server should run database migrations at a time." "Only one worker should warm the cache." "Only one cron job should execute this batch." There's no specific row to lock. Enter <span class="tooltip-trigger">advisory locks<span class="tooltip-content">Locks that the database manages for you, but that have no connection to any particular row or table. You pick an arbitrary number as the lock ID, acquire it, and release it. The database tracks who holds which advisory lock. Other sessions that try to acquire the same lock ID will block (or fail, if you use the try_ variant). They're "advisory" because the database doesn't enforce them automatically &mdash; your application code decides what they mean.</span></span> &mdash; locks that are stored in the database but don't correspond to any table or row.</p>
 
       <div class="macos-window">
@@ -1902,15 +1910,18 @@ SELECT * FROM pg_locks WHERE locktype = 'advisory';</code></pre>
       </div>
 
       <p><strong>Real uses:</strong> Running database migrations (Rails uses advisory locks so two servers don't run migrations simultaneously). Distributed cron jobs (only one instance executes the job). Cache warming (prevent thundering herd). The lock lives in PostgreSQL's shared memory, so it's fast &mdash; microseconds to acquire, no disk I/O.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 4: Two-Phase Locking -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>Two-Phase Locking (2PL) &mdash; The Theory Behind It All</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>All the locking strategies above are practical tools. <span class="tooltip-trigger">Two-Phase Locking<span class="tooltip-content">A theoretical protocol that guarantees serializability (the gold standard of correctness). It has two strict rules: (1) In the "growing phase," a transaction can acquire locks but must not release any. (2) In the "shrinking phase," a transaction can release locks but must not acquire any. Once you release your first lock, you can never acquire another. This simple rule mathematically prevents all anomalies. Most databases use a variant called Strict 2PL (S2PL) where all locks are held until COMMIT, which is even stricter but simpler to implement.</span></span> (2PL) is the theoretical foundation that explains <em>why</em> they work. It's the answer to the interview question: "How do databases guarantee serializability?"</p>
 
       <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two-Phase Locking: growing phase acquires locks, shrinking phase releases them, no new locks after first release">
@@ -1958,6 +1969,7 @@ SELECT * FROM pg_locks WHERE locktype = 'advisory';</code></pre>
       <p>The rule is beautifully simple: once you release your first lock, you can never acquire another one. This prevents a scenario where Transaction A releases a lock on Row 1, Transaction B grabs it and modifies it, and then Transaction A tries to read Row 1 again (seeing B's changes mid-transaction). In practice, most databases use <strong>Strict 2PL</strong> &mdash; they hold ALL locks until COMMIT, which is even simpler: you never release anything until you're completely done.</p>
 
       <p>You'll never call a "2PL API" in your code. But understanding it explains why transactions hold locks until COMMIT (not until the last statement), why long transactions cause contention (they hold locks longer), and why the database can guarantee that SERIALIZABLE really means serializable.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -2340,10 +2352,12 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
 
   <!-- Collapsible 1: Always SERIALIZABLE -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>"Always use SERIALIZABLE for safety" &mdash; The Sledgehammer Approach</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>It sounds logical: "SERIALIZABLE is the safest level. Why not use it everywhere and never worry about concurrency bugs?" Because safety has a price, and that price is steep.</p>
 
       <p>At SERIALIZABLE, PostgreSQL's SSI engine tracks read/write dependencies between all active transactions. When it detects a potential conflict pattern (even if no actual anomaly occurred), it aborts one transaction. Under moderate contention, you'll see a <strong>10% retry rate</strong>. Under heavy contention, it can hit <strong>30-50%</strong>. Every retry means wasted CPU, wasted I/O, wasted network round-trips, and higher latency for the user.</p>
@@ -2410,15 +2424,18 @@ def list_products(conn):
       </div>
 
       <p><strong>The rule:</strong> Use SERIALIZABLE only for transactions where getting it wrong costs money, safety, or legal liability. Everything else stays at READ COMMITTED.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 2: FOR UPDATE everywhere -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>"SELECT FOR UPDATE on every read" &mdash; The Lock Everything Approach</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>After learning about <code>SELECT FOR UPDATE</code>, some developers add it to every query "just to be safe." This is like putting a padlock on every door in your house, including the bathroom door, the kitchen door, and the closet door. Now nobody can move through the house without waiting for keys.</p>
 
       <p><code>FOR UPDATE</code> is designed for one specific pattern: <strong>you intend to UPDATE the row you just read</strong>. Read-then-write. If you're just reading data to display on a page, <code>FOR UPDATE</code> is pure overhead &mdash; it holds a lock that blocks other writers for no reason.</p>
@@ -2472,15 +2489,18 @@ LIMIT 1 FOR UPDATE SKIP LOCKED;</code></pre>
       </div>
 
       <p><strong>The rule:</strong> Only use <code>FOR UPDATE</code> when you're going to UPDATE or DELETE the row in the same transaction. For read-only queries, MVCC already provides a consistent view without any locking.</p>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 3: Deadlocks are bugs -->
   <div class="collapsible">
-    <div class="collapsible-header">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
       <span>"Deadlocks mean your code is broken" &mdash; The Prevention Fallacy</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>When a developer sees their first <code>ERROR: deadlock detected</code>, the instinct is "something is fundamentally wrong with my code." But deadlocks are a <strong>normal part of concurrent systems</strong>. They happen. The database detects them automatically and resolves them by killing one transaction. Your job isn't to prevent all deadlocks &mdash; it's to handle them gracefully.</p>
 
       <p>Even perfectly correct code can deadlock if two transactions happen to lock rows in different orders. You can minimize deadlocks by always locking rows in a consistent order (e.g., by ascending primary key), but you can't eliminate them entirely in a system with unpredictable user behavior.</p>
@@ -2542,6 +2562,7 @@ def with_retry(conn, func, max_retries=3):
 
       <div class="callout callout-info">
         <strong>Think First:</strong> If deadlocks are "normal," why does PostgreSQL log them as ERROR level? (Because the transaction WAS aborted &mdash; it's an error from that transaction's perspective. But from a system perspective, it's expected behavior. The key metric is: did the retry succeed? If yes, the user never noticed. If retries keep failing, <em>then</em> you have a real problem to investigate.)
+      </div>
       </div>
     </div>
   </div>

@@ -1564,8 +1564,9 @@ SHOW synchronous_commit;
 
   <!-- Collapsible 1: B+ Tree -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-sitemap icon-gap"></i> B+ Tree Index &mdash; The Default (and Best All-Rounder)</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-sitemap icon-gap"></i> B+ Tree Index &mdash; The Default (and Best All-Rounder)</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>When you run <code>CREATE INDEX</code> without specifying a type, PostgreSQL creates a <span class="tooltip-trigger">B+ tree<span class="tooltip-content">A self-balancing tree structure where all data pointers live in the leaf nodes, and leaf nodes are linked together in a doubly-linked list. This means: (1) lookups are O(log n) &mdash; follow the tree from root to leaf, (2) range scans are efficient &mdash; find the start leaf, then follow links forward, (3) the tree stays balanced automatically, so worst-case = average-case. The "B" stands for "balanced" (not "binary"). A B+ tree with fanout 500 and 10 million rows has depth 3 &mdash; that's just 3 disk reads to find any row.</span></span>. It's the workhorse of database indexing &mdash; good at equality lookups (<code>WHERE email = 'x'</code>), range queries (<code>WHERE created_at > '2024-01-01'</code>), and sorting (<code>ORDER BY name</code>).</p>
 
@@ -1601,13 +1602,15 @@ SELECT pg_size_pretty(pg_indexes_size('users'));
 -- Shows total size of ALL indexes on the users table.</code></pre>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 2: Hash Index -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-hashtag icon-gap"></i> Hash Index &mdash; O(1) for Exact Matches Only</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-hashtag icon-gap"></i> Hash Index &mdash; O(1) for Exact Matches Only</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>A <span class="tooltip-trigger">hash index<span class="tooltip-content">An index that uses a hash function to convert the column value into a bucket number. Lookups are O(1) &mdash; compute the hash, jump to the bucket, find the row. But hash indexes can't do range queries (WHERE price > 100), can't do pattern matching (WHERE name LIKE 'A%'), and can't sort results (ORDER BY). They're specialists: blindingly fast at one thing, useless at everything else. In PostgreSQL, hash indexes became crash-safe only in version 10 (2017). Before that, they weren't WAL-logged.</span></span> is like a coat check: give your coat (value), get a ticket number (hash). Later, hand back the ticket and get your coat instantly. No searching. But you can't say "give me all coats between ticket 50 and 75" &mdash; the numbers aren't in order. That's the trade-off: <strong>O(1) for exact matches, useless for everything else</strong>.</p>
 
@@ -1635,13 +1638,15 @@ SELECT * FROM users ORDER BY email;
 --   In practice, B-tree is so good that hash indexes are rarely needed.</code></pre>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 3: Composite Index -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-layer-group icon-gap"></i> Composite Index &mdash; Multi-Column Power</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-layer-group icon-gap"></i> Composite Index &mdash; Multi-Column Power</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>A composite index covers <strong>multiple columns</strong>. It's like a phone book sorted by last name, then first name. You can look up "Smith" (last name only) quickly. You can look up "Smith, John" (both columns) even faster. But you <em>can't</em> look up just "John" (first name only) without scanning the whole book &mdash; because the book isn't sorted by first name.</p>
 
@@ -1698,13 +1703,15 @@ EXPLAIN ANALYZE SELECT * FROM orders
         <text x="630" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">columns go LEFT.</text>
         <text x="630" y="144" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-size="8">Think: phone book is (last, first)</text>
       </svg>
+      </div>
     </div>
   </div>
 
   <!-- Collapsible 4: When NOT to Index -->
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-ban icon-gap"></i> When NOT to Index &mdash; The Hidden Costs</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-ban icon-gap"></i> When NOT to Index &mdash; The Hidden Costs</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
 
       <p>Indexes aren't free. Every index is a <em>separate data structure</em> that the database maintains alongside your table. Every INSERT, UPDATE, and DELETE on the table must <em>also</em> update every index on that table. More indexes = slower writes.</p>
 
@@ -1741,6 +1748,7 @@ ORDER BY pg_relation_size(indexrelid) DESC;
         <p><strong>DO index:</strong> columns in WHERE clauses, JOIN conditions, ORDER BY, and columns used in <code>GROUP BY</code>. These are columns the query planner searches, sorts, or matches against.</p>
         <p><strong>DON'T index:</strong> boolean columns (only 2 values &mdash; the index doesn't narrow much), columns you rarely filter on, tables with fewer than ~1,000 rows (sequential scan is faster than the index overhead), and columns that change constantly (every update rewrites the index entry).</p>
         <p><strong>Monitor:</strong> Use <code>pg_stat_user_indexes</code> to find unused indexes. Use <code>EXPLAIN ANALYZE</code> to verify the planner uses your index. If <code>idx_scan = 0</code> for weeks, that index is dead weight &mdash; drop it.</p>
+      </div>
       </div>
     </div>
   </div>
@@ -2098,8 +2106,9 @@ ANALYZE users;</code></pre>
   <p>The internet is full of database advice. Most of it is wrong, and some of it is dangerously wrong. These three myths have caused more production outages, unnecessary rewrites, and wasted engineering months than any actual technical limitation. Let's kill them with evidence.</p>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-explosion icon-gap"></i> "Relational databases don't scale"</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-explosion icon-gap"></i> "Relational databases don't scale"</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>This is the single most harmful myth in system design. It's repeated in blog posts, YouTube videos, and even some system design interview prep materials. And it is <strong>demonstrably false</strong>.</p>
       <p>The evidence:</p>
       <ul>
@@ -2124,12 +2133,14 @@ ANALYZE users;</code></pre>
 
       <p>When someone says "we moved to MongoDB because PostgreSQL couldn't handle the load," the correct follow-up question is: <em>"Did you add indexes? Did you run EXPLAIN ANALYZE? Did you check for N+1 queries?"</em> Nine times out of ten, the answer is no. They didn't outgrow the database &mdash; they never learned to use it properly.</p>
       <p>Relational databases scale vertically (bigger hardware) further than most people think. A single PostgreSQL instance on modern hardware (64 cores, 512GB RAM, NVMe SSDs) can handle millions of transactions per second. And when you do need horizontal scale, tools like Vitess, Citus, and native partitioning let you shard without abandoning SQL.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-table-cells icon-gap"></i> "Always normalize to 3NF"</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-table-cells icon-gap"></i> "Always normalize to 3NF"</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>Normalization is a tool, not a religion. Yes, 3NF eliminates redundancy and prevents update anomalies. But taken to an extreme, it creates queries with 7-table JOINs that take 30 seconds to run &mdash; and your dashboard users aren't going to wait 30 seconds.</p>
 
       <div class="tab-container">
@@ -2179,12 +2190,14 @@ WHERE u.id = 42;
       </div>
 
       <p>The rule of thumb: normalize by default. Denormalize when you have <strong>evidence</strong> (slow queries, <code>EXPLAIN ANALYZE</code> showing expensive JOINs) that normalization is hurting you. Document WHY you denormalized and HOW you keep the copies in sync. Denormalization without a sync strategy is just a bug waiting to happen.</p>
+      </div>
     </div>
   </div>
 
   <div class="collapsible">
-    <div class="collapsible-header"><i class="fa-solid fa-robot icon-gap"></i> "ORMs mean you don't need to know SQL"</div>
-    <div class="collapsible-body">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fa-solid fa-robot icon-gap"></i> "ORMs mean you don't need to know SQL"</span><i class="fa-solid fa-chevron-down collapsible-chevron"></i></div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
       <p>ORMs (Object-Relational Mappers) like ActiveRecord (Rails), Entity Framework (.NET), SQLAlchemy (Python), and Hibernate (Java) are wonderful tools. They reduce boilerplate, prevent SQL injection, and let you work with objects instead of raw strings. But they have a dark side: they hide the SQL they generate, and that hidden SQL is often <em>terrible</em>.</p>
 
       <p>The most infamous problem is the <span class="tooltip-trigger">N+1 query<span class="tooltip-content">A performance bug where loading a list of N items triggers 1 query to get the list, plus N additional queries to load a related object for each item. Example: fetching 100 blog posts (1 query), then for each post, fetching its author (100 queries) = 101 queries total. The correct approach: eager loading (JOIN or IN clause) to fetch posts and authors in 1-2 queries. ORMs make N+1 easy to create accidentally because the lazy loading happens transparently.</span></span>:</p>
@@ -2244,6 +2257,7 @@ end
       <div class="callout callout-info">
         <div class="callout-title"><i class="fa-solid fa-terminal"></i> Always Check Your ORM's SQL</div>
         <p>In PostgreSQL, enable query logging: <code>SET log_min_duration_statement = 0;</code> (logs every query). In development, this shows you exactly what SQL your ORM generates. In production, set it to something like <code>1000</code> (1 second) to log only slow queries. The first time you see the ORM generating 500 queries for one page load, you'll understand why knowing SQL matters.</p>
+      </div>
       </div>
     </div>
   </div>
