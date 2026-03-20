@@ -28,13 +28,13 @@
   <div class="relative z-1">
     <div class="hero-badge"><i class="fa-solid fa-database"></i> Data Fundamentals</div>
     <h1>ACID vs BASE</h1>
-    <p class="hero-subtitle">Two philosophies of data: one demands perfection (every transaction is bulletproof), the other accepts imperfection (good enough, fast enough, available enough). Knowing when to use each is what separates junior from senior engineers.</p>
+    <p class="hero-subtitle">Stripe processes billions in payments with PostgreSQL's SERIALIZABLE isolation &mdash; they'd rather be slow than lose a cent. Discord stores 12 billion messages per week in Cassandra &mdash; they'd rather be fast than perfectly synchronized. Two philosophies, both correct, for completely different reasons.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-brain"></i> 6 Think Firsts</span>
-      <span><i class="fa-solid fa-diagram-project"></i> 18 SVG Diagrams</span>
-      <span><i class="fa-solid fa-dumbbell"></i> 5 Exercises</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 10 SVG Diagrams</span>
+      <span><i class="fa-solid fa-terminal"></i> Live Commands</span>
       <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
-      <span><i class="fa-solid fa-circle-info"></i> 24 Tooltips</span>
+      <span><i class="fa-solid fa-circle-info"></i> 30+ Tooltips</span>
     </div>
   </div>
 </div>
@@ -54,67 +54,70 @@
   </div>
 
   <div class="callout callout-success">
-    <strong>Mental Model:</strong> <span class="tooltip-trigger">ACID<span class="tooltip-content">Stands for Atomicity, Consistency, Isolation, Durability &mdash; four guarantees that traditional databases (like PostgreSQL, MySQL, Oracle) make about every transaction. If any guarantee is violated, the transaction is rolled back as if it never happened.</span></span> = bank transfer mindset. Either <strong>everything</strong> happens or <strong>nothing</strong> happens. No half-states. <span class="tooltip-trigger">BASE<span class="tooltip-content">Stands for Basically Available, Soft state, Eventual consistency &mdash; a relaxed approach to data used by distributed systems (like Cassandra, DynamoDB, MongoDB). It trades strict correctness for speed and availability.</span></span> = social media mindset. Your friend's post might take 2 seconds to show up on your screen &mdash; and that's fine. Both are valid. The right choice depends on what happens when things go wrong.
+    <strong>Mental Model:</strong> <span class="tooltip-trigger">ACID<span class="tooltip-content">Atomicity, Consistency, Isolation, Durability &mdash; four guarantees that databases like PostgreSQL and MySQL make about every transaction. If any guarantee is violated, the entire transaction rolls back as if it never happened. You can verify your database's isolation level right now: <code>psql -c "SHOW transaction_isolation"</code> (PostgreSQL) or <code>SELECT @@transaction_isolation;</code> (MySQL).</span></span> is the bank transfer mindset. Either <strong>everything</strong> happens or <strong>nothing</strong> happens. No half-states, ever. <span class="tooltip-trigger">BASE<span class="tooltip-content">Basically Available, Soft state, Eventual consistency &mdash; a relaxed approach used by distributed databases like Cassandra, DynamoDB, and Redis. It trades strict correctness for speed and availability. You can see eventual consistency yourself: write to a Redis master, then immediately read from a replica &mdash; you might get the old value for a few milliseconds.</span></span> is the social media mindset. Your friend's post might take 2 seconds to show up on your screen &mdash; and that's fine.
   </div>
 
-  <p>Think of two very different businesses. A bank and a social media app. When you transfer $500 from your checking account to your savings account, you expect <em>perfection</em>. The money leaves one account and arrives in the other &mdash; every single time, no exceptions. If the system crashes halfway through, you don't want $500 to vanish into thin air. That's the ACID mindset: absolute correctness, no matter what.</p>
+  <p>Think of two very different businesses. A bank and a messaging app. When you transfer $500 from checking to savings, you expect <em>perfection</em>. The money leaves one account and arrives in the other &mdash; every single time. If the server crashes halfway, PostgreSQL's <span class="tooltip-trigger">Write-Ahead Log<span class="tooltip-content">WAL (Write-Ahead Log) is a file where PostgreSQL records every change BEFORE applying it to the actual data. If the server crashes mid-transaction, PostgreSQL reads the WAL on restart and rolls back any incomplete transactions. This is why ACID databases can guarantee "all or nothing" &mdash; the WAL is the safety net. You can inspect it: <code>pg_waldump</code> shows the actual log entries.</span></span> ensures both operations roll back automatically. Your $500 never vanishes. That's ACID.</p>
 
-  <p>Now think about Instagram. You post a photo. Your friend in another city opens the app two seconds later and doesn't see it yet. Five seconds later, it appears. Was anyone harmed? Nope. That tiny delay is the BASE mindset: <em>speed and availability matter more than instant perfection</em>.</p>
+  <p>Now think about Discord. Someone sends a message in a server with 500,000 members. It appears on your screen. Your friend in another timezone sees it 100 milliseconds later. Did anyone get hurt? Nope. Discord stores <strong>12 billion messages per week</strong> in <span class="tooltip-trigger">Cassandra<span class="tooltip-content">A distributed NoSQL database originally built at Facebook. It spreads data across many servers (nodes) and lets you tune consistency per query. Discord chose it because it handles massive write throughput across many data centers without any single point of failure. Trade-off: different nodes might briefly show slightly different data.</span></span>, accepting that different servers might be briefly out of sync. That's BASE.</p>
 
-  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ACID vs BASE mental model comparison">
+  <svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ACID vs BASE mental model: bank transfer vs Discord messages">
     <defs>
       <marker id="acb-tldr-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
       </marker>
     </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="14">Two Philosophies &mdash; Real Companies, Real Choices</text>
 
-    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">Two Philosophies of Data</text>
+    <!-- Left: ACID / Stripe -->
+    <rect x="20" y="42" width="345" height="230" rx="12" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="192" y="68" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="800" font-size="16">ACID</text>
+    <text x="192" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11">"I'd rather be slow than wrong"</text>
 
-    <!-- Left: ACID -->
-    <rect x="20" y="45" width="345" height="195" rx="12" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
-    <text x="192" y="72" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="800" font-size="16">ACID</text>
-    <text x="192" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">"Everything perfect, or nothing at all"</text>
+    <rect x="42" y="100" width="300" height="44" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="192" y="118" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="9">BEGIN;</text>
+    <text x="192" y="134" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="8">UPDATE accounts SET balance = balance - 500 ...</text>
 
-    <rect x="45" y="110" width="130" height="36" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
-    <text x="110" y="133" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Account A: -$500</text>
+    <rect x="42" y="150" width="300" height="28" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="192" y="169" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="8">UPDATE accounts SET balance = balance + 500 ... COMMIT;</text>
 
-    <line x1="185" y1="128" x2="220" y2="128" stroke="#eab308" stroke-width="2" marker-end="url(#acb-tldr-arr)"/>
+    <text x="192" y="200" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2713; Both happen or neither happens</text>
+    <text x="192" y="216" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="10" font-weight="600">Stripe: PostgreSQL SERIALIZABLE</text>
+    <text x="192" y="232" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Processes $billions/year &mdash; never loses a cent</text>
+    <text x="192" y="250" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="9">&#x2717; Slower. Single-region. Harder to scale.</text>
+    <text x="192" y="264" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">PostgreSQL &bull; MySQL &bull; Oracle &bull; SQL Server</text>
 
-    <rect x="230" y="110" width="130" height="36" rx="6" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
-    <text x="295" y="133" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">Account B: +$500</text>
+    <!-- Right: BASE / Discord -->
+    <rect x="395" y="42" width="345" height="230" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="567" y="68" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="800" font-size="16">BASE</text>
+    <text x="567" y="86" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="11">"I'd rather be fast than perfectly in sync"</text>
 
-    <text x="192" y="172" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Both happen or neither happens</text>
-    <text x="192" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Banks, payments, inventory</text>
-    <text x="192" y="208" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10">&#x2717; Slower, harder to scale</text>
-    <text x="192" y="226" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">PostgreSQL, MySQL, Oracle</text>
+    <rect x="417" y="100" width="95" height="50" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="464" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">US-East Node</text>
+    <text x="464" y="134" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="9">"Hello!"</text>
+    <text x="464" y="146" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">t = 0ms</text>
 
-    <!-- Right: BASE -->
-    <rect x="395" y="45" width="345" height="195" rx="12" fill="#1e293b" stroke="#eab308" stroke-width="1.5" stroke-dasharray="6,3"/>
-    <text x="567" y="72" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="800" font-size="16">BASE</text>
-    <text x="567" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="11">"Good enough, fast enough, available enough"</text>
+    <rect x="527" y="100" width="95" height="50" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="574" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">EU Node</text>
+    <text x="574" y="134" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="9">(syncing...)</text>
+    <text x="574" y="146" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">t = 50ms</text>
 
-    <rect x="420" y="110" width="95" height="36" rx="6" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
-    <text x="467" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Node 1</text>
-    <text x="467" y="138" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">4,231 likes</text>
+    <rect x="637" y="100" width="95" height="50" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="684" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Asia Node</text>
+    <text x="684" y="134" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="9">(syncing...)</text>
+    <text x="684" y="146" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">t = 100ms</text>
 
-    <rect x="530" y="110" width="95" height="36" rx="6" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
-    <text x="577" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Node 2</text>
-    <text x="577" y="138" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-size="9">4,232 likes</text>
-
-    <rect x="640" y="110" width="95" height="36" rx="6" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
-    <text x="687" y="125" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Node 3</text>
-    <text x="687" y="138" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">4,231 likes</text>
-
-    <text x="567" y="172" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2248; Close enough &mdash; they'll converge</text>
-    <text x="567" y="190" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Feeds, likes, analytics, caches</text>
-    <text x="567" y="208" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10">&#x2713; Fast, available, scales easily</text>
-    <text x="567" y="226" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Cassandra, DynamoDB, MongoDB</text>
+    <text x="567" y="176" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2248; They all converge within ~100ms</text>
+    <text x="567" y="196" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="10" font-weight="600">Discord: Cassandra, 12B msgs/week</text>
+    <text x="567" y="212" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Message appears 100ms earlier on your screen</text>
+    <text x="567" y="232" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">&#x2713; Fast. Multi-region. Scales horizontally.</text>
+    <text x="567" y="250" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">Cassandra &bull; DynamoDB &bull; Redis &bull; CouchDB</text>
   </svg>
 
-  <p>Neither philosophy is "better." They solve different problems. The real skill is knowing <em>which one to use where</em> &mdash; and most production systems use both, side by side, in the same application. Your payment service uses ACID (money can't disappear). Your notification service uses BASE (a 2-second delay in push notifications is fine).</p>
+  <p>Neither philosophy is "better." They solve different problems. The <em>real</em> engineering skill is knowing which one to use where &mdash; and here's the thing most tutorials won't tell you: <strong>every serious production system uses both</strong>. Stripe uses PostgreSQL (ACID) for payments and Redis (BASE) for caching session data. Amazon uses a relational database (ACID) for order totals and DynamoDB (BASE) for shopping cart state. Same company, different guarantees for different data.</p>
 
   <div class="callout callout-info">
-    <strong>One-line takeaway:</strong> ACID = "I'd rather be slow than wrong." BASE = "I'd rather be fast than perfectly up-to-date." Most real systems use both.
+    <strong>You can see this yourself right now.</strong> If you have PostgreSQL installed, run: <code>psql -c "SHOW transaction_isolation"</code> &mdash; it'll show <code>read committed</code>, your database's default ACID isolation level. If you have Redis, run: <code>redis-cli SET test "hello"</code> then immediately <code>redis-cli GET test</code> on a replica &mdash; you might get <code>(nil)</code> for a few milliseconds. That's eventual consistency, live on your machine.
   </div>
 </div>
 
@@ -127,102 +130,132 @@
     <div class="section-icon yellow"><i class="fa-solid fa-money-bill-transfer"></i></div>
     <div>
       <div class="section-num">Section 2</div>
-      <h2 class="section-title">Why You Need This &mdash; The Disappearing $500</h2>
+      <h2 class="section-title">The Scenario &mdash; The Disappearing $500</h2>
     </div>
   </div>
 
-  <p>Let's make this concrete with two stories that show exactly why these two philosophies exist.</p>
+  <p>Let's make this painfully concrete. You open your banking app and transfer $500 from checking to savings. Behind the scenes, the database runs two SQL statements back to back:</p>
 
-  <h3><i class="fa-solid fa-building-columns icon-gap"></i> Story 1: The Bank Transfer</h3>
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">bank-transfer.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- This is a REAL PostgreSQL transaction. You can run this yourself.
+BEGIN;
+  UPDATE accounts SET balance = balance - 500 WHERE id = 1;  -- debit checking
+  UPDATE accounts SET balance = balance + 500 WHERE id = 2;  -- credit savings
+COMMIT;</code></pre>
+    </div>
+  </div>
 
-  <p>You open your banking app and transfer $500 from Account A to Account B. Behind the scenes, the system needs to do two things: subtract $500 from A, then add $500 to B. Simple enough.</p>
+  <p>Two statements. One subtracts. One adds. Seems simple enough. But what happens if the PostgreSQL server crashes <em>after</em> the first UPDATE (money leaves checking) but <em>before</em> the second UPDATE (money arrives in savings)?</p>
 
-  <p>But what if the server crashes <em>after</em> step 1 (money leaves A) but <em>before</em> step 2 (money arrives in B)? Your $500 is gone. Not in A, not in B &mdash; just... vanished. This is called a <span class="tooltip-trigger">partial failure<span class="tooltip-content">When a multi-step operation completes some steps but fails before finishing all of them, leaving the system in an inconsistent or corrupt state. ACID transactions prevent this by rolling back all steps if any step fails.</span></span>, and in banking, it's catastrophic.</p>
+  <p>Without ACID, your $500 is gone. Not in checking, not in savings &mdash; just... vanished. This is called a <span class="tooltip-trigger">partial failure<span class="tooltip-content">When a multi-step operation completes some steps but fails before finishing all of them, leaving the system in an inconsistent state. In the bank example: Account A lost $500 but Account B never gained it. The total money in the system decreased, which violates the most basic accounting rule. ACID prevents this by treating all steps as one atomic unit.</span></span>, and in banking, it's catastrophic. Not "bug report" catastrophic &mdash; "regulatory fine and front-page news" catastrophic.</p>
 
-  <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bank transfer crash scenario showing disappearing money">
+  <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bank transfer crash: money vanishes between debit and credit">
     <defs>
       <marker id="acb-s2-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
       </marker>
     </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Server Crashes Between UPDATE #1 and UPDATE #2</text>
 
-    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">What Happens When a Transfer Crashes Halfway?</text>
+    <!-- Before -->
+    <rect x="20" y="42" width="170" height="70" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+    <text x="105" y="62" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Checking (id=1)</text>
+    <text x="105" y="82" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="16">$1,000</text>
+    <text x="105" y="102" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Before transfer</text>
 
-    <!-- Step 1 -->
-    <rect x="30" y="45" width="150" height="55" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
-    <text x="105" y="67" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Account A</text>
-    <text x="105" y="86" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">$1,000</text>
+    <line x1="200" y1="77" x2="250" y2="77" stroke="#eab308" stroke-width="2" marker-end="url(#acb-s2-arr)"/>
+    <text x="225" y="68" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="9">UPDATE #1</text>
 
-    <line x1="190" y1="72" x2="240" y2="72" stroke="#eab308" stroke-width="2" marker-end="url(#acb-s2-arr)"/>
-    <text x="215" y="62" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Step 1: -$500</text>
+    <!-- After debit -->
+    <rect x="260" y="42" width="150" height="70" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
+    <text x="335" y="62" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Checking (id=1)</text>
+    <text x="335" y="82" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="16">$500</text>
+    <text x="335" y="102" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="8">-$500 applied</text>
 
-    <rect x="250" y="45" width="150" height="55" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
-    <text x="325" y="67" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Account A</text>
-    <text x="325" y="86" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">$500</text>
+    <!-- CRASH lightning bolt -->
+    <rect x="435" y="46" width="80" height="62" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="2"/>
+    <text x="475" y="66" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="800" font-size="16">&#x26A1;</text>
+    <text x="475" y="82" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="10">CRASH!</text>
+    <text x="475" y="98" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Power failure</text>
 
-    <!-- CRASH -->
-    <text x="460" y="55" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="800" font-size="18">&#x26A0;</text>
-    <text x="460" y="75" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="11">CRASH!</text>
-    <text x="460" y="92" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Server dies here</text>
+    <!-- Savings untouched -->
+    <rect x="545" y="42" width="195" height="70" rx="8" fill="#334155" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="642" y="62" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Savings (id=2)</text>
+    <text x="642" y="82" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="16">$200</text>
+    <text x="642" y="102" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8">UPDATE #2 never ran</text>
 
-    <!-- Account B untouched -->
-    <rect x="540" y="45" width="190" height="55" rx="8" fill="#334155" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
-    <text x="635" y="67" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="600" font-size="11">Account B</text>
-    <text x="635" y="86" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">$200 (unchanged)</text>
+    <!-- Result box -->
+    <rect x="60" y="135" width="640" height="110" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="380" y="162" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="14">$500 vanished from the system</text>
+    <text x="380" y="182" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">Before: $1,000 + $200 = $1,200 total. After crash: $500 + $200 = $700 total.</text>
+    <text x="380" y="200" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">$500 isn't in either account. It's gone. Basic accounting violated.</text>
 
-    <!-- Result -->
-    <rect x="100" y="130" width="560" height="70" rx="10" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="380" y="155" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="13">$500 disappeared from the system</text>
-    <text x="380" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">A lost $500, B never received it. The money is gone. This is why ACID exists.</text>
-    <text x="380" y="192" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">With ACID: the system would undo Step 1 automatically &mdash; A still has $1,000, transfer retries later.</text>
+    <rect x="110" y="210" width="540" height="26" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1"/>
+    <text x="380" y="228" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">With ACID: PostgreSQL's WAL replays on restart, rolls back UPDATE #1 &#x2192; checking stays at $1,000</text>
   </svg>
 
-  <p>This is the exact scenario that <span class="tooltip-trigger">ACID transactions<span class="tooltip-content">A transaction is a group of database operations that are treated as one unit. ACID guarantees that either ALL operations succeed together, or ALL are rolled back together. There's no in-between state where some succeeded and some didn't.</span></span> were invented to solve. With ACID, the database treats both steps as a single unit. If step 2 fails, step 1 is automatically undone. The $500 goes back to Account A. No money vanishes. Ever.</p>
+  <p>Here's what actually happens when you wrap those two UPDATEs in a <code>BEGIN; ... COMMIT;</code> block. PostgreSQL writes every change to the <span class="tooltip-trigger">WAL<span class="tooltip-content">Write-Ahead Log &mdash; a sequential file on disk where PostgreSQL records every intended change BEFORE applying it. Think of it like writing "I'm about to move $500" in a notebook before actually doing it. If the server crashes, PostgreSQL reads the notebook on restart and undoes anything that wasn't fully completed. This is the "D" in ACID (Durability) and enables the "A" (Atomicity). Every ACID database has some version of this: MySQL calls it the redo log, SQL Server calls it the transaction log.</span></span> (Write-Ahead Log) <em>before</em> touching the actual data. If the server crashes mid-transaction, PostgreSQL reads the WAL on restart, sees an incomplete transaction, and rolls back every change in it. Your checking account goes back to $1,000. The $500 never disappears.</p>
 
-  <h3><i class="fa-solid fa-heart icon-gap"></i> Story 2: The Instagram Like</h3>
+  <p>This isn't theoretical. You can test it yourself. Start a transaction, kill the PostgreSQL process mid-way, restart it, and check &mdash; the data will be as if the transaction never started. The WAL is the safety net that makes ACID possible.</p>
 
-  <p>Now a very different scenario. You double-tap a photo on Instagram. The like count goes from 4,231 to 4,232 on your screen. At the exact same moment, your friend across the country opens the same photo &mdash; and sees 4,231. Two seconds later, they refresh and see 4,232.</p>
+  <h3><i class="fa-solid fa-comment-dots icon-gap"></i> Now the Other Side: Discord Messages</h3>
 
-  <p>Was anyone harmed? Did anyone lose money? Did the system corrupt data? No, no, and no. The data was temporarily inconsistent &mdash; different users saw different numbers for a brief moment &mdash; but it didn't matter. Nobody even noticed. This is the BASE mindset: <em>the system is always available, always fast, and the data will sort itself out eventually.</em></p>
+  <p>Different scenario entirely. Someone sends "Hey everyone!" in a Discord server with 500,000 members. Discord writes that message to a <span class="tooltip-trigger">Cassandra<span class="tooltip-content">A distributed NoSQL database built for massive write throughput. Discord chose Cassandra because it handles billions of message writes per week across multiple data centers with no single point of failure. The trade-off: when you write to one node, other nodes get the update a few milliseconds later (eventual consistency), not instantly.</span></span> node in <code>us-east-1</code>. At that exact moment, your friend in London reads the channel from a node in <code>eu-west-1</code> &mdash; and doesn't see the message yet. 100 milliseconds later, the EU node catches up and the message appears.</p>
 
-  <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Instagram like count showing temporary inconsistency across users">
-    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">The Instagram Like &mdash; Nobody Gets Hurt</text>
+  <p>Was anyone harmed? Did data get corrupted? No. The message was just briefly invisible to some users. Discord processes <strong>12 billion messages per week</strong> this way. They made a deliberate engineering choice: a 100ms delay in message visibility is a perfectly acceptable trade-off for the ability to handle that scale without any downtime.</p>
 
-    <!-- You -->
-    <rect x="30" y="45" width="160" height="65" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
-    <text x="110" y="66" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Your screen</text>
-    <text x="110" y="85" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="14">&#x2764; 4,232</text>
-    <text x="110" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Updated instantly</text>
+  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Discord message propagation across Cassandra nodes showing eventual consistency">
+    <defs>
+      <marker id="acb-s2-arrb" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#a78bfa"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Discord Message: Write to One Node, Replicate to Others</text>
 
-    <!-- Friend -->
-    <rect x="220" y="45" width="160" height="65" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
-    <text x="300" y="66" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Friend's screen (t=0s)</text>
-    <text x="300" y="85" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="14">&#x2764; 4,231</text>
-    <text x="300" y="100" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-size="9">Stale &mdash; hasn't caught up</text>
+    <!-- Write node -->
+    <rect x="30" y="48" width="170" height="80" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
+    <text x="115" y="68" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="10">Cassandra &mdash; us-east-1</text>
+    <text x="115" y="86" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="10">"Hey everyone!"</text>
+    <text x="115" y="102" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="9">&#x2713; Written instantly (t=0ms)</text>
+    <text x="115" y="118" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Your screen sees it NOW</text>
 
-    <!-- Arrow -->
-    <line x1="400" y1="77" x2="440" y2="77" stroke="#eab308" stroke-width="2" marker-end="url(#acb-s2-arr)"/>
-    <text x="420" y="67" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">~2 sec</text>
+    <!-- Replication arrows -->
+    <line x1="210" y1="75" x2="285" y2="75" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#acb-s2-arrb)"/>
+    <text x="248" y="65" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="8">replicating...</text>
 
-    <!-- Friend after -->
-    <rect x="460" y="45" width="160" height="65" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
-    <text x="540" y="66" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">Friend's screen (t=2s)</text>
-    <text x="540" y="85" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="14">&#x2764; 4,232</text>
-    <text x="540" y="100" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="9">Caught up!</text>
+    <line x1="210" y1="100" x2="520" y2="100" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#acb-s2-arrb)"/>
+    <text x="365" y="115" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="8">replicating... (farther away)</text>
+
+    <!-- EU node -->
+    <rect x="295" y="48" width="170" height="80" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
+    <text x="380" y="68" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="10">Cassandra &mdash; eu-west-1</text>
+    <text x="380" y="86" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="10">(not here yet...)</text>
+    <text x="380" y="102" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="9">&#x23F3; Arrives at t=50ms</text>
+    <text x="380" y="118" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">London friend waits briefly</text>
+
+    <!-- Asia node -->
+    <rect x="530" y="48" width="210" height="80" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
+    <text x="635" y="68" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="10">Cassandra &mdash; ap-southeast-1</text>
+    <text x="635" y="86" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="10">(not here yet...)</text>
+    <text x="635" y="102" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="9">&#x23F3; Arrives at t=100ms</text>
+    <text x="635" y="118" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Singapore friend waits a bit more</text>
 
     <!-- Result -->
-    <rect x="100" y="135" width="560" height="50" rx="10" fill="rgba(234,179,8,0.06)" stroke="#eab308" stroke-width="1.5"/>
-    <text x="380" y="157" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="600" font-size="12">Temporarily inconsistent &mdash; but who cares?</text>
-    <text x="380" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">No money lost. No data corrupted. Users didn't even notice. This is why BASE exists.</text>
+    <rect x="80" y="150" width="600" height="65" rx="10" fill="rgba(167,139,250,0.06)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="380" y="173" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="12">Eventual Consistency &mdash; All nodes converge within ~100ms</text>
+    <text x="380" y="193" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">No data lost. No corruption. Just a brief window where different regions see different things.</text>
+    <text x="380" y="208" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">12 billion messages/week. Nobody notices 100ms of staleness. This is why BASE exists.</text>
   </svg>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
-    <p>Imagine applying ACID rules to Instagram likes &mdash; every like must be immediately visible to every user worldwide before the system confirms it. <strong>What would happen to the app's speed?</strong></p>
-    <span class="think-hint">Instagram has over 2 billion users across dozens of data centers. If every like needed global agreement before confirming, a double-tap would take seconds instead of milliseconds. The app would feel broken. ACID is overkill here because the cost of brief inconsistency is essentially zero.</span>
+    <p>If Discord used ACID for messages &mdash; every message must be confirmed written to ALL Cassandra nodes worldwide before showing it on anyone's screen &mdash; <strong>how long would each message send take?</strong> Their nodes span US, EU, and Asia.</p>
+    <span class="think-hint">Network round-trip US to Asia: ~150ms. US to EU: ~100ms. If a message must be confirmed on all nodes before appearing, every "Hey!" takes at least 150ms just for network physics. Multiply that by 12 billion messages per week. The system would collapse under the latency. By accepting eventual consistency (BASE), Discord writes locally in ~2ms and replicates in the background. The 100ms of staleness buys them 75x faster writes.</span>
   </div>
 
-  <p>Two stories, two very different needs. The bank transfer needs <em>absolute correctness</em> (ACID). The Instagram like needs <em>speed and availability</em> (BASE). Understanding which situation you're in is the core skill this page teaches.</p>
+  <p>Two stories. Two very different stakes. When the server crashes during a bank transfer, someone loses real money. When a Discord message takes 100ms to propagate, nobody even notices. The entire ACID-vs-BASE debate comes down to one question: <strong>what happens when things go wrong?</strong> If the answer is "someone loses money," use ACID. If the answer is "someone sees a slightly stale number for a moment," use BASE.</p>
 </div>
 
 
@@ -238,71 +271,94 @@
     </div>
   </div>
 
-  <p>When most developers first learn about ACID, the reaction is obvious: "This sounds amazing! Why wouldn't I use it for <em>everything</em>? If ACID guarantees my data is always correct, why would I ever accept less?"</p>
+  <p>When you first learn about ACID, the reaction is obvious: "This is amazing! If ACID prevents data corruption, why would I ever use anything else?" Fair question. Let's try it.</p>
 
-  <p>Fair question. Let's try it. Let's build a social media platform where <em>every single operation</em> is ACID-compliant. Every like, every comment, every feed refresh, every notification &mdash; all wrapped in strict <span class="tooltip-trigger">transactions<span class="tooltip-content">A transaction is a group of database operations that the database treats as a single unit of work. Either all operations in the transaction succeed (commit) or all are undone (rollback). Think of it like an all-or-nothing deal.</span></span> with full consistency guarantees.</p>
+  <p>Imagine you're building a social media platform. Every like, comment, feed refresh, and notification &mdash; all wrapped in strict <span class="tooltip-trigger">SERIALIZABLE transactions<span class="tooltip-content">The strongest isolation level in SQL databases. In PostgreSQL, you can enable it with: <code>SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;</code> This makes every transaction behave as if it ran completely alone, one at a time. It's the gold standard of correctness &mdash; but also the slowest, because the database must detect and abort conflicting concurrent transactions.</span></span>. Maximum correctness for everything.</p>
 
-  <p>On a single database server, this works beautifully. All your data is in one place, so the database can easily enforce all the ACID rules. Transactions are fast because everything is local &mdash; no network calls, no waiting for other servers.</p>
+  <p>On a single PostgreSQL server, this actually works great. You can try it yourself:</p>
 
-  <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Single database ACID working great, then falling apart when distributed">
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">single-server-acid.sql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- Check your current isolation level
+SHOW transaction_isolation;
+-- Result: "read committed" (PostgreSQL default)
+
+-- Upgrade to the strictest level
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+-- Now every read and write in this transaction is bulletproof.
+-- Open two psql sessions, try to UPDATE the same row simultaneously.
+-- One will succeed. The other will get:
+-- ERROR: could not serialize access due to concurrent update</code></pre>
+    </div>
+  </div>
+
+  <p>All your data is in one place. <span class="tooltip-trigger">Transactions<span class="tooltip-content">A group of SQL statements that the database treats as a single unit. Either ALL succeed (COMMIT) or ALL are undone (ROLLBACK). PostgreSQL enforces this using its WAL (Write-Ahead Log) &mdash; every change is recorded in the log before being applied, so crashes can be recovered from. You can see the WAL location with: <code>SHOW data_directory;</code> and look inside the <code>pg_wal/</code> folder.</span></span> are fast because everything is local &mdash; no network calls, no waiting for other servers. A like takes 2ms. Life is good.</p>
+
+  <svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ACID on single server works great vs distributed ACID is painfully slow">
     <defs>
       <marker id="acb-s3-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
       </marker>
     </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">ACID Everywhere: Single Server vs. Distributed</text>
 
-    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">ACID Everywhere: Great on One Server, Terrible at Scale</text>
+    <!-- Left: single server happy -->
+    <rect x="20" y="42" width="340" height="248" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+    <text x="190" y="67" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="12">Single PostgreSQL Server</text>
+    <text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">1,000 users &mdash; works perfectly</text>
 
-    <!-- Left: Single server - happy -->
-    <rect x="20" y="42" width="340" height="210" rx="12" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
-    <text x="190" y="67" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="700" font-size="12">Single Database Server</text>
-    <text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">1,000 users &mdash; works perfectly</text>
+    <rect x="80" y="98" width="220" height="50" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="190" y="117" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="9">BEGIN; UPDATE ... COMMIT;</text>
+    <text x="190" y="137" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Everything local, no network</text>
 
-    <rect x="100" y="100" width="180" height="50" rx="8" fill="#334155" stroke="#10b981" stroke-width="1.5"/>
-    <text x="190" y="121" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="11">&#x1F5C4; One Database</text>
-    <text x="190" y="140" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">All data in one place</text>
+    <text x="190" y="170" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2713; Transaction latency: ~2ms</text>
+    <text x="190" y="190" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2713; Throughput: 10,000 TPS</text>
+    <text x="190" y="210" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2713; Data always consistent</text>
+    <text x="190" y="230" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2713; WAL handles crashes</text>
+    <text x="190" y="255" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"ACID is amazing!"</text>
+    <text x="190" y="278" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">But... what happens when you outgrow one server?</text>
 
-    <text x="190" y="175" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; ACID transactions: 5ms</text>
-    <text x="190" y="195" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Users happy</text>
-    <text x="190" y="215" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2713; Data always correct</text>
-    <text x="190" y="240" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">&#x1F60A; "ACID is amazing!"</text>
+    <!-- Right: distributed nightmare -->
+    <rect x="400" y="42" width="340" height="248" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="570" y="67" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="12">3 Data Centers (ACID on all)</text>
+    <text x="570" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">10M users &mdash; everything breaks</text>
 
-    <!-- Right: Distributed - broken -->
-    <rect x="400" y="42" width="340" height="210" rx="12" fill="#1e293b" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="570" y="67" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-weight="700" font-size="12">3 Data Centers</text>
-    <text x="570" y="85" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">10,000,000 users &mdash; everything breaks</text>
+    <rect x="415" y="98" width="80" height="40" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+    <text x="455" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">US-East</text>
+    <text x="455" y="130" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">Virginia</text>
+    <rect x="510" y="98" width="80" height="40" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+    <text x="550" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">EU-West</text>
+    <text x="550" y="130" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">Ireland</text>
+    <rect x="605" y="98" width="80" height="40" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+    <text x="645" y="115" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">AP-South</text>
+    <text x="645" y="130" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="7">Mumbai</text>
 
-    <rect x="415" y="100" width="80" height="35" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
-    <text x="455" y="122" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">US-East</text>
-    <rect x="510" y="100" width="80" height="35" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
-    <text x="550" y="122" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">EU-West</text>
-    <rect x="605" y="100" width="80" height="35" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
-    <text x="645" y="122" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">AP-South</text>
+    <line x1="455" y1="138" x2="550" y2="138" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
+    <line x1="550" y1="138" x2="645" y2="138" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
+    <text x="570" y="158" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8" font-weight="600">All 3 MUST agree before COMMIT</text>
 
-    <!-- cross-lines showing they must agree -->
-    <line x1="455" y1="135" x2="550" y2="135" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
-    <line x1="550" y1="135" x2="645" y2="135" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
-
-    <text x="570" y="160" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="9" font-weight="600">All 3 must agree on every write</text>
-
-    <text x="570" y="185" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; ACID transactions: 500ms</text>
-    <text x="570" y="205" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; Users leaving (too slow)</text>
-    <text x="570" y="225" text-anchor="middle" fill="#ef4444" font-family="Inter, sans-serif" font-size="10" font-weight="600">&#x2717; One DC down = entire system down</text>
-    <text x="570" y="243" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">&#x1F62D; "Why is everything so slow?"</text>
+    <text x="570" y="180" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2717; Transaction latency: ~300ms</text>
+    <text x="570" y="200" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2717; Throughput: 500 TPS (20x drop)</text>
+    <text x="570" y="220" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2717; One DC down = system stops</text>
+    <text x="570" y="240" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10" font-weight="600">&#x2717; Users rage-quit (too slow)</text>
+    <text x="570" y="264" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Why is everything so slow?"</text>
+    <text x="570" y="280" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="9">Physics doesn't care about your architecture.</text>
   </svg>
 
-  <p>But now your app grows. A million users. Ten million. You can't fit all that traffic on one server anymore, so you spread your database across three data centers &mdash; one in the US, one in Europe, one in Asia. And suddenly, ACID becomes a nightmare.</p>
+  <p>But now your app grows. A million users. Ten million. You need servers in multiple regions so users everywhere get fast responses. You spread your database across three data centers &mdash; Virginia, Ireland, Mumbai. And suddenly, every ACID transaction becomes <em>agonizingly slow</em>.</p>
 
-  <p>Why? Because for a transaction to be "ACID-compliant" across multiple servers, <em>all servers must agree</em> before confirming the write. Your US server writes the data, then waits for Europe to confirm, then waits for Asia to confirm. That network round-trip takes 100-200 milliseconds &mdash; <em>each way</em>. A simple "like" that used to take 5ms now takes 500ms. Do that for every operation and your app feels like it's underwater.</p>
+  <p>Why? Because ACID requires <em>all replicas to agree</em> before confirming a write. That means network round-trips. Virginia to Mumbai: <strong>~150ms one way</strong>. Virginia to Ireland: <strong>~85ms one way</strong>. A simple "like" that took 2ms locally now needs 300ms+ because it's waiting for acknowledgments from servers on other continents. That's not a bug &mdash; that's physics. Light travels through fiber at about 200,000 km/s, and Mumbai is 13,000 km from Virginia.</p>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
-    <p>If a distributed ACID transaction requires agreement from 3 data centers, and the network round-trip between US and Asia is 150ms, <strong>what's the minimum time for a single write?</strong></p>
-    <span class="think-hint">At minimum: US writes locally (~5ms) + sends to EU and waits for confirmation (~100ms round-trip) + sends to Asia and waits for confirmation (~150ms round-trip). If done sequentially, that's ~255ms. If done in parallel, it's ~155ms (limited by the slowest). Either way, that's 30-50x slower than a local write. Multiply by millions of writes per second and you have a serious problem.</span>
+    <p>Let's do the math. Your ACID transaction needs confirmation from all 3 data centers. If the round-trips are sent <strong>in parallel</strong> (Virginia to Ireland = 85ms, Virginia to Mumbai = 150ms), <strong>what's the minimum latency for a single write?</strong> What if you're doing this for 100,000 likes per second?</p>
+    <span class="think-hint">In parallel: you wait for the slowest &mdash; 150ms (Mumbai round-trip). Add ~5ms local processing = 155ms per transaction. But here's the killer: at 155ms per transaction per row, a single row can only handle ~6 writes/second before transactions start queuing. For 100,000 likes/second spread across posts, you'd need locking coordination across continents on hot rows. The system would grind to a halt. This is why nobody runs ACID across global data centers for high-throughput operations.</span>
   </div>
 
   <div class="callout callout-danger">
-    <strong>The core problem:</strong> ACID on a single server is easy and fast. ACID across a distributed system is slow, fragile, and often impossible. When one data center goes down, ACID requires the entire system to stop (because you can't get agreement from a dead server). This is the exact trade-off that led engineers to invent BASE.
+    <strong>The core problem:</strong> ACID on a single server is easy and fast (~2ms). ACID across a distributed system is painfully slow (~300ms) because of physics &mdash; light speed through fiber, plus the coordination overhead of <span class="tooltip-trigger">two-phase commit<span class="tooltip-content">2PC (Two-Phase Commit) is the standard protocol for distributed ACID transactions. Phase 1 (Prepare): the coordinator asks all participants "Can you commit?" Phase 2 (Commit): if ALL say yes, the coordinator says "Do it." If ANY says no, everyone rolls back. The problem: if the coordinator crashes between phases, all participants are stuck waiting &mdash; they can't commit or rollback until it comes back. This is why distributed ACID is fragile.</span></span>. When one data center goes down, ACID requires the <em>entire system</em> to stop (because you can't get agreement from a dead server). This is the exact problem that led engineers to invent BASE.
   </div>
 </div>
 
@@ -315,75 +371,122 @@
     <div class="section-icon yellow"><i class="fa-solid fa-burst"></i></div>
     <div>
       <div class="section-num">Section 4</div>
-      <h2 class="section-title">Where It Breaks &mdash; The Impossible Triangle</h2>
+      <h2 class="section-title">Where It Breaks &mdash; 2PC Latency Math and the CAP Wall</h2>
     </div>
   </div>
 
-  <p>Here's the fundamental tension. In a distributed system (data spread across multiple servers or data centers), you want three things:</p>
+  <p>Let's get specific about <em>why</em> distributed ACID is so painful. The standard protocol for making ACID work across servers is called <span class="tooltip-trigger">Two-Phase Commit (2PC)<span class="tooltip-content">A coordination protocol invented in the 1980s. Phase 1: the coordinator sends "PREPARE" to all nodes. Each node writes its changes to a local log and replies "READY." Phase 2: if all replied "READY," the coordinator sends "COMMIT" to all. If any replied "ABORT" (or didn't respond), coordinator sends "ROLLBACK" to all. The fatal flaw: if the coordinator dies between phases, all participants are locked, waiting for instructions that may never come.</span></span>. Here's what it actually looks like in terms of time:</p>
 
-  <ol>
-    <li><strong>Consistency</strong> &mdash; every read returns the latest write. No stale data, ever.</li>
-    <li><strong>Availability</strong> &mdash; every request gets a response, even if some servers are down.</li>
-    <li><strong>Partition tolerance</strong> &mdash; the system keeps working even when network connections between servers break.</li>
-  </ol>
-
-  <p>The <span class="tooltip-trigger">CAP theorem<span class="tooltip-content">Proven by Eric Brewer in 2000, CAP states that a distributed system can only guarantee two out of three properties: Consistency, Availability, and Partition tolerance. Since network partitions are unavoidable in distributed systems, the real choice is between consistency (ACID-style) and availability (BASE-style) during a failure.</span></span> (which has its own page in this guide) proves that <em>you can only pick two out of three</em>. And here's the kicker: network partitions happen whether you like it or not &mdash; cables get cut, data centers lose power, undersea cables get damaged by anchors. Partition tolerance isn't optional. So the real choice is:</p>
-
-  <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CAP theorem triangle showing the ACID vs BASE trade-off">
+  <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two-phase commit timeline showing network latency between 3 data centers">
     <defs>
       <marker id="acb-s4-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
         <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
       </marker>
+      <marker id="acb-s4-arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#10b981"/>
+      </marker>
     </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Two-Phase Commit: The Timeline of a Single Distributed Write</text>
 
-    <text x="380" y="25" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="14">The CAP Trade-off: Pick Two (But Partitions Are Mandatory)</text>
+    <!-- Node labels -->
+    <rect x="20" y="40" width="120" height="30" rx="6" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
+    <text x="80" y="60" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="10">Coordinator (US)</text>
+    <rect x="320" y="40" width="120" height="30" rx="6" fill="#334155" stroke="#a78bfa" stroke-width="1"/>
+    <text x="380" y="60" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="10">Node B (Ireland)</text>
+    <rect x="620" y="40" width="120" height="30" rx="6" fill="#334155" stroke="#ef4444" stroke-width="1"/>
+    <text x="680" y="60" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10">Node C (Mumbai)</text>
 
-    <!-- Triangle -->
-    <polygon points="380,55 140,270 620,270" fill="none" stroke="#334155" stroke-width="2"/>
+    <!-- Vertical timelines -->
+    <line x1="80" y1="75" x2="80" y2="320" stroke="#334155" stroke-width="1.5"/>
+    <line x1="380" y1="75" x2="380" y2="320" stroke="#334155" stroke-width="1"/>
+    <line x1="680" y1="75" x2="680" y2="320" stroke="#334155" stroke-width="1"/>
 
-    <!-- C vertex -->
-    <circle cx="380" cy="55" r="28" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
-    <text x="380" y="51" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="800" font-size="14">C</text>
-    <text x="380" y="65" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Consistency</text>
+    <!-- Phase 1: PREPARE -->
+    <text x="80" y="95" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="9">PREPARE</text>
+    <line x1="85" y1="100" x2="375" y2="130" stroke="#eab308" stroke-width="1.5" marker-end="url(#acb-s4-arr)"/>
+    <text x="230" y="110" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">85ms (speed of light)</text>
+    <line x1="85" y1="100" x2="675" y2="145" stroke="#eab308" stroke-width="1.5" marker-end="url(#acb-s4-arr)"/>
+    <text x="440" y="138" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">150ms</text>
 
-    <!-- A vertex -->
-    <circle cx="140" cy="270" r="28" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
-    <text x="140" y="266" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="800" font-size="14">A</text>
-    <text x="140" y="280" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Availability</text>
+    <!-- Phase 1: READY responses -->
+    <text x="380" y="148" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="8">READY</text>
+    <line x1="375" y1="152" x2="85" y2="182" stroke="#10b981" stroke-width="1.5" marker-end="url(#acb-s4-arr-r)"/>
+    <text x="230" y="172" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">+85ms back</text>
 
-    <!-- P vertex -->
-    <circle cx="620" cy="270" r="28" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
-    <text x="620" y="266" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="800" font-size="14">P</text>
-    <text x="620" y="280" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Partition</text>
+    <text x="680" y="163" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="8">READY</text>
+    <line x1="675" y1="167" x2="85" y2="210" stroke="#10b981" stroke-width="1.5" marker-end="url(#acb-s4-arr-r)"/>
+    <text x="440" y="200" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">+150ms back</text>
 
-    <!-- CP label (ACID side) -->
-    <rect x="445" y="130" width="155" height="60" rx="8" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="1.5"/>
-    <text x="522" y="152" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">CP = ACID</text>
-    <text x="522" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Correct but may be unavailable</text>
-    <text x="522" y="182" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">PostgreSQL, MySQL, HBase</text>
+    <!-- Phase 1 total -->
+    <rect x="10" y="216" width="140" height="20" rx="4" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="1"/>
+    <text x="80" y="230" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="8">Phase 1 done: ~300ms</text>
 
-    <!-- AP label (BASE side) -->
-    <rect x="160" y="130" width="155" height="60" rx="8" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1.5"/>
-    <text x="237" y="152" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="12">AP = BASE</text>
-    <text x="237" y="168" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Available but may be stale</text>
-    <text x="237" y="182" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">Cassandra, DynamoDB, CouchDB</text>
+    <!-- Phase 2: COMMIT -->
+    <text x="80" y="252" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="9">COMMIT</text>
+    <line x1="85" y1="256" x2="375" y2="276" stroke="#eab308" stroke-width="1.5" marker-end="url(#acb-s4-arr)"/>
+    <line x1="85" y1="256" x2="675" y2="286" stroke="#eab308" stroke-width="1.5" marker-end="url(#acb-s4-arr)"/>
 
-    <!-- Bottom note -->
-    <rect x="200" y="300" width="360" height="18" rx="4" fill="rgba(16,185,129,0.08)"/>
-    <text x="380" y="313" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F512; Partition tolerance is not optional &mdash; networks WILL fail</text>
+    <!-- ACKs -->
+    <line x1="375" y1="282" x2="85" y2="302" stroke="#10b981" stroke-width="1.5" marker-end="url(#acb-s4-arr-r)"/>
+    <line x1="675" y1="292" x2="85" y2="315" stroke="#10b981" stroke-width="1.5" marker-end="url(#acb-s4-arr-r)"/>
+
+    <!-- Total -->
+    <rect x="10" y="306" width="140" height="18" rx="4" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1"/>
+    <text x="80" y="318" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="8">TOTAL: ~600ms per write</text>
   </svg>
 
+  <p>Let's break that down. For a <em>single distributed write</em>:</p>
   <ul>
-    <li><strong>Choose consistency + partition tolerance (CP)</strong> &mdash; your system is always correct, but might be unavailable during network failures. This is the ACID approach.</li>
-    <li><strong>Choose availability + partition tolerance (AP)</strong> &mdash; your system is always available, but might serve slightly stale data during network failures. This is the BASE approach.</li>
+    <li><strong>Phase 1 (Prepare):</strong> Coordinator sends PREPARE to Ireland (85ms) and Mumbai (150ms) in parallel. Waits for the slowest: 150ms. They process and reply: another 150ms back. Phase 1 total: <strong>~300ms</strong>.</li>
+    <li><strong>Phase 2 (Commit):</strong> Coordinator sends COMMIT. Same round-trips: <strong>~300ms</strong>.</li>
+    <li><strong>Grand total: ~600ms</strong> for a single write that took 2ms on one server. That's a <strong>300x slowdown</strong>.</li>
   </ul>
 
-  <p>This isn't a flaw in engineering &mdash; it's a mathematical impossibility. No amount of clever code can give you all three at the same time in a distributed system. ACID and BASE aren't competing philosophies; they're two sides of the same fundamental trade-off.</p>
+  <p>And that's the <em>happy path</em>. If Mumbai's network goes down mid-Phase-1, the coordinator is stuck. It sent PREPARE to Ireland (which locked its resources) but can't reach Mumbai. It can't commit (Mumbai didn't confirm). It can't rollback safely (maybe Mumbai got the message and is waiting). Everyone is <span class="tooltip-trigger">blocked<span class="tooltip-content">This is the Achilles' heel of 2PC. When the coordinator fails between phases, participants who said "READY" are in limbo &mdash; they've locked their data but don't know whether to commit or rollback. They must wait for the coordinator to come back. This can block the entire system for minutes or hours. Modern alternatives like 3PC and Paxos reduce this problem but add even more latency.</span></span>, waiting for a node that might not come back for hours.</p>
+
+  <p>This is where the <span class="tooltip-trigger">CAP theorem<span class="tooltip-content">Proven by Eric Brewer (UC Berkeley) in 2000 and formally proved by Seth Gilbert and Nancy Lynch (MIT) in 2002. It states: in a distributed system experiencing a network partition, you must choose between consistency (all nodes see the same data) and availability (all nodes respond to requests). You cannot have both during a partition. Since partitions are inevitable (cables break, routers fail), the practical choice is: do you favor consistency (ACID/CP) or availability (BASE/AP)?</span></span> enters. When that cable between Virginia and Mumbai goes down (and it <em>will</em> &mdash; undersea cables get damaged by ship anchors about 100-200 times per year worldwide), you face an impossible choice:</p>
+
+  <svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CAP theorem: the fork in the road when a network partition happens">
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Network Partition Happens: You Have Two Choices</text>
+
+    <!-- Partition event -->
+    <rect x="255" y="42" width="250" height="36" rx="8" fill="rgba(239,68,68,0.1)" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="380" y="65" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="11">&#x26A1; Cable cut between US and Mumbai</text>
+
+    <!-- Fork -->
+    <line x1="380" y1="82" x2="380" y2="100" stroke="#334155" stroke-width="2"/>
+    <line x1="380" y1="100" x2="190" y2="130" stroke="#eab308" stroke-width="2"/>
+    <line x1="380" y1="100" x2="570" y2="130" stroke="#a78bfa" stroke-width="2"/>
+
+    <!-- Choice A: Consistency (ACID) -->
+    <rect x="30" y="130" width="320" height="145" rx="12" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="190" y="155" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="12">Choice A: Stay Consistent (CP)</text>
+    <text x="190" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Reject writes until Mumbai comes back"</text>
+    <text x="190" y="198" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">&#x2713; Data is always correct</text>
+    <text x="190" y="216" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10">&#x2717; Users in Mumbai get ERROR 503</text>
+    <text x="190" y="234" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="10">&#x2717; Could last hours (cable repair)</text>
+    <text x="190" y="255" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="10">Banks, healthcare, payments choose this</text>
+    <text x="190" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Stripe, traditional banks, hospital systems</text>
+
+    <!-- Choice B: Availability (BASE) -->
+    <rect x="410" y="130" width="320" height="145" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="570" y="155" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="12">Choice B: Stay Available (AP)</text>
+    <text x="570" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">"Accept writes everywhere, merge later"</text>
+    <text x="570" y="198" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">&#x2713; Users everywhere can still use the app</text>
+    <text x="570" y="216" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-size="10">&#x2248; Data might be temporarily inconsistent</text>
+    <text x="570" y="234" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-size="10">&#x2713; Resolves automatically when cable is fixed</text>
+    <text x="570" y="255" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="10">Social, messaging, e-commerce carts</text>
+    <text x="570" y="268" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="8">Discord, Amazon cart, Netflix</text>
+  </svg>
+
+  <p>This isn't a flaw in engineering &mdash; it's a <strong>mathematical impossibility</strong>, proven by <span class="tooltip-trigger">Seth Gilbert and Nancy Lynch at MIT in 2002<span class="tooltip-content">They formally proved Eric Brewer's 2000 conjecture: no distributed system can simultaneously guarantee Consistency, Availability, and Partition tolerance. The paper is "Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services" &mdash; one of the most cited papers in distributed systems.</span></span>. No amount of clever code, hardware upgrades, or expensive consultants can give you consistency AND availability during a network partition. You must choose.</p>
+
+  <p>ACID systems choose consistency: they become unavailable during partitions. BASE systems choose availability: they accept temporary inconsistency during partitions. Neither is wrong &mdash; they're answering different questions about what's more important when things go bad.</p>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
-    <p>A network cable between your US and EU data centers is cut. Requests are still coming in. You have two choices: <strong>(a) reject all writes until the cable is fixed (stay consistent)</strong> or <strong>(b) keep accepting writes at both locations and merge them later (stay available)</strong>. Which would you choose for a banking app? For a social media app?</p>
-    <span class="think-hint">For the banking app: choose (a) &mdash; rejecting writes is safer than potentially recording two conflicting versions of an account balance. For social media: choose (b) &mdash; users expect the feed to work even during outages. Some posts might briefly show different like counts, but nobody loses money. This is exactly why banks prefer ACID and social platforms prefer BASE.</span>
+    <p>The network between US and EU data centers goes down for 2 hours. During that time, a customer in Paris tries to transfer $10,000 between bank accounts. Meanwhile, a customer in Tokyo tries to send a Discord message. For each case: <strong>should the system reject the request (stay consistent) or accept it and sort it out later (stay available)?</strong></p>
+    <span class="think-hint">Bank transfer: REJECT. If both US and EU independently process the transfer, the customer might end up with $10,000 deducted twice or credited twice when the partition heals. Wrong balances in banking means regulatory fines and lawsuits. Discord message: ACCEPT. Write the message to the local node. When the partition heals, both sides merge their messages. The worst case? A message shows up a couple of hours late. That's annoying but harmless. This is why Stripe uses PostgreSQL (CP) and Discord uses Cassandra (AP).</span>
   </div>
 </div>
 
@@ -396,87 +499,179 @@
     <div class="section-icon yellow"><i class="fa-solid fa-lightbulb"></i></div>
     <div>
       <div class="section-num">Section 5</div>
-      <h2 class="section-title">The Breakthrough &mdash; Use Both, Side by Side</h2>
+      <h2 class="section-title">The Breakthrough &mdash; Use Both (Amazon Invented This)</h2>
     </div>
   </div>
 
-  <p>Here's the insight that senior engineers have and juniors often miss: <strong>you don't have to pick one philosophy for your entire system.</strong> You can use ACID for the parts that demand correctness and BASE for the parts that demand speed. Same application, different guarantees for different data.</p>
+  <p>In 2007, Amazon published a paper that changed distributed systems forever. It was called <em>Dynamo: Amazon's Highly Available Key-value Store</em>, and it contained a sentence that became legendary in the engineering world:</p>
 
-  <p>Think of it like insurance. You insure your house for its full value (expensive, but the stakes are high). You don't insure your coffee mug (the loss is trivial). You wouldn't skip house insurance to save money, and you wouldn't insure every mug in your kitchen. You match the level of protection to the level of risk.</p>
+  <div class="callout callout-info">
+    <strong>Werner Vogels (Amazon CTO), 2007:</strong> "Customers should be able to view and add items to their shopping cart even if disks are failing, network routes are flapping, or data centers are being destroyed by tornados. <strong>Therefore, the service responsible for managing shopping cart state must always be available &mdash; it should be able to write to and read from its data store, under all circumstances.</strong>"
+  </div>
 
-  <svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="E-commerce system using ACID for payments and BASE for catalog and reviews">
-    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter, sans-serif" font-weight="700" font-size="13">Same App, Different Guarantees</text>
-    <text x="380" y="40" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="10">An e-commerce platform using ACID and BASE side by side</text>
+  <p>This was the breakthrough: <strong>you don't pick one philosophy for your entire system. You pick the right philosophy for each piece of data.</strong> Money? ACID. Shopping cart? BASE. Same company, same application, different guarantees for different tables.</p>
 
-    <!-- Central app box -->
-    <rect x="280" y="55" width="200" height="40" rx="8" fill="#334155" stroke="#eab308" stroke-width="2"/>
-    <text x="380" y="80" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">&#x1F6D2; E-Commerce App</text>
+  <p>Amazon didn't invent this idea from theory &mdash; they learned it from pain. They discovered that making the shopping cart strictly consistent (ACID) meant that during network hiccups, customers couldn't add items. Every second of downtime on the "Add to Cart" button cost Amazon <strong>millions of dollars</strong> in lost sales. So they built DynamoDB &mdash; a BASE system &mdash; specifically for shopping cart state. If the cart briefly shows 2 items instead of 3 during a network partition, that's fine. When the partition heals, the items merge. But the cart was <em>always available</em>.</p>
 
-    <!-- ACID side (left) -->
-    <rect x="20" y="120" width="340" height="175" rx="12" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
-    <text x="190" y="145" text-anchor="middle" fill="#eab308" font-family="Inter, sans-serif" font-weight="700" font-size="12">ACID Zone &mdash; "Can't be wrong"</text>
+  <svg viewBox="0 0 760 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Amazon's architecture: ACID for payments, BASE for cart, each with real database names">
+    <defs>
+      <marker id="acb-s5-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
+      </marker>
+    </defs>
+    <text x="380" y="22" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">Real Companies, Real Architectures: ACID + BASE Side by Side</text>
 
-    <rect x="40" y="158" width="140" height="42" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
-    <text x="110" y="175" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F4B3; Payments</text>
-    <text x="110" y="192" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">PostgreSQL</text>
+    <!-- Amazon row -->
+    <rect x="20" y="42" width="720" height="90" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="55" y="65" fill="#f97316" font-family="Inter,sans-serif" font-weight="800" font-size="12">AMAZON</text>
+    <rect x="140" y="52" width="185" height="30" rx="6" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="1"/>
+    <text x="232" y="72" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="9">Orders + Payments: Aurora (ACID)</text>
+    <rect x="340" y="52" width="195" height="30" rx="6" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="437" y="72" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Shopping Cart: DynamoDB (BASE)</text>
+    <rect x="550" y="52" width="180" height="30" rx="6" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="640" y="72" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Search: OpenSearch (BASE)</text>
+    <text x="380" y="118" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">"Add to Cart" must NEVER fail. Order total must ALWAYS be correct. Different data, different rules.</text>
 
-    <rect x="200" y="158" width="140" height="42" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
-    <text x="270" y="175" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F4E6; Inventory</text>
-    <text x="270" y="192" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">MySQL</text>
+    <!-- Stripe row -->
+    <rect x="20" y="142" width="720" height="90" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="55" y="165" fill="#6366f1" font-family="Inter,sans-serif" font-weight="800" font-size="12">STRIPE</text>
+    <rect x="140" y="152" width="250" height="30" rx="6" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="1"/>
+    <text x="265" y="172" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="9">ALL payments: PostgreSQL SERIALIZABLE (ACID)</text>
+    <rect x="405" y="152" width="170" height="30" rx="6" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="490" y="172" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Sessions: Redis (BASE)</text>
+    <rect x="590" y="152" width="140" height="30" rx="6" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="660" y="172" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Analytics: Kafka (BASE)</text>
+    <text x="380" y="218" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Every charge, refund, and transfer is SERIALIZABLE. They'd rather be slow than lose a penny.</text>
 
-    <rect x="40" y="210" width="140" height="42" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
-    <text x="110" y="227" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F4CB; Orders</text>
-    <text x="110" y="244" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">PostgreSQL</text>
-
-    <rect x="200" y="210" width="140" height="42" rx="6" fill="#334155" stroke="#10b981" stroke-width="1"/>
-    <text x="270" y="227" text-anchor="middle" fill="#10b981" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F464; Accounts</text>
-    <text x="270" y="244" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">MySQL</text>
-
-    <text x="190" y="282" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">If data is wrong here, people lose money.</text>
-
-    <!-- Lines from app to ACID -->
-    <line x1="330" y1="95" x2="190" y2="120" stroke="#eab308" stroke-width="1.5"/>
-
-    <!-- BASE side (right) -->
-    <rect x="400" y="120" width="340" height="175" rx="12" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6,3"/>
-    <text x="570" y="145" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="700" font-size="12">BASE Zone &mdash; "Speed over perfection"</text>
-
-    <rect x="420" y="158" width="140" height="42" rx="6" fill="#334155" stroke="#a78bfa" stroke-width="1"/>
-    <text x="490" y="175" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F50D; Product Search</text>
-    <text x="490" y="192" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Elasticsearch</text>
-
-    <rect x="580" y="158" width="140" height="42" rx="6" fill="#334155" stroke="#a78bfa" stroke-width="1"/>
-    <text x="650" y="175" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x2B50; Reviews</text>
-    <text x="650" y="192" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Cassandra</text>
-
-    <rect x="420" y="210" width="140" height="42" rx="6" fill="#334155" stroke="#a78bfa" stroke-width="1"/>
-    <text x="490" y="227" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F4CA; Analytics</text>
-    <text x="490" y="244" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">DynamoDB</text>
-
-    <rect x="580" y="210" width="140" height="42" rx="6" fill="#334155" stroke="#a78bfa" stroke-width="1"/>
-    <text x="650" y="227" text-anchor="middle" fill="#a78bfa" font-family="Inter, sans-serif" font-weight="600" font-size="10">&#x1F514; Notifications</text>
-    <text x="650" y="244" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="8">Redis</text>
-
-    <text x="570" y="282" text-anchor="middle" fill="#94a3b8" font-family="Inter, sans-serif" font-size="9">If data is 2 seconds late here, nobody notices.</text>
-
-    <!-- Lines from app to BASE -->
-    <line x1="430" y1="95" x2="570" y2="120" stroke="#a78bfa" stroke-width="1.5"/>
+    <!-- Discord row -->
+    <rect x="20" y="242" width="720" height="90" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="55" y="265" fill="#5865f2" font-family="Inter,sans-serif" font-weight="800" font-size="12">DISCORD</text>
+    <rect x="140" y="252" width="180" height="30" rx="6" fill="rgba(234,179,8,0.08)" stroke="#eab308" stroke-width="1"/>
+    <text x="230" y="272" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="9">Billing: PostgreSQL (ACID)</text>
+    <rect x="335" y="252" width="200" height="30" rx="6" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="435" y="272" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Messages: Cassandra (BASE)</text>
+    <rect x="550" y="252" width="180" height="30" rx="6" fill="rgba(167,139,250,0.08)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="640" y="272" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Presence: Redis (BASE)</text>
+    <text x="380" y="318" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">12 billion msgs/week in Cassandra. Nitro subscription charges in PostgreSQL. Both in the same app.</text>
   </svg>
 
-  <p>Look at an e-commerce platform like Amazon. The payment system uses strict ACID transactions &mdash; when you click "Buy Now," the system guarantees your card is charged exactly once and the inventory count decreases by exactly one. No double-charges, no overselling.</p>
+  <p>Here's the decision process in a single visual &mdash; the flowchart every senior engineer runs in their head:</p>
 
-  <p>But the product search? That's BASE. When a seller updates a product description, it might take a few seconds for the search index to reflect the change. The product reviews? Also BASE. A new review might take a moment to appear for all users. The recommendation engine? Definitely BASE &mdash; yesterday's browsing data is perfectly fine for generating today's "You might also like" suggestions.</p>
+  <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision flowchart: ACID or BASE per data type">
+    <defs>
+      <marker id="acb-s5-fl" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="#eab308"/>
+      </marker>
+    </defs>
+    <text x="380" y="20" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="13">The Decision Flowchart: ACID or BASE?</text>
+
+    <!-- Start -->
+    <rect x="280" y="35" width="200" height="32" rx="8" fill="#334155" stroke="#eab308" stroke-width="1.5"/>
+    <text x="380" y="56" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="600" font-size="10">New piece of data to store</text>
+    <line x1="380" y1="67" x2="380" y2="85" stroke="#eab308" stroke-width="1.5" marker-end="url(#acb-s5-fl)"/>
+
+    <!-- Q1 -->
+    <polygon points="380,88 510,125 380,162 250,125" fill="#1e293b" stroke="#eab308" stroke-width="1.5"/>
+    <text x="380" y="122" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9" font-weight="600">Wrong for 5 sec =</text>
+    <text x="380" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9" font-weight="600">money/health/legal?</text>
+
+    <!-- YES path -->
+    <line x1="250" y1="125" x2="150" y2="125" stroke="#eab308" stroke-width="1.5" marker-end="url(#acb-s5-fl)"/>
+    <text x="200" y="118" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="9">YES</text>
+    <rect x="30" y="105" width="115" height="40" rx="8" fill="rgba(234,179,8,0.1)" stroke="#eab308" stroke-width="1.5"/>
+    <text x="87" y="130" text-anchor="middle" fill="#eab308" font-family="Inter,sans-serif" font-weight="700" font-size="11">ACID</text>
+
+    <!-- NO path -->
+    <line x1="510" y1="125" x2="570" y2="125" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#acb-s5-fl)"/>
+    <text x="540" y="118" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="9">NO</text>
+
+    <!-- Q2 -->
+    <polygon points="680,88 760,125 680,162 600,125" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="680" y="122" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9" font-weight="600">High write</text>
+    <text x="680" y="135" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9" font-weight="600">throughput?</text>
+
+    <!-- Q2 YES -->
+    <line x1="680" y1="162" x2="680" y2="190" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#acb-s5-fl)"/>
+    <text x="695" y="180" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="9">YES</text>
+    <rect x="620" y="195" width="120" height="40" rx="8" fill="rgba(167,139,250,0.1)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="680" y="220" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="700" font-size="11">BASE</text>
+
+    <!-- Q2 NO -->
+    <line x1="600" y1="125" x2="600" y2="195" stroke="#eab308" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="585" y="165" fill="#ef4444" font-family="Inter,sans-serif" font-size="8">NO</text>
+    <rect x="510" y="195" width="100" height="40" rx="8" fill="rgba(234,179,8,0.06)" stroke="#334155" stroke-width="1"/>
+    <text x="560" y="213" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Either works.</text>
+    <text x="560" y="228" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Default to ACID.</text>
+
+    <!-- Examples under ACID -->
+    <text x="87" y="164" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Payments, orders,</text>
+    <text x="87" y="176" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">medical records, billing</text>
+
+    <!-- Examples under BASE -->
+    <text x="680" y="245" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Messages, likes, feeds,</text>
+    <text x="680" y="250" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">analytics, caches</text>
+  </svg>
+
+  <p>You can see this pattern everywhere once you know to look for it. Every company worth their engineering salt uses <em>both</em> ACID and BASE:</p>
+
+  <ul>
+    <li><strong>Stripe:</strong> PostgreSQL with <code>SERIALIZABLE</code> isolation for every payment transaction. Every charge, refund, and transfer. They process billions of dollars this way. For user sessions and dashboard analytics? Redis and Kafka (BASE). If a dashboard chart is 30 seconds behind, nobody cares.</li>
+    <li><strong>Discord:</strong> Cassandra for messages (BASE) &mdash; 12 billion messages per week, eventual consistency is fine. PostgreSQL for Nitro billing (ACID) &mdash; subscription charges must be exactly right.</li>
+    <li><strong>Amazon (the Dynamo paper):</strong> DynamoDB for shopping cart (BASE) &mdash; "always available, even during failures." Aurora/RDS for order processing and payment settlement (ACID).</li>
+  </ul>
+
+  <p>You can even see BASE tuning yourself. In DynamoDB, you choose consistency <em>per read</em>:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">dynamodb-consistency-choice.sh</span></div>
+    <div class="macos-body">
+<pre><code class="language-bash"># Eventually consistent read (default) — fast, cheap, might be stale
+aws dynamodb get-item \
+  --table-name Users \
+  --key '{"id":{"N":"1"}}'
+
+# Strongly consistent read — slower, 2x cost, guaranteed fresh
+aws dynamodb get-item \
+  --table-name Users \
+  --key '{"id":{"N":"1"}}' \
+  --consistent-read</code></pre>
+    </div>
+  </div>
+
+  <p>And in Cassandra, you tune consistency <em>per query</em>:</p>
+
+  <div class="macos-window">
+    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">cassandra-consistency-levels.cql</span></div>
+    <div class="macos-body">
+<pre><code class="language-sql">-- ONE: fire-and-forget, fastest, least consistent
+INSERT INTO messages (id, text) VALUES (uuid(), 'Hey!')
+  USING CONSISTENCY ONE;
+
+-- QUORUM: majority must acknowledge, good balance
+INSERT INTO orders (id, total) VALUES (uuid(), 99.99)
+  USING CONSISTENCY QUORUM;
+
+-- ALL: every replica must acknowledge (basically ACID-like)
+-- Don't use this unless you really need it — kills availability
+INSERT INTO payments (id, amount) VALUES (uuid(), 500.00)
+  USING CONSISTENCY ALL;</code></pre>
+    </div>
+  </div>
+
+  <p>This is the real-world superpower: <strong>you don't just choose ACID or BASE at the system level &mdash; you choose it per table, per query, even per request.</strong> Cassandra's <code>CONSISTENCY QUORUM</code> is stricter than <code>ONE</code> but looser than <code>ALL</code>. DynamoDB's <code>--consistent-read</code> flag upgrades a single read from eventual to strong. The spectrum between "pure ACID" and "pure BASE" is continuous, and production systems live somewhere in the middle.</p>
 
   <div class="callout callout-success">
-    <strong>The rule of thumb:</strong> Ask yourself, "What happens if this data is wrong for 5 seconds?" If the answer is "someone loses money or a critical decision is made with bad data," use ACID. If the answer is "nobody even notices," use BASE.
+    <strong>The one-question rule:</strong> For every piece of data in your system, ask: "What's the worst thing that happens if this data is wrong for 5 seconds?" If the answer involves money, health, or legal liability &mdash; ACID. If the answer is "a number is briefly off" or "a message appears a moment late" &mdash; BASE. Apply this per-table, not per-system.
   </div>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
-    <p>For each of these, decide: ACID or BASE? <strong>(a) Deducting airline miles from a loyalty account</strong>, <strong>(b) Showing how many people are viewing a hotel listing right now</strong>, <strong>(c) Recording that a patient received a medication dose</strong>, <strong>(d) Updating a user's "last seen" status.</strong></p>
-    <span class="think-hint">(a) ACID &mdash; miles are currency; losing them is like losing money. (b) BASE &mdash; "47 people viewing" vs "49 people viewing" makes no real difference. (c) ACID &mdash; medical records must be perfectly accurate; a missed dose could be life-threatening. (d) BASE &mdash; showing "online 2 minutes ago" instead of "online 30 seconds ago" is harmless.</span>
+    <p>You're designing an airline booking system. Classify each piece of data as ACID or BASE: <strong>(a) seat reservation</strong>, <strong>(b) loyalty miles balance</strong>, <strong>(c) "23 people viewing this flight right now"</strong>, <strong>(d) baggage tracking location</strong>, <strong>(e) in-flight entertainment watch history</strong>.</p>
+    <span class="think-hint">(a) ACID &mdash; double-selling a seat means two people show up for the same spot; legal nightmare. (b) ACID &mdash; miles are currency; losing them triggers support tickets and lawsuits. (c) BASE &mdash; "23 people" vs "25 people" is just social proof; nobody cares if it's slightly off. (d) BASE &mdash; knowing the bag is "in Frankfurt" vs "arriving in Frankfurt" is close enough; exact real-time position can be eventually consistent. (e) BASE &mdash; if your watch history takes 30 seconds to sync between devices, that's totally fine.</span>
   </div>
 </div>
+
+<!-- SECTIONS 6+ CONTINUE BELOW -->
 
 
 <!-- ════════════════════════════════════════════════════════════
