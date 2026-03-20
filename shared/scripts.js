@@ -895,6 +895,54 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     })();
 
+    /* -- Flow Steppers: initialize state -- */
+    document.querySelectorAll('.flow-stepper, .data-flow').forEach(function(stepper) {
+      var steps = stepper.querySelectorAll('.flow-step');
+      if (!steps.length) return;
+
+      // Default to first step if no data-current set
+      var current = parseInt(stepper.getAttribute('data-current') || '0', 10);
+      stepper.setAttribute('data-current', current);
+
+      // Ensure only the current step is active
+      steps.forEach(function(step, i) {
+        step.classList.toggle('active', i === current);
+      });
+
+      // Set progress text
+      var progress = stepper.querySelector('.flow-progress');
+      if (progress) {
+        progress.textContent = 'Step ' + (current + 1) + ' of ' + steps.length;
+      }
+
+      // Set dot indicators
+      stepper.querySelectorAll('.flow-dot').forEach(function(dot, i) {
+        dot.classList.toggle('active', i === current);
+      });
+
+      // Set button disabled states
+      var prevBtn = stepper.querySelector('.flow-prev');
+      var nextBtn = stepper.querySelector('.flow-next');
+      if (prevBtn) prevBtn.disabled = (current === 0);
+      if (nextBtn) nextBtn.disabled = (current === steps.length - 1);
+    });
+
+    /* -- Multi-File Viewers: ensure first tab is active -- */
+    document.querySelectorAll('.multi-file').forEach(function(viewer) {
+      // Skip if already has an active tab
+      if (viewer.querySelector('.multi-file-tab.active')) return;
+      var firstTab = viewer.querySelector('.multi-file-tab');
+      if (firstTab) {
+        firstTab.classList.add('active');
+        var fileId = firstTab.getAttribute('data-file');
+        if (fileId) {
+          var panel = viewer.querySelector('.multi-file-panel[data-file="' + fileId + '"]')
+                    || document.getElementById(fileId);
+          if (panel) panel.classList.add('active');
+        }
+      }
+    });
+
     /* -- Progress bar -- */
     onScroll();
   }
@@ -1240,6 +1288,291 @@ document.addEventListener('DOMContentLoaded', () => {
       window.scrollBy(0, e.deltaY);
     }
   }, { passive: false });
+
+  /* ==========================================================
+   *  SECTION E — INTERACTIVE COMPONENTS
+   *  Event delegation for new CSS components (flow stepper,
+   *  knowledge check, annotated diagram, multi-file viewer,
+   *  what-if card, formula float, rich tooltips, data-flow).
+   * ========================================================== */
+
+  /* ----------------------------------------------------------
+   *  E1. Flow Stepper — Previous/Next step navigation
+   *      Tracks current step via data-current attribute.
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.flow-prev, .flow-next');
+    if (!btn) return;
+    var stepper = btn.closest('.flow-stepper');
+    if (!stepper) return;
+
+    var steps = stepper.querySelectorAll('.flow-step');
+    if (!steps.length) return;
+
+    var current = parseInt(stepper.getAttribute('data-current') || '0', 10);
+    var isNext = btn.classList.contains('flow-next');
+    var next = isNext ? current + 1 : current - 1;
+
+    // Clamp to valid range
+    if (next < 0 || next >= steps.length) return;
+
+    // Hide current step, show next
+    steps[current].classList.remove('active');
+    steps[next].classList.add('active');
+    stepper.setAttribute('data-current', next);
+
+    // Update progress text
+    var progress = stepper.querySelector('.flow-progress');
+    if (progress) {
+      progress.textContent = 'Step ' + (next + 1) + ' of ' + steps.length;
+    }
+
+    // Update dot indicators if present
+    var dots = stepper.querySelectorAll('.flow-dot');
+    dots.forEach(function(dot, i) {
+      dot.classList.toggle('active', i === next);
+    });
+
+    // Disable/enable buttons at boundaries
+    var prevBtn = stepper.querySelector('.flow-prev');
+    var nextBtn = stepper.querySelector('.flow-next');
+    if (prevBtn) prevBtn.disabled = (next === 0);
+    if (nextBtn) nextBtn.disabled = (next === steps.length - 1);
+  });
+
+  /* ----------------------------------------------------------
+   *  E2. Knowledge Check — single-select quiz with explanation
+   *      Clicking an option reveals explanation, marks correct/
+   *      incorrect, and disables further selections.
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var option = e.target.closest('.kc-option');
+    if (!option) return;
+    var check = option.closest('.knowledge-check');
+    if (!check) return;
+
+    // Already answered — ignore further clicks
+    if (check.classList.contains('kc-answered')) return;
+
+    // Mark as answered to prevent re-selection
+    check.classList.add('kc-answered');
+
+    // Determine if correct (option has data-correct="true")
+    var isCorrect = option.getAttribute('data-correct') === 'true';
+    option.classList.add(isCorrect ? 'kc-option--correct' : 'kc-option--incorrect');
+
+    // If user picked wrong, also highlight the correct one
+    if (!isCorrect) {
+      check.querySelectorAll('.kc-option[data-correct="true"]').forEach(function(opt) {
+        opt.classList.add('kc-option--correct');
+      });
+    }
+
+    // Disable all radio inputs within this check
+    check.querySelectorAll('input[type="radio"]').forEach(function(radio) {
+      radio.disabled = true;
+    });
+
+    // Reveal explanation
+    var explanation = check.querySelector('.kc-explanation');
+    if (explanation) {
+      explanation.style.display = 'block';
+      explanation.classList.add('visible');
+    }
+  });
+
+  /* ----------------------------------------------------------
+   *  E3. Annotated Diagram — click markers to show panels
+   *      Only one panel open at a time. Active marker gets
+   *      .active class for highlight styling.
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var marker = e.target.closest('.annotation-marker');
+    if (!marker) return;
+    var diagram = marker.closest('.annotated-diagram');
+    if (!diagram) return;
+
+    var targetId = marker.getAttribute('data-annotation');
+    var wasActive = marker.classList.contains('active');
+
+    // Close all markers and panels in this diagram
+    diagram.querySelectorAll('.annotation-marker').forEach(function(m) {
+      m.classList.remove('active');
+    });
+    diagram.querySelectorAll('.annotation-panel').forEach(function(p) {
+      p.classList.remove('active');
+    });
+
+    // If clicking the already-active marker, just close (toggle off)
+    if (wasActive) return;
+
+    // Open the clicked marker's panel
+    marker.classList.add('active');
+    if (targetId) {
+      var panel = diagram.querySelector('.annotation-panel[data-annotation="' + targetId + '"]')
+                || document.getElementById(targetId);
+      if (panel) panel.classList.add('active');
+    }
+  });
+
+  /* ----------------------------------------------------------
+   *  E4. Multi-File Viewer — tab-like file switcher
+   *      Uses data-file attribute to match tabs to panels.
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var tab = e.target.closest('.multi-file-tab');
+    if (!tab) return;
+    var viewer = tab.closest('.multi-file');
+    if (!viewer) return;
+
+    var fileId = tab.getAttribute('data-file');
+    if (!fileId) return;
+
+    // Deactivate all tabs and panels
+    viewer.querySelectorAll('.multi-file-tab').forEach(function(t) {
+      t.classList.remove('active');
+    });
+    viewer.querySelectorAll('.multi-file-panel').forEach(function(p) {
+      p.classList.remove('active');
+    });
+
+    // Activate clicked tab and matching panel
+    tab.classList.add('active');
+    var panel = viewer.querySelector('.multi-file-panel[data-file="' + fileId + '"]')
+              || document.getElementById(fileId);
+    if (panel) panel.classList.add('active');
+  });
+
+  /* ----------------------------------------------------------
+   *  E5. What-If Card — toggle open/closed with chevron rotation
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var trigger = e.target.closest('.whatif-trigger');
+    if (!trigger) return;
+    var card = trigger.closest('.whatif-card');
+    if (!card) return;
+
+    card.classList.toggle('open');
+  });
+
+  /* ----------------------------------------------------------
+   *  E6. Formula Float — toggle floating panel visibility
+   *      Collapsed by default; button shows/hides.
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var toggle = e.target.closest('.formula-float-toggle');
+    if (!toggle) return;
+    var panel = toggle.closest('.formula-float');
+    if (!panel) return;
+
+    panel.classList.toggle('open');
+  });
+
+  /* ----------------------------------------------------------
+   *  E7. Rich Tooltips — show on hover/focus, hide on out/blur
+   *      Positioned below trigger, clamped to viewport.
+   * -------------------------------------------------------- */
+  (function() {
+    function showRichTooltip(trigger) {
+      var content = trigger.querySelector('.tooltip-rich-content');
+      if (!content) return;
+
+      content.style.display = 'block';
+
+      // Position below trigger, centered
+      var trigRect = trigger.getBoundingClientRect();
+      var tipRect = content.getBoundingClientRect();
+
+      var left = (trigger.offsetWidth / 2) - (tipRect.width / 2);
+      var top = trigger.offsetHeight + 8;
+
+      // Clamp to viewport edges
+      var absLeft = trigRect.left + left;
+      if (absLeft < 8) left -= (absLeft - 8);
+      if (absLeft + tipRect.width > window.innerWidth - 8) {
+        left -= (absLeft + tipRect.width - window.innerWidth + 8);
+      }
+
+      content.style.left = left + 'px';
+      content.style.top = top + 'px';
+      content.classList.add('visible');
+    }
+
+    function hideRichTooltip(trigger) {
+      var content = trigger.querySelector('.tooltip-rich-content');
+      if (!content) return;
+      content.classList.remove('visible');
+      content.style.display = '';
+    }
+
+    // Desktop: mouseenter/mouseleave via event delegation (capture phase)
+    document.addEventListener('mouseenter', function(e) {
+      var trigger = e.target.closest('.tooltip-rich');
+      if (trigger) showRichTooltip(trigger);
+    }, true);
+
+    document.addEventListener('mouseleave', function(e) {
+      var trigger = e.target.closest('.tooltip-rich');
+      if (trigger) hideRichTooltip(trigger);
+    }, true);
+
+    // Keyboard: focus/blur
+    document.addEventListener('focusin', function(e) {
+      var trigger = e.target.closest('.tooltip-rich');
+      if (trigger) showRichTooltip(trigger);
+    });
+    document.addEventListener('focusout', function(e) {
+      var trigger = e.target.closest('.tooltip-rich');
+      if (trigger) hideRichTooltip(trigger);
+    });
+  })();
+
+  /* ----------------------------------------------------------
+   *  E8. Data Flow Stepper controls
+   *      Wires up .flow-prev / .flow-next buttons inside any
+   *      data-flow stepper variant. Updates .flow-progress and
+   *      dot indicators. (Shares logic with E1 — E1 handler
+   *      covers .flow-stepper containers; this handles any
+   *      standalone data-flow wrapper that doesn't use
+   *      .flow-stepper class.)
+   * -------------------------------------------------------- */
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.data-flow .flow-prev, .data-flow .flow-next');
+    if (!btn) return;
+    var flow = btn.closest('.data-flow');
+    if (!flow) return;
+
+    // Delegate to same logic as flow-stepper if already handled
+    if (flow.classList.contains('flow-stepper')) return;
+
+    var steps = flow.querySelectorAll('.flow-step');
+    if (!steps.length) return;
+
+    var current = parseInt(flow.getAttribute('data-current') || '0', 10);
+    var isNext = btn.classList.contains('flow-next');
+    var next = isNext ? current + 1 : current - 1;
+
+    if (next < 0 || next >= steps.length) return;
+
+    steps[current].classList.remove('active');
+    steps[next].classList.add('active');
+    flow.setAttribute('data-current', next);
+
+    var progress = flow.querySelector('.flow-progress');
+    if (progress) {
+      progress.textContent = 'Step ' + (next + 1) + ' of ' + steps.length;
+    }
+
+    var dots = flow.querySelectorAll('.flow-dot');
+    dots.forEach(function(dot, i) {
+      dot.classList.toggle('active', i === next);
+    });
+
+    var prevBtn = flow.querySelector('.flow-prev');
+    var nextBtn = flow.querySelector('.flow-next');
+    if (prevBtn) prevBtn.disabled = (next === 0);
+    if (nextBtn) nextBtn.disabled = (next === steps.length - 1);
+  });
 
 }); /* end DOMContentLoaded */
 
