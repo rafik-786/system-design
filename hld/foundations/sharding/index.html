@@ -36,10 +36,10 @@
     <p class="hero-subtitle">Your single PostgreSQL is drowning under 50K writes/sec. Read replicas don't help &mdash; writes still hit one machine. The fix: split the data itself across multiple databases. Instagram does it. Discord does it. Vitess does it for YouTube. Here's exactly how, with real math, real commands, and real trade-offs.</p>
     <div class="hero-meta">
       <span><i class="fa-solid fa-brain"></i> 8 Think Firsts</span>
-      <span><i class="fa-solid fa-diagram-project"></i> 13 SVG Diagrams</span>
+      <span><i class="fa-solid fa-diagram-project"></i> 16 SVG Diagrams</span>
       <span><i class="fa-solid fa-terminal"></i> Real Commands</span>
-      <span><i class="fa-solid fa-layer-group"></i> 8 Sections</span>
-      <span><i class="fa-solid fa-circle-info"></i> 19 Tooltips</span>
+      <span><i class="fa-solid fa-layer-group"></i> 15 Sections</span>
+      <span><i class="fa-solid fa-circle-info"></i> 24 Tooltips</span>
     </div>
   </div>
 </div>
@@ -816,7 +816,7 @@ SELECT * FROM orders WHERE user_id BETWEEN 10000000 AND 15000000;
           <thead><tr><th>Pros</th><th>Cons</th></tr></thead>
           <tbody>
             <tr><td>Even distribution &mdash; no hotspots from sequential keys</td><td>Range queries require scatter-gather (all shards)</td></tr>
-            <tr><td>Works with any key type (strings, UUIDs, integers)</td><td>Adding shards requires rehashing &mdash; 50% of data moves</td></tr>
+            <tr><td>Works with any key type (strings, UUIDs, integers)</td><td>Adding shards requires rehashing &mdash; ~75&ndash;80% of data moves</td></tr>
             <tr><td>Most widely used strategy (Instagram, Discord, Citus)</td><td>Can't easily rebalance without consistent hashing</td></tr>
           </tbody>
         </table>
@@ -1021,7 +1021,7 @@ CREATE TABLE messages (
     </div>
   </div>
 
-  <p>Choosing a shard key and splitting data is the easy part. The hard part comes after: what happens when you need to add shards, query across shards, or handle failures? These four topics are what separate "I know what sharding is" from "I can operate a sharded system in production."</p>
+  <p>You've split 80M users across 4 shards. Traffic doubles in 6 months and you need 8 shards. With naive <code>hash(key) % 4</code> becoming <code>% 8</code>, roughly 50% of all keys change shards &mdash; that's 40 million rows physically moving between machines. And what about that JOIN you used to run in 5ms? It now scatter-gathers across every shard, ballooning to 80ms. These are the hard problems that separate "I know what sharding is" from "I can operate a sharded system in production."</p>
 
   <div class="think-first-box">
     <span class="think-label">Think First</span>
@@ -1663,10 +1663,1051 @@ DROP TABLE app_logs_2024_12;  -- Gone. Instantly. No IO overhead.
 </div>
 
 
-<!-- SECTIONS 9+ CONTINUE BELOW -->
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 9 &mdash; AT SCALE
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="at-scale">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-building"></i></div>
+    <div>
+      <div class="section-num">Section 9</div>
+      <h2 class="section-title">At Scale &mdash; How the Giants Actually Shard</h2>
+    </div>
+  </div>
+
+  <p>Instagram routes 1 billion users across 64 PostgreSQL shards using a Snowflake ID trick. Discord stores 120 billion messages across thousands of ScyllaDB nodes using a composite key. Shopify hides sharding entirely behind Vitess so developers never see it. MongoDB automates everything with an internal balancer. Four companies, four different architectures &mdash; each one shaped by their specific data access patterns.</p>
+
+  <!-- Card 1: Instagram -->
+  <div class="card open">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="true">
+      <span><i class="fa-solid fa-camera icon-gap"></i> Instagram &mdash; 64 PostgreSQL Shards, Snowflake IDs</span>
+    </h3>
+    <div class="card-body">
+      <p>Instagram needed to handle over a billion users, and they chose the most straightforward approach: <strong>shard PostgreSQL by user_id</strong>. Every user's photos, comments, likes, and stories live on the same shard. No cross-shard queries needed for "show me this user's feed."</p>
+
+      <p>Here's the math: 1 billion users across 64 logical shards = roughly <strong>15.6 million users per shard</strong>. Each shard is a separate PostgreSQL instance running on its own hardware with its own connection pool, its own pg_partman config for time-based sub-partitioning, and its own replication setup.</p>
+
+      <p>The clever part is how they <em>route</em> requests. Instead of looking up "which shard is user 482,391 on?" in some mapping table, they <strong>embed the shard ID directly into every ID they generate</strong>. Instagram uses a Snowflake-style ID generator where the shard ID is baked into the bits of the ID itself. Given any photo ID or comment ID, you can extract the shard number with a bit shift &mdash; no lookup required.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">instagram-routing.sql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- Instagram's routing logic (simplified)
+-- Shard = user_id % 64
+-- user_id = 482391 → 482391 % 64 = 7 → Shard 7
+
+-- Snowflake ID structure (64 bits):
+-- [timestamp 41 bits][shard_id 13 bits][sequence 10 bits]
+
+-- Given photo_id = 1375782301427_07_0042:
+--   shard_id = 07 → route to shard-07.instagram.internal
+
+-- pg_partman handles sub-partitioning within each shard:
+SELECT partman.create_parent(
+  'public.photos',
+  'created_at',
+  'native',
+  'monthly'
+);
+-- Result: photos_2024_01, photos_2024_02, ... auto-created
+
+-- Migration: split shard_03 into shard_03a + shard_03b
+-- Step 1: Create new shard with logical replication
+-- Step 2: Start replicating shard_03 → shard_03b
+-- Step 3: Once caught up, update routing: user_id % 128
+-- Step 4: Cut over, stop old replication</code></pre>
+        </div>
+      </div>
+
+      <!-- SVG: Instagram shard routing -->
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Instagram: user_id mod 64 routes to one of 64 PostgreSQL shards, shard ID embedded in Snowflake IDs">
+        <defs>
+          <marker id="shd-s9-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#f59e0b"/></marker>
+          <marker id="shd-s9-grn" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#10b981"/></marker>
+        </defs>
+        <text x="360" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="12">Instagram: user_id % 64 &rarr; Shard Routing</text>
+
+        <!-- Request -->
+        <rect x="20" y="40" width="130" height="40" rx="8" fill="#1e293b" stroke="#94a3b8" stroke-width="1.2"/>
+        <text x="85" y="56" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">GET /user/482391</text>
+        <text x="85" y="70" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">user_id = 482391</text>
+
+        <!-- Router -->
+        <rect x="200" y="35" width="140" height="50" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="270" y="55" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="10">Shard Router</text>
+        <text x="270" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">482391 % 64 = <tspan fill="#10b981" font-weight="700">7</tspan></text>
+
+        <line x1="150" y1="60" x2="200" y2="60" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#shd-s9-arr)"/>
+
+        <!-- Shards -->
+        <rect x="400" y="30" width="70" height="30" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="435" y="49" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Shard 0</text>
+        <rect x="480" y="30" width="70" height="30" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="515" y="49" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Shard 1</text>
+        <text x="595" y="49" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">...</text>
+
+        <rect x="400" y="70" width="70" height="30" rx="5" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+        <text x="435" y="89" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="9">Shard 7 &check;</text>
+        <rect x="480" y="70" width="70" height="30" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="515" y="89" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Shard 8</text>
+        <text x="595" y="89" fill="#94a3b8" font-family="Inter,sans-serif" font-size="10">...</text>
+
+        <rect x="400" y="110" width="70" height="30" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="435" y="129" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Shard 62</text>
+        <rect x="480" y="110" width="70" height="30" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="515" y="129" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Shard 63</text>
+
+        <line x1="340" y1="60" x2="400" y2="85" stroke="#10b981" stroke-width="1.5" marker-end="url(#shd-s9-grn)"/>
+
+        <!-- Snowflake box -->
+        <rect x="120" y="120" width="480" height="55" rx="8" fill="rgba(245,158,11,0.06)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="360" y="140" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="600" font-size="10">Snowflake ID (64 bits)</text>
+        <rect x="145" y="148" width="170" height="18" rx="3" fill="rgba(59,130,246,0.15)" stroke="#3b82f6" stroke-width="0.8"/>
+        <text x="230" y="161" text-anchor="middle" fill="#3b82f6" font-family="Inter,sans-serif" font-size="8">timestamp (41 bits)</text>
+        <rect x="320" y="148" width="100" height="18" rx="3" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="0.8"/>
+        <text x="370" y="161" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="700" font-size="8">shard_id (13 bits)</text>
+        <rect x="425" y="148" width="80" height="18" rx="3" fill="rgba(148,163,184,0.1)" stroke="#94a3b8" stroke-width="0.8"/>
+        <text x="465" y="161" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">seq (10 bits)</text>
+      </svg>
+
+      <div class="callout callout-info">
+        <strong>Why 64?</strong> Power of two makes modulo operations fast (just a bitwise AND). 64 shards at ~15M users each means each PostgreSQL instance holds about 60&ndash;80 GB of data &mdash; small enough to fit the working set in RAM, big enough that you don't drown in coordination overhead.
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Discord -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-gamepad icon-gap"></i> Discord &mdash; Cassandra to ScyllaDB, 120B+ Messages</span>
+    </h3>
+    <div class="card-body">
+      <p>Discord's problem is different from Instagram's. Instagram shards by user &mdash; neat and clean. Discord has to shard <em>messages</em>, and messages belong to <strong>channels</strong>, not users. A single server like MrBeast's has 40+ million members, and every message in #general goes to the same channel_id. If you shard only by channel_id, that one channel becomes a massive <span class="tooltip-trigger">hotspot<span class="tooltip-content">A hotspot occurs when one shard receives disproportionately more traffic than others. In Discord's case, a popular channel like MrBeast's #general (40M+ members) would receive thousands of writes per second, while most channels get near zero. Hotspots defeat the entire purpose of sharding: even distribution of load.</span></span>.</p>
+
+      <p>Discord's solution: a <strong>composite shard key</strong> of <code>(channel_id, bucket)</code>, where a bucket represents a 10-day time window. Old messages from January 2023 in #general live on a different partition than this week's messages. This means the "hot" partition (current bucket) for a massive channel might still be heavy, but at least the historical data is spread across many partitions and can be archived to cold storage.</p>
+
+      <p>In 2022, Discord migrated from Cassandra to <span class="tooltip-trigger">ScyllaDB<span class="tooltip-content">A drop-in replacement for Cassandra, written in C++ instead of Java. Discord switched because Cassandra's garbage collection pauses caused unpredictable tail latencies &mdash; sometimes a read that should take 5ms would take 500ms. ScyllaDB doesn't use a garbage collector, so tail latencies are much more predictable. Same data model, same query language (CQL), dramatically better P99 latency.</span></span> because Cassandra's Java garbage collection pauses caused unpredictable latency spikes. The shard key stayed the same &mdash; they swapped the engine, not the architecture.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">discord-messages.cql</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-sql">-- Discord's message table (simplified CQL)
+CREATE TABLE messages (
+  channel_id  bigint,
+  bucket      int,        -- 10-day window: floor(epoch_days / 10)
+  message_id  bigint,     -- Snowflake ID (contains timestamp)
+  author_id   bigint,
+  content     text,
+  PRIMARY KEY ((channel_id, bucket), message_id)
+) WITH CLUSTERING ORDER BY (message_id DESC);
+
+-- Partition key = (channel_id, bucket)
+-- Each partition = one channel's messages for 10 days
+-- "Show latest messages in #general" → hits 1 partition (current bucket)
+-- "Search last 90 days" → hits 9 partitions (9 buckets)
+
+-- Hot channels (servers with 1M+ members) get dedicated nodes:
+-- Discord's internal tooling detects hotspots and moves
+-- heavy partitions to beefier ScyllaDB nodes with more RAM/CPU
+
+-- Total scale: 120+ billion messages across thousands of nodes</code></pre>
+        </div>
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>The Taylor Swift Problem.</strong> When Taylor Swift drops an album and her Discord server explodes with activity, <em>one channel</em> might get 10,000 writes/sec while the average channel gets 0.1 writes/sec. Discord handles this by detecting hot partitions in real-time and migrating them to dedicated high-spec nodes. You can't prevent hotspots entirely &mdash; you can only detect and react to them.
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Shopify / Vitess -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-store icon-gap"></i> Shopify / Vitess &mdash; One Merchant Per Logical Shard</span>
+    </h3>
+    <div class="card-body">
+      <p><span class="tooltip-trigger">Vitess<span class="tooltip-content">An open-source database clustering system originally built at YouTube (Google) to shard MySQL. It sits between your application and MySQL, transparently routing queries to the right shard. Your app connects to vtgate (the Vitess proxy) and thinks it's talking to a single MySQL. Vitess handles sharding, replication, schema migrations, and failover. Used by Shopify, Slack, GitHub, and Square.</span></span> gives Shopify something powerful: the application code doesn't know sharding exists. The app connects to <code>vtgate</code> (the Vitess proxy) and sends normal SQL. vtgate reads the <span class="tooltip-trigger">VSchema<span class="tooltip-content">A JSON/YAML config file that tells Vitess how your database is sharded. It defines which column is the shard key for each table, how to hash values to keyspace IDs, and which tables are "reference tables" (replicated to every shard). Think of it as the sharding blueprint &mdash; Vitess reads it and routes queries accordingly.</span></span> (a JSON config defining the shard key for each table) and routes the query to the correct shard.</p>
+
+      <p>Shopify's model: <strong>each merchant is a logical shard</strong>. All of Kylie Cosmetics' data (orders, products, customers, inventory) lives on one shard. Nike's data lives on another. This means queries within one store never cross shards &mdash; a massive simplification. They group shards into "pods" (clusters of shards) for operational isolation, so a misbehaving merchant can't affect others.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">vitess-commands.sh</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-bash"># 1. Define how to shard the 'orders' table by merchant_id
+vtctl ApplyVSchema -- --vschema='{
+  "tables": {
+    "orders": {
+      "column_vindexes": [{
+        "column": "merchant_id",
+        "name": "hash"
+      }]
+    }
+  }
+}' commerce
+
+# 2. Reshard: split 2 shards into 4 (when load doubles)
+vtctl Reshard -- --source_shards='-80,80-' \
+  --target_shards='-40,40-80,80-c0,c0-' commerce.reshard1
+
+# 3. vtgate routes transparently — app sees one "database"
+mysql -h vtgate.shopify.internal -u app -p commerce \
+  -e "SELECT * FROM orders WHERE merchant_id = 12345;"
+# vtgate: hash(12345) → keyspace_id → shard '-40' → route there
+
+# 4. Check shard health
+vtctl ListAllTablets | grep commerce</code></pre>
+        </div>
+      </div>
+
+      <p>When a merchant grows massive (think Gymshark during a flash sale), Vitess can <strong>reshard</strong> on the fly: split one shard into two using the <code>vtctl Reshard</code> command. It creates the new shards, replicates data over, and cuts traffic with near-zero downtime. No application changes required.</p>
+    </div>
+  </div>
+
+  <!-- Card 4: MongoDB -->
+  <div class="card">
+    <h3 class="card-title" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-leaf icon-gap"></i> MongoDB &mdash; Chunks, Balancer, and Config Servers</span>
+    </h3>
+    <div class="card-body">
+      <p>MongoDB has sharding built right into the database &mdash; you don't need an external proxy. It uses three components: <strong>mongos</strong> (the router your app connects to), <strong>config servers</strong> (store the mapping of which chunks live on which shard), and the <strong>shards themselves</strong> (each a replica set). When you issue a query, mongos checks the config servers to find out which shard has the data, then routes the query there.</p>
+
+      <p>The data is split into <strong>chunks</strong> (default 128 MB each). MongoDB's <span class="tooltip-trigger">balancer<span class="tooltip-content">A background process that runs on the config servers and monitors chunk distribution across shards. When one shard has significantly more chunks than others (default threshold: 8 chunks difference), the balancer automatically migrates chunks from the heavy shard to a lighter one. You can see it in action with <code>sh.status()</code>.</span></span> automatically moves chunks between shards to keep the distribution even. You don't manually assign data to shards &mdash; MongoDB handles it.</p>
+
+      <div class="macos-window">
+        <div class="macos-titlebar">
+          <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+          <span class="macos-filename">mongodb-sharding.js</span>
+        </div>
+        <div class="macos-body">
+<pre><code class="language-bash"># Connect to mongos (the router)
+mongosh --host mongos1.prod.internal
+
+# Enable sharding on the database
+sh.enableSharding("ecommerce")
+
+# Shard the orders collection by hashed user_id
+sh.shardCollection("ecommerce.orders", { "user_id": "hashed" })
+# "hashed" = MongoDB hashes user_id for even distribution
+# vs { "user_id": 1 } = range-based (good for range queries)
+
+# Check shard distribution
+sh.status()
+# --- Sharding Status ---
+# shards:
+#   { "_id": "shard0", "host": "shard0/rs0-0:27017,rs0-1:27017" }
+#   { "_id": "shard1", "host": "shard1/rs1-0:27017,rs1-1:27017" }
+#   { "_id": "shard2", "host": "shard2/rs2-0:27017,rs2-1:27017" }
+# databases:
+#   { "_id": "ecommerce", "partitioned": true }
+#     ecommerce.orders
+#       shard key: { "user_id": "hashed" }
+#       chunks:
+#         shard0: 42
+#         shard1: 41
+#         shard2: 43
+#       → balanced ✓
+
+# When you query WITH the shard key, mongos routes to 1 shard:
+db.orders.find({ user_id: 12345 })  // → targeted query (fast)
+
+# When you query WITHOUT the shard key, mongos asks ALL shards:
+db.orders.find({ status: "pending" })  // → scatter-gather (slow)</code></pre>
+        </div>
+      </div>
+
+      <!-- SVG: MongoDB architecture -->
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MongoDB sharding: app connects to mongos, which routes via config servers to shard replica sets">
+        <defs>
+          <marker id="shd-mg-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#10b981"/></marker>
+          <marker id="shd-mg-yl" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#f59e0b"/></marker>
+        </defs>
+        <text x="360" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="12">MongoDB Sharded Cluster</text>
+
+        <!-- App -->
+        <rect x="20" y="75" width="80" height="40" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1.2"/>
+        <text x="60" y="99" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-size="9">App Server</text>
+
+        <!-- mongos -->
+        <rect x="150" y="65" width="100" height="55" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+        <text x="200" y="85" text-anchor="middle" fill="#f59e0b" font-family="Inter,sans-serif" font-weight="700" font-size="10">mongos</text>
+        <text x="200" y="100" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">(router)</text>
+        <text x="200" y="112" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">stateless proxy</text>
+
+        <line x1="100" y1="95" x2="150" y2="95" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#shd-mg-yl)"/>
+
+        <!-- Config servers -->
+        <rect x="155" y="145" width="90" height="35" rx="6" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="200" y="163" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="8">Config Servers</text>
+        <text x="200" y="175" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">chunk &rarr; shard map</text>
+        <line x1="200" y1="120" x2="200" y2="145" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Shards -->
+        <rect x="330" y="40" width="110" height="45" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="385" y="58" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Shard 0 (RS)</text>
+        <text x="385" y="74" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">42 chunks &bull; 5.4 GB</text>
+
+        <rect x="330" y="95" width="110" height="45" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="385" y="113" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Shard 1 (RS)</text>
+        <text x="385" y="129" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">41 chunks &bull; 5.3 GB</text>
+
+        <rect x="330" y="150" width="110" height="45" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+        <text x="385" y="168" text-anchor="middle" fill="#10b981" font-family="Inter,sans-serif" font-weight="600" font-size="9">Shard 2 (RS)</text>
+        <text x="385" y="184" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">43 chunks &bull; 5.5 GB</text>
+
+        <line x1="250" y1="82" x2="330" y2="62" stroke="#10b981" stroke-width="1.5" marker-end="url(#shd-mg-arr)"/>
+        <line x1="250" y1="92" x2="330" y2="117" stroke="#10b981" stroke-width="1.5" marker-end="url(#shd-mg-arr)"/>
+        <line x1="250" y1="105" x2="330" y2="172" stroke="#10b981" stroke-width="1.5" marker-end="url(#shd-mg-arr)"/>
+
+        <!-- Balancer note -->
+        <rect x="500" y="85" width="200" height="50" rx="8" fill="rgba(167,139,250,0.06)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="600" y="105" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-weight="600" font-size="9">Balancer (automatic)</text>
+        <text x="600" y="120" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Moves chunks when &Delta; &gt; 8</text>
+      </svg>
+
+      <div class="callout callout-info">
+        <strong>Targeted vs. Scatter-Gather.</strong> If your query includes the shard key (<code>user_id</code>), mongos sends it to exactly one shard &mdash; that's a <strong>targeted query</strong> and it's fast. If your query doesn't include the shard key (<code>WHERE status = 'pending'</code>), mongos has to ask <em>every</em> shard and merge results &mdash; that's <strong>scatter-gather</strong> and it's slow. This is why picking the right shard key matters so much.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 10 &mdash; ANTI-LESSON
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="anti-lesson">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="section-num">Section 10</div>
+      <h2 class="section-title">Anti-Lessons &mdash; Things That Sound Smart but Aren't</h2>
+    </div>
+  </div>
+
+  <p>These are mistakes that look reasonable on a whiteboard but cause real pain in production. Each one comes from a company that learned the hard way.</p>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-1 text-red"></i> "Shard from Day One"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Sounds smart:</strong> "We're going to be huge. Let's shard now so we don't have to migrate later."</p>
+        <p><strong>Reality:</strong> Shopify ran on a <em>single MySQL server</em> for years before they needed Vitess. Instagram launched on one PostgreSQL and didn't shard until they had over a million users. Premature sharding means every feature now has to consider cross-shard queries, every migration touches multiple databases, and your team spends time on shard routing instead of product features.</p>
+        <p>Foursquare sharded MongoDB early in 2010 and spent <strong>two engineers full-time for six months</strong> fixing shard key issues, rebalancing hotspots, and debugging cross-shard queries &mdash; time that could have built features to compete with Yelp.</p>
+
+        <div class="callout callout-warning">
+          <strong>The Rule:</strong> If a single vertically-scaled database with read replicas, connection pooling, and proper indexing can handle your load &mdash; <strong>don't shard</strong>. Sharding is a 10&times; complexity multiplier for a problem you might not have yet. A $7,200/month RDS instance handles a LOT of traffic.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-2 text-red"></i> "Shard by Timestamp"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Sounds smart:</strong> "Shard by <code>created_at</code> so recent data is together."</p>
+        <p><strong>Reality:</strong> All new data goes to the same shard &mdash; the one handling "today." Shards holding last year's data sit idle while the current shard melts down. You've created the worst kind of hotspot: one that gets worse every day.</p>
+        <p>This is exactly the problem Discord would've had if they sharded only by timestamp. Instead, they use a <strong>composite key</strong>: <code>(channel_id, time_bucket)</code>. The channel_id spreads writes across many partitions, and the time bucket keeps each partition from growing forever. The time component helps with range queries ("last 10 days"), but it's not the <em>only</em> component &mdash; that's the key insight.</p>
+
+        <svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timestamp-only sharding creates a hotspot on the latest shard">
+          <text x="360" y="18" text-anchor="middle" fill="#f1f5f9" font-family="Inter,sans-serif" font-weight="700" font-size="11">Timestamp-Only Sharding: All Writes Hit One Shard</text>
+
+          <!-- Old shards (idle) -->
+          <rect x="30" y="40" width="100" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="80" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Jan 2024 shard</text>
+          <text x="80" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">0 writes/sec</text>
+
+          <rect x="150" y="40" width="100" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="200" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Feb 2024 shard</text>
+          <text x="200" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">0 writes/sec</text>
+
+          <text x="290" y="62" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">...</text>
+
+          <rect x="330" y="40" width="100" height="40" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="380" y="58" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="8">Jan 2026 shard</text>
+          <text x="380" y="72" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="7">2 writes/sec</text>
+
+          <!-- Hot shard -->
+          <rect x="480" y="30" width="130" height="60" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2.5"/>
+          <text x="545" y="52" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="700" font-size="9">Mar 2026 shard</text>
+          <text x="545" y="66" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="8">50K writes/sec</text>
+          <text x="545" y="80" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-size="7">CPU: 100% &mdash; HOTSPOT</text>
+
+          <!-- Bottom label -->
+          <rect x="100" y="105" width="520" height="30" rx="6" fill="rgba(239,68,68,0.06)" stroke="#ef4444" stroke-width="1"/>
+          <text x="360" y="124" text-anchor="middle" fill="#ef4444" font-family="Inter,sans-serif" font-weight="600" font-size="9">Fix: composite key (entity_id + time_bucket) distributes writes across shards</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-3 text-red"></i> "Cross-Shard JOINs Will Be Fine"</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>Sounds smart:</strong> "We'll just JOIN across shards &mdash; the proxy handles it."</p>
+        <p><strong>Reality:</strong> A cross-shard JOIN means the router sends a query to every shard, waits for every response, then merges the results in memory. With 64 shards, that's 64 parallel queries. If each shard takes 5ms, the <em>best</em> case is 5ms (perfect parallelism). The <em>real</em> case? The slowest shard determines your latency, and with 64 shards, P99 is much worse than any single shard's P99.</p>
+
+        <p>Real-world numbers: a scatter-gather query across 64 shards typically takes <strong>500ms&ndash;2s</strong> for anything involving aggregation, sorting, or LIMIT. That's fine for a nightly analytics job. It's not fine for a page load.</p>
+
+        <div class="callout callout-info">
+          <strong>The fix:</strong> <strong>Denormalize</strong> (store redundant data so JOINs aren't needed) or <strong>co-locate</strong> (put related data on the same shard). Instagram puts a user's photos, comments, and likes all on the user's shard &mdash; so "show me this user's feed" never crosses shards. The cost: if you need "all comments on photo X from different users," that's a cross-shard query. You pick your trade-off.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 11 &mdash; COMMON MISTAKES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="common-mistakes">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-bug"></i></div>
+    <div>
+      <div class="section-num">Section 11</div>
+      <h2 class="section-title">Common Mistakes &mdash; 6 Traps That Bite Real Teams</h2>
+    </div>
+  </div>
+
+  <p>These aren't theoretical pitfalls. Every one of these has caused production incidents, midnight pages, and painful migrations at real companies.</p>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-1 text-red"></i> Wrong Shard Key &mdash; Low Cardinality</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Sharding by <code>country</code>. There are ~200 countries, but the US, India, and Brazil together handle 80% of your traffic. You end up with 3 overloaded shards and 197 nearly empty ones.</p>
+        <p><strong>Why it hurts:</strong> Low-cardinality shard keys create <em>permanent</em> imbalance. You can't fix it by adding shards &mdash; the data is inherently skewed. The US shard will always be 50&times; bigger than the Iceland shard.</p>
+        <p><strong>The fix:</strong> Use a high-cardinality key like <code>user_id</code> (billions of unique values) with a hash function for even distribution. If you must include geography, make it a <em>secondary</em> index, not the shard key.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-2 text-red"></i> Not Planning for Rebalancing</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Using <code>shard = user_id % N</code> where N is the number of shards. When you add a shard (N changes from 64 to 65), <em>almost every user's shard assignment changes</em>. You'd have to migrate ~98% of your data.</p>
+        <p><strong>Why it hurts:</strong> Naive modulo-based routing makes adding capacity a massive, risky operation. You can't just "add a shard" &mdash; you have to reshuffle billions of rows.</p>
+        <p><strong>The fix:</strong> Use <strong>consistent hashing</strong> (only ~1/N of data moves when adding a shard) or a proxy like <strong>Vitess</strong> that handles resharding for you. Vitess's <code>Reshard</code> command creates new shards, replicates data via VReplication, and cuts over with minimal downtime. Plan for growth before you need it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-3 text-red"></i> Ignoring Cross-Shard Transactions</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Assuming <code>BEGIN; UPDATE shard_1...; UPDATE shard_2...; COMMIT;</code> will work like a normal transaction.</p>
+        <p><strong>Why it hurts:</strong> There's no single transaction manager across independent databases. <span class="tooltip-trigger">Two-phase commit (2PC)<span class="tooltip-content">A protocol where a coordinator asks all participants to "prepare" (lock resources and promise to commit). If all say yes, the coordinator says "commit." If any says no, everyone rolls back. The problem: if the coordinator crashes after "prepare" but before "commit," all participants are stuck holding locks until the coordinator recovers. This can block other transactions for minutes or hours.</span></span> exists but it's slow (extra round-trip, lock holding) and fragile (coordinator failure blocks everything). <span class="tooltip-trigger">Saga pattern<span class="tooltip-content">Instead of one big transaction, break it into a chain of local transactions with compensating actions. "Deduct inventory" → "Charge payment" → "Create shipment." If "Charge payment" fails, run a compensating action: "Restore inventory." Eventual consistency, not strict ACID, but much simpler than 2PC at scale.</span></span> provides eventual consistency but adds complexity.</p>
+        <p><strong>The fix:</strong> Design your shard key so that related data lives on the same shard. If an order always belongs to one user, shard by <code>user_id</code> and keep orders on the user's shard. The goal: <strong>99% of transactions should be shard-local</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-4 text-red"></i> Forgetting Shard-Local vs. Global Indexes</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> You shard orders by <code>user_id</code>, then need to look up an order by <code>order_id</code>. Your index on <code>order_id</code> is local to each shard &mdash; it only knows about orders on that shard. To find order #ABC123, you'd have to query all 64 shards.</p>
+        <p><strong>Why it hurts:</strong> Every "lookup by non-shard-key" becomes a scatter-gather query. If this happens on every page load, your P99 latency skyrockets.</p>
+        <p><strong>The fix:</strong> Maintain a small <strong>global lookup table</strong> (order_id &rarr; shard_id) in a shared service or cache. Or embed the shard_id in the order_id itself (Instagram's Snowflake approach). Or use <strong>Vitess vindexes</strong> &mdash; secondary indexes that map a column value to a keyspace ID, letting vtgate route non-shard-key lookups to the right shard.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-5 text-red"></i> Not Monitoring Shard Size Distribution</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> You set up sharding and forget about it. Six months later, shard_03 is at 450 GB while shard_12 has 80 GB. One shard is slow, others are wasting resources.</p>
+        <p><strong>Why it hurts:</strong> Uneven shard sizes mean uneven performance. The overloaded shard becomes the bottleneck for any query that touches it, and it fills up disk faster than others.</p>
+
+        <div class="macos-window">
+          <div class="macos-titlebar">
+            <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+            <span class="macos-filename">monitor-shards.sql</span>
+          </div>
+          <div class="macos-body">
+<pre><code class="language-sql">-- PostgreSQL: check shard sizes (run on each shard)
+SELECT pg_size_pretty(pg_database_size('shard_01'));  -- 120 GB
+SELECT pg_size_pretty(pg_database_size('shard_03'));  -- 450 GB ← problem!
+
+-- MongoDB: check chunk distribution
+sh.status()
+-- shard0: 42 chunks
+-- shard1: 41 chunks
+-- shard2: 180 chunks  ← balancer might be stuck!
+
+-- Vitess: check tablet health
+vtctl ListAllTablets | awk '{print $1, $4, $5}'
+-- shard-00 SERVING master
+-- shard-01 SERVING master
+-- shard-02 NOT_SERVING master  ← investigate!</code></pre>
+          </div>
+        </div>
+
+        <p><strong>The fix:</strong> Set up alerts for shard size divergence. If any shard is 2&times; the median size, trigger a resharding review. Automate the check &mdash; don't rely on engineers remembering to look.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+      <span><i class="fa-solid fa-6 text-red"></i> Treating All Shards Identically</span>
+      <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+    </div>
+    <div class="collapsible-content">
+      <div class="collapsible-body">
+        <p><strong>The mistake:</strong> Every shard gets the same hardware, same connection limits, same resource allocation. But shard_07 holds Taylor Swift's channel with 40M followers, while shard_42 holds channels with 50 members each.</p>
+        <p><strong>Why it hurts:</strong> Hot shards need more CPU, more RAM, and more network bandwidth. Treating them the same as cold shards means the hot ones are constantly throttled.</p>
+        <p><strong>The fix:</strong> Discord dedicates extra nodes to hot shards &mdash; they detect hotspots with real-time monitoring and dynamically reassign resources. In Vitess, you can place hot shards on beefier tablets. In MongoDB, you can use <strong>zones</strong> to pin hot collections to specific shard hardware. The key: <strong>observe, then adapt</strong> &mdash; not "set and forget."</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 12 &mdash; INTERVIEW PLAYBOOK
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="interview-playbook">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-user-tie"></i></div>
+    <div>
+      <div class="section-num">Section 12</div>
+      <h2 class="section-title">Interview Playbook &mdash; "Design the Sharding Strategy"</h2>
+    </div>
+  </div>
+
+  <p>The prompt: <strong>"Design the sharding strategy for a social media platform with 500M users, 10B posts, and 50K writes/sec."</strong> Here's how a junior, mid-level, and senior engineer would answer &mdash; and what the interviewer is looking for at each level.</p>
+
+  <div class="tab-container">
+    <div class="tab-header" role="tablist">
+      <button class="tab-btn active" data-tab="shd-int-junior" role="tab" aria-selected="true">Junior</button>
+      <button class="tab-btn" data-tab="shd-int-mid" role="tab" aria-selected="false">Mid-Level</button>
+      <button class="tab-btn" data-tab="shd-int-senior" role="tab" aria-selected="false">Senior</button>
+    </div>
+
+    <div class="tab-panel active" id="shd-int-junior" role="tabpanel">
+      <h4>Junior Answer: The Basics</h4>
+      <p>"I'd shard the users table by <code>user_id</code> using hash-based sharding. <code>user_id % N</code> where N is the number of shards. Posts would be on the same shard as their author, since <code>posts.user_id</code> is the foreign key."</p>
+
+      <p><strong>What the interviewer notices:</strong></p>
+      <ul>
+        <li><span class="text-green">Good:</span> Chose user_id (high cardinality), co-located posts with users</li>
+        <li><span class="text-red">Missing:</span> No mention of what happens when you add shards (modulo problem), no discussion of hotspots (celebrity users), no consideration of cross-shard queries (feeds from multiple users)</li>
+      </ul>
+
+      <p><strong>Upgrade tip:</strong> After stating the basic approach, immediately say: "The risk with <code>user_id % N</code> is that adding shards requires reshuffling data. I'd use consistent hashing instead to minimize data movement."</p>
+    </div>
+
+    <div class="tab-panel" id="shd-int-mid" role="tabpanel">
+      <h4>Mid-Level Answer: Trade-offs and Nuance</h4>
+      <p>"I'd shard by <code>user_id</code> with consistent hashing so we can add shards without massive data migration. Posts and comments go on the author's shard. For the news feed &mdash; which pulls posts from many users &mdash; I'd pre-compute a materialized feed per user, stored on the user's shard. This way, reading your feed is a single-shard query."</p>
+
+      <p>"For celebrity users with millions of followers, I'd handle them differently: their posts get written to a fanout service that pushes to followers' feeds asynchronously, rather than doing scatter-gather at read time."</p>
+
+      <p><strong>What the interviewer notices:</strong></p>
+      <ul>
+        <li><span class="text-green">Good:</span> Consistent hashing, fan-out-on-write for feeds, celebrity hotspot awareness</li>
+        <li><span class="text-green">Good:</span> Materialized feeds avoid cross-shard reads</li>
+        <li><span class="text-red">Missing:</span> No mention of operational concerns (monitoring, rebalancing), no discussion of the shard split procedure, no global secondary indexes</li>
+      </ul>
+    </div>
+
+    <div class="tab-panel" id="shd-int-senior" role="tabpanel">
+      <h4>Senior Answer: Full Operational Picture</h4>
+      <p>"Let me walk through the full strategy."</p>
+
+      <p><strong>Shard key:</strong> <code>user_id</code> with consistent hashing (virtual nodes for balance). Posts co-located with author. Feeds are pre-computed and stored on the follower's shard using fan-out-on-write with async workers."</p>
+
+      <p><strong>Capacity planning:</strong> 500M users / 50K writes/sec. A single PostgreSQL handles ~15K writes/sec. That's a minimum of 4 shards for writes. But I'd plan for 16 shards to give 4&times; headroom, keep each shard under 200 GB, and leave room for rebalancing without hitting capacity."</p>
+
+      <p><strong>Hotspot mitigation:</strong> Top 0.01% users (celebrities) get flagged. Their follower fan-out is rate-limited and processed by a dedicated queue, not the main write path. Shard health is monitored per-shard: if any shard's P99 exceeds 2&times; median, alert fires and we evaluate a split."</p>
+
+      <p><strong>Cross-shard concerns:</strong> Lookup by post_id needs a global index &mdash; either a small Redis mapping (post_id &rarr; shard_id) or embed shard_id in the post_id (Snowflake approach). Search and analytics go through a separate pipeline (Elasticsearch/ClickHouse), not the sharded OLTP database."</p>
+
+      <p><strong>Rebalancing plan:</strong> Using Vitess or similar proxy. When we need to split shard_03 &mdash; start VReplication to a new shard, verify data consistency, cut traffic, retire old shard. Zero downtime. Runbook documented, tested quarterly."</p>
+
+      <p><strong>What the interviewer notices:</strong></p>
+      <ul>
+        <li><span class="text-green">Excellent:</span> Complete picture &mdash; from math to monitoring to migration</li>
+        <li><span class="text-green">Excellent:</span> Quantified the capacity (15K writes/shard, 16 shards for headroom)</li>
+        <li><span class="text-green">Excellent:</span> Separated OLTP from analytics, addressed operational concerns</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 13 &mdash; EXERCISES
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="exercises">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-dumbbell"></i></div>
+    <div>
+      <div class="section-num">Section 13</div>
+      <h2 class="section-title">Practice Exercises</h2>
+    </div>
+  </div>
+
+  <p>Try these yourself before opening the solutions. The best way to internalize sharding is to work through the math and the trade-offs on your own.</p>
+
+  <!-- Exercise 1 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span class="difficulty-tag difficulty-easy">Easy</span>
+      Exercise 1: Calculate Shard Count
+    </div>
+    <p>Your e-commerce platform has <strong>500 GB</strong> of order data and handles <strong>50,000 writes/sec</strong> during peak. A single database node can comfortably handle <strong>200 GB of data</strong> and <strong>15,000 writes/sec</strong>. How many shards do you need? Which constraint is the bottleneck &mdash; storage or throughput?</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Calculate independently for each constraint: <code>ceil(500 / 200) = ?</code> for storage, <code>ceil(50000 / 15000) = ?</code> for throughput. The answer is the <em>larger</em> of the two.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Storage:</strong> 500 GB / 200 GB per node = <strong>3 shards</strong> (rounded up from 2.5).</p>
+          <p><strong>Throughput:</strong> 50,000 writes/sec / 15,000 writes/sec per node = <strong>4 shards</strong> (rounded up from 3.33).</p>
+          <p><strong>Answer: 4 shards minimum</strong>, bottlenecked by write throughput. In practice, you'd use <strong>8 shards</strong> for 2&times; headroom &mdash; because you don't want to be at 100% capacity when the next flash sale hits. Each shard: ~62.5 GB data, ~6,250 writes/sec &mdash; comfortable on standard hardware.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 2 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span class="difficulty-tag difficulty-medium">Medium</span>
+      Exercise 2: Design a Shard Key for E-Commerce
+    </div>
+    <p>Your platform has three main entities: <strong>users</strong> (80M), <strong>orders</strong> (600M), and <strong>products</strong> (2M). Users browse products and place orders. The most common queries are: (a) "show me my orders" (by user), (b) "show me this order" (by order_id), (c) "show me this product's reviews" (by product). Design the shard key. Which entities get co-located? What's the trade-off?</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Hint</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p>Think about which queries must be fast (single-shard) vs. which can tolerate scatter-gather. With 2M products and 80M users, which table is small enough to replicate everywhere?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Shard key: <code>user_id</code></strong>. Users and their orders co-locate on the same shard. Query (a) "show me my orders" is a single-shard query &mdash; fast.</p>
+          <p><strong>Products: reference table</strong>. At 2M rows (~500 MB), products are small enough to replicate to every shard. This is what Vitess calls a "reference table." Every shard has a full copy, so product lookups are always local.</p>
+          <p><strong>Query (b)</strong> "show me this order" by order_id: embed the shard_id in the order_id (Snowflake style), or maintain a small global index in Redis.</p>
+          <p><strong>Query (c)</strong> "product reviews": reviews are scattered across user shards. Options: (1) denormalize &mdash; store a reviews summary on the products reference table, (2) use a separate reviews service that aggregates from all shards, or (3) accept the scatter-gather cost since product pages are cacheable.</p>
+          <p><strong>Trade-off:</strong> Optimized for user-centric queries (most common), at the cost of cross-shard queries for product-centric aggregations (less common, cacheable).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 3 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span class="difficulty-tag difficulty-medium">Medium</span>
+      Exercise 3: Implement Consistent Hashing
+    </div>
+    <p>Implement a basic consistent hash ring in Python. Your ring should support: (a) adding a node, (b) removing a node, (c) finding which node a key maps to. Use 150 virtual nodes per physical node for balance. Test with 10,000 keys and verify that adding a 4th node to a 3-node ring only moves ~25% of keys.</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Skeleton</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">consistent_hash.py</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-bash">import hashlib, bisect
+
+class ConsistentHashRing:
+    def __init__(self, virtual_nodes=150):
+        self.virtual_nodes = virtual_nodes
+        self.ring = {}         # hash_value → node_name
+        self.sorted_keys = []  # sorted list of hash values
+
+    def _hash(self, key: str) -> int:
+        """Hash a string to a position on the ring (0 to 2^32-1)."""
+        # TODO: use hashlib.md5 or sha256, return int
+
+    def add_node(self, node: str):
+        """Add a node with virtual_nodes copies on the ring."""
+        # TODO: for each virtual node, compute hash and insert
+
+    def remove_node(self, node: str):
+        """Remove all virtual nodes for this node."""
+        # TODO: remove entries from ring and sorted_keys
+
+    def get_node(self, key: str) -> str:
+        """Find which node a key maps to."""
+        # TODO: hash the key, bisect into sorted_keys, return node
+
+# Test: add 3 nodes, hash 10K keys, add 4th node, count moves
+</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <div class="macos-window">
+            <div class="macos-titlebar">
+              <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+              <span class="macos-filename">consistent_hash_solution.py</span>
+            </div>
+            <div class="macos-body">
+<pre><code class="language-bash">import hashlib, bisect
+
+class ConsistentHashRing:
+    def __init__(self, virtual_nodes=150):
+        self.virtual_nodes = virtual_nodes
+        self.ring = {}
+        self.sorted_keys = []
+
+    def _hash(self, key: str) -> int:
+        digest = hashlib.md5(key.encode()).hexdigest()
+        return int(digest, 16) % (2**32)
+
+    def add_node(self, node: str):
+        for i in range(self.virtual_nodes):
+            vnode_key = f"{node}#vn{i}"
+            h = self._hash(vnode_key)
+            self.ring[h] = node
+            bisect.insort(self.sorted_keys, h)
+
+    def remove_node(self, node: str):
+        for i in range(self.virtual_nodes):
+            vnode_key = f"{node}#vn{i}"
+            h = self._hash(vnode_key)
+            del self.ring[h]
+            self.sorted_keys.remove(h)
+
+    def get_node(self, key: str) -> str:
+        if not self.ring:
+            return None
+        h = self._hash(key)
+        idx = bisect.bisect_right(self.sorted_keys, h)
+        if idx == len(self.sorted_keys):
+            idx = 0  # wrap around the ring
+        return self.ring[self.sorted_keys[idx]]
+
+# Test
+ring = ConsistentHashRing(virtual_nodes=150)
+for node in ["shard-0", "shard-1", "shard-2"]:
+    ring.add_node(node)
+
+# Hash 10K keys with 3 nodes
+before = {f"key-{i}": ring.get_node(f"key-{i}") for i in range(10000)}
+
+# Add 4th node
+ring.add_node("shard-3")
+after = {f"key-{i}": ring.get_node(f"key-{i}") for i in range(10000)}
+
+# Count moves
+moves = sum(1 for k in before if before[k] != after[k])
+print(f"Keys moved: {moves}/10000 = {moves/100:.1f}%")
+# Expected: ~25% (1/4 of keys move to the new node)</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 4 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span class="difficulty-tag difficulty-hard">Hard</span>
+      Exercise 4: Plan a Shard Split
+    </div>
+    <p>Shard_03 in your Vitess cluster is at <strong>90% capacity</strong> (380 GB data, 14,000 writes/sec out of a 15K max). Walk through the full Vitess <code>Reshard</code> process to split it into two shards. What's the sequence of steps? What's the risk at each stage? How do you validate data consistency before cutting over?</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Step 1: Provision new tablets.</strong> Create shard_03a and shard_03b with fresh MySQL instances. Risk: misconfiguration. Validate: <code>vtctl ListAllTablets</code> shows both as NOT_SERVING.</p>
+          <p><strong>Step 2: Start VReplication.</strong> <code>vtctl Reshard --source_shards='30-40' --target_shards='30-38,38-40' commerce.split03</code>. Vitess starts copying data from shard_03 to both new shards using binary log replication. Risk: replication lag if shard_03 is under heavy write load. Monitor with <code>vtctl VReplicationExec</code>.</p>
+          <p><strong>Step 3: Verify data consistency.</strong> Once replication catches up (lag &lt; 1 sec), run <code>vtctl VDiff commerce.split03</code>. This compares row-by-row between source and targets. Risk: false positives from in-flight writes. Run during low-traffic window.</p>
+          <p><strong>Step 4: Cut over reads.</strong> <code>vtctl SwitchReads --tablet_types=rdonly,replica commerce.split03</code>. Read traffic moves to new shards. Write traffic still goes to old shard. Risk: low (reads are idempotent). Validate: monitor P99 latency on new shards.</p>
+          <p><strong>Step 5: Cut over writes.</strong> <code>vtctl SwitchWrites commerce.split03</code>. Brief write pause (~1-2 seconds) while Vitess updates the routing. Risk: highest-risk step. Have a rollback command ready. Validate: write success rate returns to 100% within 5 seconds.</p>
+          <p><strong>Step 6: Clean up.</strong> Once satisfied, <code>vtctl Complete commerce.split03</code>. Removes old shard_03's VReplication streams and marks it for decommission.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise 5 -->
+  <div class="exercise-card">
+    <div class="exercise-card-title">
+      <span class="difficulty-tag difficulty-expert">Expert</span>
+      Exercise 5: Cross-Shard Query Strategy
+    </div>
+    <p>Your orders are sharded by <code>user_id</code> across 64 shards. The business team needs: <strong>"Find all orders from users in California placed in the last 30 days."</strong> Users don't have a <code>state</code> column on the orders table. Design a query strategy that returns results in under 500ms. Consider: where does the state data live? Can you avoid scatter-gather?</p>
+
+    <div class="collapsible">
+      <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false">
+        <span>Solution</span>
+        <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
+      </div>
+      <div class="collapsible-content">
+        <div class="collapsible-body">
+          <p><strong>Option A: Denormalize.</strong> Add <code>user_state</code> to the orders table. Now the query is: <code>SELECT * FROM orders WHERE user_state = 'CA' AND created_at > NOW() - INTERVAL '30 days'</code>. Still a scatter-gather (64 shards), but each shard query is fast (indexed on <code>user_state, created_at</code>). Expected: ~50ms per shard, ~80ms total with parallelism. Under 500ms.</p>
+          <p><strong>Option B: Pre-computed view.</strong> Maintain a separate (unsharded) table: <code>california_orders_30d</code> updated by a change data capture (CDC) pipeline. The business query hits this one table, not 64 shards. Near-instant, but adds pipeline complexity and ~30 second data staleness.</p>
+          <p><strong>Option C: Analytics sidecar.</strong> Stream all order events to ClickHouse or Elasticsearch via Kafka. The analytics query runs there, not on the OLTP shards. Best for complex queries, but adds a full analytics pipeline.</p>
+          <p><strong>Recommended:</strong> Option A for this specific query (low effort, fast enough). Option C if the business team has many ad-hoc queries. Never Option "just scatter-gather with JOINs across 64 shards" &mdash; that's the path to 2-second page loads.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 14 &mdash; CHEAT CARDS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="cheat-cards">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-rectangle-list"></i></div>
+    <div>
+      <div class="section-num">Section 14</div>
+      <h2 class="section-title">Cheat Cards &mdash; Quick Reference</h2>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-key"></i> Shard Key Rules</div>
+      <div class="cheat-card-body">
+        <pre>High cardinality (user_id, order_id)
+Even distribution (hash for balance)
+Query-aligned (most queries include it)
+Immutable (never changes after insert)
+
+Bad keys: country, status, boolean</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-calculator"></i> Capacity Math</div>
+      <div class="cheat-card-body">
+        <pre>shards_storage = ceil(total_GB / GB_per_node)
+shards_writes  = ceil(peak_wps / wps_per_node)
+shards_needed  = max(storage, writes)
+shards_actual  = shards_needed × 2  (headroom)
+
+Instagram: 1B users / 64 = 15.6M/shard</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-route"></i> Routing Strategies</div>
+      <div class="cheat-card-body">
+        <pre>Hash:      shard = hash(key) % N
+Range:     shard = lookup(key_range)
+Directory: shard = lookup_table[key]
+Consistent hash: minimal reshuffling
+
+Best for most: hash + consistent hashing</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-scale-balanced"></i> Rebalancing Tools</div>
+      <div class="cheat-card-body">
+        <pre>Vitess:   vtctl Reshard (VReplication)
+MongoDB:  balancer (auto, chunk-based)
+Citus:    rebalance_table_shards()
+Manual:   logical replication + cutover
+
+Goal: zero-downtime, &lt;1% data loss risk</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-fire"></i> Hotspot Fixes</div>
+      <div class="cheat-card-body">
+        <pre>Composite key (entity + time bucket)
+Dedicated nodes for hot shards
+Rate-limit writes to hot keys
+Shard splitting (Vitess Reshard)
+Cache hot reads (Redis in front)
+
+Discord: detect + migrate hot partitions</pre>
+      </div>
+    </div>
+
+    <div class="cheat-card">
+      <div class="cheat-card-title"><i class="fa-solid fa-circle-xmark"></i> Cross-Shard Survival</div>
+      <div class="cheat-card-body">
+        <pre>Avoid: co-locate related data
+Denormalize: duplicate for local reads
+Reference tables: small, replicated everywhere
+Global index: Redis lookup (key → shard)
+Analytics: separate pipeline (ClickHouse)
+
+2PC = last resort, Saga = eventual consistency</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SECTION 15 &mdash; CONNECTED TOPICS
+     ════════════════════════════════════════════════════════════ -->
+<div class="section" id="connected-topics">
+  <div class="section-header">
+    <div class="section-icon red"><i class="fa-solid fa-arrow-right"></i></div>
+    <div>
+      <div class="section-num">Section 15</div>
+      <h2 class="section-title">Connected Topics &mdash; Where to Go Next</h2>
+    </div>
+  </div>
+
+  <div class="related-grid">
+    <a href="../scaling-databases/index.html" class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-database"></i></div>
+      <div class="related-card-text">
+        <h4>Scaling Databases</h4>
+        <p>The full picture: vertical scaling, read replicas, connection pooling, and caching &mdash; all the things you should try before sharding. Sharding is step 5, not step 1.</p>
+      </div>
+    </a>
+    <a href="../cap-theorem/index.html" class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="related-card-text">
+        <h4>CAP Theorem</h4>
+        <p>Sharding across nodes means network partitions will happen. CAP explains why you can't have perfect consistency and availability at the same time during a partition.</p>
+      </div>
+    </a>
+    <a href="../isolation-levels/index.html" class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-lock"></i></div>
+      <div class="related-card-text">
+        <h4>Isolation Levels</h4>
+        <p>Cross-shard transactions are hard. Understanding isolation levels (Read Committed, Serializable) helps you reason about what guarantees your sharded system actually provides.</p>
+      </div>
+    </a>
+    <a href="../wal/index.html" class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-scroll"></i></div>
+      <div class="related-card-text">
+        <h4>Write-Ahead Log (WAL)</h4>
+        <p>Shard splits use logical replication under the hood, which is built on WAL. Understanding WAL helps you debug replication lag during resharding operations.</p>
+      </div>
+    </a>
+    <a href="../database-internals/index.html" class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-gears"></i></div>
+      <div class="related-card-text">
+        <h4>Database Internals</h4>
+        <p>B-trees, buffer pools, and query planners still matter within each shard. Knowing internals helps you size shards correctly and pick the right indexes for shard-local queries.</p>
+      </div>
+    </a>
+    <a href="../sql-tuning/index.html" class="related-card">
+      <div class="related-card-icon"><i class="fa-solid fa-gauge-high"></i></div>
+      <div class="related-card-text">
+        <h4>SQL Tuning</h4>
+        <p>Optimize queries within each shard first. EXPLAIN ANALYZE, proper indexing, and query rewriting can often delay sharding by months or years.</p>
+      </div>
+    </a>
+  </div>
+</div>
 
 </main>
-<footer class="footer"><p>System Guide &copy; 2025. Built for engineers who want to <em>understand</em>, not just memorize.</p></footer>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand"><i class="fa-solid fa-book-open"></i>System Guide</div>
+    <p class="footer-tagline">Master system design &mdash; from design patterns to distributed architectures</p>
+    <div class="footer-links">
+      <a href="../../../index.html"><i class="fa-solid fa-house"></i>Home</a>
+      <a href="../../index.html"><i class="fa-solid fa-cubes"></i>HLD</a>
+      <a href="https://github.com/rafik-786" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i>GitHub</a>
+      <a href="mailto:contact.rafikulalam@gmail.com"><i class="fa-solid fa-envelope"></i>Contact</a>
+    </div>
+    <div class="footer-tech">
+      <span><i class="fa-brands fa-html5"></i> HTML</span>
+      <span><i class="fa-brands fa-css3-alt"></i> CSS</span>
+      <span><i class="fa-brands fa-js"></i> Vanilla JS</span>
+      <span><i class="fa-solid fa-feather"></i> Zero deps</span>
+    </div>
+    <div class="footer-divider"></div>
+    <p class="footer-copy">&copy; 2026 Rafikul Alam. Built for learning, open for everyone.</p>
+  </div>
+</footer>
+
 <button class="back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
 <script src="../../../shared/scripts.js"></script>
 </body>
