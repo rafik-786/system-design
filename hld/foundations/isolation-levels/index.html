@@ -1194,7 +1194,8 @@ result = run_serializable(conn, book_ticket)</code></pre>
   </svg>
 
   <!-- Card 1: Pessimistic Locking -->
-  <h3 class="card-title">Pessimistic Locking &mdash; SELECT FOR UPDATE</h3>
+  <div class="card open">
+    <h3 class="card-title"><span>Pessimistic Locking &mdash; SELECT FOR UPDATE</span></h3>
   <div class="card-body">
     <p>Think of pessimistic locking as the "nuclear option." Before you even <em>read</em> a row, you tell the database: "Lock this row. Nobody else touches it until I'm done." It's called <span class="tooltip-trigger">pessimistic<span class="tooltip-content">Pessimistic because you ASSUME there will be a conflict. You lock preventively, just in case. The opposite is optimistic locking, where you assume conflicts are rare and only check at the end. Pessimistic is safer but slower; optimistic is faster but requires retry logic.</span></span> because you assume the worst &mdash; that someone else IS going to try to change this row right now &mdash; so you lock it preemptively.</p>
 
@@ -1335,9 +1336,11 @@ WHERE relation = 'tickets'::regclass;
       <strong>The throughput problem.</strong> With 10,000 concurrent users and <code>FOR UPDATE</code>, every single transaction queues up behind the one before it. If each transaction takes 5ms to complete, that's 50 seconds for all 10K users. Most of them will time out. Your flash sale becomes a flash <em>failure</em>. We need something smarter.
     </div>
   </div>
+  </div>
 
   <!-- Card 2: SKIP LOCKED -->
-  <h3 class="card-title">SKIP LOCKED &mdash; The Flash Sale Solution</h3>
+  <div class="card">
+    <h3 class="card-title"><span>SKIP LOCKED &mdash; The Flash Sale Solution</span></h3>
   <div class="card-body">
     <p>Here's where it gets clever. What if, instead of <em>waiting</em> for a locked row, you just skip it and grab the next available one? That's exactly what <span class="tooltip-trigger">SKIP LOCKED<span class="tooltip-content">A PostgreSQL clause (also supported by MySQL 8.0+ and Oracle) that tells the database: "If the row I want is already locked by another transaction, don't wait for it &mdash; just pretend it doesn't exist and move on to the next matching row." This is incredibly powerful for job queues and flash sales because workers never block each other. Added in PostgreSQL 9.5.</span></span> does. Instead of forming a queue, each user instantly grabs whichever row isn't already taken.</p>
 
@@ -1494,9 +1497,11 @@ pgbench -c 100 -j 4 -t 1 -f book_seat.sql mydb
       <strong>Real-world uses for SKIP LOCKED.</strong> It's not just for tickets. Job queues use it heavily: <code>SELECT * FROM jobs WHERE status = 'pending' LIMIT 1 FOR UPDATE SKIP LOCKED;</code> lets multiple workers pull jobs simultaneously without stepping on each other. PostgreSQL's own <code>pg_cron</code> extension uses this pattern internally.
     </div>
   </div>
+  </div>
 
   <!-- Card 3: Optimistic Locking -->
-  <h3 class="card-title">Optimistic Locking &mdash; Version Columns</h3>
+  <div class="card">
+    <h3 class="card-title"><span>Optimistic Locking &mdash; Version Columns</span></h3>
   <div class="card-body">
     <p>What if you don't want to lock anything at all? The <span class="tooltip-trigger">optimistic<span class="tooltip-content">Called "optimistic" because you assume conflicts are rare. You read the data without any lock, do your processing, and only check for conflicts when you write. If someone else modified the row in the meantime, your write fails and you retry. This works beautifully when most transactions don't actually conflict &mdash; which is the case for many real-world workloads.</span></span> approach says: "Most of the time, nobody else is touching this row. So don't bother locking. Just read the data, do your work, and when you write, <strong>check</strong> that nothing changed since you read it."</p>
 
@@ -1589,9 +1594,11 @@ WHERE id = 1 AND version = 1;
 
     <p><strong>When NOT to use it:</strong> High contention scenarios like flash sales. If 10,000 people all try to update the same product's stock at the same millisecond, optimistic locking means 9,999 of them fail and retry, then 9,998 fail and retry again &mdash; an avalanche of wasted work. For that, use pessimistic locking or SKIP LOCKED.</p>
   </div>
+  </div>
 
   <!-- Card 4: MVCC -->
-  <h3 class="card-title">MVCC &mdash; Multi-Version Concurrency Control</h3>
+  <div class="card">
+    <h3 class="card-title"><span>MVCC &mdash; Multi-Version Concurrency Control</span></h3>
   <div class="card-body">
     <p>Here's the one you don't choose &mdash; it's always running. <span class="tooltip-trigger">MVCC<span class="tooltip-content">Multi-Version Concurrency Control. The mechanism that lets readers and writers operate simultaneously without blocking each other. Instead of locking a row when someone reads it, the database keeps multiple versions of the same row. Each transaction sees the version that was current when it started (or when its statement started, depending on isolation level). Old versions are cleaned up later by VACUUM (PostgreSQL) or purge threads (MySQL/InnoDB).</span></span> is how PostgreSQL and MySQL handle concurrent access without making every read wait for every write. The core idea: every time someone updates a row, the database doesn't <em>overwrite</em> the old data. It creates a <strong>new version</strong> of the row and keeps the old one around for any transactions that still need it.</p>
 
@@ -1680,6 +1687,7 @@ WHERE relname = 'tickets';
     <div class="callout callout-info">
       <strong>Think First:</strong> If MVCC keeps old row versions around for active transactions, what happens if you have a transaction that stays open for 3 hours? (Answer: every row version created during those 3 hours is kept alive, VACUUM can't clean them, and your table bloats massively. This is called "transaction ID wraparound" and is one of the most common production PostgreSQL emergencies. Monitor <code>SELECT max(age(xmin)) FROM your_table;</code> and kill long-running transactions.)
     </div>
+  </div>
   </div>
 </div>
 
@@ -2058,7 +2066,8 @@ SELECT * FROM pg_locks WHERE locktype = 'advisory';</code></pre>
   </svg>
 
   <!-- Card 1: PostgreSQL -->
-  <h3 class="card-title">PostgreSQL &mdash; Practical and Permissive</h3>
+  <div class="card open">
+    <h3 class="card-title"><span>PostgreSQL &mdash; Practical and Permissive</span></h3>
   <div class="card-body">
     <p>PostgreSQL's approach is "be practical, not pedantic." Its headline decisions:</p>
     <ul>
@@ -2086,9 +2095,11 @@ WHERE datname = current_database();
       </div>
     </div>
   </div>
+  </div>
 
   <!-- Card 2: MySQL/InnoDB -->
-  <h3 class="card-title">MySQL / InnoDB &mdash; Safe by Default</h3>
+  <div class="card">
+    <h3 class="card-title"><span>MySQL / InnoDB &mdash; Safe by Default</span></h3>
   <div class="card-body">
     <p>MySQL made the opposite default choice from PostgreSQL, and the reasons are historical:</p>
     <ul>
@@ -2119,9 +2130,11 @@ WHERE LOCK_TYPE = 'RECORD' AND LOCK_MODE LIKE '%GAP%';</code></pre>
       </div>
     </div>
   </div>
+  </div>
 
   <!-- Card 3: SQL Server -->
-  <h3 class="card-title">SQL Server &mdash; Lock-Based with Opt-In MVCC</h3>
+  <div class="card">
+    <h3 class="card-title"><span>SQL Server &mdash; Lock-Based with Opt-In MVCC</span></h3>
   <div class="card-body">
     <p>SQL Server is the odd one out. While PostgreSQL and MySQL both use <span class="tooltip-trigger">MVCC by default<span class="tooltip-content">PostgreSQL and MySQL/InnoDB automatically use MVCC (multi-version concurrency control) so that readers don't block writers and writers don't block readers. SQL Server, by contrast, uses traditional lock-based concurrency by default: a reader requesting READ COMMITTED will place a shared lock on the row, blocking any writer until the read is done. This is simpler but causes more blocking under concurrent load.</span></span>, SQL Server uses <strong>traditional lock-based concurrency</strong>. Readers block writers and writers block readers &mdash; unless you explicitly opt in to snapshot isolation.</p>
 
@@ -2159,6 +2172,7 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
     <div class="callout callout-info">
       <strong>Think First:</strong> If SQL Server's default (lock-based READ COMMITTED) causes readers to block writers, why do so many large enterprises still use it? (Hint: predictability. Lock-based concurrency is easier to reason about &mdash; you know exactly when a lock is held and released. MVCC's snapshot behavior can lead to subtle anomalies like write skew that lock-based systems prevent naturally. For many enterprise workloads with moderate concurrency, the simplicity is worth the trade-off.)
     </div>
+  </div>
   </div>
 </div>
 
@@ -2212,7 +2226,8 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
   </svg>
 
   <!-- Card 1: Stripe -->
-  <h3 class="card-title">Stripe &mdash; SERIALIZABLE on Every Payment</h3>
+  <div class="card open">
+    <h3 class="card-title"><span>Stripe &mdash; SERIALIZABLE on Every Payment</span></h3>
   <div class="card-body">
     <p>Stripe processes hundreds of millions of dollars in payments daily. Their rule is absolute: <strong>every payment transaction runs at SERIALIZABLE</strong>. No exceptions. The reasoning is straightforward &mdash; if a race condition causes a double charge, or if a refund goes through twice, real people lose real money and Stripe loses trust.</p>
 
@@ -2222,9 +2237,11 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
       <strong>The Stripe philosophy:</strong> "We'd rather retry a transaction 3 times than explain to a customer why they were charged twice." This is the correct trade-off when <strong>correctness is worth more than throughput</strong>.
     </div>
   </div>
+  </div>
 
   <!-- Card 2: Booking.com -->
-  <h3 class="card-title">Booking.com &mdash; Optimistic Locking for Availability</h3>
+  <div class="card">
+    <h3 class="card-title"><span>Booking.com &mdash; Optimistic Locking for Availability</span></h3>
   <div class="card-body">
     <p>Booking.com's workload is the opposite of Stripe's. Millions of people search for hotels every minute, but only a tiny fraction actually click "Book Now" at the same instant for the same room. The read-to-write ratio is enormous. Pessimistic locking would be absurd here &mdash; locking a room row every time someone <em>views</em> it would grind the site to a halt.</p>
 
@@ -2232,9 +2249,11 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
 
     <p>Their retry rate? <strong>Under 0.1%</strong>. Because contention is so low (millions searching, few booking the exact same room at the exact same millisecond), conflicts almost never happen. Optimistic locking gives them maximum throughput with negligible retries.</p>
   </div>
+  </div>
 
   <!-- Card 3: Airline Check-In -->
-  <h3 class="card-title">Airline Check-In &mdash; The SKIP LOCKED Evolution</h3>
+  <div class="card">
+    <h3 class="card-title"><span>Airline Check-In &mdash; The SKIP LOCKED Evolution</span></h3>
   <div class="card-body">
     <p>This is the story <span class="tooltip-trigger">Arpit Bhayani<span class="tooltip-content">A system design educator known for deep technical breakdowns of real-world systems. His analysis of airline seat assignment using various locking strategies (from basic FOR UPDATE through SKIP LOCKED) is one of the most referenced examples in the database concurrency space. He benchmarked each iteration and showed the progression from 1.7 seconds to 147 milliseconds.</span></span> documented &mdash; six iterations of the same seat-assignment problem, each faster than the last:</p>
 
@@ -2291,9 +2310,11 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
 
     <p>The jump from iteration 3 to iteration 5 &mdash; from 1.7 seconds to 147 milliseconds &mdash; came from adding two words: <code>SKIP LOCKED</code>. That's a <strong>10&times; improvement</strong> for a two-word code change. It's one of the best performance-per-character ratios you'll ever see.</p>
   </div>
+  </div>
 
   <!-- Card 4: Discord -->
-  <h3 class="card-title">Discord &mdash; READ COMMITTED Is Fine for Chat</h3>
+  <div class="card">
+    <h3 class="card-title"><span>Discord &mdash; READ COMMITTED Is Fine for Chat</span></h3>
   <div class="card-body">
     <p>Not every system needs strong isolation. Discord runs PostgreSQL with <strong>READ COMMITTED</strong> for their message storage. A chat message appearing 100 milliseconds late? Nobody notices. A message briefly showing an old edit before the new one? Doesn't matter. The correctness bar for a chat app is fundamentally different from a payment system.</p>
 
@@ -2302,6 +2323,7 @@ ALTER DATABASE mydb SET READ_COMMITTED_SNAPSHOT ON;
     <div class="callout callout-warning">
       <strong>The lesson from all four:</strong> There's no "best" isolation level. Stripe needs SERIALIZABLE because money. Booking.com needs optimistic locking because reads dominate. Airlines need SKIP LOCKED because high concurrency on individual items. Discord needs READ COMMITTED because speed matters more than perfect ordering. <strong>The right choice depends on what happens when you get it wrong.</strong> If "getting it wrong" means charging someone twice, go heavy. If it means showing a stale chat message, go light.
     </div>
+  </div>
   </div>
 </div>
 
