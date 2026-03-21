@@ -42,22 +42,39 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ----------------------------------------------------------
-   *  2. Code block click-to-scroll (event delegation)
+   *  2. Code block click-to-scroll
+   *      Click inside = scroll code. Click outside = scroll page.
    * -------------------------------------------------------- */
   var activeBlock = null;
-  document.addEventListener('click', (e) => {
-    const body = e.target.closest('.macos-body');
-    if (body) {
-      if (activeBlock && activeBlock !== body) activeBlock.classList.remove('scroll-active');
-      body.classList.add('scroll-active');
-      activeBlock = body;
+  document.addEventListener('click', function(e) {
+    var pre = e.target.closest('.macos-body pre');
+    if (pre) {
+      if (activeBlock && activeBlock !== pre) activeBlock.classList.remove('scroll-active');
+      pre.classList.add('scroll-active');
+      activeBlock = pre;
     } else {
       if (activeBlock) { activeBlock.classList.remove('scroll-active'); activeBlock = null; }
     }
   });
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && activeBlock) { activeBlock.classList.remove('scroll-active'); activeBlock = null; }
   });
+
+  /* Wheel: active code block traps all scroll. Not active = page scrolls. */
+  document.addEventListener('wheel', function(e) {
+    var pre = e.target.closest('.macos-body pre');
+    if (!pre) return;
+
+    if (pre !== activeBlock) {
+      e.preventDefault();
+      window.scrollBy(0, e.deltaY);
+      return;
+    }
+
+    // Active — trap scroll inside code block
+    e.preventDefault();
+    pre.scrollTop += e.deltaY;
+  }, { passive: false });
 
   /* ----------------------------------------------------------
    *  3. Fullscreen Toggle
@@ -1519,14 +1536,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * ========================================================== */
   reinit();
 
-  /* -- Wheel intercept: single document-level listener (survives SPA navigation) -- */
-  document.addEventListener('wheel', function(e) {
-    var body = e.target.closest('.macos-body');
-    if (body && body !== activeBlock) {
-      e.preventDefault();
-      window.scrollBy(0, e.deltaY);
-    }
-  }, { passive: false });
+  /* -- Wheel intercept removed: macos-body uses overflow:auto natively -- */
 
   /* ==========================================================
    *  SECTION E — INTERACTIVE COMPONENTS
