@@ -927,6 +927,90 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ----------------------------------------------------------
+   *  Interactive Tradeoff Slider
+   *  Reads snap points from data-snaps JSON, renders dots + handle,
+   *  snaps on click/drag, updates info panel.
+   * -------------------------------------------------------- */
+  function initTradeoffSliders() {
+    document.querySelectorAll('.tradeoff-slider[data-snaps]').forEach(function(slider) {
+      if (slider.dataset.initSlider) return;
+      slider.dataset.initSlider = '1';
+
+      var snaps = JSON.parse(slider.dataset.snaps);
+      var track = slider.querySelector('.tradeoff-track');
+      var handle = slider.querySelector('.tradeoff-handle');
+      var dotsContainer = slider.querySelector('.tradeoff-snap-dots');
+      var infoName = slider.querySelector('.tradeoff-info-name');
+      var infoDesc = slider.querySelector('.tradeoff-info-desc');
+      if (!track || !handle || !snaps.length) return;
+
+      // Render snap dots
+      snaps.forEach(function(snap, i) {
+        var dot = document.createElement('div');
+        dot.className = 'tradeoff-snap-dot';
+        dot.style.left = snap.pos + '%';
+        dot.dataset.index = i;
+        dotsContainer.appendChild(dot);
+      });
+      var dots = dotsContainer.querySelectorAll('.tradeoff-snap-dot');
+
+      function snapTo(index) {
+        var snap = snaps[index];
+        handle.style.left = snap.pos + '%';
+        infoName.textContent = snap.name;
+        infoDesc.textContent = snap.desc;
+        dots.forEach(function(d, j) { d.classList.toggle('active', j === index); });
+        // Color the info border to match position on gradient
+        var hue = 220 - (snap.pos / 100) * 200; // blue→red
+        slider.querySelector('.tradeoff-info').style.borderColor = 'hsla(' + hue + ', 70%, 55%, 0.25)';
+      }
+
+      // Click on track to snap
+      track.addEventListener('click', function(e) {
+        var rect = track.getBoundingClientRect();
+        var pct = ((e.clientX - rect.left) / rect.width) * 100;
+        var closest = 0, minDist = Infinity;
+        snaps.forEach(function(s, i) {
+          var d = Math.abs(s.pos - pct);
+          if (d < minDist) { minDist = d; closest = i; }
+        });
+        snapTo(closest);
+      });
+
+      // Drag handle
+      var dragging = false;
+      handle.addEventListener('mousedown', function(e) { dragging = true; handle.classList.add('dragging'); e.preventDefault(); });
+      handle.addEventListener('touchstart', function(e) { dragging = true; handle.classList.add('dragging'); }, { passive: true });
+
+      function onMove(clientX) {
+        if (!dragging) return;
+        var rect = track.getBoundingClientRect();
+        var pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+        handle.style.left = pct + '%';
+      }
+      function onEnd() {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        var current = parseFloat(handle.style.left);
+        var closest = 0, minDist = Infinity;
+        snaps.forEach(function(s, i) {
+          var d = Math.abs(s.pos - current);
+          if (d < minDist) { minDist = d; closest = i; }
+        });
+        snapTo(closest);
+      }
+      document.addEventListener('mousemove', function(e) { onMove(e.clientX); });
+      document.addEventListener('touchmove', function(e) { if (dragging) onMove(e.touches[0].clientX); }, { passive: true });
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchend', onEnd);
+
+      // Initialize at first snap
+      snapTo(0);
+    });
+  }
+
+  /* ----------------------------------------------------------
    *  Semantic icon colors — auto-color FA icons by class name.
    *  Runs on every reinit so dynamically added icons get colored.
    * -------------------------------------------------------- */
@@ -1064,6 +1148,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -- Convert rich tooltips to use existing positioning system -- */
     initRichTooltips();
+
+    /* -- Interactive tradeoff sliders -- */
+    initTradeoffSliders();
 
     /* -- Line numbers (skip terminal blocks only) -- */
     document.querySelectorAll('pre code').forEach(function(block) {
