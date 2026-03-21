@@ -1003,6 +1003,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.card-title, .collapsible-header span').forEach(function(el) {
       if (el.dataset.badged) return;
       el.dataset.badged = '1';
+      /* Find the semantic icon (skip chevrons which are structural) */
+      var icon = el.querySelector('i.fa-solid:not(.fa-chevron-right):not(.fa-chevron-down), i.fas:not(.fa-chevron-right):not(.fa-chevron-down)');
       var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
       var node;
       while ((node = walker.nextNode())) {
@@ -1014,7 +1016,13 @@ document.addEventListener('DOMContentLoaded', () => {
             var before = document.createTextNode(m[1]);
             var badge = document.createElement('span');
             badge.className = 'title-badge title-badge--' + badgeTypes[keyword];
-            badge.textContent = m[2] + ' ' + m[3];
+            /* Move icon inside the badge if it exists */
+            if (icon) {
+              badge.appendChild(icon);
+              badge.appendChild(document.createTextNode(' ' + m[2] + ' ' + m[3]));
+            } else {
+              badge.textContent = m[2] + ' ' + m[3];
+            }
             var after = document.createTextNode(m[4]);
             var parent = node.parentNode;
             parent.insertBefore(before, node);
