@@ -927,6 +927,115 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ----------------------------------------------------------
+   *  Sequence Diagram Builder
+   *  Reads data-participants and .seq-msg elements, renders
+   *  participant boxes, dashed lifelines, and arrow rows.
+   * -------------------------------------------------------- */
+  function initSequenceDiagrams() {
+    document.querySelectorAll('.sequence-diagram[data-participants]').forEach(function(diagram) {
+      if (diagram.dataset.seqBuilt) return;
+      diagram.dataset.seqBuilt = '1';
+
+      var names = diagram.dataset.participants.split(',').map(function(s) { return s.trim(); });
+      var msgs = diagram.querySelectorAll('.seq-msg');
+      var count = names.length;
+      var ROW_H = 44; // px per message row
+
+      // Build header
+      var header = document.createElement('div');
+      header.className = 'seq-header';
+      names.forEach(function(name) {
+        var p = document.createElement('div');
+        p.className = 'seq-participant';
+        p.textContent = name;
+        header.appendChild(p);
+      });
+      diagram.insertBefore(header, diagram.firstChild);
+
+      // Build body with lifelines
+      var body = document.createElement('div');
+      body.className = 'seq-body';
+      body.style.height = (msgs.length * ROW_H + 16) + 'px';
+      body.style.marginTop = '0';
+
+      names.forEach(function() {
+        var ll = document.createElement('div');
+        ll.className = 'seq-lifeline';
+        ll.style.height = '100%';
+        body.appendChild(ll);
+      });
+
+      // Calculate lifeline positions (center of each participant column)
+      diagram.appendChild(body);
+
+      // After layout, get positions
+      requestAnimationFrame(function() {
+        var bodyRect = body.getBoundingClientRect();
+        var lifelines = body.querySelectorAll('.seq-lifeline');
+        var headerParts = header.querySelectorAll('.seq-participant');
+        var centers = [];
+
+        headerParts.forEach(function(p) {
+          var r = p.getBoundingClientRect();
+          centers.push(r.left + r.width / 2 - bodyRect.left);
+        });
+
+        // Position lifelines
+        lifelines.forEach(function(ll, i) {
+          ll.style.position = 'absolute';
+          ll.style.left = centers[i] + 'px';
+        });
+
+        // Render message arrows
+        msgs.forEach(function(msg, i) {
+          var from = parseInt(msg.dataset.from);
+          var to = parseInt(msg.dataset.to);
+          var label = msg.dataset.label;
+          var time = msg.dataset.time;
+          var isResp = msg.classList.contains('resp');
+
+          var row = document.createElement('div');
+          row.className = 'seq-row';
+          row.style.top = (i * ROW_H + 8) + 'px';
+
+          var line = document.createElement('div');
+          line.className = 'seq-arrow-line ' + (isResp ? 'resp' : 'req');
+
+          var leftCenter = Math.min(centers[from], centers[to]);
+          var rightCenter = Math.max(centers[from], centers[to]);
+          line.style.left = leftCenter + 'px';
+          line.style.width = (rightCenter - leftCenter) + 'px';
+
+          if (from < to) {
+            line.classList.add('arrow-right');
+          } else {
+            line.classList.add('arrow-left');
+          }
+
+          // Label
+          var lbl = document.createElement('span');
+          lbl.className = 'seq-msg-label';
+          lbl.textContent = label;
+          lbl.style.left = ((rightCenter - leftCenter) / 2 - 20) + 'px';
+          line.appendChild(lbl);
+
+          // Time
+          if (time) {
+            var tm = document.createElement('span');
+            tm.className = 'seq-msg-time';
+            tm.textContent = time;
+            tm.style.left = ((rightCenter - leftCenter) / 2 - 10) + 'px';
+            line.appendChild(tm);
+          }
+
+          row.appendChild(line);
+          body.appendChild(row);
+        });
+      });
+    });
+  }
+
+  /* ----------------------------------------------------------
    *  Interactive Tradeoff Slider
    *  Reads snap points from data-snaps JSON, renders dots + handle,
    *  snaps on click/drag, updates info panel.
@@ -1151,6 +1260,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -- Interactive tradeoff sliders -- */
     initTradeoffSliders();
+
+    /* -- Sequence diagrams -- */
+    initSequenceDiagrams();
 
     /* -- Line numbers (skip terminal blocks only) -- */
     document.querySelectorAll('pre code').forEach(function(block) {

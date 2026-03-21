@@ -4976,83 +4976,105 @@ body.has-sidebar .footer { margin-left: 260px; }
 
 /* ----------------------------------------------------------
    B1-6. Protocol Sequence Diagram (.sequence-diagram)
+   Built by JS: reads data-participants + .seq-msg elements,
+   renders participant boxes, lifelines, and arrow rows.
    ---------------------------------------------------------- */
 .sequence-diagram {
   margin: var(--space-6) 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 1.25rem;
+  overflow-x: auto;
 }
-.seq-participants {
+/* Participant header row */
+.seq-header {
   display: flex;
-  justify-content: space-between;
-  padding: var(--space-4);
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-color);
+  justify-content: space-around;
+  margin-bottom: 0;
   position: relative;
 }
 .seq-participant {
-  flex: 0 0 auto;
-  padding: var(--space-2) var(--space-4);
-  background: var(--bg-primary);
-  border: 2px solid var(--accent-primary);
-  border-radius: var(--radius-sm);
+  padding: 0.4rem 1rem;
+  background: rgba(var(--accent-primary-rgb), 0.08);
+  border: 1.5px solid rgba(var(--accent-primary-rgb), 0.3);
+  border-radius: 6px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-primary);
   text-align: center;
-  min-width: 80px;
-  z-index: 1;
+  min-width: 70px;
+  z-index: 2;
+  position: relative;
 }
-/* Lifelines rendered as pseudo-elements on the participant row */
-.seq-participants::after {
-  content: '';
+/* Lifeline container */
+.seq-body {
+  display: flex;
+  justify-content: space-around;
+  position: relative;
+}
+.seq-lifeline {
+  width: 1.5px;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 4px, transparent 4px, transparent 8px);
+  flex-shrink: 0;
+}
+/* Message row — positioned over lifelines */
+.seq-row {
   position: absolute;
-  bottom: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: transparent;
-}
-/* Messages area */
-.seq-messages {
-  padding: var(--space-2) var(--space-4);
-}
-.seq-message {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
   align-items: center;
-  padding: var(--space-2) var(--space-4);
-  border-bottom: 1px solid rgba(var(--accent-primary-rgb), 0.07);
-  transition: background 0.15s ease;
+  height: 2.4rem;
 }
-.seq-message:hover {
-  background: rgba(var(--accent-primary-rgb), 0.04);
+.seq-arrow-line {
+  position: absolute;
+  height: 2px;
+  top: 50%;
+  transform: translateY(-50%);
 }
-.seq-message:last-child { border-bottom: none; }
-.seq-message--right .seq-arrow { color: var(--accent-blue); }
-.seq-message--left  .seq-arrow { color: var(--accent-green); }
-.seq-arrow {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-right: var(--space-2);
+.seq-arrow-line.req { background: #3b82f6; }
+.seq-arrow-line.resp { background: #34d399; }
+/* Arrowhead */
+.seq-arrow-line::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  transform: translateY(-50%);
 }
-.seq-label {
+.seq-arrow-line.arrow-right::after { right: -1px; border-left: 7px solid; border-left-color: inherit; }
+.seq-arrow-line.arrow-left::after { left: -1px; border-right: 7px solid; border-right-color: inherit; }
+/* Label on arrow */
+.seq-msg-label {
+  position: absolute;
+  top: -1rem;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--text-primary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: var(--bg-primary);
+  z-index: 3;
 }
-.seq-time {
-  font-size: 0.75rem;
+.seq-arrow-line.req .seq-msg-label { color: #60a5fa; }
+.seq-arrow-line.resp .seq-msg-label { color: #6ee7b7; }
+/* Time badge */
+.seq-msg-time {
+  position: absolute;
+  top: 1rem;
+  font-size: 0.62rem;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  justify-self: end;
+  z-index: 3;
 }
-/* Message direction indicator */
-.seq-message--right {
-  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.04));
-}
+/* Hide the source elements (JS reads them) */
+.seq-flow { display: none; }
+/* Old classes hidden */
+.seq-participants, .seq-messages { display: none; }
 .seq-message--left {
   background: linear-gradient(270deg, transparent, rgba(16, 185, 129, 0.04));
 }
