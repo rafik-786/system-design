@@ -935,7 +935,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'fa-skull-crossbones':     '#fbbf24',   /* amber */
     'fa-triangle-exclamation': '#fbbf24',   /* amber */
     'fa-exclamation-triangle': '#fbbf24',   /* amber (legacy) */
-    'fa-circle-exclamation':   '#fbbf24',   /* amber */
+    'fa-circle-exclamation':   '#fb923c',   /* orange */
     'fa-lightbulb':            '#facc15',   /* yellow */
     'fa-code':                 '#60a5fa',   /* blue */
     'fa-gear':                 '#a78bfa',   /* purple */

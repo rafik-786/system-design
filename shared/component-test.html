@@ -145,16 +145,16 @@ public async Task&lt;NpgsqlConnection&gt; GetConnectionAsync(CancellationToken c
   <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> <i class="fa-solid fa-circle-exclamation"></i> Pitfall 1 Using <code>SELECT *</code> on Wide Tables</span></div>
   <div class="collapsible-content"><div class="collapsible-body">
 
-    <div class="callout-danger">Fetching all 47 columns when the API only needs <code>id</code>, <code>name</code>, and <code>email</code>. Each row is 2.4 KB instead of 96 bytes &mdash; 25&times; more data over the wire. At 10K rows, that's 23 MB vs 940 KB.</div>
-    <div class="callout-success">Always project only the columns you need: <code>SELECT id, name, email FROM users</code>.</div>
+    <p>Fetching all 47 columns when the API only needs <code>id</code>, <code>name</code>, and <code>email</code>. Each row is 2.4 KB instead of 96 bytes &mdash; 25&times; more data over the wire. At 10K rows, that's 23 MB vs 940 KB.</p>
+    <p>Fix &rarr; <code>SELECT id, name, email FROM users</code></p>
   </div></div>
 </div>
 <div class="collapsible">
   <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> <i class="fa-solid fa-circle-exclamation"></i> Pitfall 2 Missing Index on Foreign Key</span></div>
   <div class="collapsible-content"><div class="collapsible-body">
 
-    <div class="callout-danger">PostgreSQL doesn't auto-create indexes on foreign keys (unlike MySQL). A <code>JOIN</code> on <code>orders.user_id</code> does a sequential scan on 5M rows &mdash; 850ms per query.</div>
-    <div class="callout-success"><code>CREATE INDEX idx_orders_user_id ON orders(user_id);</code> &mdash; drops query time to 2ms.</div>
+    <p>PostgreSQL doesn't auto-create indexes on foreign keys (unlike MySQL). A <code>JOIN</code> on <code>orders.user_id</code> does a sequential scan on 5M rows &mdash; 850ms per query.</p>
+    <p>Fix &rarr; <code>CREATE INDEX idx_orders_user_id ON orders(user_id);</code> drops it to 2ms.</p>
   </div></div>
 </div>
 
@@ -221,16 +221,39 @@ public void CalculateTotal_WithOverflow_ThrowsOverflowException()
 <div class="math-block">
   <div class="math-label">Back-of-Envelope Calculation</div>
   <p>QPS = 10M DAU &times; 20 req/user / 86,400 sec &asymp; 2,315 QPS</p>
-  <div class="math-result">Peak QPS (2&times;) &asymp; 4,630</div>
+  <p>Storage = 2,315 QPS &times; 2 KB avg &times; 86,400 sec &asymp; 400 GB/day</p>
+  <p>Bandwidth = 2,315 QPS &times; 2 KB &asymp; 4.6 MB/s</p>
+  <p>5-year storage = 400 GB &times; 365 &times; 5 &asymp; 730 TB</p>
+  <div class="math-result">Peak QPS (2&times;) &asymp; 4,630 &nbsp;|&nbsp; Storage: 730 TB over 5 years &nbsp;|&nbsp; Bandwidth: 4.6 MB/s</div>
 </div>
 
 <!-- 7. macOS Window -->
 <h2>7a. Terminal Window</h2>
-<pre data-file="~/projects/api — bash" data-terminal>~/projects/api $ curl -X GET http://api.example.com/users/42
-{"id": 42, "name": "Alice", "role": "admin"}
+<pre data-file="~/projects/api — bash" data-terminal>~/projects/api $ curl -s http://api.example.com/users/42 | jq .
+{
+  "id": 42,
+  "name": "Alice",
+  "email": "alice@example.com",
+  "role": "admin",
+  "created_at": "2024-01-15T09:23:00Z"
+}
 
-~/projects/api $ echo $?
-0</pre>
+~/projects/api $ curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" http://api.example.com/users/42
+200 0.043s
+
+~/projects/api $ redis-cli INFO stats | grep instantaneous_ops
+instantaneous_ops_per_sec:4231
+
+~/projects/api $ psql -c "SELECT count(*) FROM users WHERE last_login > now() - interval '24h';"
+ count
+-------
+ 84291
+(1 row)
+
+~/projects/api $ docker stats --no-stream --format "{{.Name}}: {{.CPUPerc}} / {{.MemUsage}}"
+api-server: 23.4% / 512MiB / 2GiB
+postgres: 67.1% / 1.8GiB / 4GiB
+redis: 4.2% / 892MiB / 2GiB</pre>
 
 <!-- 7b. Code Window (auto-built from pre[data-file]) -->
 <h2>7b. Code Window</h2>
