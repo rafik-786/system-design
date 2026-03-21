@@ -362,12 +362,29 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ----------------------------------------------------------
+   *  10b. Auto-create tooltip-content from data-tooltip attribute
+   * -------------------------------------------------------- */
+  function initDataTooltips() {
+    document.querySelectorAll('.tooltip-trigger[data-tooltip]').forEach(function(trigger) {
+      if (trigger.querySelector('.tooltip-content')) return;
+      var text = trigger.getAttribute('data-tooltip');
+      if (!text) return;
+      var el = document.createElement('span');
+      el.className = 'tooltip-content';
+      el.textContent = text;
+      trigger.appendChild(el);
+    });
+  }
+
+  /* ----------------------------------------------------------
    *  11. Tooltip Smart Positioning (event delegation)
    *      Uses position:fixed to escape overflow:auto containers.
    * -------------------------------------------------------- */
   function positionTooltip(trigger, content) {
     // 1. Capture trigger rect BEFORE moving anything
-    var rect = trigger.getBoundingClientRect();
+    //    Use getClientRects() to handle inline text wrapping across lines
+    var rects = trigger.getClientRects();
+    var rect = (rects && rects.length > 0) ? rects[0] : trigger.getBoundingClientRect();
 
     // 2. Move tooltip to <body> so position:fixed escapes ALL transformed ancestors
     //    (CSS transforms create a new containing block, breaking fixed positioning)
@@ -394,9 +411,13 @@ document.addEventListener('DOMContentLoaded', () => {
     var left = rect.left + rect.width / 2 - tipW / 2;
     var top = rect.top - tipH - 10;
 
-    // Flip below if overflowing top
+    // Flip below if overflowing top — use last rect for bottom position
     var below = false;
-    if (top < 8) { top = rect.bottom + 10; below = true; }
+    if (top < 8) {
+      var lastRect = (rects && rects.length > 1) ? rects[rects.length - 1] : rect;
+      top = lastRect.bottom + 10;
+      below = true;
+    }
     // Shift horizontally if overflowing edges
     if (left < 8) left = 8;
     if (left + tipW > window.innerWidth - 8) left = window.innerWidth - 8 - tipW;
@@ -688,15 +709,233 @@ document.addEventListener('DOMContentLoaded', () => {
   var currentRevealObserver = null;
   var currentSidebarScrollHandler = null;
 
+  /* ----------------------------------------------------------
+   *  Terminal Colorizer — auto-highlight shell tokens
+   *  inside .macos-body pre code blocks.
+   * -------------------------------------------------------- */
+  function colorizeTerminals() {
+    document.querySelectorAll('.macos-window.terminal .macos-body pre code').forEach(function(block) {
+      if (block.dataset.colorized) return;
+      block.dataset.colorized = 'true';
+      var raw = block.textContent;
+      var lines = raw.split('\n');
+      var html = lines.map(function(line) {
+        var trimmed = line.trim();
+        if (!trimmed) return '<div class="term-line">&nbsp;</div>';
+        var dollarIdx = line.indexOf('$ ');
+        if (dollarIdx > -1) {
+          var path = line.substring(0, dollarIdx).replace(/^\s+/, '');
+          var afterPrompt = line.substring(dollarIdx + 2);
+          var tokens = afterPrompt.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+          var cmd = tokens[0] || '';
+          var args = tokens.slice(1).map(function(a) {
+            if (/^-/.test(a)) return '<span class="t-flag">' + a + '</span>';
+            if (/^https?:\/\//.test(a)) return '<span class="t-url">' + a + '</span>';
+            if (/^["']/.test(a)) return '<span class="t-string">' + a + '</span>';
+            if (/^\$/.test(a)) return '<span class="t-param">' + a + '</span>';
+            if (/^\d+(\.\d+)?$/.test(a)) return '<span class="t-number">' + a + '</span>';
+            return '<span class="t-param">' + a + '</span>';
+          }).join(' ');
+          return '<div class="term-line">'
+            + (path ? '<span class="t-path">' + path + '</span> ' : '')
+            + '<span class="t-prompt">$</span> '
+            + '<span class="t-cmd">' + cmd + '</span>'
+            + (args ? ' ' + args : '')
+            + '</div>';
+        }
+        if (trimmed.startsWith('#')) return '<div class="term-line"><span class="t-comment">' + line + '</span></div>';
+        return '<div class="term-line term-output">' + line + '</div>';
+      }).join('');
+      block.innerHTML = html;
+    });
+  }
+
+  /* ----------------------------------------------------------
+   *  Custom Syntax Highlighter — token-based, no third-party
+   *  Processes text character by character to avoid regex bugs.
+   * -------------------------------------------------------- */
+  var SY_KEYWORDS = /^(abstract|as|async|await|base|bool|break|byte|case|catch|char|class|const|continue|decimal|default|delegate|do|double|else|enum|event|extern|false|finally|fixed|float|for|foreach|goto|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|var|virtual|void|volatile|while|yield|let|function|export|import|from|extends|implements|def|elif|except|raise|with|lambda|pass|self|True|False|None|func|go|chan|defer|select|range|type|fallthrough|SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TABLE|INDEX|INTO|VALUES|SET|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|AND|OR|NOT|IN|EXISTS|BETWEEN|LIKE|IS|NULL|AS|DISTINCT|COUNT|SUM|AVG|MAX|MIN|UNION|ALL)$/;
+
+  function tokenizeLine(line) {
+    var out = '';
+    var i = 0;
+    var len = line.length;
+
+    function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    while (i < len) {
+      var ch = line[i];
+
+      // 1. Single-line comment: //
+      if (ch === '/' && line[i+1] === '/') {
+        out += '<span class="sy-cmt">' + esc(line.slice(i)) + '</span>';
+        return out;
+      }
+
+      // 2. String: " or ' or ` (handles escape chars)
+      if (ch === '"' || ch === "'" || ch === '`') {
+        var q = ch;
+        // C# interpolated: $" or $@"
+        var prefix = '';
+        if (i > 0 && line[i-1] === '$') {
+          prefix = '';  // $ already emitted
+        }
+        var j = i + 1;
+        while (j < len && line[j] !== q) {
+          if (line[j] === '\\') j++; // skip escaped char
+          j++;
+        }
+        j++; // include closing quote
+        out += '<span class="sy-str">' + esc(line.slice(i, j)) + '</span>';
+        i = j;
+        continue;
+      }
+
+      // 3. Number
+      if ((ch >= '0' && ch <= '9') && (i === 0 || !/[\w]/.test(line[i-1]))) {
+        var j = i;
+        while (j < len && /[\d.xXa-fA-FbBoO_]/.test(line[j])) j++;
+        if (j < len && /[fFdDmMlL]/.test(line[j])) j++;
+        out += '<span class="sy-num">' + esc(line.slice(i, j)) + '</span>';
+        i = j;
+        continue;
+      }
+
+      // 4. Word (identifier / keyword / type)
+      if (/[a-zA-Z_$@]/.test(ch)) {
+        // Attribute: [Word] or @word
+        if (ch === '[') {
+          var j = line.indexOf(']', i);
+          if (j !== -1) {
+            out += '<span class="sy-attr">' + esc(line.slice(i, j+1)) + '</span>';
+            i = j + 1;
+            continue;
+          }
+        }
+        if (ch === '@') {
+          var j = i + 1;
+          while (j < len && /[\w]/.test(line[j])) j++;
+          out += '<span class="sy-attr">' + esc(line.slice(i, j)) + '</span>';
+          i = j;
+          continue;
+        }
+
+        var j = i;
+        while (j < len && /[\w$]/.test(line[j])) j++;
+        var word = line.slice(i, j);
+
+        // Check if followed by ( — it's a function call
+        var rest = line.slice(j);
+        var isCall = /^\s*\(/.test(rest) && !SY_KEYWORDS.test(word);
+
+        if (SY_KEYWORDS.test(word)) {
+          out += '<span class="sy-kw">' + esc(word) + '</span>';
+        } else if (isCall) {
+          out += '<span class="sy-fn">' + esc(word) + '</span>';
+        } else if (/^[A-Z]/.test(word) && word.length > 1) {
+          out += '<span class="sy-type">' + esc(word) + '</span>';
+        } else {
+          out += esc(word);
+        }
+        i = j;
+        continue;
+      }
+
+      // 5. Attribute: [Something]
+      if (ch === '[') {
+        var j = line.indexOf(']', i);
+        if (j !== -1 && j - i < 60 && /^\[\w/.test(line.slice(i))) {
+          out += '<span class="sy-attr">' + esc(line.slice(i, j+1)) + '</span>';
+          i = j + 1;
+          continue;
+        }
+      }
+
+      // Default: emit character
+      out += esc(ch);
+      i++;
+    }
+    return out;
+  }
+
+  function colorizeCode() {
+    document.querySelectorAll('.macos-window:not(.terminal) .macos-body pre code').forEach(function(block) {
+      if (block.dataset.highlighted) return;
+      block.dataset.highlighted = 'true';
+
+      var text = block.textContent;
+      var lines = text.split('\n');
+      if (lines.length > 0 && lines[lines.length-1].trim() === '') lines.pop();
+
+      var html = lines.map(function(line, i) {
+        return '<span class="code-line"><span class="line-num">' + (i + 1) + '</span>' + tokenizeLine(line) + '</span>';
+      }).join('\n');
+
+      block.innerHTML = html;
+    });
+  }
+
+  /* ----------------------------------------------------------
+   *  Auto-build code window from <pre data-file="Name.cs">
+   *  Just write: <pre data-file="UserService.cs">code here</pre>
+   *  JS builds the full macOS window with titlebar, dots, etc.
+   * -------------------------------------------------------- */
+  function buildCodeWindows() {
+    document.querySelectorAll('pre[data-file]').forEach(function(pre) {
+      if (pre.dataset.built) return;
+      pre.dataset.built = 'true';
+
+      var filename = pre.getAttribute('data-file');
+      var isTerminal = pre.hasAttribute('data-terminal');
+      var code = pre.textContent;
+
+      var win = document.createElement('div');
+      win.className = 'macos-window' + (isTerminal ? ' terminal' : '');
+
+      // Titlebar
+      win.innerHTML =
+        '<div class="macos-titlebar">' +
+          '<div class="dot dot-red"></div>' +
+          '<div class="dot dot-yellow"></div>' +
+          '<div class="dot dot-green"></div>' +
+          '<span class="macos-filename">' + filename + '</span>' +
+        '</div>' +
+        '<div class="macos-body"><pre><code>' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre></div>';
+
+      pre.parentNode.replaceChild(win, pre);
+    });
+  }
+
   function reinit() {
-    /* -- Highlight.js -- */
+    /* -- Prevent hljs from touching terminal blocks (not code windows) -- */
+    document.querySelectorAll('.macos-window.terminal .macos-body pre code').forEach(function(el) {
+      el.classList.add('nohighlight');
+    });
+
+    /* -- Highlight.js (if loaded — backward compat) -- */
     if (typeof hljs !== 'undefined') {
       hljs.highlightAll();
     }
 
-    /* -- Line numbers -- */
-    document.querySelectorAll('.macos-body pre code').forEach(function(block) {
-      // Skip if already has line numbers
+    /* -- Auto-build code windows from <pre data-file="..."> -- */
+    buildCodeWindows();
+
+    /* -- Terminal colorizer -- */
+    colorizeTerminals();
+
+    /* -- Custom syntax highlighter for code windows -- */
+    colorizeCode();
+
+    /* -- Auto-create tooltips from data-tooltip -- */
+    initDataTooltips();
+
+    /* -- Convert rich tooltips to use existing positioning system -- */
+    initRichTooltips();
+
+    /* -- Line numbers (skip terminal blocks only) -- */
+    document.querySelectorAll('pre code').forEach(function(block) {
+      // Skip terminal blocks (not code windows) and already-processed blocks
+      if (block.closest('.macos-window.terminal')) return;
       if (block.querySelector('.code-line')) return;
       var lines = block.innerHTML.split('\n');
       if (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
@@ -1376,8 +1615,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reveal explanation
     var explanation = check.querySelector('.kc-explanation');
     if (explanation) {
-      explanation.style.display = 'block';
-      explanation.classList.add('visible');
+      explanation.classList.add('kc-visible');
     }
   });
 
@@ -1469,63 +1707,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ----------------------------------------------------------
-   *  E7. Rich Tooltips — show on hover/focus, hide on out/blur
-   *      Positioned below trigger, clamped to viewport.
+   *  E7. Rich Tooltips — convert to tooltip-trigger system
+   *      on init so they use the existing smart positioning.
    * -------------------------------------------------------- */
-  (function() {
-    function showRichTooltip(trigger) {
-      var content = trigger.querySelector('.tooltip-rich-content');
-      if (!content) return;
-
-      content.style.display = 'block';
-
-      // Position below trigger, centered
-      var trigRect = trigger.getBoundingClientRect();
-      var tipRect = content.getBoundingClientRect();
-
-      var left = (trigger.offsetWidth / 2) - (tipRect.width / 2);
-      var top = trigger.offsetHeight + 8;
-
-      // Clamp to viewport edges
-      var absLeft = trigRect.left + left;
-      if (absLeft < 8) left -= (absLeft - 8);
-      if (absLeft + tipRect.width > window.innerWidth - 8) {
-        left -= (absLeft + tipRect.width - window.innerWidth + 8);
+  function initRichTooltips() {
+    document.querySelectorAll('.tooltip-rich').forEach(function(el) {
+      if (el.dataset.richInit) return;
+      el.dataset.richInit = 'true';
+      // Add tooltip-trigger class so existing positioning JS handles it
+      el.classList.add('tooltip-trigger');
+      // Convert .tooltip-rich-content to .tooltip-content
+      var rich = el.querySelector('.tooltip-rich-content');
+      if (rich) {
+        rich.classList.add('tooltip-content');
       }
-
-      content.style.left = left + 'px';
-      content.style.top = top + 'px';
-      content.classList.add('visible');
-    }
-
-    function hideRichTooltip(trigger) {
-      var content = trigger.querySelector('.tooltip-rich-content');
-      if (!content) return;
-      content.classList.remove('visible');
-      content.style.display = '';
-    }
-
-    // Desktop: mouseenter/mouseleave via event delegation (capture phase)
-    document.addEventListener('mouseenter', function(e) {
-      var trigger = e.target.closest('.tooltip-rich');
-      if (trigger) showRichTooltip(trigger);
-    }, true);
-
-    document.addEventListener('mouseleave', function(e) {
-      var trigger = e.target.closest('.tooltip-rich');
-      if (trigger) hideRichTooltip(trigger);
-    }, true);
-
-    // Keyboard: focus/blur
-    document.addEventListener('focusin', function(e) {
-      var trigger = e.target.closest('.tooltip-rich');
-      if (trigger) showRichTooltip(trigger);
     });
-    document.addEventListener('focusout', function(e) {
-      var trigger = e.target.closest('.tooltip-rich');
-      if (trigger) hideRichTooltip(trigger);
-    });
-  })();
+  }
 
   /* ----------------------------------------------------------
    *  E8. Data Flow Stepper controls
