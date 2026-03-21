@@ -47,11 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
    * -------------------------------------------------------- */
   var activeBlock = null;
   document.addEventListener('click', function(e) {
-    var pre = e.target.closest('.macos-body pre');
-    if (pre) {
-      if (activeBlock && activeBlock !== pre) activeBlock.classList.remove('scroll-active');
-      pre.classList.add('scroll-active');
-      activeBlock = pre;
+    var body = e.target.closest('.macos-body');
+    if (body) {
+      if (activeBlock && activeBlock !== body) activeBlock.classList.remove('scroll-active');
+      body.classList.add('scroll-active');
+      activeBlock = body;
     } else {
       if (activeBlock) { activeBlock.classList.remove('scroll-active'); activeBlock = null; }
     }
@@ -60,20 +60,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape' && activeBlock) { activeBlock.classList.remove('scroll-active'); activeBlock = null; }
   });
 
-  /* Wheel: active code block traps all scroll. Not active = page scrolls. */
+  /* Wheel: active code block traps vertical scroll. Horizontal always passes through for two-finger swipe. */
   document.addEventListener('wheel', function(e) {
-    var pre = e.target.closest('.macos-body pre');
-    if (!pre) return;
+    var body = e.target.closest('.macos-body');
+    if (!body) return;
 
-    if (pre !== activeBlock) {
+    // Horizontal swipe — always let the browser scroll the code block natively
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
+    if (body !== activeBlock) {
       e.preventDefault();
       window.scrollBy(0, e.deltaY);
       return;
     }
 
-    // Active — trap scroll inside code block
+    // Active — trap vertical scroll inside code block
     e.preventDefault();
-    pre.scrollTop += e.deltaY;
+    body.scrollTop += e.deltaY;
   }, { passive: false });
 
   /* ----------------------------------------------------------

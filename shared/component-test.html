@@ -103,22 +103,37 @@ body { opacity: 1; }
 <main class="wiki-container test-container">
 
 <h1>Component Test Page</h1>
-<p>Visual regression test for all 81 components. Zero inline styles — all styling via shared CSS or page &lt;style&gt; block.</p>
+<p>Visual regression test for all 120 components. Zero inline styles — all styling via shared CSS or page &lt;style&gt; block.</p>
 
 <!-- ═══════════════════════════════════════════════════════
      1. Card Accordion
      ═══════════════════════════════════════════════════════ -->
 <h2>1. Card Accordion</h2>
 <div class="card open">
-  <h3 class="card-title"><span>Card One — Open by Default</span></h3>
+  <h3 class="card-title"><i class="fa-solid fa-bug"></i> Bug #1 &mdash; Race Condition in Connection Pool</h3>
   <div class="card-body">
-    <p>This card starts expanded. Clicking the title should collapse it.</p>
+    <div class="callout-danger"><strong>Incident:</strong> On 2024-02-15, the order service started returning HTTP 500 errors during peak traffic (12K req/s). PostgreSQL logs showed <code>FATAL: too many connections for role "api_user"</code>.</div>
+    <p>The connection pool had <code>max_pool_size = 20</code>, but under concurrent load, two threads could both see 19 active connections, both open a 20th, and blow past the limit. The fix was double-checked locking with a semaphore:</p>
+    <pre data-file="ConnectionPool.cs">private readonly SemaphoreSlim _semaphore = new(maxPoolSize);
+
+public async Task&lt;NpgsqlConnection&gt; GetConnectionAsync(CancellationToken ct)
+{
+    await _semaphore.WaitAsync(ct);
+    return await _pool.OpenConnectionAsync(ct);
+}</pre>
+    <div class="callout-info"><strong>Lesson:</strong> Always use a semaphore to guard pool access. <code>if (count &lt; max)</code> is never thread-safe.</div>
   </div>
 </div>
 <div class="card">
-  <h3 class="card-title"><span>Card Two — Collapsed</span></h3>
+  <h3 class="card-title"><i class="fa-solid fa-bug"></i> Bug #2 &mdash; Cache Stampede on Expiry</h3>
   <div class="card-body">
-    <p>This card starts collapsed. Clicking the title should expand it.</p>
+    <p>When a popular cache key expired, 8,000 concurrent requests all hit the database simultaneously. The fix: stale-while-revalidate with a background refresh and a distributed lock.</p>
+  </div>
+</div>
+<div class="card">
+  <h3 class="card-title"><i class="fa-solid fa-bug"></i> Bug #3 &mdash; N+1 Query in Order History</h3>
+  <div class="card-body">
+    <p>Fetching 50 orders triggered 50 individual <code>SELECT</code> queries for related items. The page took 3.2 seconds. Adding <code>.Include(o => o.Items)</code> reduced it to 42ms &mdash; one query with a JOIN.</p>
   </div>
 </div>
 
@@ -127,15 +142,18 @@ body { opacity: 1; }
      ═══════════════════════════════════════════════════════ -->
 <h2>2. Collapsible</h2>
 <div class="collapsible">
-  <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Collapsible Item A</span></div>
+  <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Pitfall #1: Using <code>SELECT *</code> on Wide Tables</span></div>
   <div class="collapsible-content"><div class="collapsible-body">
-    <p>Hidden content for item A. Should slide open on click.</p>
+    <p><strong>Mistake:</strong> Fetching all 47 columns when the API only needs <code>id</code>, <code>name</code>, and <code>email</code>.</p>
+    <p><strong>Why bad:</strong> Each row is 2.4 KB instead of 96 bytes &mdash; 25&times; more data over the wire. At 10K rows, that's 23 MB vs 940 KB.</p>
+    <p><strong>Fix:</strong> Always project only the columns you need: <code>SELECT id, name, email FROM users</code>.</p>
   </div></div>
 </div>
 <div class="collapsible">
-  <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Collapsible Item B</span></div>
+  <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Pitfall #2: Missing Index on Foreign Key</span></div>
   <div class="collapsible-content"><div class="collapsible-body">
-    <p>Hidden content for item B.</p>
+    <p><strong>Mistake:</strong> PostgreSQL doesn't auto-create indexes on foreign keys (unlike MySQL). A <code>JOIN</code> on <code>orders.user_id</code> does a sequential scan on 5M rows.</p>
+    <p><strong>Fix:</strong> <code>CREATE INDEX idx_orders_user_id ON orders(user_id);</code> &mdash; drops query time from 850ms to 2ms.</p>
   </div></div>
 </div>
 
@@ -145,20 +163,49 @@ body { opacity: 1; }
 <h2>3. Tab Container</h2>
 <div class="tab-container">
   <div class="tab-header" role="tablist">
-    <button class="tab-btn active" data-tab="tab-alpha" role="tab" aria-selected="true">Alpha</button>
-    <button class="tab-btn" data-tab="tab-beta" role="tab" aria-selected="false">Beta</button>
+    <button class="tab-btn active" data-tab="tab-buggy" role="tab" aria-selected="true">Buggy Code</button>
+    <button class="tab-btn" data-tab="tab-fix" role="tab" aria-selected="false">Fix</button>
+    <button class="tab-btn" data-tab="tab-test" role="tab" aria-selected="false">Unit Test</button>
   </div>
-  <div class="tab-panel active" id="tab-alpha" role="tabpanel"><p>Content of Alpha tab.</p></div>
-  <div class="tab-panel" id="tab-beta" role="tabpanel"><p>Content of Beta tab.</p></div>
+  <div class="tab-panel active" id="tab-buggy" role="tabpanel">
+    <pre data-file="OrderService.cs">public decimal CalculateTotal(List&lt;Item&gt; items)
+{
+    decimal total = 0;
+    foreach (var item in items)
+        total += item.Price * item.Quantity;  // No overflow check!
+    return total;
+}</pre>
+  </div>
+  <div class="tab-panel" id="tab-fix" role="tabpanel">
+    <pre data-file="OrderService.cs">public decimal CalculateTotal(List&lt;Item&gt; items)
+{
+    checked  // throws OverflowException if total > decimal.MaxValue
+    {
+        return items.Sum(i => i.Price * i.Quantity);
+    }
+}</pre>
+  </div>
+  <div class="tab-panel" id="tab-test" role="tabpanel">
+    <pre data-file="OrderServiceTests.cs">[Fact]
+public void CalculateTotal_WithOverflow_ThrowsOverflowException()
+{
+    var items = new List&lt;Item&gt;
+    {
+        new(Price: decimal.MaxValue, Quantity: 2)
+    };
+    Assert.Throws&lt;OverflowException&gt;(
+        () => _svc.CalculateTotal(items));
+}</pre>
+  </div>
 </div>
 
 <!-- 4. Callouts -->
 <h2>4. Callouts</h2>
-<div class="callout-danger"><strong>Danger:</strong> This operation is irreversible.</div>
-<div class="callout-success"><strong>Success:</strong> All tests passed.</div>
-<div class="callout-info"><strong>Info:</strong> This feature requires PostgreSQL 14+.</div>
-<div class="callout-warning"><strong>Warning:</strong> High memory usage detected.</div>
-<div class="callout-purple"><strong>Note:</strong> This is a design pattern highlight.</div>
+<div class="callout-danger"><strong>Breaking Change:</strong> PostgreSQL 16 removed <code>postmaster.pid</code> locking behavior. If you upgrade from PG 15, your custom health checks that read this file will silently fail. Verify your monitoring before upgrading.</div>
+<div class="callout-success"><strong>Performance Win:</strong> After adding a composite index on <code>(user_id, created_at DESC)</code>, the order history query dropped from 1,247ms to 3ms &mdash; a 415&times; improvement.</div>
+<div class="callout-info"><strong>Version Note:</strong> Keyed DI services (<code>AddKeyedScoped</code>) require .NET 8+. For .NET 6/7, use named registrations via a factory delegate.</div>
+<div class="callout-warning"><strong>Memory Alert:</strong> Your Redis instance is using 14.2 GB of its 16 GB limit (88.7%). At current growth rate, you'll hit OOM in ~36 hours. Consider eviction policy or vertical scaling.</div>
+<div class="callout-purple"><strong>Design Insight:</strong> The Strategy pattern and State pattern look identical in UML. The difference is <em>who decides</em>: in Strategy, the client picks the algorithm; in State, the object transitions automatically based on internal state.</div>
 
 <!-- 5. Think-First Box -->
 <h2>5. Think-First Box</h2>
@@ -186,55 +233,88 @@ body { opacity: 1; }
 
 <!-- 7b. Code Window (auto-built from pre[data-file]) -->
 <h2>7b. Code Window</h2>
-<pre data-file="UserService.cs">public class UserService
+<pre data-file="UserService.cs">public class UserService : IUserService, IDisposable
 {
     private readonly IDbContext _db;
     private readonly ICache _cache;
+    private readonly ILogger<UserService> _logger;
+    private readonly IConfiguration _config;
 
-    public UserService(IDbContext db, ICache cache)
+    public UserService(IDbContext db, ICache cache, ILogger<UserService> logger, IConfiguration config, IHttpClientFactory httpFactory, IMemoryCache localCache)
     {
         _db = db;
         _cache = cache;
+        _logger = logger;
+        _config = config;
     }
 
-    public async Task<User?> GetByIdAsync(int id)
+    public async Task<User?> GetByIdAsync(int id, CancellationToken ct = default)
     {
         // Check cache first — O(1) lookup
-        var cached = await _cache.GetAsync<User>($"user:{id}");
+        var cached = await _cache.GetAsync<User>($"user:{id}", ct);
         if (cached != null) return cached;
 
         // Cache miss — hit database
-        var user = await _db.Users.FindAsync(id);
+        _logger.LogInformation("Cache miss for user:{UserId}, falling back to DB", id);
+        var user = await _db.Users.Where(u => u.Id == id && u.IsActive).FirstOrDefaultAsync(ct);
         if (user != null)
-            await _cache.SetAsync($"user:{id}", user, TimeSpan.FromMinutes(5));
+            await _cache.SetAsync($"user:{id}", user, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) }, ct);
 
         return user;
     }
+
+    public async Task<PagedResult<User>> SearchAsync(string query, int page, int pageSize, string sortBy, SortDirection direction, bool includeInactive = false)
+    {
+        var users = await _db.Users
+            .Where(u => u.Name.Contains(query) || u.Email.Contains(query))
+            .OrderByDynamic(sortBy, direction)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<User>(users, totalCount, page, pageSize);
+    }
+
+    public void Dispose() => _db?.Dispose();
 }</pre>
 
 <!-- 8. Exercise Card -->
 <h2>8. Exercise Card</h2>
 <div class="exercise-card">
   <div class="exercise-card-title"><span class="difficulty-tag difficulty-medium">Medium</span> Design a URL Shortener</div>
-  <p>Given 100M URLs/day, design a system that generates short URLs and redirects in under 10ms.</p>
+  <p>Given 100M URLs/day, design a system that generates short URLs and redirects in under 10ms. Your system must handle 100:1 read:write ratio, guarantee uniqueness across distributed nodes, and support custom aliases. Consider: How do you generate 7-character unique keys at 1,150 writes/sec without collisions?</p>
+  <div class="collapsible">
+    <div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Hint</span></div>
+    <div class="collapsible-content"><div class="collapsible-body">
+      <p>Base62 encoding of an auto-increment ID gives you 62<sup>7</sup> = 3.5 trillion unique keys. At 1,150/sec, that lasts 96,000 years. Pre-generate key ranges per node to avoid coordination.</p>
+    </div></div>
+  </div>
+</div>
+<div class="exercise-card">
+  <div class="exercise-card-title"><span class="difficulty-tag difficulty-hard">Hard</span> Design a Rate Limiter</div>
+  <p>Build a distributed rate limiter that handles 500K req/sec across 12 API gateway instances. Must support per-user limits (100 req/min), per-IP limits (1,000 req/min), and global endpoint limits (50K req/min). How do you synchronize counters without adding more than 1ms latency?</p>
 </div>
 
 <!-- 9. Cheat Cards -->
 <h2>9. Cheat Cards</h2>
 <div class="grid-3">
-  <div class="cheat-card cheat-blue"><strong>CAP Theorem</strong><br>Pick 2 of 3: Consistency, Availability, Partition Tolerance</div>
-  <div class="cheat-card cheat-green"><strong>ACID</strong><br>Atomicity, Consistency, Isolation, Durability</div>
-  <div class="cheat-card cheat-amber"><strong>BASE</strong><br>Basically Available, Soft state, Eventually consistent</div>
+  <div class="cheat-card cheat-blue"><strong>CAP Theorem</strong><br>During a partition, choose CP (reject writes) or AP (accept stale reads). You always have P.</div>
+  <div class="cheat-card cheat-green"><strong>ACID</strong><br>Atomicity &middot; Consistency &middot; Isolation &middot; Durability. All-or-nothing transactions with strong guarantees.</div>
+  <div class="cheat-card cheat-amber"><strong>BASE</strong><br>Basically Available &middot; Soft state &middot; Eventually consistent. Trade strong consistency for higher availability.</div>
 </div>
 
 <!-- 10. Table -->
 <h2>10. Table</h2>
 <div class="table-wrapper">
   <table>
-    <thead><tr><th>Database</th><th>Type</th><th>Use Case</th></tr></thead>
+    <thead><tr><th>Database</th><th>Type</th><th>Max QPS (single node)</th><th>Use Case</th><th>Used By</th></tr></thead>
     <tbody>
-      <tr><td>PostgreSQL</td><td>Relational</td><td>OLTP, complex queries</td></tr>
-      <tr><td>Cassandra</td><td>Wide-column</td><td>Write-heavy, time-series</td></tr>
+      <tr><td>PostgreSQL</td><td>Relational</td><td>~20K writes/sec</td><td>OLTP, complex joins, ACID</td><td>Instagram, Stripe, Reddit</td></tr>
+      <tr><td>MySQL</td><td>Relational</td><td>~25K writes/sec</td><td>OLTP, read replicas</td><td>GitHub, Shopify, Uber</td></tr>
+      <tr><td>Cassandra</td><td>Wide-column</td><td>~50K writes/sec</td><td>Write-heavy, time-series</td><td>Netflix, Discord, Apple</td></tr>
+      <tr><td>MongoDB</td><td>Document</td><td>~30K writes/sec</td><td>Flexible schema, rapid iteration</td><td>Coinbase, Toyota</td></tr>
+      <tr><td>Redis</td><td>Key-value</td><td>~100K ops/sec</td><td>Caching, sessions, pub/sub</td><td>Twitter, Stack Overflow</td></tr>
+      <tr><td>DynamoDB</td><td>Key-value</td><td>Unlimited (auto-scale)</td><td>Serverless, single-digit ms</td><td>Amazon, Lyft, Duolingo</td></tr>
     </tbody>
   </table>
 </div>
@@ -285,12 +365,12 @@ body { opacity: 1; }
 <div class="arch-diff">
   <div class="arch-diff-before">
     <div class="arch-diff-label arch-diff-label--before">Before</div>
-    <p>Single monolith handling all requests. One database, one server.</p>
+    <p>Single Django monolith on one EC2 r5.2xlarge. PostgreSQL on same machine. 2K req/sec capacity, 45ms p99. Single point of failure &mdash; any deploy = 30s downtime for all users.</p>
   </div>
   <div class="arch-diff-divider"><span>&rarr;</span></div>
   <div class="arch-diff-after">
     <div class="arch-diff-label arch-diff-label--after">After</div>
-    <p>Microservices with dedicated databases. Load balancer distributes traffic.</p>
+    <p>3 microservices behind ALB. Auth, Orders, Payments each with own RDS instance. 15K req/sec capacity, 12ms p99. Zero-downtime rolling deploys. Cost: +$400/mo but 7.5&times; throughput.</p>
   </div>
 </div>
 
@@ -300,13 +380,25 @@ body { opacity: 1; }
   <div class="evo-step">
     <div class="evo-step-badge">v1</div>
     <div class="evo-step-title">Single Server</div>
-    <div class="evo-step-desc">Everything on one machine. Works until ~1K users.</div>
+    <div class="evo-step-desc">One EC2 t3.medium ($30/mo). App + DB on same box. Works for ~1K DAU, 50 req/sec. Latency: 15ms p99.</div>
   </div>
-  <div class="evo-step-break"><span>Breaks at: 10K concurrent connections</span></div>
-  <div class="evo-step evo-step--active">
+  <div class="evo-step-break"><span>Breaks at: 10K concurrent connections &mdash; CPU hits 98%, p99 spikes to 3.2s</span></div>
+  <div class="evo-step">
     <div class="evo-step-badge">v2</div>
     <div class="evo-step-title">Vertical Scaling</div>
-    <div class="evo-step-desc">Bigger machine — 64 cores, 256 GB RAM. Buys time but has a ceiling.</div>
+    <div class="evo-step-desc">Upgrade to r6g.4xlarge &mdash; 16 cores, 128 GB RAM ($490/mo). Handles 5K req/sec. But single point of failure.</div>
+  </div>
+  <div class="evo-step-break"><span>Breaks at: 50K DAU &mdash; single DB can't handle 8K writes/sec, disk IOPS maxed</span></div>
+  <div class="evo-step evo-step--active">
+    <div class="evo-step-badge">v3</div>
+    <div class="evo-step-title">Read Replicas + Cache</div>
+    <div class="evo-step-desc">3 read replicas + Redis cache. 95% cache hit ratio &rarr; DB sees only 400 req/sec instead of 8K. Cost: $720/mo total.</div>
+  </div>
+  <div class="evo-step-break"><span>Breaks at: 500K DAU &mdash; writes still bottleneck on single primary, replication lag hits 4s</span></div>
+  <div class="evo-step">
+    <div class="evo-step-badge">v4</div>
+    <div class="evo-step-title">Sharding + Horizontal Scale</div>
+    <div class="evo-step-desc">Shard by user_id across 4 DB nodes. Each shard handles 2K writes/sec. Auto-scaling API behind ALB. Cost: $2,100/mo.</div>
   </div>
 </div>
 
@@ -493,9 +585,16 @@ body { opacity: 1; }
 <!-- 30. Code Walkthrough -->
 <h2>30. Code Walkthrough (#20)</h2>
 <div class="code-walkthrough">
-  <div class="cw-line"><span class="cw-num">1</span><code>var cache = new Dictionary&lt;string, int&gt;();</code></div>
-  <div class="cw-line cw-line--highlight" data-annotation="Cache miss on first call — hits the database"><span class="cw-num">2</span><code>cache["users"] = db.GetUserCount();</code></div>
-  <div class="cw-line"><span class="cw-num">3</span><code>return cache["users"];</code></div>
+  <div class="cw-line"><span class="cw-num">1</span><code>public async Task&lt;User?&gt; GetByIdAsync(int id)</code></div>
+  <div class="cw-line"><span class="cw-num">2</span><code>{</code></div>
+  <div class="cw-line cw-line--highlight" data-annotation="O(1) lookup in Redis. Returns null on cache miss. Cost: ~0.1ms."><span class="cw-num">3</span><code>    var cached = await _cache.GetAsync&lt;User&gt;($"user:{id}");</code></div>
+  <div class="cw-line cw-line--highlight" data-annotation="Early return on cache hit — avoids the expensive DB call entirely."><span class="cw-num">4</span><code>    if (cached != null) return cached;</code></div>
+  <div class="cw-line"><span class="cw-num">5</span><code></code></div>
+  <div class="cw-line cw-line--highlight" data-annotation="Cache miss path: B-tree index lookup on primary key. Cost: ~2-4ms."><span class="cw-num">6</span><code>    var user = await _db.Users.FindAsync(id);</code></div>
+  <div class="cw-line"><span class="cw-num">7</span><code>    if (user != null)</code></div>
+  <div class="cw-line cw-line--highlight" data-annotation="Populate cache with 5-min TTL. Next request for this user will be a cache hit."><span class="cw-num">8</span><code>        await _cache.SetAsync($"user:{id}", user, TimeSpan.FromMinutes(5));</code></div>
+  <div class="cw-line"><span class="cw-num">9</span><code>    return user;</code></div>
+  <div class="cw-line"><span class="cw-num">10</span><code>}</code></div>
 </div>
 
 <!-- 31. Scorecard -->
@@ -545,9 +644,9 @@ body { opacity: 1; }
 <!-- 36. What-If Card -->
 <h2>36. What-If Card (#26)</h2>
 <div class="whatif-card">
-  <div class="whatif-trigger"><i class="fas fa-bolt"></i> What if the primary database goes down during peak traffic?</div>
-  <div class="whatif-consequence"><p>Writes fail immediately. Read replicas serve stale reads for ~10-30s until failover.</p></div>
-  <div class="whatif-recovery"><p><strong>Recovery:</strong> Automated failover promotes replica. DNS TTL update in 30s. Total: 15-45s downtime.</p></div>
+  <div class="whatif-trigger"><i class="fas fa-bolt"></i> What if the primary database goes down during Black Friday peak (25K writes/sec)?</div>
+  <div class="whatif-consequence"><p>All writes fail immediately &mdash; 25K errors/sec. Read replicas serve stale data (up to 4s behind). Shopping carts freeze. Payment confirmations lost. Estimated revenue loss: $47K/minute based on 2023 Black Friday average order of $113.</p></div>
+  <div class="whatif-recovery"><p><strong>Recovery plan:</strong> (1) RDS Multi-AZ automated failover promotes standby replica in 60-120s. (2) Application retries with exponential backoff absorb the gap. (3) Idempotent payment endpoints prevent double charges on retry. (4) Post-recovery: replay failed writes from Kafka dead-letter queue. Total impact: 90-180s degraded, zero data loss.</p></div>
 </div>
 
 <!-- 37. Company Card -->
@@ -556,9 +655,9 @@ body { opacity: 1; }
   <div class="company-card-logo">&#127909;</div>
   <div class="company-card-info">
     <h4 class="company-card-name">Netflix</h4>
-    <div class="company-card-stats"><span>300M subscribers</span><span>17K microservices</span></div>
-    <div class="company-card-stack">Java, Node.js, Python | Cassandra, CockroachDB, EVCache</div>
-    <div class="company-card-lesson">Uses Chaos Monkey to randomly kill production instances, ensuring graceful degradation.</div>
+    <div class="company-card-stats"><span>300M subscribers</span><span>17K microservices</span><span>~400K req/sec to API</span></div>
+    <div class="company-card-stack">Java, Node.js, Python | Cassandra, CockroachDB, EVCache | AWS (100K+ EC2 instances)</div>
+    <div class="company-card-lesson">Uses Chaos Monkey to randomly kill production instances during business hours. Key insight: they moved from synchronous REST calls to asynchronous event-driven messaging for inter-service communication, cutting tail latency from 800ms to 50ms.</div>
   </div>
 </div>
 
@@ -566,28 +665,38 @@ body { opacity: 1; }
 <h2>38. Callout Trap (#28)</h2>
 <div class="callout-trap">
   <div class="callout-trap-header"><i class="fas fa-skull-crossbones"></i> Common Trap</div>
-  <div class="callout-trap-body">Caching everything sounds great until stale data causes more bugs than slow responses. Always ask: "What's the cost of showing stale data here?"</div>
+  <div class="callout-trap-body">Caching everything sounds great until stale data causes more bugs than slow responses. Shopify cached product inventory for 30 seconds &mdash; during flash sales, customers would "buy" out-of-stock items because the cache showed old quantities. The fix wasn't removing the cache &mdash; it was reducing TTL to 2s for high-velocity items and using cache invalidation on write. Always ask: "What's the cost of showing stale data <em>for this specific field</em>?"</div>
 </div>
 
 <!-- 39. Dependency Graph -->
 <h2>39. Dependency Graph (#29)</h2>
 <div class="dep-graph">
-  <div class="dep-node dep-node--done">API Gateway</div>
+  <div class="dep-node dep-node--done">API Gateway (Kong)</div>
   <div class="dep-arrow">&rarr;</div>
-  <div class="dep-node dep-node--current">Auth Service</div>
+  <div class="dep-node dep-node--done">Auth Service (JWT)</div>
   <div class="dep-arrow">&rarr;</div>
-  <div class="dep-node dep-node--locked">User DB</div>
+  <div class="dep-node dep-node--current">Order Service</div>
+  <div class="dep-arrow">&rarr;</div>
+  <div class="dep-node dep-node--locked">Payment Gateway (Stripe)</div>
+  <div class="dep-arrow">&rarr;</div>
+  <div class="dep-node dep-node--locked">Notification Service</div>
 </div>
 
 <!-- 40. Git Diff -->
 <h2>40. Git Diff (#30)</h2>
 <div class="git-diff">
-  <div class="diff-header">config/database.yml</div>
-  <div class="diff-line diff-line--context"> pool: 5</div>
-  <div class="diff-line diff-line--remove">- timeout: 5000</div>
-  <div class="diff-line diff-line--add">+ timeout: 30000  # increased for slow queries</div>
-  <div class="diff-line diff-line--remove">- max_retries: 1</div>
-  <div class="diff-line diff-line--add">+ max_retries: 3  # retry on transient errors</div>
+  <div class="diff-header">appsettings.Production.json</div>
+  <div class="diff-line diff-line--context"> "ConnectionStrings": {</div>
+  <div class="diff-line diff-line--remove">-   "Default": "Host=db-primary;Port=5432;Database=app;Pooling=true;MaxPoolSize=20"</div>
+  <div class="diff-line diff-line--add">+   "Default": "Host=db-primary;Port=5432;Database=app;Pooling=true;MaxPoolSize=100;ConnectionIdleLifetime=300"</div>
+  <div class="diff-line diff-line--context"> },</div>
+  <div class="diff-line diff-line--context"> "Redis": {</div>
+  <div class="diff-line diff-line--remove">-   "ConnectTimeout": 1000,</div>
+  <div class="diff-line diff-line--add">+   "ConnectTimeout": 5000,  // was timing out during GC pauses</div>
+  <div class="diff-line diff-line--remove">-   "SyncTimeout": 1000</div>
+  <div class="diff-line diff-line--add">+   "SyncTimeout": 3000,</div>
+  <div class="diff-line diff-line--add">+   "AbortOnConnectFail": false  // graceful degradation</div>
+  <div class="diff-line diff-line--context"> }</div>
 </div>
 
 <!-- 41. Multi-File Viewer -->
@@ -609,10 +718,16 @@ public async Task&lt;IActionResult&gt; Get(int id)
 <div class="config-diff">
   <div class="config-diff-before"><div class="config-diff-label">Before</div><pre>max_connections = 100
 shared_buffers = 256MB
-work_mem = 4MB</pre></div>
+work_mem = 4MB
+effective_cache_size = 1GB
+random_page_cost = 4.0
+wal_level = minimal</pre></div>
   <div class="config-diff-after"><div class="config-diff-label">After</div><pre>max_connections = 500
-shared_buffers = 4GB
-work_mem = 64MB</pre></div>
+shared_buffers = 4GB       # 25% of 16GB RAM
+work_mem = 64MB            # sort/hash operations
+effective_cache_size = 12GB # OS + shared buffers
+random_page_cost = 1.1     # SSD (was HDD default)
+wal_level = replica         # enable streaming replication</pre></div>
 </div>
 
 <!-- 43. Pipeline -->
@@ -679,9 +794,10 @@ work_mem = 64MB</pre></div>
 <!-- 48. Shard Map -->
 <h2>48. Shard Map (#38)</h2>
 <div class="shard-map">
-  <div class="shard"><span class="shard-id">Shard 0</span><span class="shard-size">A&ndash;H</span><span class="shard-load">32%</span></div>
-  <div class="shard"><span class="shard-id">Shard 1</span><span class="shard-size">I&ndash;Q</span><span class="shard-load">41%</span></div>
-  <div class="shard shard--hot"><span class="shard-id">Shard 2</span><span class="shard-size">R&ndash;Z</span><span class="shard-load">87%</span></div>
+  <div class="shard"><span class="shard-id">Shard 0</span><span class="shard-size">user_id % 4 = 0</span><span class="shard-load">28%</span></div>
+  <div class="shard"><span class="shard-id">Shard 1</span><span class="shard-size">user_id % 4 = 1</span><span class="shard-load">31%</span></div>
+  <div class="shard"><span class="shard-id">Shard 2</span><span class="shard-size">user_id % 4 = 2</span><span class="shard-load">34%</span></div>
+  <div class="shard shard--hot"><span class="shard-id">Shard 3</span><span class="shard-size">user_id % 4 = 3</span><span class="shard-load">92%</span></div>
 </div>
 
 <!-- 49. Cost Calc -->
@@ -690,9 +806,13 @@ work_mem = 64MB</pre></div>
   <table>
     <thead><tr><th>Resource</th><th>Spec</th><th>Monthly Cost</th></tr></thead>
     <tbody>
-      <tr><td>RDS PostgreSQL</td><td>3&times; r6g.xlarge</td><td class="cost-calc-subtotal">$540</td></tr>
-      <tr><td>ElastiCache Redis</td><td>r6g.large</td><td class="cost-calc-subtotal">$180</td></tr>
-      <tr class="cost-calc-total"><td colspan="2">Monthly Total</td><td>$720/mo</td></tr>
+      <tr><td>RDS PostgreSQL (Primary)</td><td>r6g.2xlarge (8 vCPU, 64 GB)</td><td class="cost-calc-subtotal">$620</td></tr>
+      <tr><td>RDS Read Replicas (3x)</td><td>r6g.xlarge &times; 3</td><td class="cost-calc-subtotal">$540</td></tr>
+      <tr><td>ElastiCache Redis</td><td>r6g.large (2-node cluster)</td><td class="cost-calc-subtotal">$360</td></tr>
+      <tr><td>ALB + EC2 (API)</td><td>4&times; c6g.xlarge + ALB</td><td class="cost-calc-subtotal">$480</td></tr>
+      <tr><td>S3 + CloudFront</td><td>500 GB storage + 2 TB egress</td><td class="cost-calc-subtotal">$95</td></tr>
+      <tr><td>CloudWatch + Logs</td><td>50 GB logs, 10 dashboards</td><td class="cost-calc-subtotal">$45</td></tr>
+      <tr class="cost-calc-total"><td colspan="2">Monthly Total</td><td>$2,140/mo</td></tr>
     </tbody>
   </table>
 </div>
@@ -716,9 +836,14 @@ work_mem = 64MB</pre></div>
   <table>
     <thead><tr><th>Feature</th><th>Redis</th><th>Memcached</th></tr></thead>
     <tbody>
-      <tr><td>Data structures</td><td class="compare-win">Strings, Lists, Sets, Hashes</td><td class="compare-lose">Strings only</td></tr>
-      <tr><td>Persistence</td><td class="compare-win">RDB + AOF</td><td class="compare-lose">None</td></tr>
-      <tr><td>Multi-threading</td><td class="compare-lose">Single-threaded (mostly)</td><td class="compare-win">Multi-threaded</td></tr>
+      <tr><td>Data structures</td><td class="compare-win">Strings, Lists, Sets, Hashes, Sorted Sets, Streams</td><td class="compare-lose">Strings only (key-value)</td></tr>
+      <tr><td>Persistence</td><td class="compare-win">RDB snapshots + AOF append log</td><td class="compare-lose">None &mdash; volatile only</td></tr>
+      <tr><td>Threading</td><td class="compare-lose">Single-threaded commands (I/O threads since v6)</td><td class="compare-win">Multi-threaded &mdash; utilizes all cores</td></tr>
+      <tr><td>Max memory</td><td class="compare-lose">Limited by single-node RAM</td><td class="compare-win">Slab allocator, no fragmentation</td></tr>
+      <tr><td>Cluster mode</td><td class="compare-win">Redis Cluster with auto-sharding</td><td class="compare-lose">Client-side sharding only</td></tr>
+      <tr><td>Pub/Sub</td><td class="compare-win">Built-in pub/sub + Streams</td><td class="compare-lose">Not supported</td></tr>
+      <tr><td>Typical latency</td><td>~0.1ms (local)</td><td>~0.1ms (local)</td></tr>
+      <tr><td>Best for</td><td class="compare-win">Feature-rich caching, sessions, leaderboards, queues</td><td class="compare-win">Simple, high-throughput key-value caching</td></tr>
     </tbody>
   </table>
 </div>
@@ -1339,14 +1464,14 @@ _strategy.Pay(amount);
 <h2>95. Monologue</h2>
 <div class="monologue">
   <div class="monologue-label">Inner Monologue</div>
-  "Hmm, every time I add a new payment method I have to touch the checkout class. That violates OCP. What if I used a strategy instead?"
+  "Hmm, I just added Apple Pay support and had to modify the same <code>ProcessPayment</code> method that handles credit cards, PayPal, and bank transfers. That's 4 changes to the same file in 3 months. Every time I touch it, I risk breaking the other payment methods. That violates OCP &mdash; the class should be open for extension but closed for modification. What if each payment method was its own class implementing <code>IPaymentStrategy</code>? Then adding Google Pay would just mean creating one new file. Zero changes to existing code."
 </div>
 
 <!-- Smell Card -->
 <h2>96. Smell Card</h2>
 <div class="smell-card">
   <strong>Code Smell: God Class</strong><br>
-  The PaymentProcessor handles validation, charging, refunds, notifications, and logging. It has 2,000 lines and 47 methods. Each change risks breaking unrelated features.
+  <code>OrderManager.cs</code> is 3,847 lines with 62 methods. It validates carts, calculates tax, processes payments, sends emails, updates inventory, generates invoices, and writes audit logs. Last quarter, 14 of 18 production bugs traced back to this file. Every developer on the team has merge conflicts in it. The class has 23 constructor dependencies &mdash; a clear sign it's doing too much.
 </div>
 
 <!-- L16. Decorator Viz -->
@@ -1547,10 +1672,9 @@ _strategy.Pay(amount);
 <!-- Existing: TL;DR Card (S1) -->
 <h2>112. TL;DR Card</h2>
 <div class="tldr-card">
-  <div class="tldr-label">TL;DR</div>
-  <p><strong>What:</strong> Define a family of algorithms, encapsulate each one, and make them interchangeable.</p>
-  <p><strong>Why:</strong> So you can add new payment methods without touching existing checkout code.</p>
-  <p><strong>Real example:</strong> Stripe's payment processing — credit card, PayPal, bank transfer all use the same interface.</p>
+  <p><strong>What:</strong> Define a family of algorithms, encapsulate each one, and make them interchangeable at runtime.</p>
+  <p><strong>Why:</strong> So you can add new payment methods without touching existing checkout code. Adding Google Pay = one new class, zero changes to existing code.</p>
+  <p><strong>Real example:</strong> Stripe's payment processing uses this pattern — credit card, PayPal, bank transfer, SEPA, and 20+ methods all implement the same <code>IPaymentStrategy</code> interface.</p>
 </div>
 
 <!-- Existing: Before/After Grid -->
@@ -1569,10 +1693,10 @@ _strategy.Pay(amount);
 <!-- Existing: Level Badge + Progress -->
 <h2>114. Level Badge + Progress</h2>
 <div class="level-progress">
-  <div class="level-progress-item" style="border-color: #34d399; color: #34d399;">&#10003; L0 Basics</div>
-  <div class="level-progress-item" style="border-color: #34d399; color: #34d399;">&#10003; L1 Core Pattern</div>
-  <div class="level-progress-item" style="border-color: #fbbf24; color: #fbbf24;">&#9654; L2 Advanced</div>
-  <div class="level-progress-item" style="border-color: var(--text-muted); color: var(--text-muted);">&#128274; L3 Expert</div>
+  <div class="level-progress-item done">&#10003; L0 Basics</div>
+  <div class="level-progress-item done">&#10003; L1 Core Pattern</div>
+  <div class="level-progress-item current">&#9654; L2 Advanced</div>
+  <div class="level-progress-item locked">&#128274; L3 Expert</div>
 </div>
 
 <!-- Existing: Concept Card -->
