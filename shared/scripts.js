@@ -927,6 +927,78 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ----------------------------------------------------------
+   *  Latency Ruler Builder
+   *  Reads data-entries JSON, renders logarithmic bar chart
+   *  with multipliers between levels and human-readable times.
+   * -------------------------------------------------------- */
+  function initLatencyRulers() {
+    document.querySelectorAll('.latency-ruler[data-entries]').forEach(function(ruler) {
+      if (ruler.dataset.rulerBuilt) return;
+      ruler.dataset.rulerBuilt = '1';
+
+      var entries = JSON.parse(ruler.dataset.entries);
+      var maxNs = entries[entries.length - 1].ns;
+      var maxLog = Math.log10(maxNs);
+
+      // Color gradient: green → yellow → orange → red
+      var colors = ['#10b981','#10b981','#34d399','#a3e635','#fbbf24','#f59e0b','#f97316','#ef4444'];
+
+      function formatNs(ns) {
+        if (ns < 1000) return ns + ' ns';
+        if (ns < 1000000) return (ns / 1000) + ' \u00B5s';
+        if (ns < 1000000000) return (ns / 1000000) + ' ms';
+        return (ns / 1000000000).toFixed(1) + ' s';
+      }
+
+      ruler.innerHTML = ''; // clear
+
+      entries.forEach(function(entry, i) {
+        var pct = (Math.log10(entry.ns) / maxLog) * 100;
+        var color = colors[Math.min(i, colors.length - 1)];
+
+        var row = document.createElement('div');
+        row.className = 'ruler-item';
+
+        // Label
+        var lbl = document.createElement('span');
+        lbl.className = 'ruler-label';
+        lbl.textContent = entry.label;
+
+        // Bar container
+        var barWrap = document.createElement('div');
+        barWrap.className = 'ruler-bar';
+        var barInner = document.createElement('div');
+        barInner.className = 'ruler-bar-inner';
+        barInner.style.width = Math.max(3, pct) + '%';
+        barInner.style.background = color;
+        barWrap.appendChild(barInner);
+
+        // Value
+        var val = document.createElement('span');
+        val.className = 'ruler-value';
+        val.textContent = formatNs(entry.ns);
+
+        row.appendChild(lbl);
+        row.appendChild(barWrap);
+        row.appendChild(val);
+        ruler.appendChild(row);
+
+        // Multiplier between this and previous
+        if (i > 0) {
+          var mult = entry.ns / entries[i - 1].ns;
+          if (mult >= 2) {
+            var multEl = document.createElement('div');
+            multEl.className = 'ruler-multiplier';
+            multEl.textContent = '\u00D7' + (mult >= 1000 ? (mult/1000).toFixed(0) + 'K' : mult >= 100 ? mult.toFixed(0) : mult.toFixed(0));
+            // Insert before current row
+            ruler.insertBefore(multEl, row);
+          }
+        }
+      });
+    });
+  }
+
+  /* ----------------------------------------------------------
    *  Sequence Diagram Builder
    *  Reads data-participants and .seq-msg elements, renders
    *  participant boxes, dashed lifelines, and arrow rows.
@@ -1260,6 +1332,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -- Interactive tradeoff sliders -- */
     initTradeoffSliders();
+
+    /* -- Latency rulers -- */
+    initLatencyRulers();
 
     /* -- Sequence diagrams -- */
     initSequenceDiagrams();
