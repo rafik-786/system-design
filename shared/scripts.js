@@ -926,6 +926,107 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /* ----------------------------------------------------------
+   *  Semantic icon colors — auto-color FA icons by class name.
+   *  Runs on every reinit so dynamically added icons get colored.
+   * -------------------------------------------------------- */
+  var iconColorMap = {
+    'fa-bug':                  '#f87171',   /* red */
+    'fa-skull-crossbones':     '#fbbf24',   /* amber */
+    'fa-triangle-exclamation': '#fbbf24',   /* amber */
+    'fa-exclamation-triangle': '#fbbf24',   /* amber (legacy) */
+    'fa-lightbulb':            '#facc15',   /* yellow */
+    'fa-code':                 '#60a5fa',   /* blue */
+    'fa-gear':                 '#a78bfa',   /* purple */
+    'fa-cog':                  '#a78bfa',   /* purple (legacy) */
+    'fa-check-circle':         '#34d399',   /* green */
+    'fa-circle-check':         '#34d399',   /* green */
+    'fa-check':                '#34d399',   /* green */
+    'fa-layer-group':          '#f472b6',   /* pink */
+    'fa-clock':                '#fb923c',   /* orange */
+    'fa-shield-halved':        '#38bdf8',   /* sky */
+    'fa-diagram-project':      '#c084fc',   /* violet */
+    'fa-rocket':               '#fb7185',   /* rose */
+    'fa-flask':                '#a78bfa',   /* purple */
+    'fa-fire':                 '#f97316',   /* orange */
+    'fa-bolt':                 '#fbbf24',   /* amber */
+    'fa-star':                 '#fbbf24',   /* amber */
+    'fa-puzzle-piece':         '#34d399',   /* green */
+    'fa-eye':                  '#60a5fa',   /* blue */
+    'fa-pen':                  '#fb923c',   /* orange */
+    'fa-trash':                '#f87171',   /* red */
+    'fa-lock':                 '#f87171',   /* red */
+    'fa-unlock':               '#34d399',   /* green */
+    'fa-database':             '#60a5fa',   /* blue */
+    'fa-server':               '#a78bfa',   /* purple */
+    'fa-network-wired':        '#38bdf8',   /* sky */
+    'fa-magnifying-glass':     '#94a3b8',   /* slate */
+    'fa-wrench':               '#94a3b8',   /* slate */
+    'fa-hammer':               '#94a3b8',   /* slate */
+    'fa-redo':                 '#60a5fa',   /* blue */
+    'fa-spinner':              '#60a5fa',   /* blue */
+  };
+
+  function colorizeIcons() {
+    var selectors = '.card-title i.fa-solid, .card-title i.fas, ' +
+                    '.collapsible-header i.fa-solid, .collapsible-header i.fas, ' +
+                    '.tab-btn i.fa-solid, .tab-btn i.fas, ' +
+                    '.exercise-card-title i.fa-solid, .exercise-card-title i.fas';
+    document.querySelectorAll(selectors).forEach(function(icon) {
+      if (icon.dataset.colored) return;
+      var cls = icon.classList;
+      for (var key in iconColorMap) {
+        if (cls.contains(key)) {
+          icon.style.color = iconColorMap[key];
+          icon.dataset.colored = '1';
+          return;
+        }
+      }
+    });
+
+    /* Auto-badge keywords + numbers in card titles and collapsible headers
+       e.g. "Bug 1 — Title" → "<span class='title-badge bug'>Bug 1</span> — Title"
+            "Pitfall #2: Title" → "<span class='title-badge pitfall'>Pitfall 2</span> Title" */
+    var badgeTypes = {
+      'Bug':      'bug',
+      'Pitfall':  'pitfall',
+      'Step':     'step',
+      'Stage':    'stage',
+      'Level':    'level',
+      'Era':      'era',
+      'Phase':    'phase',
+      'Part':     'part',
+      'Case':     'case',
+      'Fix':      'fix',
+    };
+    document.querySelectorAll('.card-title, .collapsible-header span').forEach(function(el) {
+      if (el.dataset.badged) return;
+      el.dataset.badged = '1';
+      var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+      var node;
+      while ((node = walker.nextNode())) {
+        var txt = node.textContent;
+        for (var keyword in badgeTypes) {
+          var re = new RegExp('^(\\s*)(' + keyword + ')\\s*#?(\\d+)([:\\s—].*)$');
+          var m = txt.match(re);
+          if (m) {
+            var before = document.createTextNode(m[1]);
+            var badge = document.createElement('span');
+            badge.className = 'title-badge title-badge--' + badgeTypes[keyword];
+            badge.textContent = m[2] + ' ' + m[3];
+            var after = document.createTextNode(m[4]);
+            var parent = node.parentNode;
+            parent.insertBefore(before, node);
+            parent.insertBefore(badge, node);
+            parent.insertBefore(after, node);
+            parent.removeChild(node);
+            break;
+          }
+        }
+      }
+    });
+  }
+
   function reinit() {
     /* -- Prevent hljs from touching terminal blocks (not code windows) -- */
     document.querySelectorAll('.macos-window.terminal .macos-body pre code').forEach(function(el) {
@@ -945,6 +1046,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -- Custom syntax highlighter for code windows -- */
     colorizeCode();
+
+    /* -- Semantic icon colors (auto-apply by FA class name) -- */
+    colorizeIcons();
 
     /* -- Auto-create tooltips from data-tooltip -- */
     initDataTooltips();
