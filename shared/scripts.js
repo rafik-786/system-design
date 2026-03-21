@@ -1010,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
       while ((node = walker.nextNode())) {
         var txt = node.textContent;
         for (var keyword in badgeTypes) {
-          var re = new RegExp('^(\\s*)(' + keyword + ')\\s*#?(\\d+)([:\\s—].*)$');
+          var re = new RegExp('^(\\s*)(' + keyword + ')\\s*#?(\\d+)\\s*[:\\s—]*(.*)$');
           var m = txt.match(re);
           if (m) {
             var before = document.createTextNode(m[1]);
