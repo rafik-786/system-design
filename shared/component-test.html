@@ -509,19 +509,27 @@ redis: 4.2% / 892MiB / 2GiB</pre>
 <div class="flow-stepper" data-current="0">
   <div class="flow-step active">
     <div class="flow-step-header"><div class="flow-step-num">1</div><div class="flow-step-title">Client sends request</div></div>
-    <div class="flow-step-body"><p>The browser sends an HTTP GET to the load balancer.</p></div>
+    <div class="flow-step-body"><p>The browser sends an HTTP GET to the load balancer on port 443. The TLS handshake has already happened (session resumption via TLS 1.3 &mdash; 0-RTT). Total overhead: ~2ms.</p></div>
   </div>
   <div class="flow-step">
     <div class="flow-step-header"><div class="flow-step-num">2</div><div class="flow-step-title">Load balancer routes</div></div>
-    <div class="flow-step-body"><p>Round-robin selects server #3 (least connections).</p></div>
+    <div class="flow-step-body"><p>ALB uses least-connections algorithm. Server #3 has 12 active connections (lowest). Health check passed 2s ago. Request forwarded via private subnet &mdash; no extra TLS hop.</p></div>
   </div>
   <div class="flow-step">
-    <div class="flow-step-header"><div class="flow-step-num">3</div><div class="flow-step-title">Server responds</div></div>
-    <div class="flow-step-body"><p>Server #3 queries the cache, finds a hit, returns 200 OK in 4ms.</p></div>
+    <div class="flow-step-header"><div class="flow-step-num">3</div><div class="flow-step-title">Check cache</div></div>
+    <div class="flow-step-body"><p>Server #3 checks Redis for key <code>user:42</code>. Cache hit! Response was stored 2 minutes ago with a 5-minute TTL. Redis returns in 0.1ms.</p></div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-header"><div class="flow-step-num">4</div><div class="flow-step-title">Serialize &amp; compress</div></div>
+    <div class="flow-step-body"><p>The cached object is serialized to JSON (1.8 KB). Gzip compression reduces it to 640 bytes. Response headers add 220 bytes. Total payload: 860 bytes over the wire.</p></div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-step-header"><div class="flow-step-num">5</div><div class="flow-step-title">Client receives response</div></div>
+    <div class="flow-step-body"><p>200 OK in 4ms total. The browser parses JSON, updates the DOM via React reconciliation. Time to interactive: 4ms network + 2ms parsing = 6ms. User sees the profile instantly.</p></div>
   </div>
   <div class="flow-stepper-controls">
     <button class="flow-prev" disabled>&larr; Previous</button>
-    <span class="flow-progress">Step 1 of 3</span>
+    <span class="flow-progress">Step 1 of 5</span>
     <button class="flow-next">Next &rarr;</button>
   </div>
 </div>

@@ -1541,36 +1541,73 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     })();
 
-    /* -- Flow Steppers: initialize state -- */
+    /* -- Flow Steppers: build timeline + initialize state -- */
     document.querySelectorAll('.flow-stepper, .data-flow').forEach(function(stepper) {
       var steps = stepper.querySelectorAll('.flow-step');
       if (!steps.length) return;
 
-      // Default to first step if no data-current set
       var current = parseInt(stepper.getAttribute('data-current') || '0', 10);
-      stepper.setAttribute('data-current', current);
 
-      // Ensure only the current step is active
-      steps.forEach(function(step, i) {
-        step.classList.toggle('active', i === current);
-      });
-
-      // Set progress text
-      var progress = stepper.querySelector('.flow-progress');
-      if (progress) {
-        progress.textContent = 'Step ' + (current + 1) + ' of ' + steps.length;
+      // Build horizontal timeline if not already built
+      if (!stepper.querySelector('.flow-timeline')) {
+        var timeline = document.createElement('div');
+        timeline.className = 'flow-timeline';
+        steps.forEach(function(step, i) {
+          if (i > 0) {
+            var line = document.createElement('div');
+            line.className = 'flow-timeline-line' + (i <= current ? ' completed' : '');
+            timeline.appendChild(line);
+          }
+          var node = document.createElement('div');
+          node.className = 'flow-timeline-node';
+          node.textContent = i + 1;
+          node.dataset.step = i;
+          if (i < current) node.classList.add('completed');
+          if (i === current) node.classList.add('active');
+          // Click to jump to step
+          node.addEventListener('click', function() {
+            goToStep(stepper, parseInt(this.dataset.step));
+          });
+          timeline.appendChild(node);
+        });
+        stepper.insertBefore(timeline, stepper.firstChild);
       }
 
-      // Set dot indicators
-      stepper.querySelectorAll('.flow-dot').forEach(function(dot, i) {
-        dot.classList.toggle('active', i === current);
-      });
+      function goToStep(s, idx) {
+        var allSteps = s.querySelectorAll('.flow-step');
+        var nodes = s.querySelectorAll('.flow-timeline-node');
+        var lines = s.querySelectorAll('.flow-timeline-line');
+        var prev = s.querySelector('.flow-prev');
+        var next = s.querySelector('.flow-next');
+        var prog = s.querySelector('.flow-progress');
 
-      // Set button disabled states
+        s.setAttribute('data-current', idx);
+        allSteps.forEach(function(st, j) { st.classList.toggle('active', j === idx); });
+        nodes.forEach(function(n, j) {
+          n.classList.remove('active', 'completed');
+          if (j < idx) n.classList.add('completed');
+          if (j === idx) n.classList.add('active');
+        });
+        lines.forEach(function(l, j) { l.classList.toggle('completed', j < idx); });
+        if (prog) prog.textContent = 'Step ' + (idx + 1) + ' of ' + allSteps.length;
+        if (prev) prev.disabled = (idx === 0);
+        if (next) next.disabled = (idx === allSteps.length - 1);
+      }
+
+      // Wire up prev/next buttons
       var prevBtn = stepper.querySelector('.flow-prev');
       var nextBtn = stepper.querySelector('.flow-next');
-      if (prevBtn) prevBtn.disabled = (current === 0);
-      if (nextBtn) nextBtn.disabled = (current === steps.length - 1);
+      if (prevBtn) prevBtn.addEventListener('click', function() {
+        var cur = parseInt(stepper.getAttribute('data-current'));
+        if (cur > 0) goToStep(stepper, cur - 1);
+      });
+      if (nextBtn) nextBtn.addEventListener('click', function() {
+        var cur = parseInt(stepper.getAttribute('data-current'));
+        var max = stepper.querySelectorAll('.flow-step').length - 1;
+        if (cur < max) goToStep(stepper, cur + 1);
+      });
+
+      goToStep(stepper, current);
     });
 
     /* -- Multi-File Viewers: ensure first tab is active -- */
