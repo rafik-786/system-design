@@ -879,7 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function colorizeCode() {
-    document.querySelectorAll('.macos-window:not(.terminal) .macos-body pre code').forEach(function(block) {
+    document.querySelectorAll('.macos-window:not(.terminal) .macos-body pre code, .multi-file-panel pre code, .code-evo-code pre code, .refactor-code pre code').forEach(function(block) {
       if (block.dataset.highlighted) return;
       block.dataset.highlighted = 'true';
 
@@ -892,6 +892,174 @@ document.addEventListener('DOMContentLoaded', () => {
       }).join('\n');
 
       block.innerHTML = html;
+    });
+  }
+
+  /* ----------------------------------------------------------
+   *  Syntax-highlight code walkthrough blocks using tokenizeLine
+   * -------------------------------------------------------- */
+  function colorizeWalkthrough() {
+    document.querySelectorAll('.code-walkthrough .cw-line code').forEach(function(code) {
+      if (code.dataset.cwHighlighted) return;
+      code.dataset.cwHighlighted = '1';
+      var text = code.textContent;
+      code.innerHTML = tokenizeLine(text);
+    });
+  }
+
+  /* ----------------------------------------------------------
+   *  Estimation Calc Builder
+   *  Reads .calc-input, .calc-op, .calc-eq, .calc-result children
+   *  and builds the dashboard metric cards + result strip.
+   * -------------------------------------------------------- */
+  function initEstimationCalcs() {
+    document.querySelectorAll('.estimation-calc').forEach(function(calc) {
+      if (calc.dataset.calcBuilt) return;
+      calc.dataset.calcBuilt = '1';
+
+      var title = calc.dataset.title || 'Estimation';
+      var tag = calc.dataset.tag || '';
+      var children = Array.from(calc.children);
+
+      // Walk children in order, building a sequence of metric cards + operators
+      var metricItems = []; // {type:'card'|'op'|'eq', ...data}
+      var results = [];
+
+      children.forEach(function(child) {
+        if (child.classList.contains('calc-input')) {
+          metricItems.push({ type: 'card', label: child.dataset.label, value: child.dataset.value, note: child.dataset.note || '' });
+        } else if (child.classList.contains('calc-op')) {
+          metricItems.push({ type: 'op', text: child.innerHTML.trim() });
+        } else if (child.classList.contains('calc-eq')) {
+          // Auto-insert = before eq if last item isn't an op
+          var last = metricItems[metricItems.length - 1];
+          if (!last || last.type !== 'op') {
+            metricItems.push({ type: 'op', text: '=' });
+          }
+          metricItems.push({ type: 'card', label: child.dataset.label, value: child.dataset.value, note: child.dataset.note || '', isEq: true });
+        } else if (child.classList.contains('calc-result')) {
+          results.push({ label: child.dataset.label, value: child.dataset.value, formula: child.dataset.formula || '' });
+        }
+      });
+
+      // Clear and rebuild
+      calc.innerHTML = '';
+
+      // Header
+      var header = document.createElement('div');
+      header.className = 'calc-header';
+      header.innerHTML = '<span><i class="fa-solid fa-calculator"></i> ' + title + '</span>' +
+        (tag ? '<span class="calc-tag">' + tag + '</span>' : '');
+      calc.appendChild(header);
+
+      // Split metric items into rows at each eq card
+      // Each row: [inputs + ops] → eq result
+      var rows = [[]];
+      metricItems.forEach(function(item) {
+        rows[rows.length - 1].push(item);
+        if (item.isEq) rows.push([]); // start new row after eq
+      });
+      // Remove trailing empty row
+      if (rows[rows.length - 1].length === 0) rows.pop();
+
+      rows.forEach(function(rowItems) {
+        var metricsRow = document.createElement('div');
+        metricsRow.className = 'calc-metrics';
+
+        rowItems.forEach(function(item) {
+          if (item.type === 'op') {
+            var opEl = document.createElement('div');
+            opEl.className = 'calc-metric-op';
+            opEl.innerHTML = item.text;
+            metricsRow.appendChild(opEl);
+          } else {
+            var metric = document.createElement('div');
+            metric.className = 'calc-metric' + (item.isEq ? ' calc-metric--eq' : '');
+            metric.innerHTML =
+              '<span class="calc-metric-value">' + item.value + '</span>' +
+              '<span class="calc-metric-label">' + item.label + '</span>' +
+              (item.note ? '<span class="calc-metric-note">' + item.note + '</span>' : '');
+            metricsRow.appendChild(metric);
+          }
+        });
+        calc.appendChild(metricsRow);
+      });
+
+      // Result strip
+      if (results.length) {
+        var strip = document.createElement('div');
+        strip.className = 'calc-result-strip';
+        results.forEach(function(r, i) {
+          if (i > 0) {
+            var div = document.createElement('div');
+            div.className = 'calc-result-divider';
+            strip.appendChild(div);
+          }
+          var item = document.createElement('div');
+          item.className = 'calc-result-item';
+          item.innerHTML =
+            '<span class="calc-result-label">' + r.label + '</span>' +
+            '<span class="calc-result-value">' + r.value + '</span>' +
+            (r.formula ? '<span class="calc-result-formula">' + r.formula + '</span>' : '');
+          strip.appendChild(item);
+        });
+        calc.appendChild(strip);
+      }
+    });
+  }
+
+  /* Count-up animation for estimation calc values */
+  function initCalcCountUp() {
+    var observed = new Set();
+    function animateValue(el, finalText) {
+      // Extract numeric part: "~13,889" → 13889, "1.2B" → 1.2, "95%" → 95
+      var match = finalText.replace(/[~≈,]/g, '').match(/([\d.]+)/);
+      if (!match) return;
+      var target = parseFloat(match[1]);
+      var prefix = finalText.slice(0, finalText.indexOf(match[1].charAt(0))).replace(/,/g, '');
+      var suffix = finalText.slice(finalText.indexOf(match[1]) + match[1].length);
+      var hasCommas = finalText.indexOf(',') !== -1;
+      var decimals = (match[1].indexOf('.') !== -1) ? match[1].split('.')[1].length : 0;
+      var duration = 800;
+      var start = performance.now();
+
+      function step(now) {
+        var t = Math.min((now - start) / duration, 1);
+        // ease-out cubic
+        var ease = 1 - Math.pow(1 - t, 3);
+        var current = target * ease;
+        var formatted;
+        if (decimals > 0) {
+          formatted = current.toFixed(decimals);
+        } else {
+          formatted = Math.round(current).toString();
+          if (hasCommas) {
+            formatted = formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+          }
+        }
+        el.textContent = prefix + formatted + suffix;
+        if (t < 1) requestAnimationFrame(step);
+        else el.textContent = finalText; // ensure exact final value
+      }
+      el.textContent = prefix + '0' + suffix;
+      requestAnimationFrame(step);
+    }
+
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var calc = entry.target;
+        if (observed.has(calc)) return;
+        observed.add(calc);
+        // Animate metric values
+        calc.querySelectorAll('.calc-metric-value, .calc-result-value').forEach(function(el) {
+          animateValue(el, el.textContent.trim());
+        });
+      });
+    }, { threshold: 0.3 });
+
+    document.querySelectorAll('.estimation-calc').forEach(function(el) {
+      observer.observe(el);
     });
   }
 
@@ -1301,6 +1469,1154 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /* ----------------------------------------------------------
+   *  JSON Syntax Highlighter for API Viewer bodies
+   *  Colorizes keys, strings, numbers, booleans, nulls
+   * -------------------------------------------------------- */
+  /* -- JSON line tokenizer (used by the line-number pass for .api-body blocks) -- */
+  function tokenizeJSON(rawLine) {
+    var line = rawLine
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Tokenize by finding all quoted strings and structure in one pass
+    var result = '';
+    var i = 0;
+    while (i < line.length) {
+      // Check for // comment
+      if (line[i] === '/' && line[i+1] === '/') {
+        result += '<span class="json-comment">' + line.substring(i) + '</span>';
+        break;
+      }
+      // Check for quoted string
+      if (line[i] === '"') {
+        var end = line.indexOf('"', i + 1);
+        if (end === -1) { result += line.substring(i); break; }
+        var str = line.substring(i, end + 1);
+        // Look ahead: is this a key (followed by optional spaces then colon)?
+        var after = line.substring(end + 1);
+        var colonMatch = after.match(/^(\s*:)/);
+        if (colonMatch) {
+          result += '<span class="json-key">' + str + '</span>' + colonMatch[1];
+          i = end + 1 + colonMatch[1].length;
+        } else {
+          result += '<span class="json-string">' + str + '</span>';
+          i = end + 1;
+        }
+        continue;
+      }
+      // Check for number (after : , [ or start)
+      if (/[-\d]/.test(line[i]) && (i === 0 || /[:,\[\s]/.test(line[i-1]))) {
+        var numMatch = line.substring(i).match(/^(-?\d+\.?\d*)/);
+        if (numMatch) {
+          result += '<span class="json-number">' + numMatch[1] + '</span>';
+          i += numMatch[1].length;
+          continue;
+        }
+      }
+      // Check for boolean/null
+      var wordMatch = line.substring(i).match(/^(true|false|null)\b/);
+      if (wordMatch) {
+        var cls = wordMatch[1] === 'null' ? 'json-null' : 'json-bool';
+        result += '<span class="' + cls + '">' + wordMatch[1] + '</span>';
+        i += wordMatch[1].length;
+        continue;
+      }
+      result += line[i];
+      i++;
+    }
+    return result;
+  }
+
+  /* ----------------------------------------------------------
+   *  Collapsible API Bodies
+   *  Adds a toggle button to .api-body sections. Long JSON
+   *  bodies start collapsed with a "Show response" button.
+   * -------------------------------------------------------- */
+  function initApiCollapsible() {
+    document.querySelectorAll('.api-body').forEach(function(body) {
+      if (body.dataset.collapsibleInit) return;
+      body.dataset.collapsibleInit = '1';
+
+      var pre = body.querySelector('pre');
+      if (!pre) return;
+
+      // Only collapse if content is tall enough (> 4 lines)
+      var lineCount = (pre.textContent.match(/\n/g) || []).length;
+      if (lineCount < 5) return;
+
+      // Determine request vs response: if this .api-body appears before .api-response, it's a request
+      var viewer = body.closest('.api-viewer');
+      var responseEl = viewer ? viewer.querySelector('.api-response') : null;
+      var isRequest = false;
+      if (responseEl && body.compareDocumentPosition(responseEl) & Node.DOCUMENT_POSITION_FOLLOWING) {
+        isRequest = true;
+      }
+      var label = isRequest ? 'Request Body' : 'Response Body';
+      var icon = isRequest ? 'fa-arrow-up' : 'fa-arrow-down';
+
+      // Wrap content
+      body.classList.add('api-body--collapsible', 'api-body--collapsed');
+
+      var toggle = document.createElement('button');
+      toggle.className = 'api-body-toggle';
+      toggle.innerHTML = '<i class="fa-solid ' + icon + '"></i> <span>' + label + '</span> <span class="api-body-lines">' + lineCount + ' lines</span> <i class="fa-solid fa-chevron-down api-body-chevron"></i>';
+      body.insertBefore(toggle, pre);
+
+      toggle.addEventListener('click', function() {
+        var collapsed = body.classList.toggle('api-body--collapsed');
+        var chevron = toggle.querySelector('.api-body-chevron');
+        if (chevron) {
+          chevron.style.transform = collapsed ? '' : 'rotate(180deg)';
+        }
+      });
+    });
+  }
+
+  /* ----------------------------------------------------------
+   *  DATA-DRIVEN BUILDERS — All 32 components
+   *  Each reads minimal HTML + data-* attrs, builds full DOM
+   * -------------------------------------------------------- */
+
+  /* 13. Math Stepper — builds from minimal step divs */
+  function initMathSteppers() {
+    document.querySelectorAll('.math-stepper').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var steps = el.querySelectorAll('.math-step');
+      steps.forEach(function(step, i) {
+        var numEl = step.querySelector('.math-step-number');
+        if (numEl && !numEl.dataset.num) numEl.dataset.num = i + 1;
+      });
+    });
+  }
+
+  /* 15. Architecture Diff — data-driven before/after */
+  function initArchDiffs() {
+    document.querySelectorAll('.arch-diff[data-before]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      el.innerHTML =
+        '<div class="arch-diff-before"><div class="arch-diff-label arch-diff-label--before">Before</div>' +
+        '<p>' + el.dataset.before + '</p></div>' +
+        '<div class="arch-diff-divider"><span>&rarr;</span></div>' +
+        '<div class="arch-diff-after"><div class="arch-diff-label arch-diff-label--after">After</div>' +
+        '<p>' + el.dataset.after + '</p></div>';
+    });
+  }
+
+  /* 16. Evolution Stepper — data-driven from data-steps JSON */
+  function initEvoSteppers() {
+    document.querySelectorAll('.evolution-stepper[data-steps]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var steps = JSON.parse(el.dataset.steps);
+      var html = '';
+      steps.forEach(function(s, i) {
+        var active = s.active ? ' evo-step--active' : '';
+        html += '<div class="evo-step' + active + '">' +
+          '<div class="evo-step-badge">' + s.badge + '</div>' +
+          '<div class="evo-step-title">' + s.title + '</div>' +
+          '<div class="evo-step-desc">' + s.desc + '</div></div>';
+        if (s.breaks) {
+          html += '<div class="evo-step-break"><span>' + s.breaks + '</span></div>';
+        }
+      });
+      el.innerHTML = html;
+    });
+  }
+
+  /* 18. Storage Visualizer — data-driven from data-rows JSON */
+  function initStorageViz() {
+    document.querySelectorAll('.storage-viz[data-rows]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var rows = JSON.parse(el.dataset.rows);
+      var legendItems = {};
+      var html = '';
+      rows.forEach(function(row) {
+        html += '<div class="storage-row-label">' + row.label + '</div><div class="storage-row">';
+        row.blocks.forEach(function(b) {
+          html += '<div class="storage-block storage-block--' + b.type + '" style="flex:' + b.flex + '">' + b.name + '</div>';
+          legendItems[b.type] = b.name;
+        });
+        html += '</div>';
+      });
+      html += '<div class="storage-legend">';
+      Object.keys(legendItems).forEach(function(type) {
+        html += '<span class="storage-legend-item storage-legend-item--' + type + '">' + legendItems[type] + '</span>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+    });
+  }
+
+  /* 20. Flow Stepper — already has HTML steps, JS adds navigation */
+  function initFlowSteppers() {
+    document.querySelectorAll('.flow-stepper').forEach(function(el) {
+      if (el.dataset.flowInit) return; el.dataset.flowInit = '1';
+      var steps = el.querySelectorAll('.flow-step');
+      var controls = el.querySelector('.flow-stepper-controls');
+      if (!controls || steps.length === 0) return;
+
+      var current = parseInt(el.dataset.current || '0');
+      var prevBtn = controls.querySelector('.flow-prev');
+      var nextBtn = controls.querySelector('.flow-next');
+      var progress = controls.querySelector('.flow-progress');
+
+      // Build timeline
+      var timeline = document.createElement('div');
+      timeline.className = 'flow-timeline';
+      for (var t = 0; t < steps.length; t++) {
+        if (t > 0) {
+          var line = document.createElement('div');
+          line.className = 'flow-timeline-line';
+          timeline.appendChild(line);
+        }
+        var node = document.createElement('div');
+        node.className = 'flow-timeline-node';
+        node.textContent = t + 1;
+        timeline.appendChild(node);
+      }
+      el.insertBefore(timeline, steps[0]);
+
+      function goToStep(n) {
+        current = Math.max(0, Math.min(n, steps.length - 1));
+        steps.forEach(function(s, i) { s.classList.toggle('active', i === current); });
+        var nodes = timeline.querySelectorAll('.flow-timeline-node');
+        var lines = timeline.querySelectorAll('.flow-timeline-line');
+        nodes.forEach(function(nd, i) {
+          nd.classList.toggle('active', i <= current);
+          nd.classList.toggle('current', i === current);
+        });
+        lines.forEach(function(ln, i) { ln.classList.toggle('active', i < current); });
+        prevBtn.disabled = current === 0;
+        nextBtn.disabled = current === steps.length - 1;
+        progress.textContent = 'Step ' + (current + 1) + ' of ' + steps.length;
+      }
+      prevBtn.addEventListener('click', function() { goToStep(current - 1); });
+      nextBtn.addEventListener('click', function() { goToStep(current + 1); });
+      goToStep(current);
+    });
+  }
+
+  /* 21. Packet Viewer — data-driven from data-fields JSON */
+  function initPacketViewers() {
+    document.querySelectorAll('.packet-viewer[data-fields]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var title = el.dataset.title || 'TCP Segment';
+      var fields = JSON.parse(el.dataset.fields);
+      var html = '<div class="packet-header">' + title + '</div><div class="packet-fields">';
+      fields.forEach(function(f) {
+        var cls = 'packet-field' + (f.width ? ' pkt-' + f.width : '') + (f.highlight ? ' packet-field--highlight' : '');
+        html += '<div class="' + cls + '"><span class="packet-field-name">' + f.name + '</span>' +
+          '<span class="packet-field-value">' + f.value + '</span>' +
+          (f.note ? '<span class="packet-field-note">' + f.note + '</span>' : '') + '</div>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+    });
+  }
+
+  /* 22. Schema Viewer — data-driven from data-tables JSON */
+  function initSchemaViewers() {
+    document.querySelectorAll('.schema-viewer[data-tables]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var tables = JSON.parse(el.dataset.tables);
+      var html = '';
+      tables.forEach(function(tbl) {
+        html += '<div class="schema-table"><div class="schema-table-header"><i class="fas fa-table"></i> ' + tbl.name + '</div><div class="schema-columns">';
+        tbl.columns.forEach(function(col) {
+          var cls = 'schema-col' + (col.pk ? ' schema-col--pk' : '') + (col.fk ? ' schema-col--fk' : '');
+          var icon = col.pk ? '&#128273;' : (col.fk ? '&#128279;' : '');
+          var constraint = col.pk ? 'PK' : (col.fk ? 'FK &rarr; ' + col.fk : (col.constraint || ''));
+          html += '<div class="' + cls + '"><span class="schema-col-icon">' + icon + '</span>' +
+            '<span class="schema-col-name">' + col.name + '</span>' +
+            '<span class="schema-col-type">' + col.type + '</span>' +
+            '<span class="schema-col-constraint">' + constraint + '</span></div>';
+        });
+        html += '</div></div>';
+      });
+      el.innerHTML = html;
+    });
+  }
+
+  /* 24. Log Viewer — data-driven from data-entries JSON */
+  function initLogViewers() {
+    document.querySelectorAll('.log-viewer[data-entries]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var entries = JSON.parse(el.dataset.entries);
+      var html = '';
+      entries.forEach(function(e) {
+        var level = (e.level || 'info').toLowerCase();
+        html += '<div class="log-entry log-entry--' + level + '">' +
+          '<span class="log-timestamp">' + e.time + '</span>' +
+          '<span class="log-level">' + level.toUpperCase() + '</span>' +
+          '<span class="log-message">' + e.msg + '</span></div>';
+      });
+      el.innerHTML = html;
+    });
+  }
+
+  /* 25. Error Block — data-driven from data-* attrs */
+  function initErrorBlocks() {
+    document.querySelectorAll('.error-block[data-code]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var type = el.dataset.type || 'postgres';
+      el.classList.add('error-block--' + type);
+      el.innerHTML =
+        '<div class="error-block-header">' + (el.dataset.header || type + ' Error') + '</div>' +
+        '<div class="error-block-code">' + el.dataset.code + '</div>' +
+        '<div class="error-block-message">' + el.dataset.message + '</div>' +
+        (el.dataset.detail ? '<div class="error-block-detail">' + el.dataset.detail + '</div>' : '');
+    });
+  }
+
+  /* 26. Query Plan — data-driven from data-plan JSON */
+  function initQueryPlans() {
+    document.querySelectorAll('.query-plan[data-plan]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var plan = JSON.parse(el.dataset.plan);
+      function buildNode(node) {
+        var cls = node.children ? 'plan-node plan-node--root' : 'plan-node--child';
+        var html = '<div class="' + cls + '">' +
+          '<span class="plan-node-type plan-node-type--' + node.type + '">' + node.label + '</span>' +
+          '<div class="plan-node-stats">' + node.stats + '</div>' +
+          (node.note ? '<div class="plan-node-note">&#9888; ' + node.note + '</div>' : '');
+        if (node.children) {
+          node.children.forEach(function(child) { html += buildNode(child); });
+        }
+        html += '</div>';
+        return html;
+      }
+      el.innerHTML = buildNode(plan);
+    });
+  }
+
+  /* 27. Dashboard — data-driven from data-metrics JSON */
+  function initDashboards() {
+    document.querySelectorAll('.dashboard[data-metrics]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var metrics = JSON.parse(el.dataset.metrics);
+      var html = '';
+      metrics.forEach(function(m) {
+        var cls = 'dashboard-metric' + (m.status ? ' dashboard-metric--' + m.status : '');
+        html += '<div class="' + cls + '">' +
+          '<div class="dashboard-metric-label">' + m.label + '</div>' +
+          '<div class="dashboard-metric-value">' + m.value + '</div>' +
+          (m.trend ? '<div class="dashboard-metric-trend dashboard-metric-trend--' + m.dir + '">' + m.trend + '</div>' : '') +
+          '</div>';
+      });
+      el.innerHTML = html;
+    });
+  }
+
+  /* 28. Interview Chat — data-driven from child elements with data-* attrs */
+  function initInterviewChats() {
+    document.querySelectorAll('.interview-chat[data-chat]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var chat = JSON.parse(el.dataset.chat);
+      var html = '<div class="chat-header"><div class="chat-header-left">' +
+        '<span class="chat-header-dot"></span>' +
+        '<span class="chat-header-title">' + (chat.title || 'System Design Round') + '</span></div>' +
+        '<div class="chat-header-meta">' +
+        (chat.topic ? '<span class="chat-header-topic"><i class="fa-solid fa-link"></i> ' + chat.topic + '</span>' : '') +
+        (chat.duration ? '<span class="chat-header-duration"><i class="fa-regular fa-clock"></i> ' + chat.duration + '</span>' : '') +
+        '</div></div>';
+      chat.messages.forEach(function(m) {
+        if (m.phase) {
+          html += '<div class="chat-phase"><span>' + m.phase + '</span></div>';
+        } else if (m.typing) {
+          html += '<div class="chat-typing"><div class="chat-avatar">' + m.avatar + '</div><span class="chat-typing-text">typing...</span></div>';
+        } else {
+          var role = m.role || 'candidate';
+          html += '<div class="chat-message chat-message--' + role + '">' +
+            '<div class="chat-avatar">' + m.avatar + '</div><div class="chat-content">' +
+            '<div class="chat-meta"><span class="chat-name">' + m.name + '</span><span class="chat-time">' + m.time + '</span></div>' +
+            '<div class="chat-bubble">' + m.text + '</div></div></div>';
+          if (m.score) {
+            var scoreCls = m.scoreBad ? ' chat-score--bad' : '';
+            var icon = m.scoreBad ? 'fa-xmark' : 'fa-check';
+            html += '<div class="chat-score' + scoreCls + '"><i class="fa-solid ' + icon + '"></i> ' + m.score + '</div>';
+          }
+        }
+      });
+      el.innerHTML = html;
+    });
+  }
+
+  /* 29. Knowledge Check — data-driven from data-* attrs */
+  function initKnowledgeChecks() {
+    document.querySelectorAll('.knowledge-check[data-question]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var options = JSON.parse(el.dataset.options);
+      var name = 'kc-' + Math.random().toString(36).slice(2, 8);
+      var html = '<div class="kc-question">' + el.dataset.question + '</div><div class="kc-options">';
+      options.forEach(function(opt, i) {
+        var correct = opt.correct ? ' data-correct="true"' : '';
+        html += '<label class="kc-option"' + correct + '><input type="radio" name="' + name + '" value="' + i + '"> ' + opt.text + '</label>';
+      });
+      html += '</div><div class="kc-explanation">' + el.dataset.explanation + '</div>';
+      el.innerHTML = html;
+    });
+  }
+
+  /* 30. Code Walkthrough — CSS ::after handles tooltips via data-cw-tip attr.
+   *     This builder just marks annotated lines for styling if needed. */
+  function initCodeWalkthroughs() {
+    document.querySelectorAll('.code-walkthrough').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      // CSS already renders tooltip via ::after { content: attr(data-cw-tip) }
+      // Just ensure position:relative on annotated lines
+      el.querySelectorAll('.cw-line[data-cw-tip]').forEach(function(line) {
+        line.style.position = 'relative';
+      });
+    });
+  }
+
+  /* 31. Scorecard — data-driven from data-scorecard JSON */
+  function initScorecards() {
+    document.querySelectorAll('.scorecard[data-scorecard]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var sc = JSON.parse(el.dataset.scorecard);
+      var circumference = 2 * Math.PI * 34;
+      var html = '<div class="scorecard-header">' +
+        '<span class="scorecard-title"><i class="fa-solid fa-chart-pie"></i> ' + (sc.title || 'Interview Performance') + '</span>' +
+        '<span class="scorecard-verdict scorecard-verdict--' + sc.verdictClass + '">' + sc.verdict + '</span></div>' +
+        '<div class="scorecard-gauges">';
+      sc.criteria.forEach(function(c) {
+        var dashLen = (c.score / 100) * circumference;
+        var color = c.score >= 70 ? '#34d399' : (c.score >= 40 ? '#fbbf24' : '#f87171');
+        html += '<div class="scorecard-gauge" data-score="' + c.score + '">' +
+          '<svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="5"/>' +
+          '<circle class="sg-ring" cx="40" cy="40" r="34" fill="none" stroke="' + color + '" stroke-width="5" stroke-dasharray="' + dashLen.toFixed(0) + ' ' + circumference.toFixed(0) + '" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 40 40)"/></svg>' +
+          '<span class="sg-value">' + c.score + '</span>' +
+          '<span class="sg-label">' + c.label + '</span></div>';
+      });
+      html += '</div><div class="scorecard-details">';
+      sc.criteria.forEach(function(c) {
+        var color = c.score >= 70 ? '#34d399' : (c.score >= 40 ? '#fbbf24' : '#f87171');
+        var rating = c.score >= 70 ? 'strong' : (c.score >= 40 ? 'mixed' : 'weak');
+        var ratingText = c.score >= 70 ? 'Strong' : (c.score >= 40 ? 'Mixed' : 'Weak');
+        html += '<div class="scorecard-row"><span class="scorecard-dot" style="background:' + color + '"></span>' +
+          '<span class="scorecard-criteria">' + c.label + '</span>' +
+          '<span class="scorecard-note">' + c.note + '</span>' +
+          '<span class="scorecard-rating scorecard-rating--' + rating + '">' + ratingText + '</span></div>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+    });
+  }
+
+  /* 39. Dependency Graph — Render-then-connect approach
+   *  Step 1: Render nodes in flex layers (browser handles layout)
+   *  Step 2: After paint, measure real positions, draw SVG edges
+   *  Step 3: Add drag + hover interactivity */
+  function initDepGraphs() {
+    document.querySelectorAll('.dep-graph[data-graph]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var g = JSON.parse(el.dataset.graph);
+      var title = g.title || 'Service Dependencies';
+      var edges = g.edges || [];
+
+      // Step 1: Build flex layout (no absolute positioning)
+      // Count total nodes
+      var nodeCount = g.layers.reduce(function(sum, l) { return sum + l.length; }, 0);
+      var html = '<div class="dep-graph-header"><span><i class="fa-solid fa-diagram-project"></i> ' + title + '</span><span class="dep-graph-count">' + nodeCount + ' nodes</span></div>';
+      html += '<div class="dep-graph-body"><button class="dep-graph-reset"><i class="fa-solid fa-rotate-left"></i> Reset</button><svg class="dep-graph-canvas"></svg>';
+      var layerLabels = g.layerLabels || [];
+      g.layers.forEach(function(layer, li) {
+        var tag = layerLabels[li] ? '<span class="dep-layer-tag">' + layerLabels[li] + '</span>' : '';
+        html += '<div class="dep-layer">' + tag;
+        layer.forEach(function(node, ni) {
+          var cls = 'dep-node' + (node.status ? ' dep-node--' + node.status : '');
+          var icon = node.icon ? '<i class="fa-solid ' + node.icon + '"></i> ' : '';
+          var tip = node.tip ? '<span class="dep-node-tip">' + node.tip + '</span>' : '';
+          html += '<div class="' + cls + '" data-nid="' + li + '-' + ni + '">' + icon + node.name + tip + '</div>';
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+
+      // Auto-generate edges if not provided
+      if (edges.length === 0) {
+        g.layers.forEach(function(layer, li) {
+          if (li >= g.layers.length - 1) return;
+          layer.forEach(function(_, ni) {
+            g.layers[li + 1].forEach(function(_, nj) {
+              edges.push([li, ni, li + 1, nj]);
+            });
+          });
+        });
+      }
+
+      // Step 2: After layout, measure and draw SVG
+      requestAnimationFrame(function() { setTimeout(function() {
+        var body = el.querySelector('.dep-graph-body');
+        var svg = el.querySelector('.dep-graph-canvas');
+        var bodyR = body.getBoundingClientRect();
+        svg.style.width = bodyR.width + 'px';
+        svg.style.height = bodyR.height + 'px';
+        svg.setAttribute('width', bodyR.width);
+        svg.setAttribute('height', bodyR.height);
+
+        function drawEdges() {
+          svg.innerHTML = '';
+          edges.forEach(function(e) {
+            var fromEl = body.querySelector('[data-nid="' + e[0] + '-' + e[1] + '"]');
+            var toEl = body.querySelector('[data-nid="' + e[2] + '-' + e[3] + '"]');
+            if (!fromEl || !toEl) return;
+            var fR = fromEl.getBoundingClientRect();
+            var tR = toEl.getBoundingClientRect();
+            var x1 = fR.left + fR.width / 2 - bodyR.left;
+            var y1 = fR.bottom - bodyR.top;
+            var x2 = tR.left + tR.width / 2 - bodyR.left;
+            var y2 = tR.top - bodyR.top;
+            var cy1 = y1 + (y2 - y1) * 0.35;
+            var cy2 = y1 + (y2 - y1) * 0.65;
+            var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', 'M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + cy1 + ',' + x2 + ' ' + cy2 + ',' + x2 + ' ' + y2);
+            path.dataset.from = e[0] + '-' + e[1];
+            path.dataset.to = e[2] + '-' + e[3];
+            svg.appendChild(path);
+          });
+        }
+        drawEdges();
+
+        // Step 3: Hover — highlight connected edges
+        var allPaths = function() { return svg.querySelectorAll('path'); };
+        body.querySelectorAll('.dep-node').forEach(function(node) {
+          var nid = node.dataset.nid;
+          node.addEventListener('mouseenter', function() {
+            allPaths().forEach(function(p) {
+              if (p.dataset.from === nid || p.dataset.to === nid) p.classList.add('dg-highlight');
+              else p.classList.add('dg-dim');
+            });
+          });
+          node.addEventListener('mouseleave', function() {
+            allPaths().forEach(function(p) { p.classList.remove('dg-highlight', 'dg-dim'); });
+          });
+        });
+
+        // Step 3b: Drag support
+        var dragNode = null, dragStartX = 0, dragStartY = 0, origLeft = 0, origTop = 0;
+        body.addEventListener('mousedown', function(ev) {
+          var node = ev.target.closest('.dep-node');
+          if (!node) return;
+          ev.preventDefault();
+          dragNode = node;
+          dragNode.style.position = 'relative';
+          dragNode.classList.add('dg-dragging');
+          dragStartX = ev.clientX;
+          dragStartY = ev.clientY;
+          origLeft = parseInt(dragNode.style.left || '0');
+          origTop = parseInt(dragNode.style.top || '0');
+          dragNode.style.zIndex = '5';
+          dragNode.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mousemove', function(ev) {
+          if (!dragNode) return;
+          var dx = ev.clientX - dragStartX;
+          var dy = ev.clientY - dragStartY;
+          dragNode.style.left = (origLeft + dx) + 'px';
+          dragNode.style.top = (origTop + dy) + 'px';
+          // Redraw edges
+          svg.innerHTML = '';
+          bodyR = body.getBoundingClientRect();
+          edges.forEach(function(e) {
+            var fromEl = body.querySelector('[data-nid="' + e[0] + '-' + e[1] + '"]');
+            var toEl = body.querySelector('[data-nid="' + e[2] + '-' + e[3] + '"]');
+            if (!fromEl || !toEl) return;
+            var fR = fromEl.getBoundingClientRect();
+            var tR = toEl.getBoundingClientRect();
+            var x1 = fR.left + fR.width / 2 - bodyR.left;
+            var y1 = fR.bottom - bodyR.top;
+            var x2 = tR.left + tR.width / 2 - bodyR.left;
+            var y2 = tR.top - bodyR.top;
+            var cy1 = y1 + (y2 - y1) * 0.35;
+            var cy2 = y1 + (y2 - y1) * 0.65;
+            var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', 'M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + cy1 + ',' + x2 + ' ' + cy2 + ',' + x2 + ' ' + y2);
+            path.dataset.from = e[0] + '-' + e[1];
+            path.dataset.to = e[2] + '-' + e[3];
+            svg.appendChild(path);
+          });
+        });
+        document.addEventListener('mouseup', function() {
+          if (dragNode) { dragNode.style.zIndex = ''; dragNode.style.cursor = ''; dragNode.classList.remove('dg-dragging'); }
+          dragNode = null;
+        });
+
+        // Reset button
+        var resetBtn = body.querySelector('.dep-graph-reset');
+        if (resetBtn) {
+          resetBtn.addEventListener('click', function() {
+            body.querySelectorAll('.dep-node').forEach(function(n) {
+              n.style.left = ''; n.style.top = ''; n.style.position = '';
+            });
+            setTimeout(function() {
+              bodyR = body.getBoundingClientRect();
+              svg.style.width = bodyR.width + 'px';
+              svg.style.height = bodyR.height + 'px';
+              svg.setAttribute('width', bodyR.width);
+              svg.setAttribute('height', bodyR.height);
+              drawEdges();
+            }, 20);
+          });
+        }
+      }, 50); }); // setTimeout ensures paint is complete
+    });
+
+    // Backward compat
+    document.querySelectorAll('.dep-graph:not([data-graph])').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var nodes = Array.from(el.querySelectorAll('.dep-node'));
+      if (nodes.length === 0) return;
+      var layers = [], layer = [];
+      nodes.forEach(function(node, i) {
+        layer.push({
+          name: node.textContent.replace(/🔒/g, '').trim(),
+          status: node.classList.contains('dep-node--done') ? 'done' :
+                  node.classList.contains('dep-node--current') ? 'current' :
+                  node.classList.contains('dep-node--locked') ? 'locked' : ''
+        });
+        if (layer.length === 3 || i === nodes.length - 1) { layers.push(layer); layer = []; }
+      });
+      el.dataset.graph = JSON.stringify({ title: el.dataset.title || 'Service Dependencies', layers: layers });
+      el.dataset.built = '';
+      initDepGraphs();
+    });
+  }
+
+  /* 73. B+ Tree Navigator — SVG connectors + animated search */
+  function initBtreeNavs() {
+    document.querySelectorAll('.btree-nav').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+
+      // Wrap content in body if needed
+      if (!el.querySelector('.btree-body')) {
+        var children = Array.from(el.children);
+        var bodyDiv = document.createElement('div');
+        bodyDiv.className = 'btree-body';
+        children.forEach(function(c) { bodyDiv.appendChild(c); });
+        el.appendChild(bodyDiv);
+      }
+      var body = el.querySelector('.btree-body');
+
+      // Add SVG layer
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.classList.add('btree-svg');
+      body.insertBefore(svg, body.firstChild);
+
+      // Add header
+      if (!el.querySelector('.btree-header')) {
+        var header = document.createElement('div');
+        header.className = 'btree-header';
+        header.innerHTML = '<span><i class="fa-solid fa-sitemap"></i> B+ Tree Lookup</span>' +
+          '<span class="btree-search-info">click any key to search</span>' +
+          '<button class="btree-reset"><i class="fa-solid fa-rotate-left"></i> Reset</button>';
+        el.insertBefore(header, el.firstChild);
+      }
+
+      // Add narration bar
+      var narration = document.createElement('div');
+      narration.className = 'btree-narration';
+      narration.textContent = 'Click any key in the tree to visualize the B+ tree search path.';
+      el.insertBefore(narration, body);
+
+      // Add level labels
+      var levels = body.querySelectorAll('.btree-level');
+      var levelNames = ['Root', 'Internal', 'Leaf'];
+      levels.forEach(function(lvl, i) {
+        if (!lvl.querySelector('.btree-level-tag')) {
+          var tag = document.createElement('span');
+          tag.className = 'btree-level-tag';
+          tag.textContent = i < levelNames.length ? levelNames[i] : 'L' + i;
+          lvl.appendChild(tag);
+        }
+      });
+
+      // Tag nodes with level/index for connector mapping
+      levels.forEach(function(lvl, li) {
+        var nodes = lvl.querySelectorAll('.btree-node');
+        nodes.forEach(function(node, ni) {
+          node.dataset.lvl = li;
+          node.dataset.idx = ni;
+        });
+      });
+
+      // Draw SVG connectors after layout
+      var allLines = [];
+      requestAnimationFrame(function() { setTimeout(function() {
+        var bodyR = body.getBoundingClientRect();
+        svg.setAttribute('width', bodyR.width);
+        svg.setAttribute('height', bodyR.height);
+        svg.style.width = bodyR.width + 'px';
+        svg.style.height = bodyR.height + 'px';
+
+        // Connect each parent node to its children
+        // B+ tree rule: node with N keys has N+1 children
+        for (var li = 0; li < levels.length - 1; li++) {
+          var parentNodes = levels[li].querySelectorAll('.btree-node');
+          var childNodes = levels[li + 1].querySelectorAll('.btree-node');
+          var childIdx = 0;
+          parentNodes.forEach(function(pNode) {
+            var keyCount = pNode.querySelectorAll('.btree-key').length;
+            var childCount = keyCount + 1; // B+ tree: N keys → N+1 children
+            var pR = pNode.getBoundingClientRect();
+            var px = pR.left + pR.width / 2 - bodyR.left;
+            var py = pR.bottom - bodyR.top;
+
+            for (var c = 0; c < childCount && childIdx < childNodes.length; c++, childIdx++) {
+              var cNode = childNodes[childIdx];
+              var cR = cNode.getBoundingClientRect();
+              var cx = cR.left + cR.width / 2 - bodyR.left;
+              var cy = cR.top - bodyR.top;
+
+              var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+              line.setAttribute('x1', px);
+              line.setAttribute('y1', py);
+              line.setAttribute('x2', cx);
+              line.setAttribute('y2', cy);
+              line.dataset.parent = pNode.dataset.lvl + '-' + pNode.dataset.idx;
+              line.dataset.child = cNode.dataset.lvl + '-' + cNode.dataset.idx;
+              svg.appendChild(line);
+              allLines.push(line);
+            }
+          });
+        }
+
+        // Animated search on key click
+        function animateSearch(targetVal) {
+          // Clear previous
+          body.querySelectorAll('.bt-visited,.bt-match,.bt-dim').forEach(function(e) {
+            e.classList.remove('bt-visited', 'bt-match', 'bt-dim');
+          });
+          allLines.forEach(function(l) { l.classList.remove('bt-active', 'bt-active-leaf'); });
+
+          // Dim all nodes
+          body.querySelectorAll('.btree-node').forEach(function(n) { n.classList.add('bt-dim'); });
+
+          // Walk the tree level by level with animation delay
+          var searchPath = []; // [{node, keyIdx, childIdx}]
+          var childOffset = 0;
+
+          for (var li = 0; li < levels.length; li++) {
+            var nodes = levels[li].querySelectorAll('.btree-node');
+            // Find which node at this level we should visit
+            var visitNode, visitKeyIdx = -1, nextChildIdx = 0;
+
+            if (li === 0) {
+              visitNode = nodes[0]; // root
+            } else {
+              // Use childIdx from previous step
+              var prevStep = searchPath[searchPath.length - 1];
+              var cumIdx = 0;
+              // Count children of all parent nodes before the visited one
+              var parentLevel = levels[li - 1].querySelectorAll('.btree-node');
+              for (var pi = 0; pi < parentLevel.length; pi++) {
+                if (parentLevel[pi] === prevStep.node) {
+                  visitNode = nodes[cumIdx + prevStep.childIdx];
+                  break;
+                }
+                cumIdx += parentLevel[pi].querySelectorAll('.btree-key').length + 1;
+              }
+            }
+
+            if (!visitNode) break;
+
+            var keys = visitNode.querySelectorAll('.btree-key');
+            var vals = Array.from(keys).map(function(k) { return parseInt(k.textContent); });
+            var isLeaf = visitNode.classList.contains('leaf');
+
+            if (isLeaf) {
+              // Find exact match
+              var foundIdx = vals.indexOf(targetVal);
+              searchPath.push({ node: visitNode, keyIdx: foundIdx, childIdx: -1, isLeaf: true });
+            } else {
+              // Find which child pointer to follow
+              var ci = 0;
+              for (var ki = 0; ki < vals.length; ki++) {
+                if (targetVal < vals[ki]) { ci = ki; visitKeyIdx = ki; break; }
+                if (ki === vals.length - 1) { ci = ki + 1; visitKeyIdx = ki; }
+              }
+              searchPath.push({ node: visitNode, keyIdx: visitKeyIdx, childIdx: ci, isLeaf: false });
+            }
+          }
+
+          // Animate step by step
+          var info = el.querySelector('.btree-search-info');
+          if (info) info.textContent = 'searching: ' + targetVal;
+
+          searchPath.forEach(function(step, si) {
+            setTimeout(function() {
+              step.node.classList.remove('bt-dim');
+              step.node.classList.add('bt-visited');
+
+              if (step.isLeaf && step.keyIdx >= 0) {
+                var keys = step.node.querySelectorAll('.btree-key');
+                keys[step.keyIdx].classList.add('bt-match');
+                narration.textContent = '✓ Found ' + targetVal + ' in leaf node!';
+                narration.style.color = '#34d399';
+              } else if (step.isLeaf) {
+                narration.textContent = '✗ Key ' + targetVal + ' not found in leaf.';
+                narration.style.color = '#f87171';
+              } else {
+                var keys = step.node.querySelectorAll('.btree-key');
+                if (step.keyIdx >= 0) keys[step.keyIdx].classList.add('bt-match');
+                var keyVal = step.keyIdx >= 0 ? parseInt(keys[step.keyIdx].textContent) : '?';
+                var dir = targetVal < keyVal ? 'go LEFT' : 'go RIGHT';
+                var depth = si === 0 ? 'Root' : 'Level ' + si;
+                narration.textContent = depth + ': compare ' + targetVal + ' vs ' + keyVal + ' → ' + dir;
+                narration.style.color = '';
+              }
+
+              // Highlight the connector line to this node
+              if (si > 0) {
+                var prevId = searchPath[si - 1].node.dataset.lvl + '-' + searchPath[si - 1].node.dataset.idx;
+                var currId = step.node.dataset.lvl + '-' + step.node.dataset.idx;
+                allLines.forEach(function(l) {
+                  if (l.dataset.parent === prevId && l.dataset.child === currId) {
+                    l.classList.add(step.isLeaf ? 'bt-active-leaf' : 'bt-active');
+                  }
+                });
+              }
+            }, si * 600); // 600ms per step
+          });
+        }
+
+        // Click handler on any key
+        body.querySelectorAll('.btree-key').forEach(function(key) {
+          key.addEventListener('click', function() {
+            var val = parseInt(key.textContent);
+            if (!isNaN(val)) animateSearch(val);
+          });
+        });
+
+        // Reset button
+        var resetBtn = el.querySelector('.btree-reset');
+        if (resetBtn) {
+          resetBtn.addEventListener('click', function() {
+            body.querySelectorAll('.bt-visited,.bt-match,.bt-dim').forEach(function(e) {
+              e.classList.remove('bt-visited', 'bt-match', 'bt-dim');
+            });
+            allLines.forEach(function(l) { l.classList.remove('bt-active', 'bt-active-leaf'); });
+            narration.textContent = 'Click any key in the tree to visualize the B+ tree search path.';
+            narration.style.color = '';
+            var info = el.querySelector('.btree-search-info');
+            if (info) info.textContent = 'click any key to search';
+          });
+        }
+      }, 60); });
+    });
+  }
+
+  /* 72. Glossary Panel — auto-build header, search, alpha sidebar */
+  function initGlossaryPanels() {
+    document.querySelectorAll('.glossary-panel').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var list = el.querySelector('.glossary-panel-list');
+      if (!list) return;
+      var items = list.querySelectorAll('.glossary-item');
+      var letters = list.querySelectorAll('.glossary-letter');
+
+      // Count terms
+      var count = items.length;
+
+      // Build header
+      var header = document.createElement('div');
+      header.className = 'glossary-panel-header';
+      header.innerHTML = '<span><i class="fa-solid fa-book"></i> Key Terms</span><span class="glossary-panel-count">' + count + ' terms</span>';
+      el.insertBefore(header, el.firstChild);
+
+      // Hide old title
+      var oldTitle = el.querySelector('.glossary-panel-title');
+      if (oldTitle) oldTitle.style.display = 'none';
+
+      // Build search
+      var search = document.createElement('div');
+      search.className = 'glossary-search';
+      search.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Filter terms...">';
+      el.insertBefore(search, list);
+      var input = search.querySelector('input');
+
+      // Build body wrapper with alpha sidebar
+      var body = document.createElement('div');
+      body.className = 'glossary-body';
+
+      // Alpha sidebar
+      var uniqueLetters = [];
+      letters.forEach(function(l) { uniqueLetters.push(l.textContent.trim()); });
+      if (uniqueLetters.length > 3) {
+        var alpha = document.createElement('div');
+        alpha.className = 'glossary-alpha';
+        uniqueLetters.forEach(function(letter) {
+          var btn = document.createElement('button');
+          btn.className = 'glossary-alpha-btn';
+          btn.textContent = letter;
+          btn.addEventListener('click', function() {
+            letters.forEach(function(lEl) {
+              if (lEl.textContent.trim() === letter) {
+                lEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            });
+          });
+          alpha.appendChild(btn);
+        });
+        body.appendChild(alpha);
+      }
+
+      // Move list into body wrapper
+      el.insertBefore(body, list);
+      body.appendChild(list);
+
+      // Search filter
+      input.addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        items.forEach(function(item) {
+          var term = item.querySelector('.glossary-term');
+          var def = item.querySelector('.glossary-def');
+          var text = (term ? term.textContent : '') + ' ' + (def ? def.textContent : '');
+          item.classList.toggle('gl-hidden', q && text.toLowerCase().indexOf(q) === -1);
+        });
+        // Hide letter headers if all items under them are hidden
+        letters.forEach(function(lEl) {
+          var next = lEl.nextElementSibling;
+          var anyVisible = false;
+          while (next && !next.classList.contains('glossary-letter')) {
+            if (next.classList.contains('glossary-item') && !next.classList.contains('gl-hidden')) anyVisible = true;
+            next = next.nextElementSibling;
+          }
+          lEl.style.display = anyVisible || !q ? '' : 'none';
+        });
+      });
+
+      // Auto-link: scan page text and wrap matching glossary terms with tooltips
+      var termMap = {};
+      items.forEach(function(item) {
+        var termEl = item.querySelector('.glossary-term');
+        var defEl = item.querySelector('.glossary-def');
+        if (termEl && defEl) {
+          termMap[termEl.textContent.trim()] = defEl.textContent.trim();
+        }
+      });
+
+      // Sort terms by length (longest first) to avoid partial matches
+      var termKeys = Object.keys(termMap).sort(function(a, b) { return b.length - a.length; });
+      if (termKeys.length === 0) return;
+
+      // Build regex matching all terms (case-insensitive, word boundary)
+      var escapedTerms = termKeys.map(function(t) {
+        return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      });
+      var regex = new RegExp('\\b(' + escapedTerms.join('|') + ')\\b', 'gi');
+
+      // Walk text nodes in the page content (skip glossary panel itself, code, pre, script, etc.)
+      var skipTags = { SCRIPT: 1, STYLE: 1, PRE: 1, CODE: 1, BUTTON: 1, INPUT: 1, TEXTAREA: 1, SVG: 1 };
+      var skipClasses = ['glossary-panel', 'glossary-term', 'glossary-def', 'tooltip-trigger', 'tooltip-rich', 'macos-window', 'code-walkthrough'];
+
+      function shouldSkip(node) {
+        if (skipTags[node.tagName]) return true;
+        if (node.classList) {
+          for (var i = 0; i < skipClasses.length; i++) {
+            if (node.classList.contains(skipClasses[i])) return true;
+          }
+        }
+        // Skip if already a glossary-linked term
+        if (node.dataset && node.dataset.glLinked) return true;
+        return false;
+      }
+
+      function walkTextNodes(root) {
+        var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+          acceptNode: function(node) {
+            var parent = node.parentElement;
+            // Skip nodes inside excluded containers
+            while (parent && parent !== root) {
+              if (shouldSkip(parent)) return NodeFilter.FILTER_REJECT;
+              parent = parent.parentElement;
+            }
+            return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+          }
+        });
+
+        var textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        return textNodes;
+      }
+
+      // Find content container (main, .test-container, or body)
+      var contentRoot = document.querySelector('main') || document.querySelector('.test-container') || document.body;
+      var textNodes = walkTextNodes(contentRoot);
+
+      textNodes.forEach(function(textNode) {
+        var text = textNode.textContent;
+        if (!regex.test(text)) return;
+        regex.lastIndex = 0; // reset after test()
+
+        var frag = document.createDocumentFragment();
+        var lastIdx = 0;
+        var match;
+        regex.lastIndex = 0;
+        while ((match = regex.exec(text)) !== null) {
+          // Add text before match
+          if (match.index > lastIdx) {
+            frag.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
+          }
+          // Create tooltip span for the matched term
+          var matchedTerm = match[1];
+          // Find the exact key (case-insensitive lookup)
+          var defText = '';
+          for (var k = 0; k < termKeys.length; k++) {
+            if (termKeys[k].toLowerCase() === matchedTerm.toLowerCase()) {
+              defText = termMap[termKeys[k]];
+              break;
+            }
+          }
+          var span = document.createElement('span');
+          span.className = 'tooltip-trigger gl-auto-link';
+          span.setAttribute('data-tooltip', defText);
+          span.dataset.glLinked = '1';
+          span.textContent = matchedTerm;
+          frag.appendChild(span);
+          lastIdx = regex.lastIndex;
+        }
+        // Add remaining text
+        if (lastIdx < text.length) {
+          frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+        }
+        textNode.parentNode.replaceChild(frag, textNode);
+      });
+    });
+  }
+
+  /* 41. Multi-File — auto-build titlebar, file icons, tab switching */
+  var fileIcons = {
+    cs: 'fa-solid fa-hashtag', js: 'fa-brands fa-js', ts: 'fa-brands fa-js',
+    py: 'fa-brands fa-python', java: 'fa-brands fa-java', go: 'fa-solid fa-code',
+    rs: 'fa-solid fa-gear', rb: 'fa-solid fa-gem', php: 'fa-brands fa-php',
+    html: 'fa-brands fa-html5', css: 'fa-brands fa-css3-alt', json: 'fa-solid fa-code',
+    sql: 'fa-solid fa-database', yaml: 'fa-solid fa-file-code', yml: 'fa-solid fa-file-code',
+    md: 'fa-solid fa-file-lines', txt: 'fa-solid fa-file-lines', xml: 'fa-solid fa-code',
+    sh: 'fa-solid fa-terminal', bash: 'fa-solid fa-terminal', dockerfile: 'fa-brands fa-docker'
+  };
+  function getFileIcon(filename) {
+    var ext = (filename.split('.').pop() || '').toLowerCase();
+    return fileIcons[ext] || 'fa-solid fa-file-code';
+  }
+  function initMultiFiles() {
+    document.querySelectorAll('.multi-file').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+
+      // Add titlebar if missing
+      if (!el.querySelector('.multi-file-titlebar')) {
+        var titlebar = document.createElement('div');
+        titlebar.className = 'multi-file-titlebar';
+        titlebar.innerHTML = '<div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>';
+        el.insertBefore(titlebar, el.firstChild);
+      }
+
+      // Add file icons to tabs
+      el.querySelectorAll('.multi-file-tab').forEach(function(tab) {
+        if (tab.querySelector('i')) return; // already has icon
+        var filename = tab.textContent.trim();
+        var iconCls = getFileIcon(filename);
+        tab.innerHTML = '<i class="' + iconCls + '"></i> ' + filename;
+      });
+
+      // Tab switching
+      var tabs = el.querySelectorAll('.multi-file-tab');
+      var panels = el.querySelectorAll('.multi-file-panel');
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          var target = this.dataset.file;
+          tabs.forEach(function(t) { t.classList.toggle('active', t === tab); });
+          panels.forEach(function(p) { p.classList.toggle('active', p.dataset.file === target); });
+        });
+      });
+
+      // Copy button in titlebar
+      if (!el.querySelector('.mf-copy-btn')) {
+        var titlebar = el.querySelector('.multi-file-titlebar');
+        if (titlebar) {
+          var copyBtn = document.createElement('button');
+          copyBtn.className = 'mf-copy-btn';
+          copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+          copyBtn.setAttribute('aria-label', 'Copy code');
+          copyBtn.addEventListener('click', function() {
+            var activePanel = el.querySelector('.multi-file-panel.active');
+            if (!activePanel) return;
+            var code = activePanel.querySelector('code');
+            if (!code) return;
+            navigator.clipboard.writeText(code.textContent).then(function() {
+              copyBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+              copyBtn.classList.add('copied');
+              setTimeout(function() {
+                copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+                copyBtn.classList.remove('copied');
+              }, 1500);
+            });
+          });
+          titlebar.appendChild(copyBtn);
+        }
+      }
+    });
+  }
+
+  /* 34. Debug Template — data-driven from data-steps JSON */
+  var debugIcons = {
+    observe: 'fa-eye', hypothesize: 'fa-lightbulb',
+    verify: 'fa-magnifying-glass', fix: 'fa-wrench'
+  };
+  function initDebugTemplates() {
+    document.querySelectorAll('.debug-template[data-steps]').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var title = el.dataset.title || 'Debug Walkthrough';
+      var steps = JSON.parse(el.dataset.steps);
+      var html = '<div class="debug-header"><i class="fa-solid fa-bug"></i> ' + title + '</div><div class="debug-steps">';
+      steps.forEach(function(s) {
+        var type = s.type || 'observe';
+        var icon = debugIcons[type] || 'fa-circle';
+        html += '<div class="debug-step debug-step--' + type + '">' +
+          '<div class="debug-step-badge"><i class="fa-solid ' + icon + '"></i></div>' +
+          '<div class="debug-step-content">' +
+          '<div class="debug-step-label">' + s.label + '</div>' +
+          '<div class="debug-step-example">' + s.example + '</div>' +
+          '</div></div>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+    });
+    // Also upgrade existing hardcoded debug templates
+    document.querySelectorAll('.debug-template:not([data-steps])').forEach(function(el) {
+      if (el.dataset.built) return; el.dataset.built = '1';
+      var steps = el.querySelectorAll('.debug-step');
+      var stepTypes = ['observe', 'hypothesize', 'verify', 'fix'];
+      var stepsData = [];
+      steps.forEach(function(step, i) {
+        var labelEl = step.querySelector('.debug-step-label');
+        var exampleEl = step.querySelector('.debug-step-example');
+        if (labelEl && exampleEl) {
+          stepsData.push({
+            type: stepTypes[i] || 'observe',
+            label: labelEl.textContent,
+            example: exampleEl.innerHTML
+          });
+        }
+      });
+      if (stepsData.length === 0) return;
+      var title = el.dataset.title || 'Debug Walkthrough';
+      var html = '<div class="debug-header"><i class="fa-solid fa-bug"></i> ' + title + '</div><div class="debug-steps">';
+      stepsData.forEach(function(s) {
+        var icon = debugIcons[s.type] || 'fa-circle';
+        html += '<div class="debug-step debug-step--' + s.type + '">' +
+          '<div class="debug-step-badge"><i class="fa-solid ' + icon + '"></i></div>' +
+          '<div class="debug-step-content">' +
+          '<div class="debug-step-label">' + s.label + '</div>' +
+          '<div class="debug-step-example">' + s.example + '</div>' +
+          '</div></div>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+    });
+  }
+
   function reinit() {
     /* -- Prevent hljs from touching terminal blocks (not code windows) -- */
     document.querySelectorAll('.macos-window.terminal .macos-body pre code').forEach(function(el) {
@@ -1318,8 +2634,9 @@ document.addEventListener('DOMContentLoaded', () => {
     /* -- Terminal colorizer -- */
     colorizeTerminals();
 
-    /* -- Custom syntax highlighter for code windows -- */
+    /* -- Custom syntax highlighter for code windows + walkthroughs -- */
     colorizeCode();
+    colorizeWalkthrough();
 
     /* -- Semantic icon colors (auto-apply by FA class name) -- */
     colorizeIcons();
@@ -1339,17 +2656,51 @@ document.addEventListener('DOMContentLoaded', () => {
     /* -- Sequence diagrams -- */
     initSequenceDiagrams();
 
-    /* -- Line numbers (skip terminal blocks only) -- */
+    /* -- Estimation calculators -- */
+    initEstimationCalcs();
+    initCalcCountUp();
+
+    /* -- Data-driven component builders -- */
+    initMathSteppers();
+    initArchDiffs();
+    initEvoSteppers();
+    initStorageViz();
+    initFlowSteppers();
+    initPacketViewers();
+    initSchemaViewers();
+    initLogViewers();
+    initErrorBlocks();
+    initQueryPlans();
+    initDashboards();
+    initInterviewChats();
+    initKnowledgeChecks();
+    initCodeWalkthroughs();
+    initScorecards();
+    initDebugTemplates();
+    initDepGraphs();
+    initMultiFiles();
+    initGlossaryPanels();
+    initBtreeNavs();
+    initDataTooltips(); /* re-run for auto-linked glossary terms */
+    colorizeCode(); /* re-run for multi-file panels + custom tag content */
+
+    /* -- Line numbers + JSON highlighting for API bodies -- */
     document.querySelectorAll('pre code').forEach(function(block) {
-      // Skip terminal blocks (not code windows) and already-processed blocks
       if (block.closest('.macos-window.terminal')) return;
       if (block.querySelector('.code-line')) return;
-      var lines = block.innerHTML.split('\n');
+
+      var isApiBody = !!block.closest('.api-body');
+      var lines = (isApiBody ? block.textContent : block.innerHTML).split('\n');
       if (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+
       block.innerHTML = lines.map(function(line, i) {
-        return '<span class="code-line"><span class="line-num">' + (i + 1) + '</span>' + line + '</span>';
+        var content = isApiBody ? tokenizeJSON(line) : line;
+        return '<span class="code-line"><span class="line-num">' + (i + 1) + '</span>' + content + '</span>';
       }).join('\n');
     });
+
+    /* -- Collapsible API bodies -- */
+    initApiCollapsible();
 
     /* -- Copy-to-clipboard buttons -- */
     document.querySelectorAll('.macos-window').forEach(function(win) {
@@ -1543,6 +2894,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -- Flow Steppers: build timeline + initialize state -- */
     document.querySelectorAll('.flow-stepper, .data-flow').forEach(function(stepper) {
+      if (stepper.dataset.flowInit) return;
+      stepper.dataset.flowInit = '1';
+
       var steps = stepper.querySelectorAll('.flow-step');
       if (!steps.length) return;
 
@@ -1973,48 +3327,9 @@ document.addEventListener('DOMContentLoaded', () => {
    * ========================================================== */
 
   /* ----------------------------------------------------------
-   *  E1. Flow Stepper — Previous/Next step navigation
-   *      Tracks current step via data-current attribute.
+   *  E1. Flow Stepper — handled by reinit (timeline + prev/next)
+   *      Duplicate delegated handler removed to prevent double-fire.
    * -------------------------------------------------------- */
-  document.addEventListener('click', function(e) {
-    var btn = e.target.closest('.flow-prev, .flow-next');
-    if (!btn) return;
-    var stepper = btn.closest('.flow-stepper');
-    if (!stepper) return;
-
-    var steps = stepper.querySelectorAll('.flow-step');
-    if (!steps.length) return;
-
-    var current = parseInt(stepper.getAttribute('data-current') || '0', 10);
-    var isNext = btn.classList.contains('flow-next');
-    var next = isNext ? current + 1 : current - 1;
-
-    // Clamp to valid range
-    if (next < 0 || next >= steps.length) return;
-
-    // Hide current step, show next
-    steps[current].classList.remove('active');
-    steps[next].classList.add('active');
-    stepper.setAttribute('data-current', next);
-
-    // Update progress text
-    var progress = stepper.querySelector('.flow-progress');
-    if (progress) {
-      progress.textContent = 'Step ' + (next + 1) + ' of ' + steps.length;
-    }
-
-    // Update dot indicators if present
-    var dots = stepper.querySelectorAll('.flow-dot');
-    dots.forEach(function(dot, i) {
-      dot.classList.toggle('active', i === next);
-    });
-
-    // Disable/enable buttons at boundaries
-    var prevBtn = stepper.querySelector('.flow-prev');
-    var nextBtn = stepper.querySelector('.flow-next');
-    if (prevBtn) prevBtn.disabled = (next === 0);
-    if (nextBtn) nextBtn.disabled = (next === steps.length - 1);
-  });
 
   /* ----------------------------------------------------------
    *  E2. Knowledge Check — single-select quiz with explanation
@@ -2170,45 +3485,835 @@ document.addEventListener('DOMContentLoaded', () => {
    *      standalone data-flow wrapper that doesn't use
    *      .flow-stepper class.)
    * -------------------------------------------------------- */
-  document.addEventListener('click', function(e) {
-    var btn = e.target.closest('.data-flow .flow-prev, .data-flow .flow-next');
-    if (!btn) return;
-    var flow = btn.closest('.data-flow');
-    if (!flow) return;
-
-    // Delegate to same logic as flow-stepper if already handled
-    if (flow.classList.contains('flow-stepper')) return;
-
-    var steps = flow.querySelectorAll('.flow-step');
-    if (!steps.length) return;
-
-    var current = parseInt(flow.getAttribute('data-current') || '0', 10);
-    var isNext = btn.classList.contains('flow-next');
-    var next = isNext ? current + 1 : current - 1;
-
-    if (next < 0 || next >= steps.length) return;
-
-    steps[current].classList.remove('active');
-    steps[next].classList.add('active');
-    flow.setAttribute('data-current', next);
-
-    var progress = flow.querySelector('.flow-progress');
-    if (progress) {
-      progress.textContent = 'Step ' + (next + 1) + ' of ' + steps.length;
-    }
-
-    var dots = flow.querySelectorAll('.flow-dot');
-    dots.forEach(function(dot, i) {
-      dot.classList.toggle('active', i === next);
-    });
-
-    var prevBtn = flow.querySelector('.flow-prev');
-    var nextBtn = flow.querySelector('.flow-next');
-    if (prevBtn) prevBtn.disabled = (next === 0);
-    if (nextBtn) nextBtn.disabled = (next === steps.length - 1);
-  });
+  /* -- Data-flow stepper: handled by reinit (same as flow-stepper) -- */
 
 }); /* end DOMContentLoaded */
+
+/* ==========================================================
+ *  CUSTOM ELEMENTS — <sg-*> tags
+ *  Thin translation layer: reads attrs/children, builds
+ *  the existing div-based HTML, inserts it, existing CSS
+ *  and JS init functions handle the rest.
+ * ========================================================== */
+(function() {
+  function esc(s) { return s ? s.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+  /* 1. <sg-card title="..." icon="..." open> content </sg-card> */
+  customElements.define('sg-card', class extends HTMLElement {
+    connectedCallback() {
+      var t = this.getAttribute('title') || '';
+      var icon = this.getAttribute('icon') || '';
+      var open = this.hasAttribute('open') ? ' open' : '';
+      var iconHtml = icon ? '<i class="' + icon + '"></i> ' : '';
+      var body = this.innerHTML;
+      this.outerHTML = '<div class="card' + open + '"><h3 class="card-title">' + iconHtml + t + '</h3><div class="card-body">' + body + '</div></div>';
+    }
+  });
+
+  /* 2. <sg-collapse title="..." icon="..."> content </sg-collapse> */
+  customElements.define('sg-collapse', class extends HTMLElement {
+    connectedCallback() {
+      var t = this.getAttribute('title') || '';
+      var icon = this.getAttribute('icon') || '';
+      var iconHtml = icon ? ' <i class="' + icon + '"></i>' : '';
+      var body = this.innerHTML;
+      this.outerHTML = '<div class="collapsible"><div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i>' + iconHtml + ' ' + t + '</span></div><div class="collapsible-content"><div class="collapsible-body">' + body + '</div></div></div>';
+    }
+  });
+
+  /* 3. <sg-tabs> <sg-tab title="..." icon="..."> content </sg-tab> ... </sg-tabs> */
+  customElements.define('sg-tab', class extends HTMLElement {
+    connectedCallback() {} // handled by sg-tabs
+  });
+  customElements.define('sg-tabs', class extends HTMLElement {
+    connectedCallback() {
+      var tabs = this.querySelectorAll('sg-tab');
+      var header = '<div class="tab-header" role="tablist">';
+      var panels = '';
+      tabs.forEach(function(tab, i) {
+        var id = 'sgt-' + Math.random().toString(36).slice(2, 8);
+        var title = tab.getAttribute('title') || 'Tab ' + (i + 1);
+        var icon = tab.getAttribute('icon');
+        var iconHtml = icon ? '<i class="' + icon + '"></i> ' : '';
+        var active = i === 0;
+        header += '<button class="tab-btn' + (active ? ' active' : '') + '" data-tab="' + id + '" role="tab" aria-selected="' + active + '">' + iconHtml + title + '</button>';
+        panels += '<div class="tab-panel' + (active ? ' active' : '') + '" id="' + id + '" role="tabpanel">' + tab.innerHTML + '</div>';
+      });
+      header += '</div>';
+      this.outerHTML = '<div class="tab-container">' + header + panels + '</div>';
+    }
+  });
+
+  /* 4. <sg-callout type="danger|success|info|warning|purple" title="..."> text </sg-callout> */
+  customElements.define('sg-callout', class extends HTMLElement {
+    connectedCallback() {
+      var type = this.getAttribute('type') || 'info';
+      var title = this.getAttribute('title') || '';
+      var body = this.innerHTML;
+      var titleHtml = title ? '<strong>' + title + ':</strong> ' : '';
+      this.outerHTML = '<div class="callout-' + type + '">' + titleHtml + body + '</div>';
+    }
+  });
+
+  /* 5. <sg-think hint="..."> question </sg-think> */
+  customElements.define('sg-think', class extends HTMLElement {
+    connectedCallback() {
+      var hint = this.getAttribute('hint') || '';
+      var body = this.innerHTML;
+      var hintHtml = hint ? '<div class="think-hint">Hint: ' + hint + '</div>' : '';
+      this.outerHTML = '<div class="think-first-box"><div class="think-label">Think First</div><p>' + body + '</p>' + hintHtml + '</div>';
+    }
+  });
+
+  /* 6. <sg-math label="..." result="..."> lines </sg-math> */
+  customElements.define('sg-math', class extends HTMLElement {
+    connectedCallback() {
+      var label = this.getAttribute('label') || 'Calculation';
+      var result = this.getAttribute('result') || '';
+      var body = this.innerHTML;
+      var resultHtml = result ? '<div class="math-result">' + result + '</div>' : '';
+      this.outerHTML = '<div class="math-block"><div class="math-label">' + label + '</div>' + body + resultHtml + '</div>';
+    }
+  });
+
+  /* 7. <sg-code file="..." terminal> code </sg-code> */
+  customElements.define('sg-code', class extends HTMLElement {
+    connectedCallback() {
+      var file = this.getAttribute('file') || '';
+      var isTerminal = this.hasAttribute('terminal');
+      var code = this.textContent;
+      this.outerHTML = '<pre data-file="' + esc(file) + '"' + (isTerminal ? ' data-terminal' : '') + '>' + esc(code) + '</pre>';
+    }
+  });
+
+  /* 8. <sg-exercise title="..." difficulty="easy|medium|hard"> content <sg-hint>...</sg-hint> </sg-exercise> */
+  customElements.define('sg-hint', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-exercise', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || '';
+      var diff = this.getAttribute('difficulty') || 'medium';
+      var hint = this.querySelector('sg-hint');
+      var hintHtml = '';
+      if (hint) {
+        hintHtml = '<div class="collapsible"><div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Hint</span></div><div class="collapsible-content"><div class="collapsible-body">' + hint.innerHTML + '</div></div></div>';
+        hint.remove();
+      }
+      var body = this.innerHTML;
+      this.outerHTML = '<div class="exercise-card"><div class="exercise-card-title"><span class="difficulty-tag difficulty-' + diff + '">' + diff.charAt(0).toUpperCase() + diff.slice(1) + '</span> ' + title + '</div><p>' + body + '</p>' + hintHtml + '</div>';
+    }
+  });
+
+  /* 9. <sg-cheat color="blue|green|amber" title="..."> text </sg-cheat> */
+  customElements.define('sg-cheat', class extends HTMLElement {
+    connectedCallback() {
+      var color = this.getAttribute('color') || 'blue';
+      var title = this.getAttribute('title') || '';
+      var body = this.innerHTML;
+      this.outerHTML = '<div class="cheat-card cheat-' + color + '"><strong>' + title + '</strong><br>' + body + '</div>';
+    }
+  });
+
+  /* 13. <sg-math-steps> <sg-step op="..." result="..." why="..."></sg-step> </sg-math-steps> */
+  customElements.define('sg-step', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-math-steps', class extends HTMLElement {
+    connectedCallback() {
+      var steps = this.querySelectorAll('sg-step');
+      var html = '<div class="math-stepper">';
+      steps.forEach(function(s, i) {
+        html += '<div class="math-step"><div class="math-step-number" data-num="' + (i + 1) + '"></div><div class="math-step-content">' +
+          '<div class="math-step-operation">' + (s.getAttribute('op') || '') + '</div>' +
+          '<div class="math-step-result">' + (s.getAttribute('result') || '') + '</div>' +
+          (s.getAttribute('why') ? '<div class="math-step-why">' + s.getAttribute('why') + '</div>' : '') +
+          '</div></div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 14. <sg-tradeoff left="..." right="..." snaps='[...]'> </sg-tradeoff> */
+  customElements.define('sg-tradeoff', class extends HTMLElement {
+    connectedCallback() {
+      var left = this.getAttribute('left') || '';
+      var right = this.getAttribute('right') || '';
+      var snaps = this.getAttribute('snaps') || '[]';
+      this.outerHTML = '<div class="tradeoff-slider" data-snaps=\'' + snaps + '\'>' +
+        '<div class="tradeoff-left">' + left + '</div>' +
+        '<div class="tradeoff-track"><div class="tradeoff-handle"></div><div class="tradeoff-snap-dots"></div></div>' +
+        '<div class="tradeoff-right">' + right + '</div>' +
+        '<div class="tradeoff-info"><div class="tradeoff-info-name"></div><div class="tradeoff-info-desc"></div></div></div>';
+    }
+  });
+
+  /* 15. <sg-arch-diff before="..." after="..."> </sg-arch-diff> */
+  customElements.define('sg-arch-diff', class extends HTMLElement {
+    connectedCallback() {
+      var before = this.getAttribute('before') || '';
+      var after = this.getAttribute('after') || '';
+      this.outerHTML = '<div class="arch-diff" data-before="' + esc(before) + '" data-after="' + esc(after) + '"></div>';
+    }
+  });
+
+  /* 16. <sg-evolution steps='[...]'> </sg-evolution> */
+  customElements.define('sg-evolution', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="evolution-stepper" data-steps=\'' + (this.getAttribute('steps') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 17. <sg-sequence participants="..." > <sg-msg from="" to="" label="" time=""></sg-msg> </sg-sequence> */
+  customElements.define('sg-msg', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-sequence', class extends HTMLElement {
+    connectedCallback() {
+      var p = this.getAttribute('participants') || '';
+      var msgs = this.querySelectorAll('sg-msg');
+      var html = '<div class="sequence-diagram" data-participants="' + p + '"><div class="seq-flow">';
+      msgs.forEach(function(m) {
+        var cls = m.hasAttribute('resp') ? ' resp' : '';
+        html += '<div class="seq-msg' + cls + '" data-from="' + m.getAttribute('from') + '" data-to="' + m.getAttribute('to') + '" data-label="' + esc(m.getAttribute('label') || '') + '" data-time="' + (m.getAttribute('time') || '') + '"></div>';
+      });
+      html += '</div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 18. <sg-storage rows='[...]'> </sg-storage> */
+  customElements.define('sg-storage', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="storage-viz" data-rows=\'' + (this.getAttribute('rows') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 19. <sg-latency entries='[...]'> </sg-latency> */
+  customElements.define('sg-latency', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="latency-ruler" data-entries=\'' + (this.getAttribute('entries') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 20. <sg-flow> <sg-flow-step title="..."> content </sg-flow-step> </sg-flow> */
+  customElements.define('sg-flow-step', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-flow', class extends HTMLElement {
+    connectedCallback() {
+      var steps = this.querySelectorAll('sg-flow-step');
+      var html = '<div class="flow-stepper" data-current="0">';
+      steps.forEach(function(s, i) {
+        var active = i === 0 ? ' active' : '';
+        html += '<div class="flow-step' + active + '"><div class="flow-step-header"><div class="flow-step-num">' + (i + 1) + '</div><div class="flow-step-title">' + (s.getAttribute('title') || '') + '</div></div><div class="flow-step-body">' + s.innerHTML + '</div></div>';
+      });
+      html += '<div class="flow-stepper-controls"><button class="flow-prev" disabled>&larr; Previous</button><span class="flow-progress">Step 1 of ' + steps.length + '</span><button class="flow-next">Next &rarr;</button></div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 21. <sg-packet title="..." fields='[...]'> </sg-packet> */
+  customElements.define('sg-packet', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="packet-viewer" data-title="' + esc(this.getAttribute('title') || 'TCP Segment') + '" data-fields=\'' + (this.getAttribute('fields') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 22. <sg-schema tables='[...]'> </sg-schema> */
+  customElements.define('sg-schema', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="schema-viewer" data-tables=\'' + (this.getAttribute('tables') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 24. <sg-logs entries='[...]'> </sg-logs> */
+  customElements.define('sg-logs', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="log-viewer" data-entries=\'' + (this.getAttribute('entries') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 25. <sg-error type="..." code="..." message="..." detail="..."> </sg-error> */
+  customElements.define('sg-error', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="error-block" data-type="' + (this.getAttribute('type') || 'postgres') + '" data-header="' + esc(this.getAttribute('header') || '') + '" data-code="' + esc(this.getAttribute('code') || '') + '" data-message="' + esc(this.getAttribute('message') || '') + '" data-detail="' + esc(this.getAttribute('detail') || '') + '"></div>';
+    }
+  });
+
+  /* 26. <sg-query-plan plan='{...}'> </sg-query-plan> */
+  customElements.define('sg-query-plan', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="query-plan" data-plan=\'' + (this.getAttribute('plan') || '{}') + '\'></div>';
+    }
+  });
+
+  /* 27. <sg-dashboard metrics='[...]'> </sg-dashboard> */
+  customElements.define('sg-dashboard', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="dashboard" data-metrics=\'' + (this.getAttribute('metrics') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 28. <sg-chat chat='{...}'> </sg-chat> */
+  customElements.define('sg-chat', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="interview-chat" data-chat=\'' + (this.getAttribute('chat') || '{}') + '\'></div>';
+    }
+  });
+
+  /* 29. <sg-quiz question="..." options='[...]' explanation="..."> </sg-quiz> */
+  customElements.define('sg-quiz', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="knowledge-check" data-question="' + esc(this.getAttribute('question') || '') + '" data-options=\'' + (this.getAttribute('options') || '[]') + '\' data-explanation="' + esc(this.getAttribute('explanation') || '') + '"></div>';
+    }
+  });
+
+  /* 31. <sg-scorecard data='{...}'> </sg-scorecard> */
+  customElements.define('sg-scorecard', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="scorecard" data-scorecard=\'' + (this.getAttribute('data') || '{}') + '\'></div>';
+    }
+  });
+
+  /* 32. <sg-estimate title="..." tag="..."> <sg-input>, <sg-op>, <sg-eq>, <sg-result> children </sg-estimate> */
+  customElements.define('sg-input', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-op', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-eq', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-result', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-estimate', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || 'Estimation';
+      var tag = this.getAttribute('tag') || '';
+      var html = '<div class="estimation-calc" data-title="' + esc(title) + '"' + (tag ? ' data-tag="' + esc(tag) + '"' : '') + '>';
+      Array.from(this.children).forEach(function(child) {
+        var tag = child.tagName.toLowerCase();
+        if (tag === 'sg-input') html += '<div class="calc-input" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-note="' + esc(child.getAttribute('note') || '') + '"></div>';
+        else if (tag === 'sg-op') html += '<div class="calc-op">' + child.textContent + '</div>';
+        else if (tag === 'sg-eq') html += '<div class="calc-eq" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-note="' + esc(child.getAttribute('note') || '') + '"></div>';
+        else if (tag === 'sg-result') html += '<div class="calc-result" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-formula="' + esc(child.getAttribute('formula') || '') + '"></div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 33. <sg-proof title="..."> <sg-given>...</sg-given> <sg-then>...</sg-then> <sg-conclusion>...</sg-conclusion> </sg-proof> */
+  customElements.define('sg-given', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-then', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-conclusion', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-proof', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || '';
+      var html = '<div class="proof-block"><div class="proof-title">' + title + '</div>';
+      this.querySelectorAll('sg-given').forEach(function(g) { html += '<div class="proof-step"><span class="proof-given">Given:</span> ' + g.innerHTML + '</div>'; });
+      this.querySelectorAll('sg-then').forEach(function(t) { html += '<div class="proof-step"><span class="proof-therefore">&there4;</span> ' + t.innerHTML + '</div>'; });
+      var conc = this.querySelector('sg-conclusion');
+      if (conc) html += '<div class="proof-conclusion">' + conc.innerHTML + '</div>';
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 34. <sg-debug title="..." steps='[...]'> </sg-debug> */
+  customElements.define('sg-debug', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="debug-template" data-title="' + esc(this.getAttribute('title') || 'Debug Walkthrough') + '" data-steps=\'' + (this.getAttribute('steps') || '[]') + '\'></div>';
+    }
+  });
+
+  /* 35. <sg-myth myth="..." truth="..."> </sg-myth> */
+  customElements.define('sg-myth', class extends HTMLElement {
+    connectedCallback() {
+      var myth = this.getAttribute('myth') || '';
+      var truth = this.getAttribute('truth') || '';
+      this.outerHTML = '<div class="myth-buster"><div class="myth-buster-myth"><i class="fas fa-times-circle"></i> <strong>Myth:</strong> ' + myth + '</div><div class="myth-buster-truth"><i class="fas fa-check-circle"></i> <strong>Truth:</strong> ' + truth + '</div></div>';
+    }
+  });
+
+  /* 36. <sg-whatif trigger="..."> <sg-consequence>...</sg-consequence> <sg-recovery>...</sg-recovery> </sg-whatif> */
+  customElements.define('sg-consequence', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-recovery', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-whatif', class extends HTMLElement {
+    connectedCallback() {
+      var trigger = this.getAttribute('trigger') || '';
+      var cons = this.querySelector('sg-consequence');
+      var rec = this.querySelector('sg-recovery');
+      this.outerHTML = '<div class="whatif-card"><div class="whatif-trigger"><i class="fas fa-bolt"></i> ' + trigger + '</div>' +
+        (cons ? '<div class="whatif-consequence">' + cons.innerHTML + '</div>' : '') +
+        (rec ? '<div class="whatif-recovery">' + rec.innerHTML + '</div>' : '') + '</div>';
+    }
+  });
+
+  /* 37. <sg-company name="..." logo="..." stats="..." stack="..." lesson="..."> </sg-company> */
+  customElements.define('sg-company', class extends HTMLElement {
+    connectedCallback() {
+      var name = this.getAttribute('name') || '';
+      var logo = this.getAttribute('logo') || '';
+      var stats = (this.getAttribute('stats') || '').split('|').map(function(s) { return '<span>' + s.trim() + '</span>'; }).join('');
+      this.outerHTML = '<div class="company-card"><div class="company-card-logo">' + logo + '</div><div class="company-card-info">' +
+        '<h4 class="company-card-name">' + name + '</h4>' +
+        '<div class="company-card-stats">' + stats + '</div>' +
+        '<div class="company-card-stack">' + (this.getAttribute('stack') || '') + '</div>' +
+        '<div class="company-card-lesson">' + (this.getAttribute('lesson') || '') + '</div></div></div>';
+    }
+  });
+
+  /* 38. <sg-trap title="..."> content </sg-trap> */
+  customElements.define('sg-trap', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || 'Common Trap';
+      var body = this.innerHTML;
+      this.outerHTML = '<div class="callout-trap"><div class="callout-trap-header"><i class="fas fa-skull-crossbones"></i> ' + title + '</div>' + body + '</div>';
+    }
+  });
+
+  /* 39. <sg-dep-graph graph='{...}'> </sg-dep-graph> */
+  customElements.define('sg-dep-graph', class extends HTMLElement {
+    connectedCallback() {
+      this.outerHTML = '<div class="dep-graph" data-graph=\'' + (this.getAttribute('graph') || '{}') + '\'></div>';
+    }
+  });
+
+  /* 40. <sg-diff file="..."> content with +/- lines </sg-diff> */
+  customElements.define('sg-diff', class extends HTMLElement {
+    connectedCallback() {
+      var file = this.getAttribute('file') || '';
+      var lines = this.textContent.split('\n');
+      var html = '<div class="git-diff"><div class="diff-header">' + esc(file) + '</div>';
+      lines.forEach(function(line) {
+        if (!line.trim()) return;
+        var cls = line.startsWith('+') ? 'diff-line--add' : line.startsWith('-') ? 'diff-line--remove' : 'diff-line--context';
+        html += '<div class="diff-line ' + cls + '">' + esc(line) + '</div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 41. <sg-multi> <sg-file name="..."> code </sg-file> </sg-multi> */
+  customElements.define('sg-file', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-multi', class extends HTMLElement {
+    connectedCallback() {
+      var files = this.querySelectorAll('sg-file');
+      var html = '<div class="multi-file">';
+      html += '<div class="multi-file-tabs">';
+      files.forEach(function(f, i) {
+        var name = f.getAttribute('name') || 'file' + i;
+        var id = 'mf-' + Math.random().toString(36).slice(2, 8);
+        f.dataset.mfId = id;
+        html += '<button class="multi-file-tab' + (i === 0 ? ' active' : '') + '" data-file="' + id + '">' + esc(name) + '</button>';
+      });
+      html += '</div>';
+      files.forEach(function(f, i) {
+        html += '<div class="multi-file-panel' + (i === 0 ? ' active' : '') + '" data-file="' + f.dataset.mfId + '"><pre><code>' + esc(f.textContent) + '</code></pre></div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 42. <sg-config title="..." file="..." params='[{name,old,new,why}]'> </sg-config> */
+  customElements.define('sg-config', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || 'Config Diff';
+      var file = this.getAttribute('file') || '';
+      var params = JSON.parse(this.getAttribute('params') || '[]');
+      var html = '<div class="config-diff">';
+      html += '<div class="config-diff-header"><span><i class="fa-solid fa-sliders"></i> ' + title + '</span>' +
+        (file ? '<span class="cd-file">' + file + '</span>' : '') + '</div>';
+      params.forEach(function(p) {
+        var same = p.old === p.new;
+        html += '<div class="config-diff-row' + (same ? ' config-diff-row--same' : '') + '">' +
+          '<div class="cd-param">' + p.name + '</div>' +
+          '<div class="cd-old">' + p.old + '</div>' +
+          '<div class="cd-arrow">→</div>' +
+          '<div class="cd-new">' + p.new + (p.why ? '<span class="cd-why">' + p.why + '</span>' : '') + '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 43. <sg-pipeline title="..." status="running" stages='[{name,status,time}]'> </sg-pipeline> */
+  customElements.define('sg-pipeline', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || 'Deployment Pipeline';
+      var overallStatus = this.getAttribute('status') || 'running';
+      var stages = JSON.parse(this.getAttribute('stages') || '[]');
+      var statusLabels = { running: 'In Progress', pass: 'Passed', fail: 'Failed' };
+      var html = '<div class="pipeline">';
+      html += '<div class="pipeline-header"><span><i class="fa-solid fa-code-branch"></i> ' + title + '</span>' +
+        '<span class="pl-status pl-status--' + overallStatus + '">' + (statusLabels[overallStatus] || overallStatus) + '</span></div>';
+      html += '<div class="pipeline-body">';
+      stages.forEach(function(s, i) {
+        if (i > 0) html += '<div class="pipeline-connector"></div>';
+        var status = s.status || 'pending';
+        var icon = status === 'pass' ? '<i class="fas fa-check"></i>' :
+                   status === 'running' ? '<i class="fas fa-spinner fa-spin"></i>' :
+                   status === 'fail' ? '<i class="fas fa-times"></i>' : '<i class="fas fa-clock" style="opacity:0.4"></i>';
+        html += '<div class="pipeline-stage pipeline-stage--' + status + '">' +
+          '<span>' + icon + ' ' + s.name + '</span>' +
+          (s.time ? '<span class="pipeline-stage-time">' + s.time + '</span>' : '') +
+          '</div>';
+      });
+      html += '</div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 44. <sg-cache entries='[...]'> </sg-cache> */
+  customElements.define('sg-cache', class extends HTMLElement {
+    connectedCallback() {
+      var entries = JSON.parse(this.getAttribute('entries') || '[]');
+      var html = '<div class="cache-sim">';
+      entries.forEach(function(e) {
+        var cls = e.hit ? 'cache-sim-entry--hit' : 'cache-sim-entry--miss';
+        html += '<div class="cache-sim-entry ' + cls + '"><span class="cache-key">' + esc(e.key) + '</span><span class="cache-result">' + (e.hit ? 'HIT' : 'MISS') + '</span><span class="cache-time">' + (e.time || '—') + '</span></div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 45. <sg-rate-limit tokens="4" max="6" accepted="3" rejected="1"> </sg-rate-limit> */
+  customElements.define('sg-rate-limit', class extends HTMLElement {
+    connectedCallback() {
+      var tokens = parseInt(this.getAttribute('tokens') || '4');
+      var max = parseInt(this.getAttribute('max') || '6');
+      var accepted = parseInt(this.getAttribute('accepted') || '3');
+      var rejected = parseInt(this.getAttribute('rejected') || '1');
+      var html = '<div class="rate-viz"><div class="rate-viz-bucket">';
+      for (var i = 0; i < max; i++) {
+        html += i < tokens ? '<div class="rate-viz-token rvt-full"></div>' : '<div class="rate-viz-token--empty rvt-full"></div>';
+      }
+      html += '</div><div class="rate-viz-label">Token bucket: ' + tokens + '/' + max + ' tokens remaining</div><div class="rate-viz-requests">';
+      for (var a = 0; a < accepted; a++) html += '<div class="rate-viz-dot rate-viz-dot--accepted"></div>';
+      for (var r = 0; r < rejected; r++) html += '<div class="rate-viz-dot rate-viz-dot--rejected"></div>';
+      html += '</div><div class="rate-viz-label">Requests: ' + accepted + ' accepted, ' + rejected + ' rejected</div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 46. <sg-circuit active="closed"> </sg-circuit> */
+  customElements.define('sg-circuit', class extends HTMLElement {
+    connectedCallback() {
+      var active = this.getAttribute('active') || 'closed';
+      var states = [
+        { id: 'closed', label: 'Closed', arrow: '→ 5 failures →' },
+        { id: 'open', label: 'Open', arrow: '→ timeout →' },
+        { id: 'half', label: 'Half-Open', arrow: '' }
+      ];
+      var html = '<div class="circuit-state">';
+      states.forEach(function(s, i) {
+        var cls = 'circuit-node circuit-node--' + s.id + (s.id === active ? ' circuit-node--active' : '');
+        html += '<div class="' + cls + '">' + s.label + '</div>';
+        if (s.arrow) html += '<div class="circuit-arrow">' + s.arrow + '</div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 47. <sg-mq producer="..." consumer="..." messages="4"> </sg-mq> */
+  customElements.define('sg-mq', class extends HTMLElement {
+    connectedCallback() {
+      var producer = this.getAttribute('producer') || 'Producer';
+      var consumer = this.getAttribute('consumer') || 'Consumer';
+      var count = parseInt(this.getAttribute('messages') || '4');
+      var html = '<div class="mq-viz"><div class="mq-viz-producer">' + producer + '</div><div class="mq-viz-arrow">&rarr;</div><div class="mq-viz-queue">';
+      for (var i = 1; i <= count; i++) html += '<div class="mq-viz-msg">' + i + '</div>';
+      html += '</div><div class="mq-viz-arrow">&rarr;</div><div class="mq-viz-consumer">' + consumer + '</div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 48. <sg-shard-map shards='[...]'> </sg-shard-map> */
+  customElements.define('sg-shard-map', class extends HTMLElement {
+    connectedCallback() {
+      var shards = JSON.parse(this.getAttribute('shards') || '[]');
+      var html = '<div class="shard-map">';
+      shards.forEach(function(s) {
+        var cls = 'shard' + (s.hot ? ' shard--hot' : '');
+        html += '<div class="' + cls + '"><span class="shard-id">' + s.name + '</span><span class="shard-size">' + s.rule + '</span><span class="shard-load">' + s.load + '</span></div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 109. <sg-compare left-title="..." right-title="..." left-items="a|b|c" right-items="x|y|z"> */
+  customElements.define('sg-compare', class extends HTMLElement {
+    connectedCallback() {
+      var lt = this.getAttribute('left-title') || 'A';
+      var rt = this.getAttribute('right-title') || 'B';
+      var li = (this.getAttribute('left-items') || '').split('|').filter(Boolean);
+      var ri = (this.getAttribute('right-items') || '').split('|').filter(Boolean);
+      var html = '<div class="comparison-grid">';
+      html += '<div class="comparison-panel"><div class="comparison-header" style="padding:0.7rem 1.2rem;font-weight:700;font-size:0.85rem;border-bottom:1px solid var(--border-color)">' + lt + '</div><ul style="padding:0.8rem 1.2rem 0.8rem 2rem;margin:0;font-size:0.82rem;color:var(--text-secondary);line-height:1.7">';
+      li.forEach(function(item) { html += '<li>' + item + '</li>'; });
+      html += '</ul></div><div class="vs-badge">vs</div>';
+      html += '<div class="comparison-panel"><div class="comparison-header" style="padding:0.7rem 1.2rem;font-weight:700;font-size:0.85rem;border-bottom:1px solid var(--border-color)">' + rt + '</div><ul style="padding:0.8rem 1.2rem 0.8rem 2rem;margin:0;font-size:0.82rem;color:var(--text-secondary);line-height:1.7">';
+      ri.forEach(function(item) { html += '<li>' + item + '</li>'; });
+      html += '</ul></div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 110. <sg-when-use yes="a|b|c" no="x|y"> */
+  customElements.define('sg-when-use', class extends HTMLElement {
+    connectedCallback() {
+      var yes = (this.getAttribute('yes') || '').split('|').filter(Boolean);
+      var no = (this.getAttribute('no') || '').split('|').filter(Boolean);
+      var html = '<div class="when-use-grid">';
+      yes.forEach(function(item) {
+        html += '<div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check"></i></span> ' + item + '</div>';
+      });
+      no.forEach(function(item) {
+        html += '<div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-xmark"></i></span> ' + item + '</div>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 111. <sg-related items='[{icon,title,desc,href}]'> */
+  customElements.define('sg-related', class extends HTMLElement {
+    connectedCallback() {
+      var items = JSON.parse(this.getAttribute('items') || '[]');
+      var html = '<div class="related-grid">';
+      items.forEach(function(item) {
+        html += '<a class="related-card" href="' + (item.href || '#') + '">' +
+          '<div class="related-card-icon"><i class="' + item.icon + '"></i></div>' +
+          '<div class="related-card-text"><strong>' + item.title + '</strong><br>' + item.desc + '</div></a>';
+      });
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 94. <sg-code-evo title="..." steps='[{label,why,code}]'> </sg-code-evo> */
+  customElements.define('sg-code-evo', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || 'Code Evolution';
+      var steps = JSON.parse(this.getAttribute('steps') || '[]');
+      function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+      var colors = ['#ef4444','#f59e0b','#eab308','#10b981','#3b82f6','#8b5cf6','#06b6d4','#ec4899'];
+      var id = 'evo-' + Math.random().toString(36).slice(2, 8);
+      var lineCounts = steps.map(function(s) { return s.code.trim().split('\n').length; });
+      var firstLines = lineCounts[0];
+
+      var html = '<div class="code-evo" id="' + id + '">';
+      // Header
+      html += '<div class="code-evo-header"><span><i class="fa-solid fa-timeline"></i> ' + title + '</span><span class="code-evo-versions">' + steps.length + ' versions</span></div>';
+
+      // Segmented progress bar
+      html += '<div class="code-evo-timeline">';
+      steps.forEach(function(s, i) {
+        var color = colors[i % colors.length];
+        var cls = i === 0 ? 'evo-seg evo-current' : 'evo-seg evo-future';
+        html += '<div class="' + cls + '" style="background:' + color + '" data-evo-idx="' + i + '" data-label="V' + (i + 1) + ' — ' + s.label + '"></div>';
+      });
+      html += '</div>';
+
+      // Slides
+      html += '<div class="code-evo-slides">';
+      steps.forEach(function(s, i) {
+        var lines = lineCounts[i];
+        var color = colors[i % colors.length];
+        var delta = '';
+        if (i > 0) {
+          var diff = lines - lineCounts[i - 1];
+          if (diff < 0) delta = '<span class="code-evo-delta code-evo-delta--less">' + diff + ' lines</span>';
+          else if (diff > 0) delta = '<span class="code-evo-delta code-evo-delta--more">+' + diff + ' lines</span>';
+          else delta = '<span class="code-evo-delta code-evo-delta--same">same</span>';
+        }
+
+        html += '<div class="code-evo-step' + (i === 0 ? ' evo-active' : '') + '" data-evo-idx="' + i + '">';
+        html += '<div class="code-evo-info"><div class="code-evo-info-left">' +
+          '<span class="code-evo-label-num" style="background:' + color + '">' + (i + 1) + '</span>' +
+          '<span class="code-evo-label-text" style="color:' + color + '">V' + (i + 1) + ' — ' + s.label + '</span>' +
+          (s.why ? '<span class="code-evo-why">— ' + s.why + '</span>' : '') +
+          '</div><div class="code-evo-info-right"><span class="code-evo-lines">' + lines + ' lines</span>' + delta + '</div></div>';
+        html += '<div class="code-evo-code-wrap"><div class="code-evo-dots"><span class="ed-red"></span><span class="ed-yel"></span><span class="ed-grn"></span></div>' +
+          '<div class="code-evo-code"><pre><code>' + esc(s.code.trim()) + '</code></pre></div></div>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      // Nav — player style with icons
+      html += '<div class="code-evo-nav">' +
+        '<button class="evo-nav-btn evo-prev" disabled><i class="fa-solid fa-chevron-left"></i></button>' +
+        '<span class="evo-nav-progress">1 / ' + steps.length + '</span>' +
+        '<button class="evo-nav-btn evo-next"><i class="fa-solid fa-chevron-right"></i></button></div>';
+      html += '</div>';
+
+      this.outerHTML = html;
+
+      // Wire up
+      requestAnimationFrame(function() {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var segs = el.querySelectorAll('.evo-seg');
+        var slides = el.querySelectorAll('.code-evo-step');
+        var prevBtn = el.querySelector('.evo-prev');
+        var nextBtn = el.querySelector('.evo-next');
+        var progress = el.querySelector('.evo-nav-progress');
+        var current = 0;
+
+        var slidesContainer = el.querySelector('.code-evo-slides');
+        var transitioning = false;
+
+        // Measure all slide heights (briefly make each visible)
+        var slideHeights = [];
+        slides.forEach(function(s) {
+          s.classList.add('evo-active');
+          slideHeights.push(s.offsetHeight);
+          s.classList.remove('evo-active');
+        });
+        slides[0].classList.add('evo-active');
+        slidesContainer.style.height = slideHeights[0] + 'px';
+
+        function goTo(idx) {
+          idx = Math.max(0, Math.min(idx, steps.length - 1));
+          if (idx === current || transitioning) return;
+          transitioning = true;
+          var prev = current;
+          current = idx;
+
+          // Update progress bar + buttons
+          segs.forEach(function(s, i) {
+            s.classList.remove('evo-past', 'evo-current', 'evo-future');
+            s.classList.add(i < current ? 'evo-past' : i === current ? 'evo-current' : 'evo-future');
+          });
+          prevBtn.disabled = current === 0;
+          nextBtn.disabled = current === steps.length - 1;
+          progress.textContent = (current + 1) + ' / ' + steps.length;
+
+          // Crossfade: old slides out, new slide in
+          slides[prev].classList.add('evo-leaving');
+          slides[prev].classList.remove('evo-active');
+          slides[current].classList.add('evo-active');
+
+          // Animate height
+          slidesContainer.style.height = slideHeights[current] + 'px';
+
+          // Clean up after transition
+          setTimeout(function() {
+            slides[prev].classList.remove('evo-leaving');
+            transitioning = false;
+          }, 400);
+        }
+
+        segs.forEach(function(s) {
+          s.addEventListener('click', function() { goTo(parseInt(s.dataset.evoIdx)); });
+        });
+        prevBtn.addEventListener('click', function() { goTo(current - 1); });
+        nextBtn.addEventListener('click', function() { goTo(current + 1); });
+      });
+    }
+  });
+
+  /* 87. <sg-refactor title="..." pattern="..."> <sg-before>code</sg-before> <sg-after>code</sg-after> </sg-refactor> */
+  customElements.define('sg-before', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-after', class extends HTMLElement { connectedCallback() {} });
+  customElements.define('sg-refactor', class extends HTMLElement {
+    connectedCallback() {
+      var title = this.getAttribute('title') || 'Refactoring';
+      var pattern = this.getAttribute('pattern') || '';
+      var beforeEl = this.querySelector('sg-before');
+      var afterEl = this.querySelector('sg-after');
+      var beforeCode = beforeEl ? beforeEl.textContent : '';
+      var afterCode = afterEl ? afterEl.textContent : '';
+      var beforeLines = beforeCode.trim().split('\n').length;
+      var afterLines = afterCode.trim().split('\n').length;
+      var removed = beforeLines;
+      var added = afterLines;
+
+      function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+      var html = '<div class="refactor-diff">';
+      html += '<div class="refactor-header"><span><i class="fa-solid fa-code-compare"></i> ' + title + '</span>' +
+        (pattern ? '<span class="refactor-step-badge">' + pattern + '</span>' : '') + '</div>';
+      html += '<div class="refactor-body">';
+      html += '<div class="refactor-before"><div class="refactor-label"><i class="fa-solid fa-minus"></i> Before</div>' +
+        '<div class="refactor-code"><pre><code>' + esc(beforeCode.trim()) + '</code></pre></div></div>';
+      html += '<div class="refactor-after"><div class="refactor-label"><i class="fa-solid fa-plus"></i> After</div>' +
+        '<div class="refactor-code"><pre><code>' + esc(afterCode.trim()) + '</code></pre></div></div>';
+      html += '</div>';
+      html += '<div class="refactor-stats"><span class="refactor-stat--red">−' + removed + ' lines</span><span class="refactor-stat--green">+' + added + ' lines</span><span>' + Math.round((1 - added/removed) * 100) + '% reduction</span></div>';
+      html += '</div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 73. <sg-btree search="65" tree='{ levels: [[{keys:[50]}], [{keys:[10,30]},{keys:[70,90]}], ...] }'> */
+  customElements.define('sg-btree', class extends HTMLElement {
+    connectedCallback() {
+      var tree = JSON.parse(this.getAttribute('tree') || '{"levels":[]}');
+      var search = this.getAttribute('search') || '';
+      var searchVal = parseInt(search);
+      var html = '<div class="btree-nav"><div class="btree-body">';
+      tree.levels.forEach(function(level) {
+        var isLeaf = level.leaf;
+        html += '<div class="btree-level">';
+        level.nodes.forEach(function(node) {
+          var nodeActive = false;
+          var cls = 'btree-node' + (isLeaf ? ' leaf' : '');
+          var keysHtml = '';
+          node.keys.forEach(function(k) {
+            var isHighlight = false;
+            if (!isNaN(searchVal)) {
+              if (isLeaf && k === searchVal) isHighlight = true;
+              else if (!isLeaf && searchVal <= k) { isHighlight = true; }
+            }
+            if (isHighlight) nodeActive = true;
+            keysHtml += '<span class="btree-key' + (isHighlight ? ' highlight' : '') + '">' + k + '</span>';
+          });
+          if (nodeActive) cls += ' active';
+          html += '<div class="' + cls + '">' + keysHtml + '</div>';
+        });
+        html += '</div>';
+      });
+      if (tree.levels.length > 0 && tree.levels[tree.levels.length - 1].leaf) {
+        html += '<div class="btree-leaf-link"><span class="btree-leaf-link-arrow">&larr;</span> linked leaves <span class="btree-leaf-link-arrow">&rarr;</span></div>';
+      }
+      html += '</div></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 72. <sg-glossary terms='[{term,def}]'> </sg-glossary> */
+  customElements.define('sg-glossary', class extends HTMLElement {
+    connectedCallback() {
+      var terms = JSON.parse(this.getAttribute('terms') || '[]');
+      // Sort and group by first letter
+      terms.sort(function(a, b) { return a.term.localeCompare(b.term); });
+      var html = '<div class="glossary-panel"><ul class="glossary-panel-list">';
+      var lastLetter = '';
+      terms.forEach(function(t) {
+        var letter = t.term.charAt(0).toUpperCase();
+        if (letter !== lastLetter) {
+          html += '<div class="glossary-letter">' + letter + '</div>';
+          lastLetter = letter;
+        }
+        html += '<li class="glossary-item"><span class="glossary-term">' + t.term + '</span><span class="glossary-def">' + t.def + '</span></li>';
+      });
+      html += '</ul></div>';
+      this.outerHTML = html;
+    }
+  });
+
+  /* 49. <sg-cost-calc rows='[...]' total="...""> </sg-cost-calc> */
+  customElements.define('sg-cost-calc', class extends HTMLElement {
+    connectedCallback() {
+      var rows = JSON.parse(this.getAttribute('rows') || '[]');
+      var total = this.getAttribute('total') || '';
+      var html = '<div class="cost-calc"><table><thead><tr><th>Resource</th><th>Spec</th><th>Monthly Cost</th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        html += '<tr><td>' + r.resource + '</td><td>' + r.spec + '</td><td class="cost-calc-subtotal">' + r.cost + '</td></tr>';
+      });
+      if (total) html += '<tr class="cost-calc-total"><td colspan="2">Monthly Total</td><td>' + total + '</td></tr>';
+      html += '</tbody></table></div>';
+      this.outerHTML = html;
+    }
+  });
+})();
 
 /* ==========================================================
  *  CONTENT PROTECTION

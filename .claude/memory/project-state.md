@@ -156,7 +156,7 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 **Starter (9)** — after Phase 4 (15 patterns):
 1. Parking Lot System (Easy) — **Ready** — Strategy, Result Pattern, Singleton (DI), Decorator | accent: orange, 4902 lines, 60 tooltips, 13 SVGs ← ENRICHED
 2. Tic-Tac-Toe (Easy) — **Ready** — State, Command, Strategy | accent: purple, 9183 lines, ~120 tooltips, 59 SVGs
-3. Vending Machine (Easy) — State, Strategy
+3. Vending Machine (Easy) — **Ready** — State, Strategy | accent: green, 9143 lines, 101 tooltips, 61 SVGs
 4. LRU Cache (Medium) — Proxy, Strategy, Singleton
 5. Logging Framework (Medium) — Decorator, Singleton, Strategy
 6. Snake & Ladder (Medium) — Strategy, State, Factory
@@ -574,6 +574,9 @@ All interactivity is in one file. Key features:
 15. **Copy to clipboard** — button injected into `.macos-titlebar`, 1.5s checkmark feedback
 16. **Scroll-reveal** — IntersectionObserver fades in cards/callouts (respects prefers-reduced-motion)
 17. **Cmd+K search** — command palette searches all `.section[id]` titles
+18. **JSON syntax highlighting** — `tokenizeJSON()` colorizes `.api-body pre code` blocks: keys (blue), strings (light blue), numbers (orange), booleans (red), null (gray italic), comments (gray italic). Single-pass character tokenizer avoids regex/HTML conflicts.
+19. **Collapsible API bodies** — `initApiCollapsible()` collapses `.api-body` blocks with 5+ lines. Toggle bar shows "Show/Hide Request/Response Body". Detects body type by position relative to `.api-response`. CSS: `.api-body--collapsible`, `.api-body--collapsed`, `.api-body-toggle`.
+20. **Flow Stepper dedup guard** — `data-flow-init` attribute prevents reinit from adding duplicate click listeners. Fixed step-skipping bug (0→2→4) caused by delegated handlers in Section E firing alongside reinit handlers.
 
 ### UML Diagram Zoom (Section 9 in scripts.js)
 - **Ctrl+Wheel zoom**: delta ±0.04 per tick (was ±0.1, reduced for finer control)
