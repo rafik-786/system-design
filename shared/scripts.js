@@ -3550,8 +3550,24 @@ document.addEventListener('DOMContentLoaded', () => {
       var type = this.getAttribute('type') || 'info';
       var title = this.getAttribute('title') || '';
       var body = this.innerHTML;
-      var titleHtml = title ? '<strong>' + title + ':</strong> ' : '';
-      this.outerHTML = '<div class="callout-' + type + '">' + titleHtml + body + '</div>';
+      // Extended types map to callout-{type} CSS class
+      var typeMap = {
+        danger: { cls: 'callout-danger', icon: '' },
+        success: { cls: 'callout-success', icon: '' },
+        info: { cls: 'callout-info', icon: '' },
+        warning: { cls: 'callout-warning', icon: '' },
+        purple: { cls: 'callout-purple', icon: '' },
+        trap: { cls: 'callout-danger', icon: '<i class="fas fa-skull-crossbones"></i> ', defaultTitle: 'Common Trap' },
+        insight: { cls: 'callout-insight', icon: '', defaultTitle: 'Key Insight' },
+        tip: { cls: 'callout-success', icon: '<i class="fas fa-lightbulb"></i> ', defaultTitle: 'Interview Tip' },
+        takeaway: { cls: 'callout-info', icon: '<i class="fas fa-bookmark"></i> ', defaultTitle: 'Key Takeaway' },
+        rule: { cls: 'callout-warning', icon: '<i class="fas fa-gavel"></i> ', defaultTitle: 'Rule' },
+        concept: { cls: 'callout-purple', icon: '<i class="fas fa-atom"></i> ', defaultTitle: 'Concept' }
+      };
+      var cfg = typeMap[type] || typeMap.info;
+      var displayTitle = title || cfg.defaultTitle || '';
+      var titleHtml = displayTitle ? '<strong>' + (cfg.icon || '') + displayTitle + ':</strong> ' : '';
+      this.outerHTML = '<div class="' + cfg.cls + '">' + titleHtml + body + '</div>';
     }
   });
 
@@ -4060,9 +4076,11 @@ document.addEventListener('DOMContentLoaded', () => {
       var yes = (this.getAttribute('yes') || '').split('|').filter(Boolean);
       var no = (this.getAttribute('no') || '').split('|').filter(Boolean);
       var html = '<div class="when-use-grid">';
+      html += '<div class="when-section-label when-section-label--yes"><i class="fa-solid fa-check" style="margin-right:0.3rem"></i> Use when</div>';
       yes.forEach(function(item) {
         html += '<div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check"></i></span> ' + item + '</div>';
       });
+      html += '<div class="when-section-label when-section-label--no"><i class="fa-solid fa-xmark" style="margin-right:0.3rem"></i> Avoid when</div>';
       no.forEach(function(item) {
         html += '<div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-xmark"></i></span> ' + item + '</div>';
       });
@@ -4079,7 +4097,7 @@ document.addEventListener('DOMContentLoaded', () => {
       items.forEach(function(item) {
         html += '<a class="related-card" href="' + (item.href || '#') + '">' +
           '<div class="related-card-icon"><i class="' + item.icon + '"></i></div>' +
-          '<div class="related-card-text"><strong>' + item.title + '</strong><br>' + item.desc + '</div></a>';
+          '<div class="related-card-text"><h4>' + item.title + '</h4><p>' + item.desc + '</p></div></a>';
       });
       html += '</div>';
       this.outerHTML = html;
