@@ -650,11 +650,11 @@
       }
     }
 
-    // Register service worker
-    if ('serviceWorker' in navigator) {
+    // Register service worker — only on HTTPS (not localhost dev)
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
       var swBase = document.querySelector('script[src*="scripts.js"]');
       var swPath = swBase ? swBase.src.replace(/scripts\.js.*$/, 'sw.js') : '/shared/sw.js';
-      navigator.serviceWorker.register(swPath, { scope: '/' }).catch(function() {});
+      navigator.serviceWorker.register(swPath).catch(function() {});
     }
   }
 
@@ -666,6 +666,15 @@
     if (window.__sgEnhanceLoaded) return;
     window.__sgEnhanceLoaded = true;
     initPWA();
+    // Inject print.css (non-blocking, only used for print)
+    var cssBase = document.querySelector('link[href*="styles.css"]');
+    if (cssBase && !document.querySelector('link[href*="print.css"]')) {
+      var printLink = document.createElement('link');
+      printLink.rel = 'stylesheet';
+      printLink.href = cssBase.href.replace('styles.css', 'print.css');
+      printLink.media = 'print';
+      document.head.appendChild(printLink);
+    }
     initProgressBar();
     initBackToTop();
     initSidebarTOC();

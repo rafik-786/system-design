@@ -3,24 +3,13 @@
  * Caches pages for offline reading. Auto-updates on new deploys.
  * ============================================================ */
 
-var CACHE_NAME = 'sg-v1';
-var PRECACHE = [
-  '/shared/styles.css',
-  '/shared/enhance.css',
-  '/shared/print.css',
-  '/shared/scripts.js',
-  '/shared/enhance.js'
-];
+var CACHE_NAME = 'sg-v2';
+// No precache list — cache pages on first visit instead (network-first)
+// This avoids 404s from wrong absolute paths on different deployments
 
-// Install — precache core assets
+// Install — skip waiting (no precache, cache on visit)
 self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(PRECACHE);
-    }).then(function() {
-      return self.skipWaiting();
-    })
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 // Activate — clean old caches
