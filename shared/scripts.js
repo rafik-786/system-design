@@ -1054,12 +1054,14 @@ document.addEventListener('DOMContentLoaded', () => {
         var calc = entry.target;
         if (observed.has(calc)) return;
         observed.add(calc);
-        // Animate metric values
+        // Animate metric values — store final text BEFORE zeroing
         calc.querySelectorAll('.calc-metric-value, .calc-result-value').forEach(function(el) {
-          animateValue(el, el.textContent.trim());
+          var finalText = el.dataset.finalText || el.textContent.trim();
+          el.dataset.finalText = finalText;
+          animateValue(el, finalText);
         });
       });
-    }, { threshold: 0.3 });
+    }, { threshold: 0.15 });
 
     document.querySelectorAll('.estimation-calc').forEach(function(el) {
       observer.observe(el);
