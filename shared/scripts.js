@@ -2419,7 +2419,10 @@ document.addEventListener('DOMContentLoaded', () => {
       var skipClasses = ['glossary-panel', 'glossary-term', 'glossary-def', 'tooltip-trigger', 'tooltip-rich', 'macos-window', 'code-walkthrough', 'knowledge-check', 'kc-option', 'kc-question', 'cheat-card'];
 
       function shouldSkip(node) {
-        if (skipTags[node.tagName]) return true;
+        var tn = (node.tagName || '').toUpperCase();
+        if (skipTags[tn]) return true;
+        // Also skip any SVG namespace element
+        if (node.namespaceURI && node.namespaceURI.indexOf('svg') > -1) return true;
         if (node.classList) {
           for (var i = 0; i < skipClasses.length; i++) {
             if (node.classList.contains(skipClasses[i])) return true;
