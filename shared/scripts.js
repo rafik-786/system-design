@@ -3234,33 +3234,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  // Intercept internal link clicks
-  document.addEventListener('click', function(e) {
-    // Don't intercept if modifier keys (new tab)
-    if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+  // SPA navigation disabled — causes invisible sections on GitHub Pages.
+  // Links use normal browser navigation (reliable, works everywhere).
 
-    var link = e.target.closest('a[href]');
-    if (!link) return;
-
-    var href = link.getAttribute('href');
-    if (!href) return;
-
-    // Skip external links, anchors, javascript:, mailto:
-    if (href.startsWith('http') || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:')) return;
-
-    // Only intercept .html links
-    if (!href.endsWith('.html')) return;
-
-    // Resolve relative URL to absolute
-    var a = document.createElement('a');
-    a.href = href;
-    var resolved = a.href;
-
-    e.preventDefault();
-    navigateTo(resolved);
-  });
-
-  // Language switcher — intercept and use SPA navigation
+  // Language switcher — normal navigation
   document.addEventListener('click', function(e) {
     var opt = e.target.closest('.lang-option');
     if (!opt) return;
@@ -3274,9 +3251,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     var newUrl = window.location.href.replace(currentFile + '.html', lang + '.html');
     localStorage.setItem('wiki-language', lang);
-    var dd2 = document.getElementById('langDropdown');
-    if (dd2) dd2.classList.remove('open');
-    navigateTo(newUrl);
+    window.location.href = newUrl;
   });
 
   // Language button toggle
@@ -3313,17 +3288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Browser back/forward
-  window.addEventListener('popstate', function(e) {
-    if (e.state && e.state.path) {
-      navigateTo(e.state.path, false);
-    } else {
-      navigateTo(window.location.href, false);
-    }
-  });
-
-  // Set initial history state
-  try { history.replaceState({ path: window.location.href }, '', window.location.href); } catch(e) {}
+  // Browser back/forward — normal navigation (SPA disabled)
 
   /* ==========================================================
    *  SECTION D — INITIAL PAGE SETUP
