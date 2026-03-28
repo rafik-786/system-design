@@ -2416,7 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Walk text nodes in the page content (skip glossary panel itself, code, pre, script, etc.)
       var skipTags = { SCRIPT: 1, STYLE: 1, PRE: 1, CODE: 1, BUTTON: 1, INPUT: 1, TEXTAREA: 1, SVG: 1 };
-      var skipClasses = ['glossary-panel', 'glossary-term', 'glossary-def', 'tooltip-trigger', 'tooltip-rich', 'macos-window', 'code-walkthrough', 'knowledge-check', 'kc-option', 'kc-question'];
+      var skipClasses = ['glossary-panel', 'glossary-term', 'glossary-def', 'tooltip-trigger', 'tooltip-rich', 'macos-window', 'code-walkthrough', 'knowledge-check', 'kc-option', 'kc-question', 'cheat-card'];
 
       function shouldSkip(node) {
         if (skipTags[node.tagName]) return true;
