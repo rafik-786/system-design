@@ -196,7 +196,12 @@
     }
     var obs = new IntersectionObserver(function(entries) {
       entries.forEach(function(e) {
-        if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          obs.unobserve(e.target);
+          // After transition ends, remove will-change to free GPU memory
+          setTimeout(function() { e.target.classList.add('done'); }, 600);
+        }
       });
     }, { threshold: 0.08 });
     secs.forEach(function(s) { obs.observe(s); });
