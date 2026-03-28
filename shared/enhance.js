@@ -650,11 +650,11 @@
       }
     }
 
-    // Register service worker — only on HTTPS (not localhost dev)
-    if ('serviceWorker' in navigator && location.protocol === 'https:') {
-      var swBase = document.querySelector('script[src*="scripts.js"]');
-      var swPath = swBase ? swBase.src.replace(/scripts\.js.*$/, 'sw.js') : '/shared/sw.js';
-      navigator.serviceWorker.register(swPath).catch(function() {});
+    // Unregister any stale service workers (SW can't control site from /shared/)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(r) { r.unregister(); });
+      });
     }
   }
 
