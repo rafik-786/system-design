@@ -3,6 +3,15 @@
 > **Check here FIRST** when building any page. These ~35 components cover 90% of content needs.
 > If none fits → check `extra-components.md`. If still nothing → create a new component.
 
+## CRITICAL: Single-Quote Attribute Rule
+Many `<sg-*>` tags use `options='[JSON]'` with **single quotes**. This means:
+- **NEVER** use apostrophes (`'`) inside those attributes — they terminate the attribute!
+- Use "do not" instead of "don't", "cannot" instead of "can't", "they are" instead of "they're"
+- This applies to: `<sg-quiz options='...'>`, `<sg-glossary terms='...'>`, `<sg-dep-graph graph='...'>`, and any attribute wrapped in single quotes containing JSON
+
+## CRITICAL: Error Resilience
+All init functions in `reinit()` are wrapped in try-catch. If one component has bad data, others still render. But fix the root cause (usually broken JSON in attributes).
+
 ---
 
 ## Layout & Structure
@@ -13,7 +22,7 @@
 | 2 | Collapsible | `<sg-collapse>` | Hints, solutions, optional details |
 | 3 | Tab Container | `<sg-tabs>` | Code comparisons (Buggy/Fix), multi-language, Bad/Good |
 | 4 | Exercise Card | `<sg-exercise>` | Practice problems with difficulty + hint |
-| 5 | Cheat Cards | `<sg-cheat>` | Quick-reference cards in a grid |
+| 5 | Cheat Cards | `<sg-cheat>` | Quick-reference cards in a grid. Use `<ul class="cheat-list"><li>...</li></ul>` for bullet lists inside |
 | 6 | Table | `<table>` | Data comparison, feature lists |
 | 7 | Multi-File | `<sg-multi>` | Multiple code files with VS Code-style tabs |
 | 11 | Comparison Grid | `<sg-compare>` | Side-by-side comparison, also Pros/Cons |
@@ -174,7 +183,7 @@
 
 | # | Component | Custom Tag | When to Use |
 |---|-----------|-----------|-------------|
-| 44 | Knowledge Check | `<sg-quiz>` | Multiple-choice quiz with explanation |
+| 44 | Knowledge Check | `<sg-quiz>` | MCQ with letter badges (A/B/C/D), correct/incorrect states, explanation reveal. **No apostrophes in options text** |
 | 50 | Flow Stepper | `<sg-flow>` | Step-by-step walkthrough with navigation |
 | 56 | Sequence Diagram | `<sg-sequence>` | Request/response flow between services |
 | 58 | Latency Ruler | `<sg-latency>` | Logarithmic latency comparison |
@@ -183,10 +192,11 @@
 ### Usage Examples
 
 ```html
-<!-- Knowledge Check -->
-<sg-quiz question="What happens when load factor exceeds 0.75?"
-  options='[{"text":"Drops entries"},{"text":"Resizes and rehashes","correct":true}]'
-  explanation="Table doubles and rehashes every key.">
+<!-- Knowledge Check — header bar, letter badges A/B/C/D, correct/incorrect states, explanation with lightbulb -->
+<!-- IMPORTANT: options attribute uses SINGLE quotes — never use apostrophes inside option text (use "do not" instead of "don't") -->
+<sg-quiz question="What happens when a hash table load factor exceeds 0.75?"
+  options='[{"text":"It starts dropping entries silently"},{"text":"It doubles in size and rehashes every key to new positions","correct":true},{"text":"It switches from chaining to open addressing"},{"text":"It locks and blocks all new inserts"}]'
+  explanation="When load factor exceeds 0.75, most implementations double the backing array and rehash every existing key into the new slots. This is O(n) but happens infrequently enough to be amortized O(1) per insert.">
 </sg-quiz>
 
 <!-- Flow Stepper -->
