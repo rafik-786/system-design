@@ -365,6 +365,109 @@
 
 
   /* ────────────────────────────────────────────────────────────
+     §14 SECTION BOOKMARKING — localStorage per-page
+     ──────────────────────────────────────────────────────────── */
+  function initBookmarks() {
+    var sections = document.querySelectorAll('.section[id]');
+    if (!sections.length) return;
+
+    var key = 'sg-bookmarks-' + location.pathname;
+    var bookmarks = {};
+    try { bookmarks = JSON.parse(localStorage.getItem(key)) || {}; } catch(e) {}
+
+    // Add bookmark button to each section
+    sections.forEach(function(sec) {
+      sec.style.position = 'relative';
+      var btn = document.createElement('button');
+      btn.className = 'sg-bookmark-btn' + (bookmarks[sec.id] ? ' bookmarked' : '');
+      btn.innerHTML = '<i class="fa-' + (bookmarks[sec.id] ? 'solid' : 'regular') + ' fa-bookmark"></i>';
+      btn.setAttribute('aria-label', 'Bookmark this section');
+      btn.setAttribute('title', bookmarks[sec.id] ? 'Remove bookmark' : 'Bookmark this section');
+      btn.addEventListener('click', function() {
+        if (bookmarks[sec.id]) {
+          delete bookmarks[sec.id];
+          btn.classList.remove('bookmarked');
+          btn.innerHTML = '<i class="fa-regular fa-bookmark"></i>';
+          btn.title = 'Bookmark this section';
+        } else {
+          var titleEl = sec.querySelector('.section-title');
+          bookmarks[sec.id] = titleEl ? titleEl.textContent.trim() : sec.id;
+          btn.classList.add('bookmarked');
+          btn.innerHTML = '<i class="fa-solid fa-bookmark"></i>';
+          btn.title = 'Remove bookmark';
+        }
+        try { localStorage.setItem(key, JSON.stringify(bookmarks)); } catch(ex) {}
+        updateBadge();
+      });
+      sec.appendChild(btn);
+    });
+
+    // Floating bookmarks toggle button
+    var toggle = document.createElement('button');
+    toggle.className = 'sg-bookmarks-toggle';
+    toggle.innerHTML = '<i class="fa-solid fa-bookmark"></i><span class="sg-bookmarks-badge" style="display:none">0</span>';
+    toggle.setAttribute('aria-label', 'View bookmarks');
+    toggle.setAttribute('title', 'View bookmarks');
+    document.body.appendChild(toggle);
+
+    // Bookmarks panel
+    var panel = document.createElement('div');
+    panel.className = 'sg-bookmarks-panel';
+    panel.innerHTML = '<div class="sg-bookmarks-header"><span><i class="fa-solid fa-bookmark"></i> Bookmarks</span><button class="sg-bookmarks-close"><i class="fa-solid fa-xmark"></i></button></div><ul class="sg-bookmarks-list"></ul>';
+    document.body.appendChild(panel);
+
+    var list = panel.querySelector('.sg-bookmarks-list');
+    var badge = toggle.querySelector('.sg-bookmarks-badge');
+
+    function updateBadge() {
+      var count = Object.keys(bookmarks).length;
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function renderPanel() {
+      var ids = Object.keys(bookmarks);
+      if (!ids.length) {
+        list.innerHTML = '<li class="sg-bookmarks-empty">No bookmarks yet. Click <i class="fa-regular fa-bookmark"></i> on any section.</li>';
+        return;
+      }
+      list.innerHTML = '';
+      ids.forEach(function(id) {
+        var li = document.createElement('li');
+        li.innerHTML = '<i class="fa-solid fa-bookmark" style="color:#f59e0b;margin-right:0.5rem;font-size:0.7rem;"></i>' + bookmarks[id];
+        li.addEventListener('click', function() {
+          var target = document.getElementById(id);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          panel.classList.remove('visible');
+        });
+        list.appendChild(li);
+      });
+    }
+
+    toggle.addEventListener('click', function() {
+      renderPanel();
+      panel.classList.toggle('visible');
+    });
+
+    panel.querySelector('.sg-bookmarks-close').addEventListener('click', function() {
+      panel.classList.remove('visible');
+    });
+
+    // Show toggle after scroll
+    var toggleVisible = false;
+    window.addEventListener('scroll', function() {
+      var show = window.scrollY > 600;
+      if (show !== toggleVisible) {
+        toggleVisible = show;
+        toggle.classList.toggle('visible', show);
+      }
+    }, { passive: true });
+
+    updateBadge();
+  }
+
+
+  /* ────────────────────────────────────────────────────────────
      §13 NEW CUSTOM ELEMENTS
      ──────────────────────────────────────────────────────────── */
 
@@ -544,7 +647,7 @@
     initProgressTracking();
     // Batch 7 features — run after custom elements transform
     setTimeout(function() {
-      initTimers(); initFeedback(); initCopyLink();
+      initTimers(); initFeedback(); initCopyLink(); initBookmarks();
       // Auto-apply .quote-block to long italic-only paragraphs in cards
       document.querySelectorAll('.card-body p, .collapsible-content p').forEach(function(p) {
         var em = p.querySelector('em');
