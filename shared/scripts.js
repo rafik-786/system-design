@@ -473,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Desktop: mouseenter/mouseleave
   document.addEventListener('mouseenter', function (e) {
+    if (!e.target || typeof e.target.closest !== 'function') return;
     var trigger = e.target.closest('.tooltip-trigger');
     if (!trigger) return;
     var content = getTooltipContent(trigger);
@@ -483,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, true);
 
   document.addEventListener('mouseleave', function (e) {
+    if (!e.target || typeof e.target.closest !== 'function') return;
     var trigger = e.target.closest('.tooltip-trigger');
     if (!trigger) return;
     var content = getTooltipContent(trigger);
@@ -492,6 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Touch: click to toggle
   document.addEventListener('click', function (e) {
+    if (!e.target || typeof e.target.closest !== 'function') return;
     var trigger = e.target.closest('.tooltip-trigger');
     if (!trigger) {
       document.querySelectorAll('.tooltip-content.visible').forEach(function (tc) { resetTooltip(tc); });
@@ -1810,7 +1813,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function initInterviewChats() {
     document.querySelectorAll('.interview-chat[data-chat]').forEach(function(el) {
       if (el.dataset.built) return; el.dataset.built = '1';
-      var chat = JSON.parse(el.dataset.chat);
+      var chat;
+      try { chat = JSON.parse(el.dataset.chat); } catch(e) { console.warn('Interview chat JSON error:', e.message); return; }
       var html = '<div class="chat-header"><div class="chat-header-left">' +
         '<span class="chat-header-dot"></span>' +
         '<span class="chat-header-title">' + (chat.title || 'System Design Round') + '</span></div>' +
@@ -1844,14 +1848,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function initKnowledgeChecks() {
     document.querySelectorAll('.knowledge-check[data-question]').forEach(function(el) {
       if (el.dataset.built) return; el.dataset.built = '1';
-      var options = JSON.parse(el.dataset.options);
+      var options;
+      try { options = JSON.parse(el.dataset.options); } catch(e) { console.warn('Quiz JSON error:', e.message, el.dataset.question.substring(0,50)); return; }
       var name = 'kc-' + Math.random().toString(36).slice(2, 8);
-      var html = '<div class="kc-question">' + el.dataset.question + '</div><div class="kc-options">';
+      var letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+      var html = '<div class="kc-header"><div class="kc-header-left"><i class="fa-solid fa-circle-question"></i> Knowledge Check</div><span class="kc-header-count">' + options.length + ' options</span></div>';
+      html += '<div class="kc-body"><div class="kc-question">' + el.dataset.question + '</div><div class="kc-options">';
       options.forEach(function(opt, i) {
         var correct = opt.correct ? ' data-correct="true"' : '';
-        html += '<label class="kc-option"' + correct + '><input type="radio" name="' + name + '" value="' + i + '"> ' + opt.text + '</label>';
+        html += '<label class="kc-option"' + correct + '><input type="radio" name="' + name + '" value="' + i + '"><span class="kc-badge"><span class="kc-badge-letter">' + (letters[i] || '') + '</span></span> ' + opt.text + '</label>';
       });
-      html += '</div><div class="kc-explanation">' + el.dataset.explanation + '</div>';
+      html += '</div></div><div class="kc-explanation"><div class="kc-explanation-inner"><i class="fa-solid fa-lightbulb"></i><div>' + (el.dataset.explanation || '') + '</div></div></div>';
       el.innerHTML = html;
     });
   }
@@ -2409,7 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Walk text nodes in the page content (skip glossary panel itself, code, pre, script, etc.)
       var skipTags = { SCRIPT: 1, STYLE: 1, PRE: 1, CODE: 1, BUTTON: 1, INPUT: 1, TEXTAREA: 1, SVG: 1 };
-      var skipClasses = ['glossary-panel', 'glossary-term', 'glossary-def', 'tooltip-trigger', 'tooltip-rich', 'macos-window', 'code-walkthrough'];
+      var skipClasses = ['glossary-panel', 'glossary-term', 'glossary-def', 'tooltip-trigger', 'tooltip-rich', 'macos-window', 'code-walkthrough', 'knowledge-check', 'kc-option', 'kc-question'];
 
       function shouldSkip(node) {
         if (skipTags[node.tagName]) return true;
@@ -2662,27 +2669,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* -- Data-driven component builders -- */
     initMathSteppers();
-    initArchDiffs();
-    initEvoSteppers();
-    initStorageViz();
-    initFlowSteppers();
-    initPacketViewers();
-    initSchemaViewers();
-    initLogViewers();
-    initErrorBlocks();
-    initQueryPlans();
-    initDashboards();
-    initInterviewChats();
-    initKnowledgeChecks();
-    initCodeWalkthroughs();
-    initScorecards();
-    initDebugTemplates();
-    initDepGraphs();
-    initMultiFiles();
-    initGlossaryPanels();
-    initBtreeNavs();
-    initDataTooltips(); /* re-run for auto-linked glossary terms */
-    colorizeCode(); /* re-run for multi-file panels + custom tag content */
+    /* Each init wrapped in try-catch so one broken component never blocks others */
+    var inits = [initArchDiffs, initEvoSteppers, initStorageViz, initFlowSteppers,
+      initPacketViewers, initSchemaViewers, initLogViewers, initErrorBlocks,
+      initQueryPlans, initDashboards, initInterviewChats, initKnowledgeChecks,
+      initCodeWalkthroughs, initScorecards, initDebugTemplates, initDepGraphs,
+      initMultiFiles, initGlossaryPanels, initBtreeNavs, initDataTooltips, colorizeCode];
+    inits.forEach(function(fn) { try { fn(); } catch(e) { console.warn('Init error in ' + fn.name + ':', e.message); } });
 
     /* -- Line numbers + JSON highlighting for API bodies -- */
     document.querySelectorAll('pre code').forEach(function(block) {
@@ -3317,6 +3310,11 @@ document.addEventListener('DOMContentLoaded', () => {
    * ========================================================== */
   reinit();
 
+  /* Re-init after custom elements transform (containers use single rAF, need extra frame margin) */
+  requestAnimationFrame(function() { requestAnimationFrame(function() { requestAnimationFrame(function() {
+    reinit();
+  }); }); });
+
   /* -- Wheel intercept removed: macos-body uses overflow:auto natively -- */
 
   /* ==========================================================
@@ -3337,6 +3335,7 @@ document.addEventListener('DOMContentLoaded', () => {
    *      incorrect, and disables further selections.
    * -------------------------------------------------------- */
   document.addEventListener('click', function(e) {
+    if (!e.target || typeof e.target.closest !== 'function') return;
     var option = e.target.closest('.kc-option');
     if (!option) return;
     var check = option.closest('.knowledge-check');
@@ -3498,49 +3497,96 @@ document.addEventListener('DOMContentLoaded', () => {
 (function() {
   function esc(s) { return s ? s.replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
-  /* 1. <sg-card title="..." icon="..." open> content </sg-card> */
+  /* 1. <sg-card title="..." icon="..." open> content </sg-card> — IN-PLACE DOM manipulation */
   customElements.define('sg-card', class extends HTMLElement {
     connectedCallback() {
-      var t = this.getAttribute('title') || '';
-      var icon = this.getAttribute('icon') || '';
-      var open = this.hasAttribute('open') ? ' open' : '';
-      var iconHtml = icon ? '<i class="' + icon + '"></i> ' : '';
-      var body = this.innerHTML;
-      this.outerHTML = '<div class="card' + open + '"><h3 class="card-title">' + iconHtml + t + '</h3><div class="card-body">' + body + '</div></div>';
+      var el = this;
+      requestAnimationFrame(function() {
+        var t = el.getAttribute('title') || '';
+        var icon = el.getAttribute('icon') || '';
+        var open = el.hasAttribute('open') ? ' open' : '';
+        var iconHtml = icon ? '<i class="' + icon + '"></i> ' : '';
+        var wrapper = document.createElement('div');
+        wrapper.className = 'card' + open + ' visible';
+        var h3 = document.createElement('h3');
+        h3.className = 'card-title';
+        h3.innerHTML = iconHtml + t;
+        var body = document.createElement('div');
+        body.className = 'card-body';
+        while (el.firstChild) body.appendChild(el.firstChild);
+        wrapper.appendChild(h3);
+        wrapper.appendChild(body);
+        el.replaceWith(wrapper);
+      });
     }
   });
 
-  /* 2. <sg-collapse title="..." icon="..."> content </sg-collapse> */
+  /* 2. <sg-collapse title="..." icon="..."> content </sg-collapse> — IN-PLACE DOM manipulation */
   customElements.define('sg-collapse', class extends HTMLElement {
     connectedCallback() {
-      var t = this.getAttribute('title') || '';
-      var icon = this.getAttribute('icon') || '';
-      var iconHtml = icon ? ' <i class="' + icon + '"></i>' : '';
-      var body = this.innerHTML;
-      this.outerHTML = '<div class="collapsible"><div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i>' + iconHtml + ' ' + t + '</span></div><div class="collapsible-content"><div class="collapsible-body">' + body + '</div></div></div>';
+      var el = this;
+      requestAnimationFrame(function() {
+        var t = el.getAttribute('title') || '';
+        var icon = el.getAttribute('icon') || '';
+        var iconHtml = icon ? ' <i class="' + icon + '"></i>' : '';
+        var wrapper = document.createElement('div');
+        wrapper.className = 'collapsible';
+        var header = document.createElement('div');
+        header.className = 'collapsible-header';
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('aria-expanded', 'false');
+        header.innerHTML = '<span><i class="fas fa-chevron-right"></i>' + iconHtml + ' ' + t + '</span>';
+        var content = document.createElement('div');
+        content.className = 'collapsible-content';
+        var bodyDiv = document.createElement('div');
+        bodyDiv.className = 'collapsible-body';
+        while (el.firstChild) bodyDiv.appendChild(el.firstChild);
+        content.appendChild(bodyDiv);
+        wrapper.appendChild(header);
+        wrapper.appendChild(content);
+        el.replaceWith(wrapper);
+      });
     }
   });
 
-  /* 3. <sg-tabs> <sg-tab title="..." icon="..."> content </sg-tab> ... </sg-tabs> */
+  /* 3. <sg-tabs> <sg-tab title="..." icon="..."> content </sg-tab> ... </sg-tabs> — IN-PLACE DOM manipulation */
   customElements.define('sg-tab', class extends HTMLElement {
     connectedCallback() {} // handled by sg-tabs
   });
   customElements.define('sg-tabs', class extends HTMLElement {
     connectedCallback() {
-      var tabs = this.querySelectorAll('sg-tab');
-      var header = '<div class="tab-header" role="tablist">';
-      var panels = '';
-      tabs.forEach(function(tab, i) {
-        var id = 'sgt-' + Math.random().toString(36).slice(2, 8);
-        var title = tab.getAttribute('title') || 'Tab ' + (i + 1);
-        var icon = tab.getAttribute('icon');
-        var iconHtml = icon ? '<i class="' + icon + '"></i> ' : '';
-        var active = i === 0;
-        header += '<button class="tab-btn' + (active ? ' active' : '') + '" data-tab="' + id + '" role="tab" aria-selected="' + active + '">' + iconHtml + title + '</button>';
-        panels += '<div class="tab-panel' + (active ? ' active' : '') + '" id="' + id + '" role="tabpanel">' + tab.innerHTML + '</div>';
+      var el = this;
+      requestAnimationFrame(function() {
+        var tabs = Array.from(el.querySelectorAll(':scope > sg-tab'));
+        var wrapper = document.createElement('div');
+        wrapper.className = 'tab-container';
+        var headerDiv = document.createElement('div');
+        headerDiv.className = 'tab-header';
+        headerDiv.setAttribute('role', 'tablist');
+        wrapper.appendChild(headerDiv);
+        tabs.forEach(function(tab, i) {
+          var id = 'sgt-' + Math.random().toString(36).slice(2, 8);
+          var title = tab.getAttribute('title') || 'Tab ' + (i + 1);
+          var iconAttr = tab.getAttribute('icon');
+          var iconHtml = iconAttr ? '<i class="' + iconAttr + '"></i> ' : '';
+          var active = i === 0;
+          var btn = document.createElement('button');
+          btn.className = 'tab-btn' + (active ? ' active' : '');
+          btn.setAttribute('data-tab', id);
+          btn.setAttribute('role', 'tab');
+          btn.setAttribute('aria-selected', String(active));
+          btn.innerHTML = iconHtml + title;
+          headerDiv.appendChild(btn);
+          var panel = document.createElement('div');
+          panel.className = 'tab-panel' + (active ? ' active' : '');
+          panel.id = id;
+          panel.setAttribute('role', 'tabpanel');
+          while (tab.firstChild) panel.appendChild(tab.firstChild);
+          wrapper.appendChild(panel);
+        });
+        el.replaceWith(wrapper);
       });
-      header += '</div>';
-      this.outerHTML = '<div class="tab-container">' + header + panels + '</div>';
     }
   });
 
@@ -3550,7 +3596,6 @@ document.addEventListener('DOMContentLoaded', () => {
       var type = this.getAttribute('type') || 'info';
       var title = this.getAttribute('title') || '';
       var body = this.innerHTML;
-      // Extended types map to callout-{type} CSS class
       var typeMap = {
         danger: { cls: 'callout-danger', icon: '' },
         success: { cls: 'callout-success', icon: '' },
@@ -3606,16 +3651,39 @@ document.addEventListener('DOMContentLoaded', () => {
   customElements.define('sg-hint', class extends HTMLElement { connectedCallback() {} });
   customElements.define('sg-exercise', class extends HTMLElement {
     connectedCallback() {
-      var title = this.getAttribute('title') || '';
-      var diff = this.getAttribute('difficulty') || 'medium';
-      var hint = this.querySelector('sg-hint');
-      var hintHtml = '';
-      if (hint) {
-        hintHtml = '<div class="collapsible"><div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Hint</span></div><div class="collapsible-content"><div class="collapsible-body">' + hint.innerHTML + '</div></div></div>';
-        hint.remove();
-      }
-      var body = this.innerHTML;
-      this.outerHTML = '<div class="exercise-card"><div class="exercise-card-title"><span class="difficulty-tag difficulty-' + diff + '">' + diff.charAt(0).toUpperCase() + diff.slice(1) + '</span> ' + title + '</div><p>' + body + '</p>' + hintHtml + '</div>';
+      var el = this;
+      requestAnimationFrame(function() {
+        var title = el.getAttribute('title') || '';
+        var diff = el.getAttribute('difficulty') || 'medium';
+        var hint = el.querySelector('sg-hint');
+        var hintContent = null;
+        if (hint) {
+          hintContent = document.createDocumentFragment();
+          while (hint.firstChild) hintContent.appendChild(hint.firstChild);
+          hint.remove();
+        }
+        var wrapper = document.createElement('div');
+        wrapper.className = 'exercise-card visible';
+        var titleDiv = document.createElement('div');
+        titleDiv.className = 'exercise-card-title';
+        titleDiv.innerHTML = '<span class="difficulty-tag difficulty-' + diff + '">' + diff.charAt(0).toUpperCase() + diff.slice(1) + '</span> ' + title;
+        wrapper.appendChild(titleDiv);
+        while (el.firstChild) wrapper.appendChild(el.firstChild);
+        if (hintContent) {
+          var collapsible = document.createElement('div');
+          collapsible.className = 'collapsible';
+          collapsible.innerHTML = '<div class="collapsible-header" role="button" tabindex="0" aria-expanded="false"><span><i class="fas fa-chevron-right"></i> Hint</span></div>';
+          var cc = document.createElement('div');
+          cc.className = 'collapsible-content';
+          var cb = document.createElement('div');
+          cb.className = 'collapsible-body';
+          cb.appendChild(hintContent);
+          cc.appendChild(cb);
+          collapsible.appendChild(cc);
+          wrapper.appendChild(collapsible);
+        }
+        el.replaceWith(wrapper);
+      });
     }
   });
 
@@ -3624,8 +3692,11 @@ document.addEventListener('DOMContentLoaded', () => {
     connectedCallback() {
       var color = this.getAttribute('color') || 'blue';
       var title = this.getAttribute('title') || '';
-      var body = this.innerHTML;
-      this.outerHTML = '<div class="cheat-card cheat-' + color + '"><strong>' + title + '</strong><br>' + body + '</div>';
+      var body = this.innerHTML.trim();
+      // Convert <br> separated lines into a proper list
+      var lines = body.split(/<br\s*\/?>/i).map(function(l) { return l.trim(); }).filter(Boolean);
+      var listHtml = '<ul class="cheat-list">' + lines.map(function(l) { return '<li>' + l + '</li>'; }).join('') + '</ul>';
+      this.outerHTML = '<div class="cheat-card cheat-' + color + ' visible"><strong>' + title + '</strong>' + listHtml + '</div>';
     }
   });
 
@@ -3796,11 +3867,11 @@ document.addEventListener('DOMContentLoaded', () => {
       var tag = this.getAttribute('tag') || '';
       var html = '<div class="estimation-calc" data-title="' + esc(title) + '"' + (tag ? ' data-tag="' + esc(tag) + '"' : '') + '>';
       Array.from(this.children).forEach(function(child) {
-        var tag = child.tagName.toLowerCase();
-        if (tag === 'sg-input') html += '<div class="calc-input" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-note="' + esc(child.getAttribute('note') || '') + '"></div>';
-        else if (tag === 'sg-op') html += '<div class="calc-op">' + child.textContent + '</div>';
-        else if (tag === 'sg-eq') html += '<div class="calc-eq" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-note="' + esc(child.getAttribute('note') || '') + '"></div>';
-        else if (tag === 'sg-result') html += '<div class="calc-result" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-formula="' + esc(child.getAttribute('formula') || '') + '"></div>';
+        var tn = child.tagName.toLowerCase();
+        if (tn === 'sg-input') html += '<div class="calc-input" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-note="' + esc(child.getAttribute('note') || '') + '"></div>';
+        else if (tn === 'sg-op') html += '<div class="calc-op">' + child.textContent + '</div>';
+        else if (tn === 'sg-eq') html += '<div class="calc-eq" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-note="' + esc(child.getAttribute('note') || '') + '"></div>';
+        else if (tn === 'sg-result') html += '<div class="calc-result" data-label="' + esc(child.getAttribute('label') || '') + '" data-value="' + esc(child.getAttribute('value') || '') + '" data-formula="' + esc(child.getAttribute('formula') || '') + '"></div>';
       });
       html += '</div>';
       this.outerHTML = html;
