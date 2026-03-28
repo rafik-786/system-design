@@ -1918,6 +1918,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.dep-graph[data-graph]').forEach(function(el) {
       if (el.dataset.built) return; el.dataset.built = '1';
       var g = JSON.parse(el.dataset.graph);
+      if (!g || !g.layers) return;       // skip if data is incomplete
       var title = g.title || 'Service Dependencies';
       var edges = g.edges || [];
 
@@ -2679,6 +2680,21 @@ document.addEventListener('DOMContentLoaded', () => {
       initCodeWalkthroughs, initScorecards, initDebugTemplates, initDepGraphs,
       initMultiFiles, initGlossaryPanels, initBtreeNavs, initDataTooltips, colorizeCode];
     inits.forEach(function(fn) { try { fn(); } catch(e) { console.warn('Init error in ' + fn.name + ':', e.message); } });
+
+    /* -- Section scroll fade-in -- */
+    (function initSectionFadeIn() {
+      var secs = document.querySelectorAll('.section');
+      if (!secs.length || !('IntersectionObserver' in window)) {
+        secs.forEach(function(s) { s.classList.add('visible'); });
+        return;
+      }
+      var obs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+          if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+        });
+      }, { threshold: 0.08 });
+      secs.forEach(function(s) { obs.observe(s); });
+    })();
 
     /* -- Line numbers + JSON highlighting for API bodies -- */
     document.querySelectorAll('pre code').forEach(function(block) {
