@@ -2681,19 +2681,15 @@ document.addEventListener('DOMContentLoaded', () => {
       initMultiFiles, initGlossaryPanels, initBtreeNavs, initDataTooltips, colorizeCode];
     inits.forEach(function(fn) { try { fn(); } catch(e) { console.warn('Init error in ' + fn.name + ':', e.message); } });
 
-    /* -- Section scroll fade-in -- */
-    (function initSectionFadeIn() {
-      var secs = document.querySelectorAll('.section');
-      if (!secs.length || !('IntersectionObserver' in window)) {
-        secs.forEach(function(s) { s.classList.add('visible'); });
-        return;
-      }
-      var obs = new IntersectionObserver(function(entries) {
-        entries.forEach(function(e) {
-          if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
-        });
-      }, { threshold: 0.08 });
-      secs.forEach(function(s) { obs.observe(s); });
+    /* -- Load enhance.js (navigation, progress, accessibility, etc.) -- */
+    (function loadEnhance() {
+      var currentScript = document.querySelector('script[src*="scripts.js"]');
+      if (!currentScript) return;
+      var base = currentScript.src.replace(/scripts\.js.*$/, '');
+      var s = document.createElement('script');
+      s.src = base + 'enhance.js';
+      s.defer = true;
+      document.head.appendChild(s);
     })();
 
     /* -- Line numbers + JSON highlighting for API bodies -- */
