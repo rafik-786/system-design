@@ -665,6 +665,8 @@
   function initAll() {
     if (window.__sgEnhanceLoaded) return;
     window.__sgEnhanceLoaded = true;
+    // Signal to CSS that JS is active — enables fade-in animations
+    document.documentElement.classList.add('sg-enhanced');
     initPWA();
     // Inject print.css (non-blocking, only used for print)
     var cssBase = document.querySelector('link[href*="styles.css"]');

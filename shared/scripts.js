@@ -2690,7 +2690,6 @@ document.addEventListener('DOMContentLoaded', () => {
       var base = currentScript.src.replace(/scripts\.js.*$/, '');
       var s = document.createElement('script');
       s.src = base + 'enhance.js';
-      s.defer = true;
       document.head.appendChild(s);
     })();
 
