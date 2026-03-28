@@ -543,7 +543,16 @@
     initSmoothScroll();
     initProgressTracking();
     // Batch 7 features — run after custom elements transform
-    setTimeout(function() { initTimers(); initFeedback(); initCopyLink(); }, 600);
+    setTimeout(function() {
+      initTimers(); initFeedback(); initCopyLink();
+      // Auto-apply .quote-block to long italic-only paragraphs in cards
+      document.querySelectorAll('.card-body p, .collapsible-content p').forEach(function(p) {
+        var em = p.querySelector('em');
+        if (em && em === p.firstElementChild && em === p.lastElementChild && em.textContent.length > 40) {
+          em.classList.add('quote-block');
+        }
+      });
+    }, 600);
   }
 
   // Run when DOM is ready (enhance.js may load after DOMContentLoaded)

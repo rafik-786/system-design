@@ -901,6 +901,9 @@
     ]'
     explanation="Step 5 is recursive decomposition. If a component like 'Notification Service' still feels vague after one pass, you treat it as its own mini-system: ask questions about it (Step 1), break it into sub-components (Step 2), define APIs and data models for each (Step 3), and make technical decisions (Step 4). You keep going until every piece is small enough to explain clearly. It's NOT about adding more technologies or splitting into microservices &mdash; it's about understanding at the right level of detail.">
   </sg-quiz>
+
+  <sg-section-summary>The Baby Steps Framework breaks any system design problem into five recursive steps: Understand, Break Apart, Go Deeper, Decide, and Decompose Further. The key insight is that no problem is too complex &mdash; you just need more levels of decomposition.</sg-section-summary>
+  <sg-feedback></sg-feedback>
 </div>
 
 
@@ -918,7 +921,7 @@
 
   <p>Reading about a framework is one thing. <em>Seeing it work</em> is another. In this section, we'll apply the Baby Steps Framework to two real systems &mdash; one simple, one complex. Same five steps, different problems, same structured approach.</p>
 
-  <p>Pay attention to how the <em>process</em> stays identical even though the <em>problems</em> are very different. That's the whole point of a framework: it works regardless of the specific system you're designing.</p>
+  <p class="emphasis-p">Pay attention to how the <em>process</em> stays identical even though the <em>problems</em> are very different. That's the whole point of a framework: it works regardless of the specific system you're designing.</p>
 
   <!-- ═══════════════════════════════════════════════════════
        WALKTHROUGH 1: URL SHORTENER
@@ -1057,7 +1060,7 @@ GET /{short_key}
 CREATE INDEX idx_expires ON url_mappings (expires_at)
     WHERE expires_at IS NOT NULL;</sg-code>
 
-    <p>Why <code>CHAR(7)</code> for the short key? Let's do the math. We use <span class="tooltip-trigger" data-tooltip="Base62 encoding uses 62 characters: a-z (26) + A-Z (26) + 0-9 (10). Each character position can be one of 62 values. A 7-character Base62 string gives you 62^7 = 3.5 trillion possible combinations &mdash; plenty for 182 billion URLs.">Base62</span> encoding (a-z, A-Z, 0-9 = 62 characters). A 7-character key gives us 62<sup>7</sup> = 3.5 trillion possible combinations. We need 182 billion. So 7 characters gives us roughly a 19x safety margin &mdash; plenty of room.</p>
+    <p>Why <code>CHAR(7)</code> for the short key? Let's do the math. We use <span class="tooltip-trigger" data-tooltip="Base62 encoding uses 62 characters: a-z (26) + A-Z (26) + 0-9 (10). Each character position can be one of 62 values. A 7-character Base62 string gives you 62^7 = 3.5 trillion possible combinations &mdash; plenty for 182 billion URLs.">Base62</span> encoding (a-z, A-Z, 0-9 = 62 characters). A 7-character key gives us 62<sup>7</sup> = 3.5 trillion possible combinations. We need 182 billion. So 7 characters gives us roughly a <span class="hl">19x safety margin</span> &mdash; plenty of room.</p>
 
     <h4>Request Flow: Creating a Short URL</h4>
     <sg-sequence participants="Client,API Server,ID Generator,Database">
@@ -1077,14 +1080,14 @@ CREATE INDEX idx_expires ON url_mappings (expires_at)
       <sg-msg from="1" to="0" label="302 Redirect &rarr; long_url" time="2ms"></sg-msg>
     </sg-sequence>
 
-    <p>On a cache miss, the server reads from the database (~5ms) and populates the cache for next time. With a 100:1 read/write ratio, most popular URLs stay hot in the cache, giving us a cache hit rate above 90%.</p>
+    <p class="aside-note">On a cache miss, the server reads from the database (~5ms) and populates the cache for next time. With a 100:1 read/write ratio, most popular URLs stay hot in the cache, giving us a cache hit rate above 90%.</p>
   </sg-card>
 
   <sg-card title="Step 4: Technical Decisions" icon="fa-solid fa-scale-balanced">
     <h4>Decision 1: Database &mdash; SQL vs NoSQL?</h4>
     <sg-compare left-title="PostgreSQL (SQL)" right-title="DynamoDB / Cassandra (NoSQL)" left-items="Simple key-value lookup is easy in SQL|ACID guarantees prevent duplicate keys|18 TB needs sharding &mdash; Citus extension works|Rich query support for analytics" right-items="Native horizontal scaling &mdash; no extensions needed|Eventual consistency is fine for URL redirects|DynamoDB handles 18 TB across partitions automatically|No JOIN support, but we don't need JOINs here"></sg-compare>
 
-    <p><strong>Verdict:</strong> Both work. A URL shortener is essentially a key-value store &mdash; simple enough that the database choice barely matters. If you're comfortable with PostgreSQL, use it with range-based sharding on the short key. If you want zero-ops horizontal scaling, DynamoDB is excellent for this use case. <strong>The important thing is the "because":</strong> "I chose DynamoDB because the data model is pure key-value, we need automatic horizontal scaling to 18 TB, and we don't need transactions or joins."</p>
+    <p><strong>Verdict:</strong> Both work. A URL shortener is essentially a key-value store &mdash; simple enough that the database choice barely matters. If you're comfortable with <span class="code-term">PostgreSQL</span>, use it with range-based sharding on the short key. If you want zero-ops horizontal scaling, <span class="code-term">DynamoDB</span> is excellent for this use case. <strong>The important thing is the "because":</strong> "I chose DynamoDB because the data model is pure key-value, we need automatic horizontal scaling to 18 TB, and we don't need transactions or joins."</p>
 
     <h4>Decision 2: Key Generation &mdash; Base62 vs MD5 Hash?</h4>
     <sg-compare left-title="Base62 Counter" right-title="MD5 Hash (truncated)" left-items="Auto-incrementing counter &rarr; Base62 encode|Guaranteed unique (no collisions)|Requires a centralized counter (bottleneck?)|Keys are sequential &mdash; predictable" right-items="Hash the long URL &rarr; take first 7 chars|No central counter needed (distributed)|Collision risk: 2 different URLs might hash to same key|Must check for collisions on every insert"></sg-compare>
@@ -1225,7 +1228,7 @@ CREATE INDEX idx_expires ON url_mappings (expires_at)
       <sg-msg from="7" to="6" label="Delivered successfully" time="250ms"></sg-msg>
     </sg-sequence>
 
-    <p>The key insight: the caller gets a response in 12ms. The actual push notification arrives at the user's phone ~250ms later. The caller doesn't wait for delivery &mdash; that's the beauty of async processing with a message queue.</p>
+    <blockquote>The caller gets a response in 12ms. The actual push notification arrives at the user's phone ~250ms later. The caller doesn't wait for delivery &mdash; that's the beauty of async processing with a message queue.</blockquote>
 
     <h4>Data Models</h4>
     <sg-code file="User Preferences (PostgreSQL)">CREATE TABLE user_preferences (
@@ -1394,6 +1397,8 @@ GET rate:user-12345:push        -- Returns current count
     ]'
     explanation="The framework doesn't guarantee you pick the 'right' technology (there often isn't a single right answer). What it guarantees is that every choice you make has a 'because' rooted in actual requirements and numbers. When the interviewer asks 'Why Kafka and not RabbitMQ?' you can answer with specific reasons (replay capability, separate topics per channel, persistence for retries) rather than 'because Kafka is popular.' That's the difference between a senior engineer answer and a junior one.">
   </sg-quiz>
+
+  <sg-section-summary>Two full walkthroughs &mdash; a URL shortener and a notification system &mdash; demonstrate that the same five-step framework handles problems of wildly different complexity. The only thing that changes is the depth of recursive decomposition.</sg-section-summary>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1513,6 +1518,9 @@ GET rate:user-12345:push        -- Returns current count
     ]'
     explanation="No technology is 100% reliable &mdash; not Kafka, not RabbitMQ, not anything. The issue isn't which queue you pick; it's that you have a SINGLE point of failure. The fix is redundancy: either run a multi-broker Kafka cluster (so one broker dying doesn't stop the system) or have a fallback path where services can write directly to a database-backed queue when Kafka is unavailable. Criterion 2 (failure handling) is about acknowledging that everything can fail and having a plan for when it does.">
   </sg-quiz>
+
+  <sg-section-summary>Every system design must pass four checks: does it handle the scale (math), does it handle failures (redundancy), can it evolve (extensibility), and is the complexity justified (no over-engineering). Self-reviewing against these criteria before the interviewer asks is what separates strong candidates.</sg-section-summary>
+  <sg-feedback></sg-feedback>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1529,7 +1537,7 @@ GET rate:user-12345:push        -- Returns current count
 
   <p>The five-step framework works everywhere. But "everywhere" doesn't look the same. A 45-minute <span class="hl">Google</span> round feels completely different from a 30-minute startup screen, even though you're using the same thinking process. The difference isn't <em>what</em> you do &mdash; it's <em>how fast</em> you do it and <em>where you spend your depth</em>.</p>
 
-  <p>Think of it like cooking the same recipe with different time limits. You can make a great pasta in 15 minutes or 60 minutes &mdash; the ingredients are the same, but what you can do with them changes dramatically. A 60-minute version might have a slow-simmered sauce with layers of flavor. A 15-minute version needs to be fast, focused, and impressive with simplicity. Neither is "better" &mdash; they're just different calibrations of the same skill.</p>
+  <p class="aside-note">Think of it like cooking the same recipe with different time limits. You can make a great pasta in 15 minutes or 60 minutes &mdash; the ingredients are the same, but what you can do with them changes dramatically. A 60-minute version might have a slow-simmered sauce with layers of flavor. A 15-minute version needs to be fast, focused, and impressive with simplicity. Neither is "better" &mdash; they're just different calibrations of the same skill.</p>
 
   <p>Let's break down the three most common interview formats and how to allocate your time in each one:</p>
 
@@ -1606,7 +1614,7 @@ GET rate:user-12345:push        -- Returns current count
     right-items="Cover ALL major components with moderate depth|Interviewer expects comprehensive thinking|Show that nothing is forgotten or hand-waved|May tie decisions to leadership principles (Amazon)|More time for broad coverage and discussion">
   </sg-compare>
 
-  <p>Now let's look at what interviewers expect from <strong>different experience levels</strong> within each format. A junior engineer isn't expected to nail the same things as a senior &mdash; but juniors often don't know that, which leads to unnecessary panic.</p>
+  <p class="emphasis-p">Now let's look at what interviewers expect from <strong>different experience levels</strong> within each format. A junior engineer isn't expected to nail the same things as a senior &mdash; but juniors often don't know that, which leads to unnecessary panic.</p>
 
   <div class="tab-container">
     <div class="tab-header" role="tablist">
@@ -1668,6 +1676,8 @@ GET rate:user-12345:push        -- Returns current count
     ]'
     explanation="In a 30-minute screen, you have roughly 12 minutes for deep design. Trying to cover everything means covering nothing well. Scoping aggressively ('let us focus on 1-on-1 text messages for now') shows maturity and gives you time to go deep on the core flow. Mentioning what you would add with more time shows you know the full picture but made a conscious choice about where to spend your limited time. That is exactly the judgment startups are looking for.">
   </sg-quiz>
+
+  <sg-section-summary>The five-step framework adapts to any interview length. Short interviews demand aggressive scoping and focused depth; longer interviews allow broader coverage. The key is matching your <span class="hl">depth allocation</span> to the available time.</sg-section-summary>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1682,7 +1692,7 @@ GET rate:user-12345:push        -- Returns current count
     </div>
   </div>
 
-  <p>Theory is great. The framework is solid. But what does a system design interview <em>actually feel like</em> when you're sitting in the chair, the timer is running, and the interviewer is watching you think?</p>
+  <p class="emphasis-p">Theory is great. The framework is solid. But what does a system design interview <em>actually feel like</em> when you're sitting in the chair, the timer is running, and the interviewer is watching you think?</p>
 
   <p>Here are four real stories from engineers who interviewed at top companies. Names and some details are changed, but the dynamics &mdash; the questions, the mistakes, the turning points &mdash; are real. Pay attention to the <span class="hl">lessons</span> at the end of each story. They're more valuable than any textbook.</p>
 
@@ -1718,7 +1728,7 @@ GET rate:user-12345:push        -- Returns current count
     <h4>What the Candidate Did</h4>
     <p>Instead of jumping to the architecture, she spent the first 7 minutes asking clarifying questions: "How many URLs per day? Do short links expire? Do we need analytics (click counts)? Is this public-facing or internal? What's the expected read-to-write ratio?" The interviewer answered each one, and by the end, she had a crisp scope: 100M new URLs/day, links never expire, basic analytics (click count only), 100:1 read-to-write ratio.</p>
 
-    <p>Then she did the math on the whiteboard: 100M writes/day = ~1,150 writes/sec. At a 100:1 ratio, that means ~115,000 reads/sec. Each record is ~500 bytes, so 100M/day &times; 500B &times; 365 days = ~18 TB/year. She mapped every number to a technology choice: "115K reads/sec needs a cache &mdash; Redis can handle 500K+ reads/sec from memory, so one Redis instance is enough. 18 TB/year means we need to partition the database, but the lookups are simple key-value, so DynamoDB handles this natively."</p>
+    <p>Then she did the math on the whiteboard: 100M writes/day = ~1,150 writes/sec. At a 100:1 ratio, that means ~115,000 reads/sec. Each record is ~500 bytes, so 100M/day &times; 500B &times; 365 days = ~18 TB/year. She mapped every number to a technology choice: "115K reads/sec needs a cache &mdash; <span class="code-term">Redis</span> can handle 500K+ reads/sec from memory, so one Redis instance is enough. 18 TB/year means we need to partition the database, but the lookups are simple key-value, so <span class="code-term">DynamoDB</span> handles this natively."</p>
 
     <p>When the interviewer pushed back &mdash; "What if the ID generation becomes a bottleneck?" &mdash; she had an answer ready because she'd thought about it during scoping: "We can use a distributed ID approach with range-based allocation &mdash; each server pre-fetches a block of 10,000 IDs, so there's no central bottleneck."</p>
 
@@ -1780,7 +1790,7 @@ GET rate:user-12345:push        -- Returns current count
 
     <p>She did quick math: 10,000 companies &times; 50 users = 500,000 total users. Even if all are online at once (they won't be), that's 500K <span class="tooltip-trigger" data-tooltip="WebSocket is a protocol that keeps a persistent connection between the client and server, allowing real-time bidirectional communication. Unlike HTTP (where the client sends a request and waits for a response), WebSocket lets the server push messages to the client instantly. It's the standard protocol for chat, live notifications, and real-time collaboration.">WebSocket</span> connections. A single server can handle ~65K connections, so she'd need about 8 servers. But realistically, maybe 10% are online at peak &mdash; so 50K connections, which is one well-configured server.</p>
 
-    <p>"For a startup at this scale, I'd keep it simple: one WebSocket server behind a load balancer, PostgreSQL for message storage, Redis for presence tracking (who's online). No Kafka, no sharding, no microservices. When you hit 100K concurrent users, we revisit."</p>
+    <p class="aside-note">"For a startup at this scale, I'd keep it simple: one <span class="code-term">WebSocket</span> server behind a load balancer, <span class="code-term">PostgreSQL</span> for message storage, <span class="code-term">Redis</span> for presence tracking (who's online). No Kafka, no sharding, no microservices. When you hit 100K concurrent users, we revisit."</p>
 
     <p>The CTO pushed: "What about when we grow 10x?" She responded: "At 5 million users, I'd introduce message queues for async delivery, shard the database by company_id (natural partition), and add a second WebSocket server pool. But I wouldn't build that today because <span class="tooltip-trigger" data-tooltip="YAGNI stands for 'You Ain't Gonna Need It' &mdash; a software principle that says don't build features or infrastructure until you actually need them. Building for hypothetical future requirements wastes time and adds complexity that makes the system harder to change when the real requirements arrive (which are usually different from what you predicted).">YAGNI</span> &mdash; the engineering cost of building it now is real, and the scale that justifies it is hypothetical."</p>
 
@@ -1796,6 +1806,9 @@ GET rate:user-12345:push        -- Returns current count
   <sg-callout type="insight" title="The Cross-Story Pattern">
     Look at all four stories. The two who passed (Google, Meta, Startup) shared one trait: <strong>they let the numbers drive the design</strong>. The Google candidate calculated 115K reads/sec and picked Redis. The Meta candidate recalculated when the scale changed. The Startup candidate calculated 50K connections and chose simplicity. The one who failed (Amazon) had great technical skills but forgot that system design interviews test more than just systems &mdash; they test <em>how you think, communicate, and make decisions under uncertainty</em>.
   </sg-callout>
+
+  <sg-section-summary>Four real interview stories reveal the same lesson: candidates who let numbers drive their design decisions pass, while even technically strong candidates fail when they forget that interviews test thinking process, not just technical knowledge.</sg-section-summary>
+  <sg-feedback></sg-feedback>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1810,7 +1823,7 @@ GET rate:user-12345:push        -- Returns current count
     </div>
   </div>
 
-  <p>We've talked about what to do. Now let's talk about what <strong>NOT</strong> to do. These three anti-patterns come up in interviews over and over again. They're so common that interviewers have names for them. And here's the frustrating part: the engineers who fall into these traps often <em>know the material well</em>. They fail not because they lack knowledge, but because they present it wrong.</p>
+  <p>We've talked about what to do. Now let's talk about what <strong>NOT</strong> to do. These three <span class="hl">anti-patterns</span> come up in interviews over and over again. They're so common that interviewers have names for them. And here's the frustrating part: the engineers who fall into these traps often <em>know the material well</em>. They fail not because they lack knowledge, but because they present it wrong.</p>
 
   <p class="emphasis-p">Understanding these failure modes is just as important as understanding the framework itself &mdash; because you can't fix a mistake you don't know you're making.</p>
 
@@ -1863,7 +1876,7 @@ GET rate:user-12345:push        -- Returns current count
     <p>The deeper problem is that memorizing blocks understanding. When you memorize "use ZooKeeper for ID generation," you skip the reasoning chain: "I need unique IDs &rarr; how many servers generate IDs? &rarr; if just one, a database sequence works &rarr; if multiple, I need coordination &rarr; ZooKeeper is one option for coordination, but so is range-based allocation." Without that chain, you can't adapt.</p>
 
     <h4>What to Do Instead</h4>
-    <p><strong>Learn the reasoning, not the answer.</strong> Instead of memorizing "URL shortener uses Base62 + DynamoDB + ZooKeeper," learn: "URL shorteners need a way to generate unique short IDs (several approaches exist, each with trade-offs), a way to store the mapping (depends on scale and query patterns), and a way to handle redirects efficiently (depends on read volume)." Now you can handle any variant of the question because you understand the <em>forces</em> that shape the design.</p>
+    <blockquote>Instead of memorizing "URL shortener uses <span class="code-term">Base62</span> + <span class="code-term">DynamoDB</span> + <span class="code-term">ZooKeeper</span>," learn the forces: unique ID generation (several approaches, each with trade-offs), mapping storage (depends on scale and query patterns), and efficient redirects (depends on read volume). Understand the forces, and you can handle any variant.</blockquote>
 
     <sg-callout type="trap" title="The tell-tale sign">
       If you can describe your architecture in under 60 seconds without any questions from the interviewer, you probably memorized it. Real designs emerge from a conversation. If you find yourself racing to draw a pre-planned diagram, slow down and ask questions first.
@@ -1907,7 +1920,7 @@ GET rate:user-12345:push        -- Returns current count
     <h4>What to Do Instead</h4>
     <p><strong>Think out loud. Constantly.</strong> Narrate every decision as you make it: "I'm going to start with the write path because it's simpler and will help me establish the data model. The user sends a notification request to our API gateway. I'm putting an API gateway here because we'll need rate limiting &mdash; one bad client shouldn't be able to flood our system with notifications."</p>
 
-    <p>This feels awkward at first, especially if you're naturally quiet. Practice by designing systems in front of a mirror or recording yourself on video. The goal is to make thinking out loud feel as natural as breathing. In an interview, your spoken reasoning is <em>more important</em> than the diagram itself.</p>
+    <p class="aside-note">This feels awkward at first, especially if you're naturally quiet. Practice by designing systems in front of a mirror or recording yourself on video. The goal is to make thinking out loud feel as natural as breathing. In an interview, your spoken reasoning is <em>more important</em> than the diagram itself.</p>
 
     <sg-callout type="trap" title="The silence tax">
       Silent work is invisible work. In an interview, if you think for 2 minutes without speaking, the interviewer doesn't know if you're having a brilliant insight or if you're stuck. Say something &mdash; even "I'm thinking about whether we need a message queue here, let me work through the numbers" is infinitely better than silence.
@@ -1927,6 +1940,8 @@ GET rate:user-12345:push        -- Returns current count
     ]'
     explanation="Memorization creates the illusion of understanding. The candidate memorized architectures but not the thinking process that produces them. Collaborative editing requires concepts like conflict resolution (CRDTs or operational transforms) that do not appear in standard memorization lists. An engineer who learned the PROCESS &mdash; 'what are the unique challenges here? What kind of consistency does this need? How do concurrent edits get resolved?' &mdash; would navigate this novel problem much better than someone who memorized 15 specific solutions.">
   </sg-quiz>
+
+  <sg-section-summary>Three anti-patterns &mdash; The Parrot (memorized answers), The Astronaut (needless complexity), and The Silent Builder (no verbal reasoning) &mdash; all share the same root cause: focusing on the output instead of demonstrating the thinking process.</sg-section-summary>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -1941,7 +1956,7 @@ GET rate:user-12345:push        -- Returns current count
     </div>
   </div>
 
-  <p>The anti-patterns in Section 10 are big, obvious failures. The mistakes in this section are more subtle &mdash; and more dangerous because of it. These are the traps that catch <em>good</em> candidates. People who know the material, who've practiced, who can draw reasonable architectures &mdash; but who lose marks on things they didn't realize mattered.</p>
+  <p class="emphasis-p">The anti-patterns in Section 10 are big, obvious failures. The mistakes in this section are more subtle &mdash; and more dangerous because of it. These are the traps that catch <em>good</em> candidates. People who know the material, who've practiced, who can draw reasonable architectures &mdash; but who lose marks on things they didn't realize mattered.</p>
 
   <p>We surveyed dozens of interview debriefs from engineers at Google, Amazon, Meta, and startups. These six mistakes appeared again and again. The chart below shows how often each one came up &mdash; notice that the most common mistake is also the simplest to fix.</p>
 
@@ -2000,7 +2015,7 @@ GET rate:user-12345:push        -- Returns current count
     <p>A candidate designing a photo-sharing app said: "We'll shard the database across 10 nodes." The interviewer asked: "Why 10?" Long silence. "It's... a good number?" The actual math: 50M photos/year &times; 2MB average = 100 TB/year. Each database node can handle ~10 TB comfortably. So you need 10 nodes <em>in year one</em>, growing to 30+ by year three. The candidate got the right number by accident, but couldn't explain it &mdash; which means they couldn't adjust it when the interviewer changed the assumptions.</p>
 
     <h4>How to Fix It</h4>
-    <p><strong>Calculate three numbers for every system: QPS (queries per second), storage (GB or TB), and bandwidth (MB/s).</strong> These three numbers drive 90% of architecture decisions. Write them on the whiteboard and reference them constantly. "I'm adding a cache because the database handles 5,000 reads/sec but we need 50,000 &mdash; so the cache absorbs the extra 45,000." Now every decision has a number behind it.</p>
+    <p><strong>Calculate three numbers for every system: <span class="hl">QPS</span> (queries per second), storage (GB or TB), and bandwidth (MB/s).</strong> These three numbers drive 90% of architecture decisions. Write them on the whiteboard and reference them constantly. "I'm adding a cache because the database handles 5,000 reads/sec but we need 50,000 &mdash; so the cache absorbs the extra 45,000." Now every decision has a number behind it.</p>
     <p>Don't worry about precision. Back-of-envelope math is about <span class="tooltip-trigger" data-tooltip="Order of magnitude means getting the right power of 10. If the answer is 50,000, being off by 2x (saying 25,000 or 100,000) is fine. Being off by 100x (saying 500) is not. Back-of-envelope math cares about whether the answer is thousands, millions, or billions &mdash; not the exact number.">order-of-magnitude</span> accuracy. Saying "about 50,000 reads/sec" is just as useful as saying "52,417 reads/sec." The goal is to land in the right ballpark so your architecture matches the actual scale.</p>
   </sg-collapse>
 
@@ -2037,7 +2052,7 @@ GET rate:user-12345:push        -- Returns current count
 
     <h4>How to Fix It</h4>
     <p><strong>For every technology you name, complete this sentence: "I'm choosing [X] over [Y] because [specific reason]."</strong> If you can't complete the sentence, don't name the technology. Say what you <em>need</em> instead: "I need a way to handle 50K messages/sec with replay capability" &mdash; and then work out which technology provides that.</p>
-    <p>It's perfectly fine to say: "I need a message queue here. Kafka and RabbitMQ are both options. Kafka gives us message replay and higher throughput, while RabbitMQ is simpler to operate. Given our requirement for 50K messages/sec and the need to replay failed messages, Kafka is the better fit." That's a <em>decision</em>. "I'll use Kafka" without that reasoning is just a brand name.</p>
+    <blockquote>"I need a message queue here. <span class="code-term">Kafka</span> and <span class="code-term">RabbitMQ</span> are both options. Kafka gives us message replay and higher throughput, while RabbitMQ is simpler to operate. Given our requirement for 50K messages/sec and the need to replay failed messages, Kafka is the better fit." That's a decision. "I'll use Kafka" without that reasoning is just a brand name.</blockquote>
   </sg-collapse>
 
   <sg-collapse title="Mistake #6 &mdash; Not Addressing Trade-Offs (40% of candidates)" icon="fa-solid fa-scale-unbalanced">
@@ -2049,12 +2064,14 @@ GET rate:user-12345:push        -- Returns current count
 
     <h4>How to Fix It</h4>
     <p><strong>After every technology choice, proactively say: "The trade-off here is..."</strong> Every engineering decision has a downside. Caching reduces latency but introduces <span class="tooltip-trigger" data-tooltip="Cache invalidation is the process of removing or updating stale data in a cache. When the source data changes, the cached copy becomes outdated. Keeping caches in sync with the source is one of the hardest problems in computer science &mdash; Phil Karlton famously said there are only two hard things in computer science: cache invalidation and naming things.">cache invalidation</span> complexity. Sharding enables horizontal scaling but makes cross-shard queries hard. Microservices improve team independence but add network latency and operational overhead.</p>
-    <p>Acknowledging trade-offs doesn't make your design weaker &mdash; it makes it <em>credible</em>. An engineer who says "the trade-off is X, and here's why it's acceptable in this context" sounds like someone who's built real systems. An engineer who presents everything as perfect sounds like someone who learned from slides.</p>
+    <p class="aside-note">Acknowledging trade-offs doesn't make your design weaker &mdash; it makes it <em>credible</em>. An engineer who says "the trade-off is X, and here's why it's acceptable in this context" sounds like someone who's built real systems. An engineer who presents everything as perfect sounds like someone who learned from slides.</p>
   </sg-collapse>
 
   <sg-callout type="takeaway" title="The six-word fix for all six mistakes">
     <strong>"Do the math, say it out loud."</strong> If you calculate your numbers (Mistakes #1, #2, #4), think about what breaks (Mistake #3), justify every choice with a reason (Mistake #5), and acknowledge the downsides (Mistake #6), you've already avoided every mistake on this list. The framework naturally prevents all six &mdash; if you follow it.
   </sg-callout>
+
+  <sg-section-summary>Six common interview mistakes &mdash; skipping requirements, not doing math, ignoring failures, over-engineering, name-dropping tech, and hiding trade-offs &mdash; all boil down to one fix: do the math and say it out loud.</sg-section-summary>
 </div>
 
 
@@ -2070,7 +2087,7 @@ GET rate:user-12345:push        -- Returns current count
     </div>
   </div>
 
-  <p>You've learned the framework. You've seen the mistakes. But when you're sitting in an actual interview with a timer ticking, knowing <em>what</em> to do isn't enough &mdash; you need to know <em>when</em> to do it. This section gives you a concrete, minute-by-minute plan for a standard 45-minute system design interview.</p>
+  <p class="emphasis-p">You've learned the framework. You've seen the mistakes. But when you're sitting in an actual interview with a timer ticking, knowing <em>what</em> to do isn't enough &mdash; you need to know <em>when</em> to do it. This section gives you a concrete, <span class="hl">minute-by-minute plan</span> for a standard 45-minute system design interview.</p>
 
   <blockquote>The biggest reason candidates fail isn't lack of knowledge &mdash; it's <strong>running out of time</strong> because they spent 20 minutes on requirements and had 5 minutes left for the actual design.</blockquote>
 
@@ -2208,12 +2225,12 @@ GET rate:user-12345:push        -- Returns current count
     <h4>What You Do</h4>
     <p>This is where the interview is won or lost. Pick the 2-3 most interesting or challenging components from your high-level design and go deep. Define the <span class="tooltip-trigger" data-tooltip="An API (Application Programming Interface) is the contract between two pieces of software. In system design, APIs define what requests a service accepts (endpoints, parameters) and what responses it returns (data format, status codes).">API</span> contracts. Choose the database schema. Explain the <span class="tooltip-trigger" data-tooltip="Data flow is the path that information takes through a system &mdash; from where it enters (user request, event trigger) through processing (validation, transformation, storage) to where it exits (response, notification, analytics).">data flow</span> step by step. Discuss trade-offs.</p>
 
-    <p>You have 20 minutes for this &mdash; the biggest single block. Use it wisely. Don't spread thin across every component. Go deep on a few rather than shallow on all.</p>
+    <p class="aside-note">You have 20 minutes for this &mdash; the biggest single block. Use it wisely. Don't spread thin across every component. Go deep on a few rather than shallow on all.</p>
 
     <h4>Example Phrases to Use</h4>
     <ul>
       <li><em>"Let me dive deeper into the feed generation service, since that's the most complex part. There are two approaches: fan-out-on-write and fan-out-on-read..."</em></li>
-      <li><em>"For the database, I'm choosing PostgreSQL over DynamoDB here because we need JOIN queries for the friend-of-friend feature, and the data model is relational."</em></li>
+      <li><em>"For the database, I'm choosing <span class="code-term">PostgreSQL</span> over <span class="code-term">DynamoDB</span> here because we need JOIN queries for the friend-of-friend feature, and the data model is relational."</em></li>
       <li><em>"The trade-off with this caching approach is cache invalidation complexity. When a user updates their profile, we need to invalidate every cached feed that includes their posts."</em></li>
       <li><em>"I realize this creates a single point of failure. Let me add a replica with automatic failover..."</em></li>
     </ul>
@@ -2328,6 +2345,9 @@ GET rate:user-12345:push        -- Returns current count
     ]'
     explanation="At minute 12, you should be drawing your high-level architecture. You have the scope and the numbers &mdash; now show the big picture. Don't go straight to the deep dive (database schemas) without establishing the overall architecture first, and don't keep asking questions when the interviewer has already given you enough to work with. The technology list comes later, inside the deep dive, with justification.">
   </sg-quiz>
+
+  <sg-section-summary>A 45-minute interview breaks into six blocks: 5 min scoping, 5 min estimation, 5 min high-level design, 20 min deep dive (the most critical block), 5 min failure modes, and 5 min wrap-up. Protect the deep dive time above all else.</sg-section-summary>
+  <sg-feedback></sg-feedback>
 </div>
 
 
