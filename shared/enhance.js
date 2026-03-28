@@ -105,13 +105,21 @@
     toc.setAttribute('aria-label', 'Table of contents');
 
     var items = [];
+    var num = 0;
     sections.forEach(function(sec) {
       var titleEl = sec.querySelector('.section-title');
       if (!titleEl) return;
+      num++;
+      // Shorten title: take first phrase before " — " or first 30 chars
+      var fullTitle = titleEl.textContent.trim();
+      var shortTitle = fullTitle.split(/\s*[—–]\s*/)[0].substring(0, 30);
+
       var item = document.createElement('a');
       item.className = 'sg-toc-item';
       item.href = '#' + sec.id;
-      item.textContent = titleEl.textContent.trim();
+      item.innerHTML = '<span class="sg-toc-num">' + num + '</span>' +
+        '<span class="sg-toc-label">' + shortTitle + '</span>';
+      item.setAttribute('title', fullTitle);
       item.addEventListener('click', function(e) {
         e.preventDefault();
         sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -125,7 +133,7 @@
 
     // Show TOC only on wide screens
     function checkWidth() {
-      toc.classList.toggle('visible', window.innerWidth > 1400);
+      toc.classList.toggle('visible', window.innerWidth > 1100);
     }
     checkWidth();
     window.addEventListener('resize', checkWidth);
@@ -403,6 +411,8 @@
      INIT — Run all enhancements
      ──────────────────────────────────────────────────────────── */
   function initAll() {
+    if (window.__sgEnhanceLoaded) return;
+    window.__sgEnhanceLoaded = true;
     initProgressBar();
     initBackToTop();
     initSidebarTOC();
