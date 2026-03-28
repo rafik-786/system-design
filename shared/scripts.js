@@ -1015,34 +1015,34 @@ document.addEventListener('DOMContentLoaded', () => {
   function initCalcCountUp() {
     var observed = new Set();
     function animateValue(el, finalText) {
-      // Extract numeric part: "~13,889" → 13889, "1.2B" → 1.2, "95%" → 95
-      var match = finalText.replace(/[~≈,]/g, '').match(/([\d.]+)/);
-      if (!match) return;
-      var target = parseFloat(match[1]);
-      var prefix = finalText.slice(0, finalText.indexOf(match[1].charAt(0))).replace(/,/g, '');
-      var suffix = finalText.slice(finalText.indexOf(match[1]) + match[1].length);
-      var hasCommas = finalText.indexOf(',') !== -1;
-      var decimals = (match[1].indexOf('.') !== -1) ? match[1].split('.')[1].length : 0;
+      // Find the first numeric span in the original text (digits, commas, dots)
+      var numMatch = finalText.match(/[\d,]+\.?\d*/);
+      if (!numMatch) return;
+      var numStr = numMatch[0];
+      var numStart = numMatch.index;
+      var prefix = finalText.slice(0, numStart);
+      var suffix = finalText.slice(numStart + numStr.length);
+      var target = parseFloat(numStr.replace(/,/g, ''));
+      if (isNaN(target) || target === 0) return;
+      var hasCommas = numStr.indexOf(',') !== -1;
+      var decimals = (numStr.indexOf('.') !== -1) ? numStr.split('.')[1].length : 0;
       var duration = 800;
       var start = performance.now();
 
+      function fmt(n) {
+        var s;
+        if (decimals > 0) { s = n.toFixed(decimals); }
+        else { s = Math.round(n).toString(); }
+        if (hasCommas) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return s;
+      }
+
       function step(now) {
         var t = Math.min((now - start) / duration, 1);
-        // ease-out cubic
         var ease = 1 - Math.pow(1 - t, 3);
-        var current = target * ease;
-        var formatted;
-        if (decimals > 0) {
-          formatted = current.toFixed(decimals);
-        } else {
-          formatted = Math.round(current).toString();
-          if (hasCommas) {
-            formatted = formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-          }
-        }
-        el.textContent = prefix + formatted + suffix;
+        el.textContent = prefix + fmt(target * ease) + suffix;
         if (t < 1) requestAnimationFrame(step);
-        else el.textContent = finalText; // ensure exact final value
+        else el.textContent = finalText;
       }
       el.textContent = prefix + '0' + suffix;
       requestAnimationFrame(step);
