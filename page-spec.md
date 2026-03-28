@@ -1742,3 +1742,56 @@ Pattern tags: small pills showing 2-4 key patterns used.
 20. **Exercise overlap** — exercises should use different domains than the Mini-Project. If the mini-project builds a notification system, exercises should NOT also build notification systems.
 21. **Comparison sections** — include at least one brief code snippet showing the relationship. Abstract bullet points ("Pattern A does X, Pattern B does Y") don't create understanding without concrete code.
 22. **"Don't Use When" lists** — always include honest cases where the pattern/principle is overkill. This builds trust and teaches judgment, not just rules.
+
+---
+
+## 13. Typography & Enhancement Requirements (NEW — applies to ALL pages)
+
+> **Reference:** `shared/REGISTRY.md` — full inventory of every CSS class and custom element.
+> **All enhancements auto-load** from `enhance.css` (via @import) and `enhance.js` (via dynamic loader in scripts.js). No per-page config needed.
+
+### Auto Features (every page gets these for FREE)
+- Reading progress bar, back-to-top button, sidebar TOC, URL hash sync
+- Section scroll fade-in animation
+- Paragraph spacing, drop caps, enhanced strong/em, card h4 headings
+- Custom scrollbar, ::selection color, focus rings
+- Quiz ARIA roles + keyboard navigation
+- Responsive fonts + SVG scaling on mobile
+
+### Required Tier 2 Elements Per Page
+Every page MUST include these at minimum:
+
+| Element | Where | Required |
+|---------|-------|----------|
+| `<sg-reading-time>` | After section header in S1 | YES |
+| `<sg-difficulty level="...">` | After section header in S1 | YES |
+| `<sg-what-youll-learn>` | Top of S1 | YES |
+| `<sg-key-terms terms="...">` | Top of S1 | YES |
+| `<sg-section-summary>` | End of every section | YES (at least S1, S5, S12) |
+| `<sg-feedback>` | End of S1 (or bottom of page) | YES |
+| `<sg-practice-timer>` | S18 Exercises or S21 Mini-Project | Optional |
+| `<sg-share>` | Bottom of page or hero | Optional |
+| `<sg-prereq sections="...">` | Any section requiring prior knowledge | As needed |
+
+### Typography Formatting Rules
+When writing prose, apply these CSS classes to create visual variety:
+
+| Class | When to Use | Frequency |
+|-------|------------|-----------|
+| `.hl` | Key terms the reader must remember | 5-10 per page |
+| `.emphasis-p` | Standout statements that deserve attention | 3-5 per page |
+| `<blockquote>` | Key insights worth quoting | 3-5 per page |
+| `.big-idea` | Page-defining "hero" statements | 1-2 per page |
+| `.gradient-text` | Inside `.big-idea` for maximum impact | 1-2 per page |
+| `.code-term` | Tech terms in prose (Redis, Kafka, PostgreSQL) | 5-10 per page |
+| `.aside-note` | Supplementary "by the way" context | 2-4 per page |
+| `.divider-dots` | Between major conceptual shifts | 1-3 per page |
+| `<hr>` | Between sub-sections (e.g., walkthrough 1 vs 2) | As needed |
+
+### Typography Color Palette
+- **Amber (#f59e0b)** — drop caps, `.emphasis-p` border
+- **Purple (#c4b5fd)** — italic `<em>` text, italic quote blocks in cards
+- **Blue (#60a5fa)** — `<blockquote>` border, card `<h4>` headings, bold list leads
+- **Green (#6ee7b7)** — `.hl` highlight pills
+- **Sky blue (#7dd3fc)** — `.code-term` pills
+- **Teal gradient** — `.gradient-text`

@@ -95,10 +95,15 @@ SG.register('sg-my-thing', function(el) {
 
 | Tag | Purpose |
 |-----|---------|
-| `<sg-section-summary>` | "Key Takeaway" box at section end |
-| `<sg-reading-time>` | Auto-calculates "~X min read" from word count |
-| `<sg-difficulty level="">` | beginner/intermediate/advanced badge |
-| `<sg-share>` | Twitter + LinkedIn + copy-link buttons |
+| `<sg-section-summary>text</sg-section-summary>` | Green "Key Takeaway" box — put at section end |
+| `<sg-reading-time></sg-reading-time>` | Auto-calculates "~X min read" from page prose |
+| `<sg-difficulty level="beginner">` | Colored badge: beginner (green), intermediate (amber), advanced (red) |
+| `<sg-what-youll-learn><ul><li>...</li></ul></sg-what-youll-learn>` | Teal "What You'll Learn" teaser box |
+| `<sg-key-terms terms="QPS, fan-out, sharding">` | Blue tag pills previewing key terms |
+| `<sg-prereq sections="estimation,baby-steps">` | Amber prerequisite links box |
+| `<sg-practice-timer minutes="45">` | Countdown timer with Start/Pause/Reset |
+| `<sg-feedback></sg-feedback>` | "I'm confused" + "Report an error" buttons (localStorage) |
+| `<sg-share></sg-share>` | Twitter + LinkedIn + copy-link buttons |
 
 ## Color Palette Used in Typography
 
