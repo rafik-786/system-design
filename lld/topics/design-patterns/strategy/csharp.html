@@ -871,6 +871,28 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
       </h3>
       <div class="card-body">
         <blockquote><p class="body-text">The <span class="tooltip-trigger">Gang of Four<span class="tooltip-content">Erich Gamma, Richard Helm, Ralph Johnson, and John Vlissides — authors of "Design Patterns: Elements of Reusable Object-Oriented Software" (1994). They cataloged 23 patterns, including Strategy, and established the vocabulary used by software engineers worldwide.</span></span> defined Strategy as a behavioral pattern to encapsulate interchangeable algorithms. Their original examples used C++ with abstract base classes and virtual functions. The pattern was one of the most immediately practical — it directly replaced polymorphic switch statements that plagued large codebases.</p></blockquote>
+        <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ClassicGoF.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// The GoF blueprint — translated to early C# (same structure as the 1994 C++ original)
+public abstract class SortStrategy           // Abstract Strategy
+{
+    public abstract void Sort(int[] data);
+}
+
+public class BubbleSortStrategy : SortStrategy  // Concrete Strategy A
+{
+    public override void Sort(int[] data) { /* bubble sort logic */ }
+}
+
+public class QuickSortStrategy : SortStrategy   // Concrete Strategy B
+{
+    public override void Sort(int[] data) { /* quick sort logic */ }
+}
+
+public class Sorter                              // Context
+{
+    private SortStrategy _strategy;
+    public void SetStrategy(SortStrategy s) =&gt; _strategy = s;
+    public void Sort(int[] data) =&gt; _strategy.Sort(data);
+}</code></pre></div></div>
       </div>
     </div>
 
@@ -880,6 +902,20 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
       </h3>
       <div class="card-body">
         <p class="body-text">C# 1.0 introduced <span class="tooltip-trigger">delegates<span class="tooltip-content">A type-safe function pointer in C#. In .NET 1.0, non-generic delegates let you pass behavior as data. .NET 2.0 (2005) added generic delegates like Comparison&lt;T&gt;. Array.Sort(myArray, myComparer) is Strategy pattern using delegates instead of interfaces.</span></span>, giving .NET developers a lighter-weight alternative to full <span class="tooltip-trigger">interface-based strategies<span class="tooltip-content">The classic GoF approach: define an IStrategy interface, create concrete classes for each algorithm, and inject the interface into the Context. More ceremony than delegates, but supports DI, multiple methods, and auto-discovery via IEnumerable&lt;T&gt;.</span></span>. <code>Array.Sort(array, comparisonDelegate)</code> was Strategy pattern without ever naming it. The <code>IComparer</code> interface provided the formal GoF approach.</p>
+        <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DelegateStrategy.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// .NET 1.0 Strategy via IComparer
+public class PriceComparer : IComparer
+{
+    public int Compare(object x, object y)
+    {
+        var a = ((Product)x).Price;
+        var b = ((Product)y).Price;
+        return a.CompareTo(b);
+    }
+}
+
+// Usage — the Strategy is the comparer
+ArrayList products = GetProducts();
+products.Sort(new PriceComparer()); // &lt;-- swap comparer = swap strategy</code></pre></div></div>
       </div>
     </div>
 
@@ -889,6 +925,17 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
       </h3>
       <div class="card-body">
         <p class="body-text">C# 3.0 and <span class="code-term">LINQ</span> transformed Strategy from an explicit pattern into an everyday idiom. Every <code>.Where(x =&gt; x.IsActive)</code>, <code>.OrderBy(x =&gt; x.Name)</code>, and <code>.Select(x =&gt; x.Dto)</code> is Strategy pattern — the lambda IS the algorithm, and the LINQ method is the Context. <span class="tooltip-trigger">Func&lt;T, TResult&gt;<span class="tooltip-content">The generic delegate type introduced in .NET 3.5 that represents a function taking T and returning TResult. LINQ methods like Where, Select, and OrderBy accept Func delegates as strategies. This made Strategy so natural in C# that developers use it without thinking about the GoF pattern.</span></span> became the de facto strategy type for stateless, single-method algorithms.</p>
+        <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LinqStrategy.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// LINQ lambdas ARE strategies — you pass the algorithm as a parameter
+var cheapProducts = products
+    .Where(p =&gt; p.Price &lt; 50)          // filtering strategy
+    .OrderBy(p =&gt; p.Name)              // sorting strategy
+    .Select(p =&gt; new ProductDto(p));   // mapping strategy
+
+// Same data, different strategies — just swap the lambdas
+var expensiveFirst = products
+    .Where(p =&gt; p.Price &gt; 100)
+    .OrderByDescending(p =&gt; p.Price)
+    .Select(p =&gt; new ProductDto(p));</code></pre></div></div>
       </div>
     </div>
 
@@ -898,6 +945,20 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
       </h3>
       <div class="card-body">
         <p class="body-text"><span class="code-term">ASP.NET Core</span>'s built-in <span class="tooltip-trigger">DI container<span class="tooltip-content">Microsoft.Extensions.DependencyInjection — the DI container included with ASP.NET Core since 1.0. It supports constructor injection, three lifetimes (Transient, Scoped, Singleton), open generics, factory delegates, and keyed services (.NET 8). It's the glue that wires strategies to their consumers.</span></span> made interface-based strategies first-class citizens. Register multiple implementations of <code>IPaymentStrategy</code>, inject <code>IEnumerable&lt;IPaymentStrategy&gt;</code> into a factory, and resolve by key. The <span class="tooltip-trigger">composition root<span class="tooltip-content">Program.cs — the single place where all abstractions are wired to implementations. In Strategy pattern, the composition root registers all concrete strategies, their factories, and determines which strategy a given Context receives.</span></span> (Program.cs) became the natural place for strategy wiring. Middleware pipelines themselves are Strategy: each middleware is a processing strategy in a chain.</p>
+        <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// ASP.NET Core DI — register all strategies in Program.cs
+builder.Services.AddScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;();
+builder.Services.AddScoped&lt;IPaymentStrategy, PayPalStrategy&gt;();
+builder.Services.AddScoped&lt;IPaymentStrategy, CryptoStrategy&gt;();
+
+// Inject ALL strategies and pick by key at runtime
+public class PaymentService(IEnumerable&lt;IPaymentStrategy&gt; strategies)
+{
+    public Task ProcessAsync(string method, Order order)
+    {
+        var strategy = strategies.First(s =&gt; s.Name == method);
+        return strategy.ProcessAsync(order);
+    }
+}</code></pre></div></div>
       </div>
     </div>
 
@@ -907,6 +968,17 @@ builder.Services.AddScoped&lt;IPaymentStrategyFactory, PaymentStrategyFactory&gt
       </h3>
       <div class="card-body">
         <p class="body-text"><span class="tooltip-trigger">Keyed Services<span class="tooltip-content">Added in .NET 8 (Microsoft.Extensions.DependencyInjection 8.0). Register: builder.Services.AddKeyedScoped&lt;IStrategy, ConcreteA&gt;("keyA"). Resolve: [FromKeyedServices("keyA")] IStrategy strategy. This eliminates the need for manual factory classes in many Strategy scenarios.</span></span> in .NET 8 made Strategy pattern resolution a framework feature. Instead of building manual factories, you register strategies with string or enum keys: <code>builder.Services.AddKeyedScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;("CreditCard")</code>. Resolve with <code>[FromKeyedServices("CreditCard")]</code> in controllers or <code>IServiceProvider.GetKeyedService&lt;T&gt;(key)</code> in code. The manual factory pattern is now optional.</p>
+        <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">KeyedServices.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// .NET 8 Keyed Services — Strategy resolution is now built-in
+builder.Services.AddKeyedScoped&lt;IPaymentStrategy, CreditCardStrategy&gt;("CreditCard");
+builder.Services.AddKeyedScoped&lt;IPaymentStrategy, PayPalStrategy&gt;("PayPal");
+builder.Services.AddKeyedScoped&lt;IPaymentStrategy, CryptoStrategy&gt;("Crypto");
+
+// Resolve by key in a controller — no factory needed!
+app.MapPost("/pay", ([FromKeyedServices("CreditCard")] IPaymentStrategy strategy,
+                      Order order) =&gt;
+{
+    return strategy.ProcessAsync(order);
+});</code></pre></div></div>
       </div>
     </div>
 
