@@ -376,12 +376,17 @@
       '<div class="sg-section-summary-body">' + text + '</div></div>';
   });
 
-  // <sg-reading-time> — auto-calculates reading time from page word count
+  // <sg-reading-time> — auto-calculates reading time from visible prose
   SG.register('sg-reading-time', function(el) {
     var main = document.querySelector('main');
     if (!main) return '';
-    var words = main.textContent.trim().split(/\s+/).length;
-    var minutes = Math.ceil(words / 200);
+    // Count only paragraph and heading text, skip SVGs/code/glossary
+    var text = '';
+    main.querySelectorAll('p, h2, h3, h4, li, td, blockquote').forEach(function(node) {
+      if (!node.closest('svg, .glossary-panel, pre, code, .sg-glossary')) text += node.textContent + ' ';
+    });
+    var words = text.trim().split(/\s+/).length;
+    var minutes = Math.ceil(words / 230);
     return '<span class="sg-reading-time-badge"><i class="fa-regular fa-clock"></i> ~' + minutes + ' min read</span>';
   });
 
@@ -406,6 +411,119 @@
       '</div>';
   });
 
+  // <sg-key-terms terms="QPS, fan-out, sharding"> — terms preview
+  SG.register('sg-key-terms', function(el) {
+    var terms = (el.getAttribute('terms') || '').split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+    if (!terms.length) return '';
+    var tags = terms.map(function(t) { return '<span class="sg-key-terms-tag">' + t + '</span>'; }).join('');
+    return '<div class="sg-key-terms-box">' +
+      '<span class="sg-key-terms-label"><i class="fa-solid fa-tags"></i> Key Terms</span>' +
+      '<div class="sg-key-terms-list">' + tags + '</div></div>';
+  });
+
+  // <sg-prereq sections="estimation,baby-steps"> — prerequisite links
+  SG.register('sg-prereq', function(el) {
+    var sections = (el.getAttribute('sections') || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    if (!sections.length) return '';
+    var links = sections.map(function(s) {
+      var name = s.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+      return '<a href="#' + s + '">' + name + '</a>';
+    }).join(', ');
+    return '<div class="sg-prereq-box"><i class="fa-solid fa-circle-info" style="color:#f59e0b;margin-right:0.4rem;"></i> <strong>Prerequisite:</strong> ' + links + '</div>';
+  });
+
+  // <sg-what-youll-learn> — teaser box
+  SG.register('sg-what-youll-learn', function(el) {
+    var content = el.innerHTML;
+    return '<div class="sg-learn-box"><div class="sg-learn-header"><i class="fa-solid fa-graduation-cap"></i> What You\'ll Learn</div>' +
+      '<div class="sg-learn-body">' + content + '</div></div>';
+  });
+
+  // <sg-practice-timer minutes="45"> — countdown timer
+  SG.register('sg-practice-timer', function(el) {
+    var mins = parseInt(el.getAttribute('minutes') || '45', 10);
+    var id = 'sg-timer-' + Math.random().toString(36).substr(2, 6);
+    return '<div class="sg-timer" id="' + id + '" data-minutes="' + mins + '">' +
+      '<div class="sg-timer-display">' + mins + ':00</div>' +
+      '<button class="sg-timer-btn sg-timer-start">Start</button>' +
+      '<button class="sg-timer-btn sg-timer-reset">Reset</button>' +
+      '</div>';
+  });
+
+  // <sg-feedback> — confused + report error buttons
+  SG.register('sg-feedback', function(el) {
+    return '<div class="sg-feedback-bar">' +
+      '<button class="sg-feedback-btn sg-feedback-confused"><i class="fa-regular fa-face-frown"></i> I\'m confused</button>' +
+      '<button class="sg-feedback-btn sg-feedback-error"><i class="fa-solid fa-flag"></i> Report an error</button>' +
+      '</div>';
+  });
+
+  // Timer logic — init after all elements transformed
+  function initTimers() {
+    document.querySelectorAll('.sg-timer').forEach(function(timer) {
+      if (timer.dataset.init) return;
+      timer.dataset.init = '1';
+      var mins = parseInt(timer.dataset.minutes || '45', 10);
+      var totalSec = mins * 60;
+      var remaining = totalSec;
+      var interval = null;
+      var display = timer.querySelector('.sg-timer-display');
+      var startBtn = timer.querySelector('.sg-timer-start');
+      var resetBtn = timer.querySelector('.sg-timer-reset');
+
+      function update() {
+        var m = Math.floor(remaining / 60);
+        var s = remaining % 60;
+        display.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        if (remaining <= 0) { clearInterval(interval); interval = null; startBtn.textContent = 'Start'; startBtn.classList.remove('running'); }
+      }
+
+      startBtn.addEventListener('click', function() {
+        if (interval) { clearInterval(interval); interval = null; startBtn.textContent = 'Resume'; startBtn.classList.remove('running'); }
+        else { interval = setInterval(function() { remaining--; update(); }, 1000); startBtn.textContent = 'Pause'; startBtn.classList.add('running'); }
+      });
+
+      resetBtn.addEventListener('click', function() {
+        clearInterval(interval); interval = null; remaining = totalSec; update();
+        startBtn.textContent = 'Start'; startBtn.classList.remove('running');
+      });
+    });
+  }
+
+  // Feedback button logic
+  function initFeedback() {
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.sg-feedback-confused, .sg-feedback-error');
+      if (!btn) return;
+      var section = btn.closest('.section');
+      var sectionName = section ? (section.querySelector('.section-title') || {}).textContent || section.id : 'unknown';
+      var type = btn.classList.contains('sg-feedback-confused') ? 'confused' : 'error';
+      // Store in localStorage
+      var key = 'sg-feedback';
+      var data = {};
+      try { data = JSON.parse(localStorage.getItem(key)) || {}; } catch(ex) {}
+      if (!data[location.pathname]) data[location.pathname] = [];
+      data[location.pathname].push({ section: sectionName, type: type, time: new Date().toISOString() });
+      try { localStorage.setItem(key, JSON.stringify(data)); } catch(ex) {}
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Noted — thanks!';
+      btn.disabled = true;
+      btn.style.color = '#10b981';
+      btn.style.borderColor = '#10b981';
+    });
+  }
+
+  // Copy link button logic
+  function initCopyLink() {
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.sg-copy-link');
+      if (!btn) return;
+      navigator.clipboard.writeText(location.href).then(function() {
+        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        setTimeout(function() { btn.innerHTML = '<i class="fa-solid fa-link"></i>'; }, 1500);
+      }).catch(function() {});
+    });
+  }
+
 
   /* ────────────────────────────────────────────────────────────
      INIT — Run all enhancements
@@ -424,6 +542,8 @@
     initFlowKeyboard();
     initSmoothScroll();
     initProgressTracking();
+    // Batch 7 features — run after custom elements transform
+    setTimeout(function() { initTimers(); initFeedback(); initCopyLink(); }, 600);
   }
 
   // Run when DOM is ready (enhance.js may load after DOMContentLoaded)
