@@ -629,11 +629,43 @@
 
 
   /* ────────────────────────────────────────────────────────────
+     §15 PWA — manifest + service worker registration
+     ──────────────────────────────────────────────────────────── */
+  function initPWA() {
+    // Inject manifest link if not present
+    if (!document.querySelector('link[rel="manifest"]')) {
+      var scriptEl = document.querySelector('script[src*="scripts.js"]');
+      var base = scriptEl ? scriptEl.src.replace(/scripts\.js.*$/, '') : '/shared/';
+      var link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = base + 'manifest.json';
+      document.head.appendChild(link);
+
+      // Also add theme-color meta
+      if (!document.querySelector('meta[name="theme-color"]')) {
+        var meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        meta.content = '#0f172a';
+        document.head.appendChild(meta);
+      }
+    }
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      var swBase = document.querySelector('script[src*="scripts.js"]');
+      var swPath = swBase ? swBase.src.replace(/scripts\.js.*$/, 'sw.js') : '/shared/sw.js';
+      navigator.serviceWorker.register(swPath, { scope: '/' }).catch(function() {});
+    }
+  }
+
+
+  /* ────────────────────────────────────────────────────────────
      INIT — Run all enhancements
      ──────────────────────────────────────────────────────────── */
   function initAll() {
     if (window.__sgEnhanceLoaded) return;
     window.__sgEnhanceLoaded = true;
+    initPWA();
     initProgressBar();
     initBackToTop();
     initSidebarTOC();
