@@ -2689,7 +2689,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!currentScript) return;
       var base = currentScript.src.replace(/scripts\.js.*$/, '');
       var s = document.createElement('script');
-      s.src = base + 'enhance.js';
+      s.src = base + 'enhance.js?v=3';
       document.head.appendChild(s);
     })();
 
@@ -3181,6 +3181,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (m) { m.style.opacity = '1'; m.style.transform = ''; }
         if (h) { h.style.opacity = '1'; h.style.transform = ''; }
       });
+      // Reset enhance.js guard so it re-initializes for new page content
+      window.__sgEnhanceLoaded = false;
+      // Remove stale enhance.js elements (TOC, back-to-top, bookmark panel, progress bar)
+      document.querySelectorAll('.sg-toc, .sg-back-to-top, .sg-bookmarks-toggle, .sg-bookmarks-panel, .sg-progress-bar, .sg-skip-link').forEach(function(el) { el.remove(); });
       reinit();
     });
   }
