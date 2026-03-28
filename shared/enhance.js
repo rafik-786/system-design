@@ -190,16 +190,18 @@
   function initSectionFadeIn() {
     var secs = document.querySelectorAll('.section');
     if (!secs.length) return;
-    if (!('IntersectionObserver' in window)) {
-      secs.forEach(function(s) { s.classList.add('visible'); });
+
+    // Skip animation on heavy pages (10+ sections) — just show them instantly
+    if (secs.length > 10 || !('IntersectionObserver' in window)) {
+      secs.forEach(function(s) { s.classList.add('visible', 'done'); });
       return;
     }
+
     var obs = new IntersectionObserver(function(entries) {
       entries.forEach(function(e) {
         if (e.isIntersecting) {
           e.target.classList.add('visible');
           obs.unobserve(e.target);
-          // After transition ends, remove will-change to free GPU memory
           setTimeout(function() { e.target.classList.add('done'); }, 600);
         }
       });
