@@ -125,25 +125,34 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 
 ## 4. LLD HUB — ALL TOPICS & STATUS
 
-### Ready Pages (14 complete)
-| Page | Type | Lines | Tooltips | Accent |
-|------|------|-------|----------|--------|
-| SRP | SOLID | 4,991 | 54 | green |
-| OCP | SOLID | 4,446 | 53 | purple |
-| LSP | SOLID | 4,907 | 48 | cyan |
-| ISP | SOLID | 4,752 | 52 | — |
-| DIP | SOLID | 4,496 | 50 | — |
-| Strategy | Pattern | 5,316 | 45 | purple |
-| Singleton | Pattern | 5,333 | 47 | cyan/blue |
-| Factory Method | Pattern | 5,862 | 49 | purple |
-| Observer | Pattern | 6,503 | 56 | green |
-| Decorator | Pattern | 7,006 | 50 | purple |
-| Abstract Factory | Pattern | 5,415 | 53 | green |
-| Builder | Pattern | 5,321 | 51 | cyan |
-| Prototype | Pattern | 5,071 | 55 | — |
-| Parking Lot | Case Study | 6,709 | 103 | orange |
-| Tic-Tac-Toe | Case Study | 9,183 | ~120 | purple |
-| Template Method | Pattern | 7,395 | 49 | cyan |
+### Ready Pages (18 LLD + 2 HLD = 20 complete)
+| Page | Type | Lines | Tooltips | Accent | sg-* upgraded? |
+|------|------|-------|----------|--------|----------------|
+| SRP | SOLID | 4,991 | 54 | green | No |
+| OCP | SOLID | 4,446 | 53 | purple | No |
+| LSP | SOLID | 4,907 | 48 | cyan | No |
+| ISP | SOLID | 4,752 | 52 | — | No |
+| DIP | SOLID | 4,496 | 50 | — | No |
+| Strategy | Pattern | 6,108 | 45 | purple | **Yes** |
+| Singleton | Pattern | 5,333 | 47 | cyan/blue | No |
+| Factory Method | Pattern | 5,862 | 49 | purple | No |
+| Observer | Pattern | 6,503 | 56 | green | No |
+| Decorator | Pattern | 7,006 | 50 | purple | No |
+| Abstract Factory | Pattern | 5,415 | 53 | green | No |
+| Builder | Pattern | 5,321 | 51 | cyan | No |
+| Prototype | Pattern | 5,071 | 55 | — | No |
+| Parking Lot | Case Study | 6,709 | 103 | orange | No |
+| Tic-Tac-Toe | Case Study | 9,183 | ~120 | purple | No |
+| Vending Machine | Case Study | 9,143 | 101 | green | No |
+| Template Method | Pattern | 7,395 | 49 | cyan | No |
+| Logging Framework | Case Study | — | — | — | No |
+| How to Approach (HLD) | Foundation | 2,689 | 21 | blue | **Yes** |
+| Back-of-Envelope (HLD) | Foundation | 2,729 | — | — | No |
+
+### Current Sprint: FULL REBUILD of all pages with sg-* custom components
+- **Rebuilt:** Strategy (audit pending), How to Approach System Design (2/20)
+- **Needs full rebuild:** 18 pages (all others listed above)
+- This is NOT a small upgrade — each page is rewritten from scratch with sg-* tags
 
 ### LLD Hub Features (`lld/index.html`)
 - Floating "Study Next" widget — 110 topics, localStorage persistence, full list view, reset button
@@ -283,7 +292,8 @@ c:\Users\Rafikul\Desktop\Learn\System Design\
 17. **IoT & Simulation** (2): Smart Home, Thermostat Control
 18. **Mastery** (10): Concurrency Patterns, Unit Testing Patterns, DI Deep Dive, Repository & Unit of Work, Refactoring Patterns, Reflection & Metaprogramming, DDD Tactical Patterns, CQRS, Clean Architecture, Event-Driven Architecture
 
-**Next to build:** Vending Machine → Snake & Ladder → Shopping Cart → ...
+**Current sprint:** Upgrading all 20 existing pages to use sg-* custom components (2 done, 18 remaining)
+**After upgrade sprint:** Snake & Ladder → Shopping Cart → Review & Rating → ...
 
 ---
 
