@@ -60,23 +60,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape' && activeBlock) { activeBlock.classList.remove('scroll-active'); activeBlock = null; }
   });
 
-  /* Wheel: active code block traps vertical scroll. Horizontal always passes through for two-finger swipe. */
+  /* Wheel: only trap vertical scroll inside an ACTIVE (clicked) code block that has overflow.
+     Non-active code blocks: let the browser handle scroll natively — no preventDefault. */
   document.addEventListener('wheel', function(e) {
+    if (!activeBlock) return;                        // no active block → native scroll
     var body = e.target.closest('.macos-body');
-    if (!body) return;
+    if (body !== activeBlock) return;                // cursor not on active block → native scroll
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // horizontal swipe → native
 
-    // Horizontal swipe — always let the browser scroll the code block natively
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    // Only trap if the code block actually has vertical overflow
+    if (activeBlock.scrollHeight <= activeBlock.clientHeight) return;
 
-    if (body !== activeBlock) {
-      e.preventDefault();
-      window.scrollBy(0, e.deltaY);
-      return;
-    }
+    // At top scrolling up, or at bottom scrolling down → release to page scroll
+    var atTop = activeBlock.scrollTop <= 0 && e.deltaY < 0;
+    var atBottom = activeBlock.scrollTop + activeBlock.clientHeight >= activeBlock.scrollHeight - 1 && e.deltaY > 0;
+    if (atTop || atBottom) return;
 
-    // Active — trap vertical scroll inside code block
     e.preventDefault();
-    body.scrollTop += e.deltaY;
+    activeBlock.scrollTop += e.deltaY;
   }, { passive: false });
 
   /* ----------------------------------------------------------
@@ -3678,9 +3679,15 @@ document.addEventListener('DOMContentLoaded', () => {
       var color = this.getAttribute('color') || 'blue';
       var title = this.getAttribute('title') || '';
       var body = this.innerHTML.trim();
-      // Convert <br> separated lines into a proper list
-      var lines = body.split(/<br\s*\/?>/i).map(function(l) { return l.trim(); }).filter(Boolean);
-      var listHtml = '<ul class="cheat-list">' + lines.map(function(l) { return '<li>' + l + '</li>'; }).join('') + '</ul>';
+      var listHtml;
+      // If child contains <ul> or <li> already, keep as-is (wrap in ul if bare <li>s)
+      if (/<li[\s>]/i.test(body)) {
+        listHtml = /<ul[\s>]/i.test(body) ? body : '<ul class="cheat-list">' + body + '</ul>';
+      } else {
+        // Convert <br> separated lines into a proper list
+        var lines = body.split(/<br\s*\/?>/i).map(function(l) { return l.trim(); }).filter(Boolean);
+        listHtml = '<ul class="cheat-list">' + lines.map(function(l) { return '<li>' + l + '</li>'; }).join('') + '</ul>';
+      }
       this.outerHTML = '<div class="cheat-card cheat-' + color + ' visible"><strong>' + title + '</strong>' + listHtml + '</div>';
     }
   });
@@ -4134,11 +4141,11 @@ document.addEventListener('DOMContentLoaded', () => {
       var html = '<div class="when-use-grid">';
       html += '<div class="when-section-label when-section-label--yes"><i class="fa-solid fa-check" style="margin-right:0.3rem"></i> Use when</div>';
       yes.forEach(function(item) {
-        html += '<div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check"></i></span> ' + item + '</div>';
+        html += '<div class="when-item"><span class="when-icon-yes"><i class="fa-solid fa-check"></i></span><span class="when-text">' + item + '</span></div>';
       });
       html += '<div class="when-section-label when-section-label--no"><i class="fa-solid fa-xmark" style="margin-right:0.3rem"></i> Avoid when</div>';
       no.forEach(function(item) {
-        html += '<div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-xmark"></i></span> ' + item + '</div>';
+        html += '<div class="when-item"><span class="when-icon-no"><i class="fa-solid fa-xmark"></i></span><span class="when-text">' + item + '</span></div>';
       });
       html += '</div>';
       this.outerHTML = html;
@@ -4385,6 +4392,38 @@ document.addEventListener('DOMContentLoaded', () => {
       if (total) html += '<tr class="cost-calc-total"><td colspan="2">Monthly Total</td><td>' + total + '</td></tr>';
       html += '</tbody></table></div>';
       this.outerHTML = html;
+    }
+  });
+
+  /* 50. <sg-tldr>content</sg-tldr> — TL;DR summary card with auto-generated label */
+  customElements.define('sg-tldr', class extends HTMLElement {
+    connectedCallback() {
+      var body = this.innerHTML.trim();
+      this.outerHTML = '<div class="tldr-card visible">' + body + '</div>';
+    }
+  });
+
+  /* 51. <sg-monologue label="thinking out loud">content</sg-monologue> — internal thought / reasoning block */
+  customElements.define('sg-monologue', class extends HTMLElement {
+    connectedCallback() {
+      var label = this.getAttribute('label') || 'Thinking out loud';
+      var body = this.innerHTML.trim();
+      this.outerHTML = '<div class="monologue"><p class="monologue-label">' + label + '</p>' + body + '</div>';
+    }
+  });
+
+  /* 52. <sg-smell type="purple|red|yellow" title="Smell Name">description</sg-smell> — code smell card */
+  customElements.define('sg-smell', class extends HTMLElement {
+    connectedCallback() {
+      var type = this.getAttribute('type') || 'purple';
+      var title = this.getAttribute('title') || '';
+      var icon = this.getAttribute('icon') || 'fa-bug';
+      var body = this.innerHTML.trim();
+      var colors = { purple: '168,85,247', red: '239,68,68', yellow: '245,158,11', green: '34,197,94', blue: '59,130,246' };
+      var rgb = colors[type] || colors.purple;
+      this.outerHTML = '<div class="smell-card" style="background:rgba(' + rgb + ',0.06);border:1px solid rgba(' + rgb + ',0.2);">'
+        + (title ? '<strong style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;color:rgb(' + rgb + ');"><i class="fa-solid ' + icon + '"></i> ' + title + '</strong>' : '')
+        + '<div>' + body + '</div></div>';
     }
   });
 })();

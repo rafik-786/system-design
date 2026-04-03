@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SVG Cookbook — Copy-Paste Patterns</title>
+<style>
+  body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; padding: 2rem; }
+  h1 { color: #14b8a6; }
+  h2 { color: #38bdf8; margin-top: 3rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; }
+  h3 { color: #94a3b8; }
+  .pattern { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; margin: 1rem 0; }
+  .pattern svg { display: block; margin: 0 auto; }
+  code { background: #334155; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+  pre { background: #1e293b; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; line-height: 1.6; }
+  .rule { color: #f87171; font-weight: 600; }
+  .math { color: #fbbf24; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<h1>SVG Cookbook — Copy-Paste Patterns for System Guide</h1>
+<p>Every SVG pattern agents need, with correct geometry pre-calculated. <strong>Copy and modify — don't reinvent.</strong></p>
+
+<!-- ============================================================ -->
+<h2>1. Decision Flowchart (Diamonds + YES/NO Arrows)</h2>
+<p>Used in: S9 When To Use, S12 Bug root cause diagrams</p>
+
+<div class="pattern">
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;">
+  <defs>
+    <!-- ALWAYS scope marker IDs with a prefix like s9-, q3-, b2- -->
+    <marker id="demo-arr-yes" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8" fill="#14b8a6"/>
+    </marker>
+    <marker id="demo-arr-no" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8" fill="#ef4444"/>
+    </marker>
+  </defs>
+
+  <!-- DIAMOND: centered at (380, 70), radius 90 horizontal, 42 vertical -->
+  <!-- Tips: left=290, right=470, top=28, bottom=112 -->
+  <g transform="translate(380, 70)">
+    <polygon points="0,-42 90,0 0,42 -90,0" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+    <text text-anchor="middle" y="-6" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="12" font-weight="600">Is condition</text>
+    <text text-anchor="middle" y="12" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="12" font-weight="600">true?</text>
+  </g>
+
+  <!-- NO arrow: starts at LEFT TIP (380-90=290), goes left to box -->
+  <line x1="290" y1="70" x2="160" y2="70" stroke="#ef4444" stroke-width="2" marker-end="url(#demo-arr-no)"/>
+  <text x="225" y="62" fill="#ef4444" font-family="Inter,sans-serif" font-size="11" font-weight="700">NO</text>
+
+  <!-- NO result box -->
+  <rect x="20" y="52" width="140" height="36" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+  <text x="90" y="75" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="12">Result A</text>
+
+  <!-- YES arrow: starts at BOTTOM TIP (70+42=112), goes down to next diamond -->
+  <line x1="380" y1="112" x2="380" y2="168" stroke="#14b8a6" stroke-width="2" marker-end="url(#demo-arr-yes)"/>
+  <text x="392" y="145" fill="#14b8a6" font-family="Inter,sans-serif" font-size="11" font-weight="700">YES</text>
+
+  <!-- SECOND DIAMOND: centered at (380, 210) -->
+  <g transform="translate(380, 210)">
+    <polygon points="0,-42 90,0 0,42 -90,0" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+    <text text-anchor="middle" y="-6" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="12" font-weight="600">Next</text>
+    <text text-anchor="middle" y="12" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="12" font-weight="600">question?</text>
+  </g>
+
+  <!-- RIGHT arrow from second diamond: starts at RIGHT TIP (380+90=470) -->
+  <line x1="470" y1="210" x2="600" y2="210" stroke="#14b8a6" stroke-width="2" marker-end="url(#demo-arr-yes)"/>
+  <text x="520" y="202" fill="#64748b" font-family="Inter,sans-serif" font-size="11" font-weight="600">label</text>
+
+  <!-- Result box (highlighted) -->
+  <rect x="600" y="192" width="140" height="36" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+  <text x="670" y="215" text-anchor="middle" fill="#14b8a6" font-family="Inter,sans-serif" font-size="12" font-weight="600">Final Result ✓</text>
+</svg>
+</div>
+
+<h3>Diamond Connection Math</h3>
+<pre>
+Diamond at translate(cx, cy) with points="0,-42 90,0 0,42 -90,0"
+
+  Connection points (ABSOLUTE coordinates):
+    TOP:    (cx, cy - 42)
+    BOTTOM: (cx, cy + 42)
+    LEFT:   (cx - 90, cy)
+    RIGHT:  (cx + 90, cy)
+
+  Line from LEFT tip going left:
+    x1 = cx - 90    ← starts at diamond edge
+    y1 = cy
+    x2 = target_x   ← ends at box edge
+    y2 = cy
+
+  Line from BOTTOM tip going down:
+    x1 = cx
+    y1 = cy + 42     ← starts at diamond edge
+    x2 = cx
+    y2 = next_cy - 42 ← ends at next diamond top (leave gap for arrow marker)
+
+  <span class="rule">WRONG: x1="cx" (center) — line starts INSIDE the diamond</span>
+  <span class="rule">RIGHT: x1="cx - 90" (left tip) — line starts at the edge</span>
+</pre>
+
+<!-- ============================================================ -->
+<h2>2. UML Class Diagram (Boxes + Inheritance/Composition)</h2>
+<p>Used in: S4 Core UML, S10 Comparisons</p>
+
+<div class="pattern">
+<svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;">
+  <defs>
+    <marker id="demo-inherit" markerWidth="12" markerHeight="10" refX="12" refY="5" orient="auto">
+      <polygon points="0,0 12,5 0,10" fill="none" stroke="#14b8a6" stroke-width="1.5"/>
+    </marker>
+    <marker id="demo-compose" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8" fill="#14b8a6"/>
+    </marker>
+  </defs>
+
+  <!-- Interface box (dashed border) -->
+  <rect x="280" y="10" width="200" height="70" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2" stroke-dasharray="6,3"/>
+  <text x="380" y="32" text-anchor="middle" fill="#14b8a6" font-family="Inter,sans-serif" font-size="11" font-style="italic">«interface»</text>
+  <text x="380" y="52" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="13" font-weight="700">IStrategy</text>
+  <line x1="290" y1="60" x2="470" y2="60" stroke="#334155" stroke-width="1"/>
+  <text x="380" y="75" text-anchor="middle" fill="#94a3b8" font-family="'JetBrains Mono',monospace" font-size="10">+ Execute(data): Result</text>
+
+  <!-- Concrete class A -->
+  <rect x="100" y="150" width="200" height="70" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+  <text x="200" y="175" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="13" font-weight="600">ConcreteStrategyA</text>
+  <line x1="110" y1="185" x2="290" y2="185" stroke="#334155" stroke-width="1"/>
+  <text x="200" y="200" text-anchor="middle" fill="#94a3b8" font-family="'JetBrains Mono',monospace" font-size="10">+ Execute(data): Result</text>
+
+  <!-- Concrete class B -->
+  <rect x="460" y="150" width="200" height="70" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+  <text x="560" y="175" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="13" font-weight="600">ConcreteStrategyB</text>
+  <line x1="470" y1="185" x2="650" y2="185" stroke="#334155" stroke-width="1"/>
+  <text x="560" y="200" text-anchor="middle" fill="#94a3b8" font-family="'JetBrains Mono',monospace" font-size="10">+ Execute(data): Result</text>
+
+  <!-- Inheritance arrows (dashed, open triangle) -->
+  <!-- A implements Interface: line from A top-center to Interface bottom-center -->
+  <line x1="200" y1="150" x2="340" y2="80" stroke="#14b8a6" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#demo-inherit)"/>
+  <line x1="560" y1="150" x2="420" y2="80" stroke="#14b8a6" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#demo-inherit)"/>
+
+  <!-- Context box (uses interface) -->
+  <rect x="280" y="240" width="200" height="30" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="380" y="260" text-anchor="middle" fill="#38bdf8" font-family="Inter,sans-serif" font-size="12" font-weight="600">Context</text>
+
+  <!-- Composition arrow: Context → Interface -->
+  <line x1="380" y1="240" x2="380" y2="80" stroke="#38bdf8" stroke-width="2" marker-end="url(#demo-compose)"/>
+  <text x="395" y="170" fill="#38bdf8" font-family="Inter,sans-serif" font-size="10">uses ▸</text>
+</svg>
+</div>
+
+<h3>Box Connection Math</h3>
+<pre>
+Rectangle at (x, y) with width=W, height=H:
+
+  Connection points:
+    TOP-CENTER:    (x + W/2, y)
+    BOTTOM-CENTER: (x + W/2, y + H)
+    LEFT-CENTER:   (x, y + H/2)
+    RIGHT-CENTER:  (x + W, y + H/2)
+
+  Inheritance arrow from child to parent:
+    x1 = child_x + child_W/2     ← child top center
+    y1 = child_y                  ← child top edge
+    x2 = parent_x + parent_W/2   ← parent bottom center
+    y2 = parent_y + parent_H     ← parent bottom edge
+</pre>
+
+<!-- ============================================================ -->
+<h2>3. Execution Flow (Horizontal Pipeline)</h2>
+<p>Used in: S5 Code execution flow, S12 Bug incident flows</p>
+
+<div class="pattern">
+<svg viewBox="0 0 760 120" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;">
+  <defs>
+    <marker id="demo-flow-arr" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8" fill="#14b8a6"/>
+    </marker>
+  </defs>
+
+  <!-- Step 1 -->
+  <rect x="10" y="30" width="120" height="50" rx="8" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+  <text x="70" y="52" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="11" font-weight="600">User Request</text>
+  <text x="70" y="68" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">HTTP POST</text>
+
+  <!-- Arrow 1→2: starts at RIGHT edge of box 1 (10+120=130) -->
+  <line x1="130" y1="55" x2="170" y2="55" stroke="#14b8a6" stroke-width="2" marker-end="url(#demo-flow-arr)"/>
+
+  <!-- Step 2 -->
+  <rect x="180" y="30" width="120" height="50" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+  <text x="240" y="52" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="11" font-weight="600">Controller</text>
+  <text x="240" y="68" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">resolve key</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="300" y1="55" x2="340" y2="55" stroke="#14b8a6" stroke-width="2" marker-end="url(#demo-flow-arr)"/>
+
+  <!-- Step 3 -->
+  <rect x="350" y="30" width="120" height="50" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
+  <text x="410" y="52" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="11" font-weight="600">IStrategy</text>
+  <text x="410" y="68" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">Process()</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="470" y1="55" x2="510" y2="55" stroke="#14b8a6" stroke-width="2" marker-end="url(#demo-flow-arr)"/>
+
+  <!-- Step 4 (highlighted result) -->
+  <rect x="520" y="30" width="120" height="50" rx="8" fill="rgba(20,184,166,0.15)" stroke="#14b8a6" stroke-width="2"/>
+  <text x="580" y="52" text-anchor="middle" fill="#14b8a6" font-family="Inter,sans-serif" font-size="11" font-weight="700">Result</text>
+  <text x="580" y="68" text-anchor="middle" fill="#94a3b8" font-family="Inter,sans-serif" font-size="9">200 OK</text>
+
+  <!-- Step numbers below -->
+  <text x="70" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">①</text>
+  <text x="240" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">②</text>
+  <text x="410" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">③</text>
+  <text x="580" y="100" text-anchor="middle" fill="#64748b" font-family="Inter,sans-serif" font-size="10">④</text>
+</svg>
+</div>
+
+<h3>Pipeline Connection Math</h3>
+<pre>
+Boxes are 120px wide with 50px gaps between them:
+  Box 1: x=10,  right edge = 10 + 120 = 130
+  Gap:   130 → 180 (arrow line)
+  Box 2: x=180, right edge = 180 + 120 = 300
+  Gap:   300 → 350 (arrow line)
+  Box 3: x=350, right edge = 350 + 120 = 470
+
+Arrow from box N to box N+1:
+  x1 = boxN_x + boxN_width     ← right edge of source
+  x2 = boxN+1_x - 10           ← leave 10px gap for arrow marker
+  y1 = y2 = boxN_y + boxN_height/2  ← vertical center
+</pre>
+
+<!-- ============================================================ -->
+<h2>4. Comparison Diagram (Side-by-Side)</h2>
+<p>Used in: S10 Pattern comparisons</p>
+
+<div class="pattern">
+<svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" style="max-width:760px;">
+  <!-- Left side -->
+  <rect x="20" y="10" width="320" height="180" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+  <text x="180" y="38" text-anchor="middle" fill="#14b8a6" font-family="Inter,sans-serif" font-size="14" font-weight="700">Strategy</text>
+  <line x1="40" y1="50" x2="320" y2="50" stroke="#334155" stroke-width="1"/>
+  <text x="40" y="75" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Client chooses algorithm</text>
+  <text x="40" y="100" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Composition (has-a)</text>
+  <text x="40" y="125" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Replaces entire algorithm</text>
+  <text x="40" y="150" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Independent strategies</text>
+  <text x="40" y="175" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Runtime flexibility</text>
+
+  <!-- VS badge -->
+  <circle cx="380" cy="100" r="22" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+  <text x="380" y="105" text-anchor="middle" fill="#e2e8f0" font-family="Inter,sans-serif" font-size="12" font-weight="700">vs</text>
+
+  <!-- Right side -->
+  <rect x="420" y="10" width="320" height="180" rx="10" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+  <text x="580" y="38" text-anchor="middle" fill="#a78bfa" font-family="Inter,sans-serif" font-size="14" font-weight="700">Template Method</text>
+  <line x1="440" y1="50" x2="720" y2="50" stroke="#334155" stroke-width="1"/>
+  <text x="440" y="75" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Base class defines skeleton</text>
+  <text x="440" y="100" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Inheritance (is-a)</text>
+  <text x="440" y="125" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Overrides specific steps</text>
+  <text x="440" y="150" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Shared logic in base</text>
+  <text x="440" y="175" fill="#94a3b8" font-family="Inter,sans-serif" font-size="12">• Compile-time structure</text>
+</svg>
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Standard Defs Block (Copy Into Every SVG)</h2>
+<pre>
+&lt;defs&gt;
+  &lt;!-- Arrow marker — ALWAYS scope ID with prefix --&gt;
+  &lt;marker id="<span class="rule">PREFIX</span>-arr" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"&gt;
+    &lt;path d="M0,0 L10,4 L0,8" fill="#14b8a6"/&gt;
+  &lt;/marker&gt;
+  &lt;!-- Red variant for NO/error paths --&gt;
+  &lt;marker id="<span class="rule">PREFIX</span>-arr-red" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto"&gt;
+    &lt;path d="M0,0 L10,4 L0,8" fill="#ef4444"/&gt;
+  &lt;/marker&gt;
+  &lt;!-- Open triangle for inheritance --&gt;
+  &lt;marker id="<span class="rule">PREFIX</span>-inherit" markerWidth="12" markerHeight="10" refX="12" refY="5" orient="auto"&gt;
+    &lt;polygon points="0,0 12,5 0,10" fill="none" stroke="#14b8a6" stroke-width="1.5"/&gt;
+  &lt;/marker&gt;
+&lt;/defs&gt;
+</pre>
+
+<!-- ============================================================ -->
+<h2>Cheat Sheet: Constants</h2>
+<pre>
+VIEWBOX:        0 0 760 {height}   (max 760 wide for sidebar pages)
+STROKE-WIDTH:   2 (lines/arrows), 1.5 (box borders), 1 (separators)
+MARKER SIZE:    markerWidth="10" markerHeight="8"
+DIAMOND RADIUS: horizontal=90, vertical=42
+FONT SIZES:     12-13px (labels), 14px (titles), 10-11px (annotations)
+COLORS:
+  accent:   #14b8a6 (teal)    highlight boxes, YES arrows
+  error:    #ef4444 (red)      NO arrows, warning boxes
+  muted:    #64748b            annotations, secondary boxes
+  text:     #e2e8f0 (primary)  #94a3b8 (secondary)
+  bg:       #1e293b (boxes)    #334155 (borders)
+  purple:   #a78bfa            comparison alt color
+  blue:     #38bdf8            context/usage highlights
+BOX SIZES:     120-200px wide, 50-70px tall, rx="8"
+GAP:           40-50px between boxes (room for arrow + label)
+</pre>
+
+</body>
+</html>
