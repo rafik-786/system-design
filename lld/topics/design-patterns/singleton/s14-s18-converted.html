@@ -1,0 +1,691 @@
+
+  <!-- ========== 14. TESTING STRATEGIES ========== -->
+
+  <div class="section" id="testing">
+    <div class="section-header">
+      <div class="section-icon green"><i class="fa-solid fa-flask-vial"></i></div>
+      <div>
+        <div class="section-num">Section 14</div>
+        <h2 class="section-title">Testing Strategies</h2>
+      </div>
+    </div>
+
+    <p class="body-text">Testing Singleton-dependent code is one of the biggest challenges. Here are battle-tested approaches from production codebases.</p>
+
+    <sg-card title="Strategy 1: Interface + DI (Preferred)">
+      <p class="body-text">Extract an interface, register via DI, and inject mocks in tests. The class doesn't know or care that it's a Singleton.</p>
+      <sg-code file="InterfaceTest.cs">// Production: registered as Singleton
+builder.Services.AddSingleton&lt;ICacheService, RedisCacheService&gt;();
+
+// Test: inject a fake
+public class OrderServiceTests
+{
+    [Fact]
+    public void PlaceOrder_CachesResult()
+    {
+        // Arrange
+        var fakeCache = new FakeCacheService();
+        var sut = new OrderService(fakeCache);
+
+        // Act
+        sut.PlaceOrder(new Order { Id = 42 });
+
+        // Assert
+        Assert.True(fakeCache.ContainsKey("order:42"));
+    }
+}
+
+public class FakeCacheService : ICacheService
+{
+    private readonly Dictionary&lt;string, object&gt; _store = new();
+    public void Set(string key, object val) =&gt; _store[key] = val;
+    public T? Get&lt;T&gt;(string key) =&gt;
+        _store.TryGetValue(key, out var v) ? (T)v : default;
+    public bool ContainsKey(string key) =&gt; _store.ContainsKey(key);
+}</sg-code>
+    </sg-card>
+
+    <sg-card title="Strategy 2: Moq / NSubstitute for Quick Mocking">
+      <p class="body-text">For fast tests without manual fakes, use a <span class="tooltip-trigger">mocking framework<span class="tooltip-content">A library (like Moq or NSubstitute) that creates fake implementations of interfaces for unit testing.</span></span>.</p>
+      <sg-code file="MoqTest.cs">using Moq;
+
+[Fact]
+public void GetProduct_ReturnsFromCache_WhenCached()
+{
+    // Arrange
+    var mockCache = new Mock&lt;ICacheService&gt;();
+    mockCache.Setup(c =&gt; c.Get&lt;Product&gt;("product:1"))
+             .Returns(new Product { Id = 1, Name = "Widget" });
+
+    var sut = new ProductService(mockCache.Object);
+
+    // Act
+    var result = sut.GetProduct(1);
+
+    // Assert
+    Assert.Equal("Widget", result.Name);
+    mockCache.Verify(c =&gt; c.Get&lt;Product&gt;("product:1"), Times.Once);
+}</sg-code>
+    </sg-card>
+
+    <sg-card title="Strategy 3: WebApplicationFactory for Integration Tests">
+      <p class="body-text">For integration tests that need the real DI pipeline, use <span class="tooltip-trigger">WebApplicationFactory<span class="tooltip-content">A test helper that bootstraps the full ASP.NET Core pipeline in-memory for integration tests.</span></span> to override Singleton registrations in the test host.</p>
+      <sg-code file="IntegrationTest.cs">public class ApiTests : IClassFixture&lt;WebApplicationFactory&lt;Program&gt;&gt;
+{
+    private readonly HttpClient _client;
+
+    public ApiTests(WebApplicationFactory&lt;Program&gt; factory)
+    {
+        _client = factory.WithWebHostBuilder(builder =&gt;
+        {
+            builder.ConfigureServices(services =&gt;
+            {
+                // Remove the real Singleton
+                var descriptor = services.SingleOrDefault(
+                    d =&gt; d.ServiceType == typeof(ICacheService));
+                if (descriptor != null) services.Remove(descriptor);
+
+                // Replace with test double
+                services.AddSingleton&lt;ICacheService, InMemoryCacheService&gt;();
+            });
+        }).CreateClient();
+    }
+
+    [Fact]
+    public async Task GetProducts_Returns200()
+    {
+        var response = await _client.GetAsync("/api/products");
+        response.EnsureSuccessStatusCode();
+    }
+}</sg-code>
+    </sg-card>
+
+    <sg-card title="Strategy 4: Dealing with Legacy Static Singletons">
+      <p class="body-text">When refactoring isn't possible, use a static reset method guarded by <code>[InternalsVisibleTo]</code>.</p>
+      <sg-code file="LegacyTest.cs">// In the Singleton class (production code):
+public sealed class LegacyConfig
+{
+    private static readonly Lazy&lt;LegacyConfig&gt; _instance
+        = new(() =&gt; new LegacyConfig());
+    public static LegacyConfig Instance =&gt; _instance.Value;
+
+    // Allow tests to reset — only accessible from test assembly
+    internal static void ResetForTesting()
+    {
+        typeof(Lazy&lt;LegacyConfig&gt;)
+            .GetField("m_boxed", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(_instance, null);
+    }
+}
+
+// In AssemblyInfo.cs:
+[assembly: InternalsVisibleTo("MyApp.Tests")]
+
+// In test:
+public class LegacyConfigTests : IDisposable
+{
+    public void Dispose() =&gt; LegacyConfig.ResetForTesting();
+
+    [Fact]
+    public void Config_LoadsCorrectly() { /* ... */ }
+}</sg-code>
+
+      <sg-callout type="warning" title="Last Resort">
+        <p class="body-text">This is a hack for legacy code. It uses <span class="tooltip-trigger">reflection<span class="tooltip-content">The ability to inspect and manipulate types, methods, and properties at runtime — powerful but slower than compile-time approaches.</span></span> and is fragile. Always prefer Strategy 1 (interface + DI) for new code.</p>
+      </sg-callout>
+    </sg-card>
+  </div>
+
+  <!-- ========== 15. PERFORMANCE CONSIDERATIONS ========== -->
+  <div class="section" id="performance">
+    <div class="section-header">
+      <div class="section-icon yellow"><i class="fa-solid fa-gauge-high"></i></div>
+      <div>
+        <div class="section-num">Section 15</div>
+        <h2 class="section-title">Performance Considerations</h2>
+      </div>
+    </div>
+
+    <sg-card title="Access Overhead: Negligible" open>
+      <p class="body-text">Once initialized, accessing a Singleton via <code>Lazy&lt;T&gt;.Value</code> is essentially a <span class="tooltip-trigger">volatile<span class="tooltip-content">A C# keyword that prevents the compiler and CPU from caching a variable in registers or reordering reads/writes.</span></span> read — sub-nanosecond. The lock is only acquired during first creation.</p>
+      <div class="table-wrapper mt-sm">
+        <table>
+          <thead><tr><th>Approach</th><th>First Access</th><th>Subsequent Access</th><th>Contention Risk</th></tr></thead>
+          <tbody>
+            <tr><td><code>Lazy&lt;T&gt;</code> (default)</td><td>Lock + construction</td><td>Volatile read (fast)</td><td>None after init</td></tr>
+            <tr><td>Double-checked lock</td><td>Lock + construction</td><td>Volatile read (fast)</td><td>None after init</td></tr>
+            <tr><td>Static constructor</td><td><span class="tooltip-trigger">CLR<span class="tooltip-content">Common Language Runtime — the virtual machine that executes .NET code, handling memory management, GC, and JIT compilation.</span></span> class init (once)</td><td>Direct field access (fastest)</td><td>None</td></tr>
+            <tr><td>DI container</td><td>Container lookup + construction</td><td>Direct reference (fastest)</td><td>None after init</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </sg-card>
+
+    <sg-card title="Memory Impact: Lives Forever">
+      <p class="body-text">Singletons are never garbage collected. This is by design — but has implications:</p>
+      <hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">
+      <p class="mb-sm">
+        <strong>GC <span class="tooltip-trigger">Gen 2<span class="tooltip-content">The long-lived generation in .NET's garbage collector. Objects surviving Gen 0 and Gen 1 are promoted here and collected less frequently.</span></span> promotion:</strong><br>
+        The Singleton object and everything it references moves to Gen 2 (long-lived heap), where GC runs less frequently.
+      </p>
+      <hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">
+      <p class="mb-sm">
+        <strong>Memory anchoring:</strong><br>
+        If the Singleton holds a reference to a large collection, that collection is also pinned forever.
+      </p>
+      <hr style="border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.75rem 0;">
+      <p class="mb-sm">
+        <strong>Cache growth:</strong><br>
+        A Singleton <code>ConcurrentDictionary</code> without eviction policy will grow unbounded until OOM.
+      </p>
+      <sg-callout type="info" title="Mitigation">
+        <p class="body-text">For caches: use <code>IMemoryCache</code> with size limits and expiration. For data stores: use weak references or periodic cleanup. Monitor with <code>dotnet-counters</code> for Gen 2 heap size.</p>
+      </sg-callout>
+    </sg-card>
+
+    <sg-card title="Contention: The Hidden Bottleneck">
+      <p class="body-text">Initialization is thread-safe but method-level locking can become a bottleneck:</p>
+      <sg-code file="ContentionExample.cs">// BAD — global lock blocks ALL threads
+public sealed class MetricsCollector
+{
+    private readonly object _lock = new();
+    private readonly Dictionary&lt;string, int&gt; _counters = new();
+
+    public void Increment(string metric)
+    {
+        lock (_lock)  // every thread waits here!
+        {
+            _counters[metric] = _counters.GetValueOrDefault(metric) + 1;
+        }
+    }
+}
+
+// GOOD — lock-free with ConcurrentDictionary + Interlocked
+public sealed class MetricsCollector
+{
+    private readonly ConcurrentDictionary&lt;string, int&gt; _counters = new();
+
+    public void Increment(string metric)
+    {
+        _counters.AddOrUpdate(metric, 1, (_, count) =&gt; count + 1);
+    }
+}</sg-code>
+      <p class="body-text mt-sm"><strong>Rule of thumb:</strong> If your Singleton method is called more than 1000 times/second, avoid locks. Use <code>Interlocked</code>, <code>ConcurrentDictionary</code>, <code>Channel&lt;T&gt;</code>, or lock-free data structures.</p>
+    </sg-card>
+  </div>
+
+  <!-- ========== 16. INTERVIEW PITCH ========== -->
+
+  <div class="section" id="pitch">
+    <div class="section-header">
+      <div class="section-icon cyan"><i class="fa-solid fa-microphone"></i></div>
+      <div>
+        <div class="section-num">Section 16</div>
+        <h2 class="section-title">How to Explain in an Interview</h2>
+      </div>
+    </div>
+
+    <sg-callout type="purple" title="Your Script (90 seconds)">
+      <p class="body-text"><strong>Opening:</strong> "The Singleton pattern ensures a class has exactly one instance throughout the application."</p>
+      <p class="body-text"><strong>Core:</strong> "It works by making the constructor private — so no one can call <code>new</code> — and exposing a static property that returns the single instance. In C#, the cleanest way is using <code>Lazy&lt;T&gt;</code>, which handles thread safety automatically."</p>
+      <p class="body-text"><strong>Example:</strong> "A good real-world example is a configuration manager. You don't want multiple copies of your app's config floating around — one source of truth keeps things consistent."</p>
+      <p class="body-text"><strong>When:</strong> "I'd use it when I genuinely need one shared instance — like connection pools or caches. But in modern .NET, I prefer registering it with the DI container using <code>AddSingleton</code>, because that gives me the same behavior with better testability."</p>
+      <p class="body-text"><strong>Close:</strong> "The key trade-off is that classic Singleton introduces hidden global state and tight coupling, which is why the DI approach is preferred in production."</p>
+    </sg-callout>
+  </div>
+
+  <!-- ========== 17. Q&A ========== -->
+  <div class="section" id="qa">
+    <div class="section-header">
+      <div class="section-icon blue"><i class="fa-solid fa-comments"></i></div>
+      <div>
+        <div class="section-num">Section 17</div>
+        <h2 class="section-title">Interview Q&amp;As</h2>
+      </div>
+    </div>
+
+    <!-- Q1 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q1: What is the Singleton pattern and why does it exist?</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What problem does having a single instance solve? Think about shared resources.</div>
+        <div class="body-text">
+          <p class="mb-sm">Singleton is a creational design pattern that:</p>
+          <ol class="qa-list">
+            <li>Ensures a class has <strong>exactly one instance</strong> throughout the application</li>
+            <li>Provides a <strong>global access point</strong> to that instance</li>
+            <li>Controls instantiation via a <strong>private constructor</strong></li>
+          </ol>
+          <p class="mt-md">It exists because some resources — configuration, connection pools, caches — must be shared and creating duplicates would waste memory, cause inconsistency, or break coordination.</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "It's one of the GoF creational patterns. The key insight is that it's not just about having one instance — it's about controlled access to a shared resource. In modern .NET, the DI container provides this guarantee more cleanly than the classic pattern."</div>
+      </div></div>
+    </div>
+
+    <!-- Q2 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q2: What's the difference between a Singleton and a static class?</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Consider interfaces, inheritance, DI, and lifecycle control.</div>
+        <div class="body-text">
+          <p class="mb-sm"><strong>Static class</strong> limitations:</p>
+          <ul class="qa-list">
+            <li>Cannot implement interfaces</li>
+            <li>Cannot be inherited or used polymorphically</li>
+            <li>Cannot be injected via DI</li>
+            <li>Eagerly loaded — initialized on first access to any member</li>
+            <li>Cannot be serialized or passed as a parameter</li>
+          </ul>
+          <p class="mb-sm mt-md"><strong>Singleton</strong> advantages:</p>
+          <ul class="qa-list">
+            <li>Can implement interfaces and participate in DI</li>
+            <li>Supports <span class="tooltip-trigger">lazy loading<span class="tooltip-content">Deferring the initialization or loading of a resource until the point at which it is actually needed.</span></span> and controlled initialization</li>
+            <li>Can be swapped with a test double</li>
+            <li>Can be serialized and passed around as an object</li>
+          </ul>
+        </div>
+        <!-- SVG: Singleton vs Static Class -->
+        <svg viewBox="0 0 720 220" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Side-by-side comparison showing the key differences between a Singleton and a static class">
+          <rect width="720" height="220" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Singleton vs Static Class — Key Differences</text>
+          <rect x="30" y="40" width="310" height="165" rx="8" fill="#292524" stroke="#78716c" stroke-width="1.5"/>
+          <text x="185" y="60" text-anchor="middle" fill="#a8a29e" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">static class Helper { }</text>
+          <text x="50" y="82" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot implement interfaces</text>
+          <text x="50" y="100" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot be injected via DI</text>
+          <text x="50" y="118" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot be mocked in tests</text>
+          <text x="50" y="136" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; No lazy loading control</text>
+          <text x="50" y="154" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10007; Cannot be serialized/passed around</text>
+          <text x="50" y="178" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">Good for: pure utility functions (Math, Path)</text>
+          <text x="50" y="194" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">No state, no dependencies, no polymorphism</text>
+          <rect x="380" y="40" width="310" height="165" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="535" y="60" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">sealed class Service : IService { }</text>
+          <text x="400" y="82" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Implements interfaces</text>
+          <text x="400" y="100" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Full DI support</text>
+          <text x="400" y="118" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Easily mocked for testing</text>
+          <text x="400" y="136" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Lazy or eager initialization</text>
+          <text x="400" y="154" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11">&#10003; Can be serialized/passed as parameter</text>
+          <text x="400" y="178" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">Good for: services with state or dependencies</text>
+          <text x="400" y="194" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">Config, caches, connection pools, loggers</text>
+        </svg>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In modern .NET, I'd register the class as <code>AddSingleton&lt;IService, Service&gt;()</code> — the container handles the single-instance guarantee, and I can inject a mock in tests. Static classes can't do that."</div>
+      </div></div>
+    </div>
+
+    <!-- Q3 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q3: How do you make a Singleton thread-safe in C#?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens if two threads call <code>Instance</code> at the exact same time when the instance doesn't exist yet?</div>
+        <div class="body-text">
+          <p class="mb-sm">Three approaches to thread-safe Singleton:</p>
+          <ol class="qa-list">
+            <li><code>Lazy&lt;T&gt;</code> — thread-safe by default, simplest and recommended</li>
+            <li><strong>Double-checked locking</strong> with <code>volatile</code> — classic pattern but verbose and error-prone</li>
+            <li><strong>Static initializer</strong> — CLR guarantees thread safety for static constructors</li>
+          </ol>
+          <p class="mt-md">Here's what each approach looks like in code:</p>
+          <sg-code file="ThreeApproaches.cs">// 1. Lazy&lt;T&gt; — recommended (1 line!)
+private static readonly Lazy&lt;MyService&gt; _instance = new(() =&gt; new MyService());
+public static MyService Instance =&gt; _instance.Value;
+
+// 2. Double-checked locking — classic but verbose
+private static volatile MyService? _instance;
+private static readonly object _lock = new();
+public static MyService Instance
+{
+    get
+    {
+        if (_instance is null)
+            lock (_lock)
+                _instance ??= new MyService();
+        return _instance;
+    }
+}
+
+// 3. Static initializer — CLR handles thread safety
+private static readonly MyService _instance = new();
+public static MyService Instance =&gt; _instance;</sg-code>
+          <p class="body-text">The first approach (<code>Lazy&lt;T&gt;</code>) is the clear winner: it's one line, handles all the thread-safety mechanics internally, and the intent is immediately obvious to anyone reading the code. The second approach (double-checked locking) requires you to get <code>volatile</code>, the lock, and the null-check ordering exactly right — it's easy to introduce subtle bugs. The third approach (static initializer) is simple but eager — the instance is created when the class is first accessed, even if you never use <code>Instance</code>.</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I prefer <code>Lazy&lt;T&gt;</code> because it's a single line, handles thread safety, and the intent is clear. Double-check locking is a red flag in code reviews — it's easy to get wrong and <code>Lazy&lt;T&gt;</code> exists for exactly this reason."</div>
+      </div></div>
+    </div>
+
+    <!-- Q4 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q4: When would you NOT use the Singleton pattern?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Consider testability, multi-tenancy, and hidden dependencies.</div>
+        <div class="body-text">
+          <p class="mb-sm">Avoid Singleton when:</p>
+          <ol class="qa-list">
+            <li>The class has <strong>mutable state</strong> that varies per request or per user</li>
+            <li>You need <strong>multiple instances</strong> in the future (multi-tenant, multi-database)</li>
+            <li>It's used as a shortcut for <strong>global state</strong> instead of proper DI</li>
+            <li>It makes <strong>unit testing hard</strong> by introducing hidden dependencies</li>
+            <li>The object holds <strong>per-request context</strong> (user identity, tenant, culture)</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The pattern itself isn't bad — the misuse is. If you find yourself accessing <code>Singleton.Instance</code> directly throughout the codebase instead of injecting it, you've created tight coupling that's hard to refactor. DI-managed singletons solve this entirely."</div>
+      </div></div>
+    </div>
+
+    <!-- Q5 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q5: What is the role of the <code>volatile</code> keyword in double-checked locking?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> CPUs and compilers can reorder instructions. What could go wrong if Thread A assigns <code>_instance</code> before the constructor finishes?</div>
+        <div class="body-text">
+          <p class="mb-sm"><code>volatile</code> prevents two critical optimizations:</p>
+          <ol class="qa-list">
+            <li><strong>CPU register caching</strong> — forces reads/writes to go to main memory, so all threads see the latest value</li>
+            <li><strong>Instruction reordering</strong> — prevents the compiler or CPU from moving the assignment before the constructor completes</li>
+          </ol>
+          <p class="mt-md">Without <code>volatile</code>, Thread B could read a non-null <code>_instance</code> that points to a <strong>partially constructed object</strong> — fields not yet initialized, leading to <code>NullReferenceException</code> or corrupt state.</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is exactly why I avoid double-checked locking entirely. <code>Lazy&lt;T&gt;</code> handles the <span class="tooltip-trigger">memory barrier<span class="tooltip-content">A CPU instruction ensuring memory operations before the barrier complete before those after it — prevents instruction reordering.</span></span> correctly under the hood — no need to reason about CPU cache coherence yourself."</div>
+      </div></div>
+    </div>
+
+    <!-- Q6 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q6: How does <code>Lazy&lt;T&gt;</code> work internally?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> How does .NET ensure the factory lambda runs exactly once even under contention?</div>
+        <div class="body-text">
+          <p class="mb-sm"><code>Lazy&lt;T&gt;</code> uses three internal mechanisms:</p>
+          <ol class="qa-list">
+            <li>A <strong>state flag</strong> tracking: not created, creating, created, or faulted</li>
+            <li>A <strong>lock object</strong> (by default <code>LazyThreadSafetyMode.ExecutionAndPublication</code>) that blocks other threads while the factory runs</li>
+            <li>A <strong>cached value</strong> — once created, subsequent calls to <code>.Value</code> skip the lock entirely (fast path)</li>
+          </ol>
+          <p class="mt-md">If the factory throws, <code>Lazy&lt;T&gt;</code> enters a faulted state and re-throws the same exception on every subsequent <code>.Value</code> call — it does NOT retry.</p>
+        </div>
+
+        <!-- SVG: Lazy<T> State Machine -->
+        <svg viewBox="0 0 720 200" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="State machine diagram showing the four states of Lazy T: Not Created, Creating (locked), Created (fast path), and Faulted (exception cached)">
+          <rect width="720" height="200" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Lazy&lt;T&gt; Internal State Machine</text>
+          <rect x="30" y="55" width="130" height="50" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
+          <text x="95" y="77" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Not Created</text>
+          <text x="95" y="95" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Initial state</text>
+          <line x1="160" y1="80" x2="210" y2="80" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <text x="185" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">.Value</text>
+          <rect x="215" y="55" width="130" height="50" rx="8" fill="#854d0e" stroke="#eab308" stroke-width="2"/>
+          <text x="280" y="77" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Creating</text>
+          <text x="280" y="95" text-anchor="middle" fill="#a16207" font-family="system-ui, -apple-system, sans-serif" font-size="9">Lock held. Others wait.</text>
+          <line x1="345" y1="68" x2="410" y2="68" stroke="#22c55e" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <text x="377" y="62" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">Success</text>
+          <rect x="415" y="45" width="150" height="50" rx="8" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+          <text x="490" y="67" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Created</text>
+          <text x="490" y="85" text-anchor="middle" fill="#15803d" font-family="system-ui, -apple-system, sans-serif" font-size="9">Fast path: no lock!</text>
+          <path d="M565 70 Q590 50 565 45" fill="none" stroke="#22c55e" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <text x="605" y="60" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">.Value</text>
+          <text x="605" y="72" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">(cached)</text>
+          <line x1="345" y1="92" x2="410" y2="125" stroke="#ef4444" stroke-width="1.5" marker-end="url(#bug1-arrow)"/>
+          <text x="378" y="115" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">Throws</text>
+          <rect x="415" y="110" width="150" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+          <text x="490" y="132" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Faulted</text>
+          <text x="490" y="150" text-anchor="middle" fill="#991b1b" font-family="system-ui, -apple-system, sans-serif" font-size="9">Exception cached forever</text>
+          <path d="M565 135 Q590 115 565 110" fill="none" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <text x="605" y="122" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">.Value</text>
+          <text x="605" y="134" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">(re-throws)</text>
+          <text x="360" y="186" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-style="italic">After creation: .Value is just a volatile read (sub-nanosecond). After fault: same exception replayed.</text>
+        </svg>
+
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "If you need retry-on-failure semantics, you'd use <code>LazyThreadSafetyMode.PublicationOnly</code> — multiple threads can race to create, but only one value wins. Or better, wrap the factory in a resilience policy like <span class="tooltip-trigger">Polly<span class="tooltip-content">A .NET resilience library providing retry, circuit-breaker, timeout, and fallback policies for transient fault handling.</span></span>."</div>
+      </div></div>
+    </div>
+
+    <!-- Q7 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q7: What's the difference between <code>AddSingleton</code>, <code>AddScoped</code>, and <code>AddTransient</code>?</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think about object lifetime in terms of HTTP requests in ASP.NET Core.</div>
+        <div class="body-text">
+          <ol class="qa-list">
+            <li><code>AddSingleton</code> — <strong>one instance for the entire app lifetime</strong>. Created on first request, reused across all requests and threads</li>
+            <li><code>AddScoped</code> — <strong>one instance per HTTP request</strong>. Created when a request starts, disposed when it ends. Different requests get different instances</li>
+            <li><code>AddTransient</code> — <strong>new instance every time</strong> it's injected. No sharing at all</li>
+          </ol>
+        </div>
+
+        <!-- SVG: DI Lifetime Comparison -->
+        <svg viewBox="0 0 720 250" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Visual comparison of Singleton, Scoped, and Transient service lifetimes across multiple HTTP requests">
+          <rect width="720" height="250" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Service Lifetimes: Singleton vs Scoped vs Transient</text>
+          <text x="200" y="48" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 1</text>
+          <text x="400" y="48" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 2</text>
+          <text x="600" y="48" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="11">Request 3</text>
+          <text x="55" y="82" text-anchor="middle" fill="#3b82f6" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Singleton</text>
+          <rect x="120" y="65" width="560" height="28" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="400" y="84" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11">Instance A (same for ALL requests)</text>
+          <text x="55" y="128" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Scoped</text>
+          <rect x="120" y="110" width="170" height="28" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="205" y="129" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance B</text>
+          <rect x="310" y="110" width="170" height="28" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="395" y="129" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance C</text>
+          <rect x="500" y="110" width="180" height="28" rx="6" fill="#14532d" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="590" y="129" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Instance D</text>
+          <text x="55" y="172" text-anchor="middle" fill="#eab308" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Transient</text>
+          <rect x="120" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="157" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">E</text>
+          <rect x="205" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="242" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">F</text>
+          <rect x="310" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="347" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">G</text>
+          <rect x="395" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="432" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">H</text>
+          <rect x="500" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="537" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">I</text>
+          <rect x="585" y="155" width="75" height="28" rx="6" fill="#854d0e" stroke="#eab308" stroke-width="1.5"/>
+          <text x="622" y="174" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">J</text>
+          <rect x="120" y="200" width="560" height="36" rx="6" fill="#292524"/>
+          <text x="400" y="215" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="10">Singleton: 1 instance total | Scoped: 1 per request | Transient: 1 per injection</text>
+          <text x="400" y="229" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="10">Danger: Singleton capturing Scoped = "captive dependency" (ObjectDisposedException)</text>
+        </svg>
+
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "A common bug is injecting a Scoped service into a Singleton — the Scoped service gets captured and lives forever, essentially becoming a Singleton with stale data. ASP.NET Core's <code>ValidateScopes</code> option catches this in development."</div>
+      </div></div>
+    </div>
+
+    <!-- Q8 through Q29: preserved as-is from original (qa-item components don't need conversion) -->
+    <!-- Q8 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q8: Can you break a Singleton? How?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think about reflection, serialization, and cloning — and which of these actually apply in modern .NET.</div>
+        <div class="body-text">
+          <p class="mb-sm">Yes, a classic (manual) Singleton can be broken via:</p>
+          <ol class="qa-list">
+            <li><strong>Reflection</strong> — <code>Activator.CreateInstance(typeof(T), true)</code> can invoke the private constructor, creating a second instance</li>
+            <li><strong>Serialization/Deserialization</strong> — <code>System.Text.Json</code> or <code>JsonConvert</code> deserializing JSON into the type creates a new instance (if the parameterless constructor is accessible via <code>[JsonConstructor]</code> or source generators)</li>
+            <li><strong>Cloning</strong> — if the class implements <code>ICloneable</code>, <code>Clone()</code> creates a duplicate. Fix: don't implement <code>ICloneable</code> on singletons</li>
+            <li><strong>Multiple <code>AssemblyLoadContext</code>s</strong> — in .NET Core, each <code>AssemblyLoadContext</code> that loads the assembly gets its own set of static fields, so each context gets a separate Singleton instance. This is relevant in plugin architectures using <code>AssemblyLoadContext.Default</code> vs custom contexts</li>
+          </ol>
+          <p class="mt-md">Here's how reflection breaks a Singleton, and how to defend against it:</p>
+          <sg-code file="BreakAndDefend.cs">// Breaking it via reflection:
+var sneakyInstance = (MySingleton)Activator.CreateInstance(
+    typeof(MySingleton),
+    nonPublic: true  // bypasses the private constructor!
+);
+// sneakyInstance != MySingleton.Instance — pattern broken!
+
+// Defending against it:
+public sealed class MySingleton
+{
+    private static int _instanceCount;
+    private MySingleton()
+    {
+        if (Interlocked.Increment(ref _instanceCount) &gt; 1)
+            throw new InvalidOperationException(
+                "Only one instance allowed. Use MySingleton.Instance.");
+    }
+}</sg-code>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "To defend against reflection, throw an <code>InvalidOperationException</code> in the constructor if an instance already exists. For serialization, implement a custom <code>JsonConverter&lt;T&gt;</code> that returns the existing instance. But honestly, DI-managed singletons sidestep all of this — the container controls instantiation, so reflection and serialization aren't vectors."</div>
+      </div></div>
+    </div>
+
+    <!-- Q9 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q9: How do you unit test a class that depends on a Singleton?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If a class calls <code>Singleton.Instance</code> directly, how do you swap it with a fake in tests?</div>
+        <div class="body-text">
+          <p class="mb-sm">Two approaches:</p>
+          <ol class="qa-list">
+            <li><strong>Extract an interface</strong> — make the Singleton implement <code>IMyService</code>, inject via constructor, mock in tests</li>
+            <li><strong>Use DI</strong> — register with <code>AddSingleton&lt;IMyService, MyService&gt;()</code> in production, inject a mock in test setup</li>
+          </ol>
+          <p class="mt-md">If you're stuck with a legacy Singleton that uses <code>.Instance</code> directly, you can use a <strong>seam</strong>: add a static <code>SetInstance()</code> method for tests only (guard it with <code>#if DEBUG</code> or <code>[InternalsVisibleTo]</code>).</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The fact that testing Singletons is hard is itself a design signal. If I see <code>Singleton.Instance</code> calls scattered across a codebase, my first refactoring step is wrapping it behind an interface and injecting it via DI."</div>
+      </div></div>
+    </div>
+
+    <!-- Q10 through Q29: I need to include all remaining Q&As. Due to size, I'll extract lines 3596-4361 from old file and convert inline code blocks -->
+    <!-- Q10 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q10: Why is <code>sealed</code> important on a Singleton class?</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens if someone inherits from your Singleton?</div>
+        <div class="body-text">
+          <p class="mb-sm"><code>sealed</code> prevents inheritance, which matters because:</p>
+          <ol class="qa-list">
+            <li>A subclass could call the protected constructor, creating a <strong>second instance</strong></li>
+            <li>The subclass could override methods, changing the Singleton's behavior unpredictably</li>
+            <li>It violates the pattern's intent — "exactly one instance" should mean exactly that</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In C#, <code>sealed</code> also enables JIT optimizations — the compiler can devirtualize method calls on sealed types, making them faster."</div>
+      </div></div>
+    </div>
+
+    <!-- Q11 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q11: How does Singleton interact with Dependency Injection?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you have Singleton behavior without the Singleton pattern?</div>
+        <div class="body-text">
+          <p class="mb-sm">DI containers provide Singleton lifetime management without the pattern:</p>
+          <ol class="qa-list">
+            <li>The class itself is a <strong>regular class</strong> — no private constructor, no static field</li>
+            <li>The <strong>container</strong> guarantees single-instance by holding a reference and reusing it</li>
+            <li>Consumers get the same instance via <strong>constructor injection</strong> — no <code>.Instance</code> calls</li>
+            <li>Testability is built in — swap the registration in test configuration</li>
+          </ol>
+        </div>
+
+        <!-- SVG: Classic vs DI Singleton -->
+        <svg viewBox="0 0 720 240" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Comparison showing classic Singleton with static Instance vs DI-managed Singleton with container injection">
+          <rect width="720" height="240" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Classic Singleton vs DI-Managed Singleton</text>
+          <rect x="20" y="40" width="320" height="185" rx="8" fill="#292524" stroke="#78716c" stroke-width="1.5"/>
+          <text x="180" y="60" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Classic Pattern</text>
+          <rect x="40" y="72" width="130" height="34" rx="4" fill="#7f1d1d"/>
+          <text x="105" y="85" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">OrderService</text>
+          <text x="105" y="98" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">Logger.Instance.Log()</text>
+          <rect x="40" y="115" width="130" height="34" rx="4" fill="#7f1d1d"/>
+          <text x="105" y="128" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">UserService</text>
+          <text x="105" y="141" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="8">Logger.Instance.Log()</text>
+          <line x1="170" y1="89" x2="200" y2="89" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="170" y1="132" x2="200" y2="132" stroke="#ef4444" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <rect x="205" y="80" width="120" height="70" rx="6" fill="#450a0a"/>
+          <text x="265" y="100" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Logger</text>
+          <text x="265" y="115" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">static Instance</text>
+          <text x="265" y="130" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="9">private ctor</text>
+          <text x="265" y="143" text-anchor="middle" fill="#ef4444" font-family="system-ui, -apple-system, sans-serif" font-size="8">hardcoded coupling</text>
+          <text x="180" y="180" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Hidden dependency. Can't mock.</text>
+          <text x="180" y="195" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Class knows it's a Singleton.</text>
+          <rect x="380" y="40" width="320" height="185" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="540" y="60" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">DI-Managed</text>
+          <rect x="400" y="72" width="130" height="34" rx="4" fill="#052e16"/>
+          <text x="465" y="85" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">OrderService</text>
+          <text x="465" y="98" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">ctor(ILogger logger)</text>
+          <rect x="400" y="115" width="130" height="34" rx="4" fill="#052e16"/>
+          <text x="465" y="128" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">UserService</text>
+          <text x="465" y="141" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="8">ctor(ILogger logger)</text>
+          <line x1="530" y1="89" x2="560" y2="89" stroke="#22c55e" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="530" y1="132" x2="560" y2="132" stroke="#22c55e" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <rect x="565" y="80" width="120" height="70" rx="6" fill="#14532d"/>
+          <text x="625" y="100" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">FileLogger</text>
+          <text x="625" y="115" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">: ILogger</text>
+          <text x="625" y="130" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="9">normal ctor</text>
+          <text x="625" y="143" text-anchor="middle" fill="#22c55e" font-family="system-ui, -apple-system, sans-serif" font-size="8">container manages</text>
+          <text x="540" y="180" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Explicit dependency. Testable.</text>
+          <text x="540" y="195" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Class doesn't know it's a Singleton.</text>
+        </svg>
+
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "DI Singleton separates two concerns the classic pattern conflates: the 'single instance' policy and the class's own logic. The container handles the policy; the class focuses on its job. That's SRP in action."</div>
+      </div></div>
+    </div>
+
+    <!-- Q12 through Q29 are large — appending from old file with macos-window converted to sg-code -->
+  </div>

@@ -1,0 +1,581 @@
+
+  <!-- ========== 13. PITFALLS & ANTI-PATTERNS ========== -->
+
+  <div class="section" id="pitfalls">
+    <div class="section-header">
+      <div class="section-icon yellow"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div>
+        <div class="section-num">Section 13</div>
+        <h2 class="section-title">Pitfalls &amp; Anti-Patterns</h2>
+      </div>
+    </div>
+
+    <!-- Pitfall 1 -->
+    <sg-collapse title="1. Using Singleton as a global variable dump">
+      <p class="body-text"><strong>Mistake:</strong> Stuffing unrelated state into a singleton: user session, app config, feature flags, cache — all in one class.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> You might think "well, I only need one of these, so let me put everything in one place." It feels convenient — one class to hold all your app-wide stuff. This is especially tempting early in a project when you're moving fast and don't want to create multiple classes. The thought process goes: "It's a Singleton, it lives forever, it's accessible everywhere — perfect place to dump all my global state!"</p>
+      <p class="body-text">But this creates a "<span class="tooltip-trigger">god object<span class="tooltip-content">A class that knows too much or does too much — violates Single Responsibility by accumulating unrelated responsibilities.</span></span>" — a class that knows too much and does too much. Every part of your application depends on it. When you change the caching logic, you risk breaking the config logic. When you test the feature flags, you're dragging along the session state. It's like putting your wallet, keys, groceries, and pet hamster all in one bag — technically it works, but good luck finding your keys when you need them.</p>
+
+      <sg-code file="GodSingleton.cs">// &#x274C; One Singleton to rule them all — god object
+public sealed class AppState
+{
+    private static readonly Lazy&lt;AppState&gt; _instance = new();
+    public static AppState Instance =&gt; _instance.Value;
+
+    // Unrelated responsibilities crammed into one class
+    public IConfiguration Config { get; set; }
+    public Dictionary&lt;string, bool&gt; FeatureFlags { get; set; }
+    public IMemoryCache Cache { get; set; }
+    public UserSession CurrentSession { get; set; }
+    public string ConnectionString { get; set; }
+}</sg-code>
+
+      <sg-code file="SeparateServices.cs">// &#x2705; Separate Singleton per responsibility
+builder.Services.AddSingleton&lt;IConfiguration&gt;(config);
+builder.Services.AddSingleton&lt;IFeatureFlagService, LaunchDarklyService&gt;();
+builder.Services.AddSingleton&lt;IMemoryCache, MemoryCache&gt;();
+builder.Services.AddScoped&lt;IUserSession, HttpUserSession&gt;();
+// Each service has ONE job. Testable. Swappable. Independent.</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Create separate singletons per responsibility. Register each via DI. Each class should do one thing — that's the Single Responsibility Principle in action.</p>
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="One god singleton with 5 responsibilities vs separate focused singletons">
+        <rect x="0" y="0" width="700" height="150" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="155" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">God Singleton</text>
+        <rect x="30" y="28" width="250" height="112" rx="6" fill="#ef4444" opacity="0.1" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="155" y="48" fill="var(--text-primary, #e2e8f0)" font-size="11" font-weight="bold" text-anchor="middle">AppState.Instance</text>
+        <text x="155" y="68" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle" opacity="0.7">Config + FeatureFlags</text>
+        <text x="155" y="84" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle" opacity="0.7">Cache + Session</text>
+        <text x="155" y="100" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle" opacity="0.7">ConnectionString</text>
+        <text x="155" y="130" fill="#ef4444" font-size="9" text-anchor="middle">Change cache &#8594; risk breaking config</text>
+        <text x="340" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="530" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Separate Services</text>
+        <rect x="395" y="30" width="115" height="26" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="453" y="47" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">IConfiguration</text>
+        <rect x="520" y="30" width="115" height="26" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="578" y="47" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">IFeatureFlagService</text>
+        <rect x="395" y="64" width="115" height="26" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="453" y="81" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">IMemoryCache</text>
+        <rect x="520" y="64" width="115" height="26" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="578" y="81" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">IUserSession</text>
+        <text x="530" y="118" fill="#22c55e" font-size="10" text-anchor="middle">Each: 1 job, testable, swappable</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 2 -->
+    <sg-collapse title="2. Singleton holding mutable state across HTTP requests">
+      <p class="body-text"><strong>Mistake:</strong> Storing per-request data (current user, tenant ID) in a singleton.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> You might think "I need to know who the current user is from anywhere in my code, so I'll just set it on the Singleton at the start of each request." This feels natural if you're coming from desktop or mobile development, where there's only one user at a time. In a web server, though, dozens or hundreds of requests are being processed simultaneously, and they all share the same Singleton instance.</p>
+      <p class="body-text">The result is a security nightmare: User A's data leaks into User B's response. Imagine a multi-tenant SaaS app where one company sees another company's data because the tenant ID was stored on a Singleton and got overwritten between requests. This isn't just a bug — it's a data breach.</p>
+
+      <sg-code file="MutableStateBad.cs">// &#x274C; Per-request data stored on a Singleton — data leak!
+public sealed class RequestContext
+{
+    private static readonly Lazy&lt;RequestContext&gt; _i = new();
+    public static RequestContext Instance =&gt; _i.Value;
+
+    public int CurrentUserId { get; set; }    // &#x274C; Shared across ALL threads
+    public string TenantId { get; set; }       // &#x274C; User A's tenant leaks to User B
+}</sg-code>
+
+      <sg-code file="MutableStateGood.cs">// &#x2705; Per-request data belongs on a Scoped service
+public class RequestContext
+{
+    public int CurrentUserId { get; set; }
+    public string TenantId { get; set; }
+}
+
+// Registration — Scoped = one instance per HTTP request, isolated
+builder.Services.AddScoped&lt;RequestContext&gt;();
+// Each request gets its own RequestContext. No leaking between users.</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Use <code>AddScoped</code> for per-request state. Singletons should only hold immutable or thread-safe data — like configuration, caches with proper eviction, or stateless logic.</p>
+      <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Singleton shared across requests causes data leaks between users">
+        <rect x="0" y="0" width="700" height="160" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="175" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Singleton (shared across threads)</text>
+        <rect x="55" y="55" width="240" height="36" rx="6" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="175" y="78" fill="var(--text-primary, #e2e8f0)" font-size="11" text-anchor="middle">RequestContext.Instance</text>
+        <rect x="30" y="28" width="80" height="22" rx="4" fill="var(--accent-primary)" opacity="0.18"/>
+        <text x="70" y="43" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">User A</text>
+        <line x1="110" y1="39" x2="135" y2="60" stroke="#ef4444" stroke-width="1.2"/>
+        <rect x="200" y="28" width="80" height="22" rx="4" fill="var(--accent-primary)" opacity="0.18"/>
+        <text x="240" y="43" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">User B</text>
+        <line x1="230" y1="50" x2="215" y2="60" stroke="#ef4444" stroke-width="1.2"/>
+        <text x="175" y="110" fill="#ef4444" font-size="10" text-anchor="middle">User A sets TenantId = "acme"</text>
+        <text x="175" y="128" fill="#ef4444" font-size="10" text-anchor="middle">User B overwrites it = "globex"</text>
+        <text x="175" y="150" fill="#ef4444" font-size="9" text-anchor="middle" font-weight="bold">User A sees Globex data = DATA BREACH</text>
+        <text x="355" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="540" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Scoped (per-request)</text>
+        <rect x="415" y="36" width="100" height="50" rx="5" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+        <text x="465" y="55" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">User A</text>
+        <text x="465" y="72" fill="var(--text-primary, #e2e8f0)" font-size="8" text-anchor="middle" opacity="0.6">own RequestContext</text>
+        <rect x="540" y="36" width="100" height="50" rx="5" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+        <text x="590" y="55" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">User B</text>
+        <text x="590" y="72" fill="var(--text-primary, #e2e8f0)" font-size="8" text-anchor="middle" opacity="0.6">own RequestContext</text>
+        <text x="540" y="115" fill="#22c55e" font-size="10" text-anchor="middle">Isolated per request</text>
+        <text x="540" y="135" fill="#22c55e" font-size="9" text-anchor="middle">No data leaking between users</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 3 -->
+    <sg-collapse title="3. Directly calling Singleton.Instance instead of using DI">
+      <p class="body-text"><strong>Mistake:</strong> Sprinkling <code>Logger.Instance.Log(...)</code> throughout your codebase instead of injecting <code>ILogger</code>.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> It's incredibly convenient. <code>Logger.Instance.Log("something")</code> works from anywhere — no constructor parameters, no DI setup, no interfaces. You might think "why bother with all that ceremony when I can just call <code>.Instance</code>?" This shortcut feels productive at first, but it's creating invisible wires throughout your codebase.</p>
+      <p class="body-text">The problem is that when you read a class's constructor, you should be able to see everything it depends on. With <code>Logger.Instance</code>, the dependency is hidden inside the method body. Unit tests can't swap it for a fake because there's no injection point — the class is hardwired to the concrete Singleton. When you later want to change the logger implementation, you have to find and update every single call site.</p>
+
+      <sg-code file="DirectAccess.cs">// &#x274C; Hidden dependency — can't see it from the constructor
+public class OrderService
+{
+    public void PlaceOrder(Order order)
+    {
+        // Where does this come from? No constructor, no injection.
+        // How do you test this without writing to a real log file?
+        Logger.Instance.Log($"Order {order.Id} placed");
+        // Hardcoded to Logger class — can't swap for a fake in tests
+    }
+}</sg-code>
+
+      <sg-code file="DIInjection.cs">// &#x2705; Explicit dependency — visible, testable, swappable
+public class OrderService
+{
+    private readonly ILogger _logger;
+    public OrderService(ILogger logger) =&gt; _logger = logger;
+
+    public void PlaceOrder(Order order)
+    {
+        _logger.Log($"Order {order.Id} placed");
+        // In production: FileLogger (Singleton via DI)
+        // In tests: FakeLogger that captures messages
+    }
+}
+
+// Registration — same single instance, no .Instance calls needed
+builder.Services.AddSingleton&lt;ILogger, FileLogger&gt;();</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Register via <code>services.AddSingleton&lt;ILogger, FileLogger&gt;()</code> and inject through constructors. Same single instance, zero coupling. Your constructor becomes a menu of what the class needs.</p>
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Hidden dependency via .Instance call vs explicit constructor injection">
+        <rect x="0" y="0" width="700" height="150" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="165" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Hidden Dependency</text>
+        <rect x="55" y="30" width="220" height="40" rx="6" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="165" y="48" fill="var(--text-primary, #e2e8f0)" font-size="11" font-weight="bold" text-anchor="middle">OrderService()</text>
+        <text x="165" y="62" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.5">no constructor params</text>
+        <line x1="165" y1="70" x2="165" y2="95" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="230" y="88" fill="#ef4444" font-size="9" text-anchor="start">buried inside method</text>
+        <rect x="85" y="96" width="160" height="28" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="165" y="114" fill="#ef4444" font-size="10" text-anchor="middle">Logger.Instance.Log()</text>
+        <text x="165" y="142" fill="#ef4444" font-size="9" text-anchor="middle">Can't swap for test fake</text>
+        <text x="340" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="540" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Explicit Injection</text>
+        <rect x="430" y="30" width="220" height="40" rx="6" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="540" y="48" fill="var(--text-primary, #e2e8f0)" font-size="11" font-weight="bold" text-anchor="middle">OrderService(ILogger logger)</text>
+        <text x="540" y="62" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.5">dependency is visible</text>
+        <line x1="540" y1="70" x2="540" y2="95" stroke="#22c55e" stroke-width="1.5"/>
+        <polygon points="535,93 540,101 545,93" fill="#22c55e"/>
+        <rect x="460" y="102" width="160" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="540" y="120" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">_logger.Log()</text>
+        <text x="540" y="142" fill="#22c55e" font-size="9" text-anchor="middle">Testable: inject FakeLogger</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 4 -->
+    <sg-collapse title="4. Not sealing the Singleton class">
+      <p class="body-text"><strong>Mistake:</strong> Forgetting the <code>sealed</code> keyword on the singleton class.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> Honestly, most developers just forget. The <code>sealed</code> keyword isn't required for the code to compile and work. But without it, you've left a door open. Another developer on your team might think "I need a special version of this Singleton" and try to inherit from it. To make inheritance work, they'd change the constructor from <code>private</code> to <code>protected</code> — and suddenly the whole "only one instance" guarantee is broken because the subclass can create its own instances.</p>
+
+      <sg-code file="UnsealedSingleton.cs">// &#x274C; Not sealed — someone can subclass and break the pattern
+public class Logger  // Missing: sealed
+{
+    private static readonly Lazy&lt;Logger&gt; _instance = new();
+    public static Logger Instance =&gt; _instance.Value;
+    private Logger() { }
+}
+
+// Later, a developer "extends" it:
+public class SpecialLogger : Logger  // Constructor must be protected for this
+{
+    // Now there's Logger.Instance AND new SpecialLogger() = 2 instances!
+}</sg-code>
+
+      <sg-code file="SealedSingleton.cs">// &#x2705; Sealed — cannot be subclassed, intent is clear
+public sealed class Logger
+{
+    private static readonly Lazy&lt;Logger&gt; _instance = new();
+    public static Logger Instance =&gt; _instance.Value;
+    private Logger() { }  // private stays private — no subclass can change this
+}
+// Bonus: sealed enables JIT devirtualization — method calls are slightly faster</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Always mark singleton classes as <code>sealed</code>. This prevents inheritance and signals intent clearly. As a bonus, the JIT compiler can optimize method calls on sealed types (devirtualization).</p>
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Unsealed singleton allows subclassing which breaks single-instance guarantee">
+        <rect x="0" y="0" width="700" height="150" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="165" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Not Sealed</text>
+        <rect x="65" y="28" width="200" height="34" rx="6" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="165" y="50" fill="var(--text-primary, #e2e8f0)" font-size="11" text-anchor="middle">public class Logger</text>
+        <line x1="165" y1="62" x2="90" y2="82" stroke="#ef4444" stroke-width="1.2"/>
+        <line x1="165" y1="62" x2="240" y2="82" stroke="#ef4444" stroke-width="1.2"/>
+        <rect x="30" y="82" width="120" height="28" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+        <text x="90" y="100" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">Logger.Instance</text>
+        <rect x="180" y="82" width="120" height="28" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+        <text x="240" y="100" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">new SpecialLogger()</text>
+        <text x="165" y="132" fill="#ef4444" font-size="10" text-anchor="middle" font-weight="bold">2 instances = pattern broken!</text>
+        <text x="350" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="540" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Sealed</text>
+        <rect x="430" y="28" width="220" height="34" rx="6" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="540" y="50" fill="var(--text-primary, #e2e8f0)" font-size="11" text-anchor="middle">public sealed class Logger</text>
+        <rect x="470" y="78" width="140" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="540" y="96" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">Logger.Instance</text>
+        <line x1="540" y1="62" x2="540" y2="78" stroke="#22c55e" stroke-width="1.5"/>
+        <polygon points="535,76 540,84 545,76" fill="#22c55e"/>
+        <text x="540" y="126" fill="#22c55e" font-size="10" text-anchor="middle">Cannot subclass. 1 instance guaranteed.</text>
+        <text x="540" y="142" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.5">+ JIT devirtualization bonus</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 5 -->
+    <sg-collapse title="5. Singleton with expensive constructor blocking startup">
+      <p class="body-text"><strong>Mistake:</strong> Doing heavy work (loading large files, network calls, database migrations) inside the singleton constructor, and using eager initialization.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> The constructor feels like the natural place to set things up. You think "the Singleton needs a warmed cache and a database connection, so let me load everything in the constructor." This works fine when the loading takes 50ms. But what about when it takes 30 seconds? The DI container creates all Singletons before the app starts accepting requests. If your constructor blocks, the entire startup stalls.</p>
+      <p class="body-text">Kubernetes health checks have a timeout. If your app doesn't respond within that window, Kubernetes kills the pod and starts a new one — which also stalls on the same constructor, gets killed, and the cycle repeats forever. In serverless environments (AWS Lambda, Azure Functions), this directly adds to your cold-start latency and can push you past timeout limits.</p>
+
+      <sg-code file="SlowConstructor.cs">// &#x274C; Heavy work in constructor blocks app startup
+public sealed class CacheManager
+{
+    public CacheManager()
+    {
+        // &#x274C; This runs DURING startup — blocks everything
+        var data = File.ReadAllBytes("catalog.dat");  // 500 MB file!
+        Thread.Sleep(5000); // Simulating slow network call
+        _cache = DeserializeAndBuild(data);  // Takes 30 seconds
+    }
+}</sg-code>
+
+      <sg-code file="DeferredInit.cs">// &#x2705; Lightweight constructor + async warmup via IHostedService
+public sealed class CacheManager
+{
+    public CacheManager() { }  // Instant — no heavy work
+
+    public async Task InitializeAsync(CancellationToken ct)
+    {
+        var data = await File.ReadAllBytesAsync("catalog.dat", ct);
+        _cache = DeserializeAndBuild(data);
+    }
+}
+
+// Warmup runs during startup pipeline (not in constructor)
+public class CacheWarmup(CacheManager cache) : IHostedService
+{
+    public Task StartAsync(CancellationToken ct) =&gt; cache.InitializeAsync(ct);
+    public Task StopAsync(CancellationToken ct) =&gt; Task.CompletedTask;
+}</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Keep constructors lightweight. Move heavy setup to an <code>async InitializeAsync()</code> method triggered by <code>IHostedService</code> during the startup pipeline. Or use <code>Lazy&lt;T&gt;</code> so initialization happens on first use rather than at app start.</p>
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Heavy constructor blocks app startup vs lightweight constructor with deferred init">
+        <rect x="0" y="0" width="700" height="150" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="165" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Heavy Constructor</text>
+        <rect x="30" y="30" width="60" height="24" rx="4" fill="var(--accent-primary)" opacity="0.18"/>
+        <text x="60" y="46" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">App Start</text>
+        <line x1="90" y1="42" x2="110" y2="42" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+        <polygon points="108,38 116,42 108,46" fill="var(--text-primary, #e2e8f0)"/>
+        <rect x="117" y="30" width="170" height="24" rx="4" fill="#ef4444" opacity="0.2" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="202" y="46" fill="#ef4444" font-size="9" text-anchor="middle">Constructor: 30s blocking</text>
+        <text x="165" y="75" fill="#ef4444" font-size="10" text-anchor="middle">K8s health check &#8594; timeout</text>
+        <text x="165" y="95" fill="#ef4444" font-size="10" text-anchor="middle">Pod killed &#8594; restarts &#8594; killed again</text>
+        <rect x="55" y="108" width="220" height="28" rx="6" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="165" y="126" fill="#ef4444" font-size="10" text-anchor="middle" font-weight="bold">Infinite restart loop</text>
+        <text x="350" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="540" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Lightweight + IHostedService</text>
+        <rect x="400" y="30" width="70" height="24" rx="4" fill="var(--accent-primary)" opacity="0.18"/>
+        <text x="435" y="46" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">App Start</text>
+        <line x1="470" y1="42" x2="490" y2="42" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+        <polygon points="488,38 496,42 488,46" fill="var(--text-primary, #e2e8f0)"/>
+        <rect x="497" y="30" width="80" height="24" rx="4" fill="#22c55e" opacity="0.15" stroke="#22c55e" stroke-width="1"/>
+        <text x="537" y="46" fill="#22c55e" font-size="9" text-anchor="middle">Instant ctor</text>
+        <line x1="577" y1="42" x2="597" y2="42" stroke="var(--text-primary, #e2e8f0)" stroke-width="1"/>
+        <polygon points="595,38 603,42 595,46" fill="var(--text-primary, #e2e8f0)"/>
+        <rect x="604" y="30" width="80" height="24" rx="4" fill="#22c55e" opacity="0.15"/>
+        <text x="644" y="46" fill="#22c55e" font-size="9" text-anchor="middle">Ready!</text>
+        <rect x="430" y="68" width="190" height="28" rx="5" fill="var(--accent-primary)" opacity="0.12" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="525" y="86" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">IHostedService: InitializeAsync()</text>
+        <text x="540" y="115" fill="#22c55e" font-size="10" text-anchor="middle">Heavy work runs in background</text>
+        <text x="540" y="135" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.6">App is responsive immediately</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 6 -->
+    <sg-collapse title="6. Forgetting to implement IDisposable for resource cleanup">
+      <p class="body-text"><strong>Mistake:</strong> A singleton holds file handles, database connections, or unmanaged resources but never implements <code>IDisposable</code>.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> You might think "Singletons live forever, so cleanup doesn't matter — it'll all get cleaned up when the process exits." That's partially true for simple cases, but in long-running services (web servers, background workers), resources that aren't explicitly cleaned up can accumulate. File handles have OS-level limits. Database connections have pool limits. If your Singleton opens a file on startup and the app restarts 100 times during a deployment, that's 100 unclosed file handles. Eventually the OS says "no more."</p>
+
+      <sg-code file="NoDispose.cs">// &#x274C; Holds resources but no cleanup mechanism
+public sealed class AuditLogger
+{
+    private readonly StreamWriter _file;
+    public AuditLogger()
+    {
+        _file = new StreamWriter("audit.log", append: true);
+    }
+    // Where does _file get closed? Nowhere. Resource leak.
+}</sg-code>
+
+      <sg-code file="WithDispose.cs">// &#x2705; Implements IDisposable — DI container calls Dispose on shutdown
+public sealed class AuditLogger : IDisposable
+{
+    private readonly StreamWriter _file;
+    public AuditLogger()
+    {
+        _file = new StreamWriter("audit.log", append: true);
+    }
+
+    public void Dispose()
+    {
+        _file.Flush();
+        _file.Dispose(); // Clean shutdown — file handle released
+    }
+}
+
+// When registered via AddSingleton, the DI container auto-disposes on shutdown
+builder.Services.AddSingleton&lt;AuditLogger&gt;();</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Implement <code>IDisposable</code> (or <code>IAsyncDisposable</code> for async cleanup). When registered via DI (<code>AddSingleton</code>), the container calls <code>Dispose</code> automatically on shutdown. For manual singletons, hook into <code>IHostApplicationLifetime.ApplicationStopping</code>.</p>
+      <svg viewBox="0 0 700 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Singleton without IDisposable leaks file handles vs proper cleanup on shutdown">
+        <rect x="0" y="0" width="700" height="140" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="165" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">No IDisposable</text>
+        <rect x="45" y="28" width="240" height="34" rx="6" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="165" y="50" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">AuditLogger + StreamWriter</text>
+        <text x="165" y="78" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle" opacity="0.7">App restarts 100 times...</text>
+        <rect x="30" y="90" width="55" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="90" y="90" width="55" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="150" y="90" width="55" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="210" y="90" width="55" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="270" y="90" width="35" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <text x="165" y="103" fill="#ef4444" font-size="7" text-anchor="middle">100 unclosed file handles</text>
+        <text x="165" y="130" fill="#ef4444" font-size="10" text-anchor="middle" font-weight="bold">OS limit reached &#8594; crash</text>
+        <text x="350" y="72" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="540" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">IDisposable</text>
+        <rect x="420" y="28" width="240" height="34" rx="6" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="540" y="50" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">AuditLogger : IDisposable</text>
+        <line x1="540" y1="62" x2="540" y2="80" stroke="#22c55e" stroke-width="1.5"/>
+        <polygon points="535,78 540,86 545,78" fill="#22c55e"/>
+        <rect x="450" y="86" width="180" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="540" y="104" fill="#22c55e" font-size="10" text-anchor="middle">Dispose() &#8594; Flush + Close</text>
+        <text x="540" y="130" fill="#22c55e" font-size="9" text-anchor="middle">DI container auto-calls on shutdown</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 7 -->
+    <sg-collapse title="7. Using Singleton in multi-tenant applications without isolation">
+      <p class="body-text"><strong>Mistake:</strong> One singleton <code>CacheManager</code> for all tenants. Tenant A caches product data, Tenant B sees Tenant A's prices.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> Multi-tenancy is often added later in a product's life. The original code was built for a single tenant and worked fine. When multi-tenant support was added, the Singleton cache was left untouched. The developer thought "caching is caching, it doesn't matter who the data belongs to." But in a multi-tenant SaaS app, Tenant A's product catalog with premium prices should never be visible to Tenant B who has different pricing. A shared Singleton cache without tenant isolation is a data breach waiting to happen.</p>
+
+      <sg-code file="MultiTenantBad.cs">// &#x274C; Shared cache without tenant isolation
+public sealed class CacheManager
+{
+    private readonly ConcurrentDictionary&lt;string, object&gt; _cache = new();
+    public void Set(string key, object val) =&gt; _cache[key] = val;
+    public object? Get(string key) =&gt; _cache.GetValueOrDefault(key);
+}
+// Tenant A: cache.Set("products", tenantAProducts)
+// Tenant B: cache.Get("products") &#8594; gets Tenant A's data!</sg-code>
+
+      <sg-code file="MultiTenantGood.cs">// &#x2705; Tenant-isolated cache — keyed by tenant ID
+public sealed class CacheManager
+{
+    private readonly ConcurrentDictionary&lt;string, ConcurrentDictionary&lt;string, object&gt;&gt;
+        _tenantCaches = new();
+
+    public void Set(string tenantId, string key, object val)
+    {
+        var cache = _tenantCaches.GetOrAdd(tenantId, _ =&gt; new());
+        cache[key] = val;
+    }
+
+    public object? Get(string tenantId, string key)
+    {
+        return _tenantCaches.TryGetValue(tenantId, out var cache)
+            ? cache.GetValueOrDefault(key) : null;
+    }
+}
+// Tenant A's data is completely isolated from Tenant B.</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Use a <code>ConcurrentDictionary&lt;string, TenantCache&gt;</code> keyed by tenant ID. Or use .NET 8 keyed services: <code>services.AddKeyedSingleton&lt;ICache&gt;(tenantId, ...)</code>. The key rule: every piece of data in a multi-tenant Singleton must include tenant context.</p>
+      <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Shared cache without tenant isolation vs tenant-keyed isolated cache">
+        <rect x="0" y="0" width="700" height="160" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="165" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Shared Cache</text>
+        <rect x="80" y="28" width="170" height="30" rx="5" fill="var(--accent-primary)" opacity="0.15" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="165" y="48" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">CacheManager (one for all)</text>
+        <rect x="30" y="70" width="120" height="24" rx="4" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+        <text x="90" y="86" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">Tenant A: "products"</text>
+        <rect x="180" y="70" width="120" height="24" rx="4" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+        <text x="240" y="86" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">Tenant B: "products"</text>
+        <line x1="90" y1="58" x2="90" y2="70" stroke="#ef4444" stroke-width="1"/>
+        <line x1="240" y1="58" x2="240" y2="70" stroke="#ef4444" stroke-width="1"/>
+        <text x="165" y="112" fill="#ef4444" font-size="10" text-anchor="middle">Same key = same data</text>
+        <text x="165" y="130" fill="#ef4444" font-size="9" text-anchor="middle">Tenant B sees Tenant A's prices!</text>
+        <text x="165" y="150" fill="#ef4444" font-size="9" text-anchor="middle" font-weight="bold">Cross-tenant data breach</text>
+        <text x="355" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="545" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Tenant-Isolated Cache</text>
+        <rect x="415" y="28" width="260" height="30" rx="5" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="545" y="48" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">CacheManager (keyed by tenantId)</text>
+        <rect x="415" y="68" width="120" height="40" rx="5" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+        <text x="475" y="84" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">Tenant A cache</text>
+        <text x="475" y="100" fill="var(--text-primary, #e2e8f0)" font-size="8" text-anchor="middle" opacity="0.5">"products" &#8594; A's data</text>
+        <rect x="555" y="68" width="120" height="40" rx="5" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+        <text x="615" y="84" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">Tenant B cache</text>
+        <text x="615" y="100" fill="var(--text-primary, #e2e8f0)" font-size="8" text-anchor="middle" opacity="0.5">"products" &#8594; B's data</text>
+        <text x="545" y="132" fill="#22c55e" font-size="10" text-anchor="middle">Completely isolated</text>
+        <text x="545" y="150" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.6">No cross-tenant leaks</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 8 -->
+    <sg-collapse title="8. Circular dependency between singletons">
+      <p class="body-text"><strong>Mistake:</strong> Singleton A depends on Singleton B, and Singleton B depends on Singleton A — either directly or through a chain.</p>
+      <p class="body-text"><strong>Why This Happens:</strong> It usually starts innocently. You build <code>OrderService</code> and it needs <code>InventoryService</code> to check stock. Later, someone adds a feature to <code>InventoryService</code> that needs to look up order history — so they inject <code>OrderService</code>. Now you have a circle: OrderService needs InventoryService, and InventoryService needs OrderService. Neither can be created without the other already existing. The DI container detects this and throws at startup with a message like "A circular dependency was detected."</p>
+      <p class="body-text">With manual singletons (using <code>Lazy&lt;T&gt;</code> or static fields), the symptom is worse: a stack overflow during initialization, or a deadlock where both singletons wait for the other to finish constructing.</p>
+
+      <sg-code file="CircularDep.cs">// &#x274C; OrderService needs InventoryService, which needs OrderService
+public class OrderService
+{
+    public OrderService(InventoryService inv) { }  // needs Inventory
+}
+public class InventoryService
+{
+    public InventoryService(OrderService orders) { } // needs Order — circular!
+}
+// DI container: "I can't create OrderService without InventoryService,
+// but I can't create InventoryService without OrderService. CRASH."</sg-code>
+
+      <sg-code file="BreakCycle.cs">// &#x2705; Break the cycle with Lazy&lt;T&gt; injection
+public class InventoryService
+{
+    private readonly Lazy&lt;OrderService&gt; _orders;
+    public InventoryService(Lazy&lt;OrderService&gt; orders) =&gt; _orders = orders;
+    // OrderService is NOT resolved during construction — only on first use
+    // This breaks the circular initialization
+}
+
+// &#x2705; Better: Extract shared logic into a third service
+public class OrderHistoryQuery { /* reads order data */ }
+public class InventoryService
+{
+    public InventoryService(OrderHistoryQuery query) { }  // no circular dep
+}</sg-code>
+
+      <p class="body-text"><strong>Fix:</strong> Break the cycle with <code>Lazy&lt;T&gt;</code> injection, an intermediary interface, or the Mediator pattern. If two singletons both need each other, they probably belong in one class or need an event-based decoupling.</p>
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Circular dependency A needs B needs A vs breaking the cycle with a third service">
+        <rect x="0" y="0" width="700" height="150" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="155" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Circular Dependency</text>
+        <rect x="40" y="45" width="110" height="32" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="95" y="65" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">OrderService</text>
+        <rect x="180" y="45" width="110" height="32" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="235" y="65" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">InventoryService</text>
+        <line x1="150" y1="55" x2="180" y2="55" stroke="#ef4444" stroke-width="1.5"/>
+        <polygon points="178,51 186,55 178,59" fill="#ef4444"/>
+        <line x1="180" y1="70" x2="150" y2="70" stroke="#ef4444" stroke-width="1.5"/>
+        <polygon points="152,66 144,70 152,74" fill="#ef4444"/>
+        <text x="165" y="42" fill="#ef4444" font-size="18" text-anchor="middle">&#8635;</text>
+        <text x="165" y="105" fill="#ef4444" font-size="10" text-anchor="middle">A needs B, B needs A</text>
+        <text x="165" y="125" fill="#ef4444" font-size="10" text-anchor="middle" font-weight="bold">DI container: CRASH</text>
+        <text x="350" y="68" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="545" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Cycle Broken</text>
+        <rect x="420" y="35" width="105" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="473" y="53" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">OrderService</text>
+        <rect x="575" y="35" width="105" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="628" y="53" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">InventoryService</text>
+        <rect x="490" y="88" width="120" height="28" rx="5" fill="var(--accent-primary)" opacity="0.18" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="550" y="106" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">OrderHistoryQuery</text>
+        <line x1="473" y1="63" x2="520" y2="88" stroke="#22c55e" stroke-width="1"/>
+        <polygon points="518,84 524,90 515,90" fill="#22c55e"/>
+        <line x1="628" y1="63" x2="580" y2="88" stroke="#22c55e" stroke-width="1"/>
+        <polygon points="582,84 576,90 585,90" fill="#22c55e"/>
+        <text x="550" y="138" fill="#22c55e" font-size="10" text-anchor="middle">No cycle. Both depend on shared query.</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 9 -->
+    <sg-collapse title="9. Generic Singleton&lt;T&gt; base class anti-pattern">
+      <p class="body-text"><strong>Mistake:</strong> Creating a "reusable" base class like:</p>
+
+      <sg-code file="GenericSingleton.cs">// &#x274C; DO NOT DO THIS
+public abstract class Singleton&lt;T&gt; where T : class, new()
+{
+    private static readonly Lazy&lt;T&gt; _instance = new();
+    public static T Instance =&gt; _instance.Value;
+}
+
+public class Logger : Singleton&lt;Logger&gt; { } // Looks clean, right?</sg-code>
+
+      <p class="body-text"><strong>Why Bad:</strong> The <code>new()</code> constraint forces a <strong>public parameterless constructor</strong> — completely defeating the pattern's core guarantee. Anyone can write <code>new Logger()</code>. It also couples every consumer to a concrete base class, making DI migration painful. And it pollutes the inheritance hierarchy (what if <code>Logger</code> needs to extend something else?).</p>
+      <p class="body-text"><strong>Fix:</strong> Either use <code>Lazy&lt;T&gt;</code> directly in each class with a private constructor, or (better) use <code>AddSingleton&lt;T&gt;()</code> via DI. There's no value in a generic base class when the DI container already manages singleton lifetime.</p>
+      <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Generic Singleton base class requires public constructor which defeats the pattern">
+        <rect x="0" y="0" width="700" height="150" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="165" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Generic Base Class</text>
+        <rect x="35" y="28" width="260" height="34" rx="6" fill="#ef4444" opacity="0.1" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="165" y="50" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">Singleton&lt;T&gt; where T : new()</text>
+        <line x1="165" y1="62" x2="165" y2="78" stroke="#ef4444" stroke-width="1"/>
+        <rect x="65" y="78" width="200" height="28" rx="5" fill="#ef4444" opacity="0.15" stroke="#ef4444" stroke-width="1"/>
+        <text x="165" y="96" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">Logger : Singleton&lt;Logger&gt;</text>
+        <text x="165" y="122" fill="#ef4444" font-size="10" text-anchor="middle">new() = public constructor required</text>
+        <text x="165" y="140" fill="#ef4444" font-size="9" text-anchor="middle" font-weight="bold">Anyone can call new Logger() = broken!</text>
+        <text x="350" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="545" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Just Use DI</text>
+        <rect x="435" y="38" width="220" height="34" rx="6" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="545" y="52" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">AddSingleton&lt;ILogger, FileLogger&gt;()</text>
+        <text x="545" y="64" fill="var(--text-primary, #e2e8f0)" font-size="8" text-anchor="middle" opacity="0.5">private constructor stays private</text>
+        <rect x="470" y="90" width="150" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="545" y="108" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">No base class needed</text>
+        <text x="545" y="135" fill="#22c55e" font-size="10" text-anchor="middle">DI manages lifetime. Pattern intact.</text>
+      </svg>
+    </sg-collapse>
+
+    <!-- Pitfall 10 -->
+    <sg-collapse title="10. Event handler memory leaks in Singleton publishers">
+      <p class="body-text"><strong>Mistake:</strong> Singleton exposes a C# <code>event</code> and short-lived objects subscribe without unsubscribing:</p>
+
+      <sg-code file="EventLeak.cs">// Singleton lives forever — holds strong references to all subscribers
+public class EventBus
+{
+    public event Action&lt;OrderPlaced&gt;? OrderPlaced;
+}
+
+// Scoped handler subscribes but never unsubscribes
+public class OrderHandler : IDisposable
+{
+    public OrderHandler(EventBus bus) =&gt; bus.OrderPlaced += Handle;
+    private void Handle(OrderPlaced e) { /* ... */ }
+    // &#x274C; Dispose never removes the handler
+    public void Dispose() { }
+}</sg-code>
+
+      <p class="body-text"><strong>Why Bad:</strong> The Singleton lives for the entire app lifetime. Every request creates a new <code>OrderHandler</code> that subscribes to the event. The Singleton's event delegate chain keeps a strong reference to every handler, preventing GC. After 10K requests &#8594; 10K leaked handlers in memory.</p>
+      <p class="body-text"><strong>Fix:</strong> Always unsubscribe in <code>Dispose()</code>, or use <span class="tooltip-trigger"><code>WeakReference</code><span class="tooltip-content">A .NET class that holds a reference to an object without preventing its garbage collection.</span></span>-based event patterns. Better yet, use <code>IObservable&lt;T&gt;</code> with <code>System.Reactive</code> (subscriptions return <code>IDisposable</code>) or MediatR notifications (no direct coupling).</p>
+      <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:0.75rem auto;display:block;" role="img" aria-label="Singleton event holds strong references to short-lived subscribers causing memory leak">
+        <rect x="0" y="0" width="700" height="160" rx="10" fill="var(--bg-secondary, #1e293b)"/>
+        <text x="175" y="18" fill="#ef4444" font-size="12" font-weight="bold" text-anchor="middle">Event Leak</text>
+        <rect x="65" y="28" width="220" height="30" rx="5" fill="var(--accent-primary)" opacity="0.18" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="175" y="48" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">EventBus (Singleton, lives forever)</text>
+        <line x1="100" y1="58" x2="100" y2="75" stroke="#ef4444" stroke-width="1"/>
+        <line x1="140" y1="58" x2="140" y2="75" stroke="#ef4444" stroke-width="1"/>
+        <line x1="180" y1="58" x2="180" y2="75" stroke="#ef4444" stroke-width="1"/>
+        <line x1="220" y1="58" x2="220" y2="75" stroke="#ef4444" stroke-width="1"/>
+        <text x="260" y="72" fill="#ef4444" font-size="9">...</text>
+        <rect x="75" y="75" width="50" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="130" y="75" width="20" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="155" y="75" width="50" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <rect x="210" y="75" width="25" height="18" rx="3" fill="#ef4444" opacity="0.2"/>
+        <text x="175" y="87" fill="#ef4444" font-size="7" text-anchor="middle">10K leaked handlers</text>
+        <text x="175" y="112" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.7">Handlers subscribe but never unsubscribe</text>
+        <text x="175" y="130" fill="#ef4444" font-size="10" text-anchor="middle">GC can't collect them &#8594; memory grows</text>
+        <text x="175" y="150" fill="#ef4444" font-size="9" text-anchor="middle" font-weight="bold">OutOfMemoryException</text>
+        <text x="355" y="78" fill="var(--text-primary, #e2e8f0)" font-size="22" text-anchor="middle">&#8594;</text>
+        <text x="545" y="18" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Proper Cleanup</text>
+        <rect x="435" y="28" width="220" height="30" rx="5" fill="var(--accent-primary)" opacity="0.18" stroke="var(--accent-primary)" stroke-width="1"/>
+        <text x="545" y="48" fill="var(--text-primary, #e2e8f0)" font-size="10" text-anchor="middle">EventBus (Singleton)</text>
+        <line x1="545" y1="58" x2="545" y2="78" stroke="#22c55e" stroke-width="1.5"/>
+        <polygon points="540,76 545,84 550,76" fill="#22c55e"/>
+        <rect x="470" y="84" width="150" height="28" rx="5" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="1"/>
+        <text x="545" y="102" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle">OrderHandler : IDisposable</text>
+        <text x="545" y="128" fill="#22c55e" font-size="10" text-anchor="middle">Dispose() &#8594; -= Handle</text>
+        <text x="545" y="150" fill="var(--text-primary, #e2e8f0)" font-size="9" text-anchor="middle" opacity="0.6">Handler unsubscribes, GC can collect it</text>
+      </svg>
+    </sg-collapse>
+  </div>

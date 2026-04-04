@@ -28,6 +28,9 @@ All init functions in `reinit()` are wrapped in try-catch. If one component has 
 | 11 | Comparison Grid | `<sg-compare>` | Side-by-side comparison, also Pros/Cons |
 | 12 | When-to-Use | `<sg-when-use>` | Use when ✓ / Avoid when ✗ decision grid |
 | 13 | Related Cards | `<sg-related>` | Links to related topics with icons |
+| 50 | TL;DR Card | `<sg-tldr>` | Section summary box with auto "TL;DR" label |
+| 51 | Monologue | `<sg-monologue>` | Internal thought / reasoning block |
+| 52 | Code Smell | `<sg-smell>` | Code smell / anti-pattern indicator card |
 
 ### Usage Examples
 
@@ -282,4 +285,68 @@ Need visualization?
   ├─ Architecture → <sg-dep-graph>
   ├─ Latency → <sg-latency>
   └─ Timeline → check extra-components.md
+
+Need a summary/reasoning block?
+  ├─ Section TL;DR → <sg-tldr>
+  ├─ Thought process → <sg-monologue>
+  └─ Code smell → <sg-smell>
+```
+
+---
+
+## New Components (50-52)
+
+### sg-tldr — TL;DR Summary Card
+Auto-generates the floating "TL;DR" label. Just put content inside.
+
+```html
+<sg-tldr>
+  <p><strong>Strategy pattern</strong> lets you swap algorithms at runtime without touching the class that uses them.</p>
+  <p>Think of it as a plug-and-play system for behaviors.</p>
+</sg-tldr>
+```
+
+### sg-monologue — Internal Thought Block
+For showing reasoning, thought process, or "thinking out loud" moments. Optional `label` attribute.
+
+```html
+<sg-monologue label="Why not just use if-else?">
+  <p>You could — for 2-3 cases. But when you hit 10 payment methods, that if-else becomes a maintenance nightmare.
+  Every new method means touching the same function, risking breaking existing ones.</p>
+</sg-monologue>
+```
+
+### sg-smell — Code Smell Card
+For flagging anti-patterns or bad practices. `type` sets the color (purple, red, yellow, green, blue). Optional `icon`.
+
+```html
+<sg-smell type="red" title="God Class" icon="fa-skull-crossbones">
+  <p>When a single class handles validation, persistence, logging, and business logic — it knows too much.</p>
+</sg-smell>
+
+<sg-smell type="yellow" title="Feature Envy">
+  <p>A method that uses more data from another class than its own. Move it where it belongs.</p>
+</sg-smell>
+```
+
+### sg-cheat (enhanced) — Now accepts `<li>` children directly
+
+```html
+<!-- Old way (still works): -->
+<sg-cheat color="green" title="Do">Use interfaces<br/>Favor composition<br/>Keep it simple</sg-cheat>
+
+<!-- New way (cleaner): -->
+<sg-cheat color="green" title="Do">
+  <li>Use interfaces</li>
+  <li>Favor composition</li>
+  <li>Keep it simple</li>
+</sg-cheat>
+
+<!-- Also works with full <ul>: -->
+<sg-cheat color="red" title="Avoid">
+  <ul class="cheat-list">
+    <li>God classes</li>
+    <li>Deep inheritance</li>
+  </ul>
+</sg-cheat>
 ```

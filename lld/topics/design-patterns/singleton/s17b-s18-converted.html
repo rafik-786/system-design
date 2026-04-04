@@ -1,0 +1,854 @@
+
+    <!-- Q12 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q12: What happens if a Singleton's constructor throws an exception?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Does <code>Lazy&lt;T&gt;</code> retry? Does double-checked locking? What about static constructors?</div>
+        <div class="body-text">
+          <p class="mb-sm">Behavior varies by approach:</p>
+          <ol class="qa-list">
+            <li><code>Lazy&lt;T&gt;</code> (default mode) — enters <strong>faulted state</strong>. Every subsequent <code>.Value</code> call re-throws the same exception. No retry.</li>
+            <li><strong>Double-checked locking</strong> — <code>_instance</code> remains null, so next call will <strong>retry</strong> the constructor</li>
+            <li><strong>Static constructor</strong> — CLR marks the type as <strong>permanently broken</strong>. Any access throws <code>TypeInitializationException</code> forever</li>
+            <li><strong>DI container</strong> — depends on the container. ASP.NET Core's default will throw on first resolve and <strong>retry</strong> on subsequent requests</li>
+          </ol>
+          <p class="mt-md">This is one of the most important distinctions to know. Each approach has a completely different failure mode, and picking the wrong one can mean the difference between a transient glitch and a permanent outage. The takeaway: if your constructor touches anything external (file system, network, database), either use <code>PublicationOnly</code> mode or move the risky work out of the constructor entirely.</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is why Singleton constructors should be lightweight. If initialization can fail (database, network), do it in a separate <code>Initialize()</code> method with retry logic, not in the constructor."</div>
+      </div></div>
+    </div>
+
+    <!-- Q13 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q13: Is Singleton an anti-pattern?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Many senior developers argue it is. Why? And when is it legitimate?</div>
+        <div class="body-text">
+          <p class="mb-sm">Arguments <strong>against</strong> (why it's considered an anti-pattern):</p>
+          <ul class="qa-list">
+            <li>Introduces <strong>hidden global state</strong> — any code can access it, making dependencies invisible</li>
+            <li>Violates <strong>DIP</strong> — high-level modules depend on a concrete class, not an abstraction</li>
+            <li>Makes <strong>unit testing</strong> difficult — shared state leaks between tests</li>
+            <li>Creates <strong>tight coupling</strong> — every call to <code>.Instance</code> is a hardcoded dependency</li>
+          </ul>
+          <p class="mb-sm mt-md">Arguments <strong>for</strong> (when it's legitimate):</p>
+          <ul class="qa-list">
+            <li>True shared resources (thread pool, logger, configuration) need controlled access</li>
+            <li>DI-managed Singleton avoids all the anti-pattern issues while preserving single-instance semantics</li>
+          </ul>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The classic GoF Singleton with <code>.Instance</code> is the anti-pattern. The concept of a single shared instance is fine — it's how you access it that matters. DI-managed singletons are a clean implementation of the same concept."</div>
+      </div></div>
+    </div>
+
+    <!-- Q14 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q14: How does Singleton behave in a multi-threaded web server?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> ASP.NET Core processes requests on thread pool threads. What if 100 requests hit at once and all use the same Singleton?</div>
+        <div class="body-text">
+          <p class="mb-sm">Critical considerations:</p>
+          <ol class="qa-list">
+            <li><strong>Thread safety of internal state</strong> — if the Singleton has mutable fields, concurrent requests will cause race conditions</li>
+            <li><strong>No per-request state</strong> — storing user ID, tenant, or HttpContext in a Singleton leaks data between requests</li>
+            <li><strong>Captured Scoped services</strong> — if a Singleton captures an injected <code>DbContext</code> (Scoped), it holds onto a disposed context after the first request ends</li>
+            <li><strong>Memory pressure</strong> — Singletons live for the entire app lifetime, so any data they accumulate never gets GC'd</li>
+          </ol>
+        </div>
+
+        <svg viewBox="0 0 720 240" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing multiple concurrent HTTP requests all accessing the same Singleton instance simultaneously on different threads">
+          <rect width="720" height="240" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">100 Concurrent Requests, 1 Singleton Instance</text>
+          <rect x="30" y="45" width="100" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="80" y="60" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread 1 (Req A)</text>
+          <rect x="30" y="72" width="100" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="80" y="87" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread 2 (Req B)</text>
+          <rect x="30" y="99" width="100" height="22" rx="4" fill="#1e3a5f"/>
+          <text x="80" y="114" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="9">Thread 3 (Req C)</text>
+          <text x="80" y="142" text-anchor="middle" fill="#64748b" font-family="system-ui, -apple-system, sans-serif" font-size="10">... Thread 100</text>
+          <line x1="130" y1="56" x2="200" y2="90" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="130" y1="83" x2="200" y2="95" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="130" y1="110" x2="200" y2="100" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <rect x="205" y="55" width="190" height="90" rx="8" fill="#292524" stroke="#eab308" stroke-width="2"/>
+          <text x="300" y="77" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">PricingEngine (Singleton)</text>
+          <text x="300" y="97" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_discount field</text>
+          <text x="300" y="112" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_cache dictionary</text>
+          <text x="300" y="127" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">_dbContext (if captured)</text>
+          <rect x="420" y="48" width="275" height="30" rx="4" fill="#7f1d1d"/>
+          <text x="557" y="68" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Mutable field: Thread A writes, B reads stale</text>
+          <rect x="420" y="85" width="275" height="30" rx="4" fill="#7f1d1d"/>
+          <text x="557" y="105" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Dictionary: concurrent writes corrupt data</text>
+          <rect x="420" y="122" width="275" height="30" rx="4" fill="#7f1d1d"/>
+          <text x="557" y="142" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Captured DbContext: disposed after Req 1 ends</text>
+          <rect x="30" y="170" width="660" height="52" rx="6" fill="#14532d"/>
+          <text x="360" y="190" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Safe Singleton: immutable data + ConcurrentDictionary + no captured Scoped services</text>
+          <text x="360" y="208" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Config (immutable), IMemoryCache (thread-safe), stateless logic (pass context as params)</text>
+        </svg>
+
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I always ask: does this Singleton hold immutable data or mutable state? Immutable (config, routing tables) is safe. Mutable needs <code>ConcurrentDictionary</code>, <code>lock</code>, or better yet — don't make it a Singleton."</div>
+      </div></div>
+    </div>
+
+    <!-- Q15 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q15: What's the Monostate pattern and how does it differ from Singleton?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Can you achieve shared state with public constructors and multiple instances?</div>
+        <div class="body-text">
+          <p class="mb-sm"><span class="tooltip-trigger">Monostate<span class="tooltip-content">A pattern where all instances share the same state via static fields but are constructed normally — an alternative to Singleton.</span></span> uses <strong>static fields</strong> with <strong>public constructors</strong>:</p>
+          <ul class="qa-list">
+            <li>You can create multiple instances, but they all share the same static backing fields</li>
+            <li>The "single state" is <strong>invisible</strong> to consumers — they think they have separate objects</li>
+            <li>Works with DI and interfaces (unlike classic Singleton)</li>
+          </ul>
+          <p class="mb-sm mt-md">Key differences:</p>
+          <ul class="qa-list">
+            <li>Singleton: <strong>one instance</strong>, one state. Enforced by private constructor.</li>
+            <li>Monostate: <strong>many instances</strong>, shared state. Enforced by static fields.</li>
+          </ul>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Monostate is a stealth Singleton — it hides the shared state, which can be surprising. I prefer explicit Singleton via DI because the single-instance policy is visible in the registration code."</div>
+      </div></div>
+    </div>
+
+    <!-- Q16 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q16: How do you handle Singleton disposal in ASP.NET Core?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If a Singleton holds a file handle or database connection, when does it get cleaned up?</div>
+        <div class="body-text">
+          <p class="mb-sm">ASP.NET Core DI handles disposal automatically:</p>
+          <ol class="qa-list">
+            <li>If the Singleton implements <code>IDisposable</code> or <code>IAsyncDisposable</code>, the container calls <code>Dispose()</code> on <strong>application shutdown</strong> (when the root <code>ServiceProvider</code> is disposed) — but only for instances the container <em>created</em></li>
+            <li><strong>Externally-created instances are NOT disposed:</strong> If you register via <code>AddSingleton(new MyService())</code>, the container does NOT call <code>Dispose()</code> — you own the lifecycle. Use <code>IHostApplicationLifetime.ApplicationStopping</code> to clean up manually</li>
+            <li><strong>Factory-created instances ARE disposed:</strong> <code>AddSingleton&lt;IService&gt;(sp =&gt; new MyService())</code> — the container created it via the factory, so it owns disposal</li>
+            <li>For manual Singleton (<code>Lazy&lt;T&gt;</code>), you must handle disposal yourself — register a callback on <code>IHostApplicationLifetime.ApplicationStopping</code></li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The key rule is: whoever creates it, disposes it. <code>AddSingleton&lt;T&gt;()</code> and factory overloads — container disposes. <code>AddSingleton(instance)</code> — you dispose. If your singleton is <code>IDisposable</code>, always prefer the factory overload so the container owns the full lifecycle. For manual disposal, hook into <code>IHostApplicationLifetime.ApplicationStopping</code>."</div>
+      </div></div>
+    </div>
+
+    <!-- Q17 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q17: What is the "Captive Dependency" problem?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What happens when a Singleton takes a Scoped service as a constructor dependency?</div>
+        <div class="body-text">
+          <p class="mb-sm">Captive Dependency occurs when a longer-lived service captures a shorter-lived one:</p>
+          <ol class="qa-list">
+            <li>Singleton is created <strong>once</strong> and gets a Scoped <code>DbContext</code> injected</li>
+            <li>After the first request, the <code>DbContext</code> is disposed — but the Singleton still holds the reference</li>
+            <li>All subsequent requests use the <strong>disposed DbContext</strong> &#8594; <code>ObjectDisposedException</code></li>
+            <li>Even if it doesn't throw immediately, the data is stale — you're reading from a disconnected context</li>
+          </ol>
+          <p class="mt-md">The term "captive" is perfect — the Scoped service is <em>held captive</em> by the Singleton, forced to live far longer than it was designed for. Think of it like a temp employee (Scoped) whose badge gets cloned by a permanent employee (Singleton). When the temp's contract ends, their access is revoked — but the permanent employee is still walking around with the cloned badge, trying to use it. Here's how to fix it:</p>
+          <sg-code file="CaptiveDependencyFix.cs">// &#x274C; BAD: Singleton captures Scoped service directly
+public class ReportService  // AddSingleton
+{
+    private readonly AppDbContext _db;  // Scoped — dies after request 1
+    public ReportService(AppDbContext db) =&gt; _db = db;
+}
+
+// &#x2705; GOOD: Singleton creates fresh scope per operation
+public class ReportService  // AddSingleton
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    public ReportService(IServiceScopeFactory sf) =&gt; _scopeFactory = sf;
+
+    public async Task&lt;Report&gt; GenerateAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;();
+        return await db.Reports.ToListAsync();
+        // scope.Dispose() cleans up the DbContext
+    }
+}</sg-code>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Fix this by injecting <code>IServiceScopeFactory</code> into the Singleton, then creating a scope per operation: <code>using var scope = _scopeFactory.CreateScope(); var db = scope.ServiceProvider.GetRequiredService&lt;DbContext&gt;();</code>"</div>
+      </div></div>
+    </div>
+
+    <!-- Q18 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q18: Name real-world .NET classes that are Singletons.</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think about framework classes you use daily — which ones should only exist once?</div>
+        <div class="body-text">
+          <ol class="qa-list">
+            <li><code>HttpClient</code> — should be a Singleton (or use <code>IHttpClientFactory</code>) to reuse TCP connections and avoid socket exhaustion</li>
+            <li><code>IConfiguration</code> — registered as Singleton by default in ASP.NET Core</li>
+            <li><code>ILoggerFactory</code> — single factory, creates logger instances per category</li>
+            <li><code>IMemoryCache</code> — shared in-memory cache, Singleton by default</li>
+            <li><code>IHostEnvironment</code> — app environment info, immutable Singleton</li>
+            <li><code>JsonSerializerOptions</code> — should be reused as Singleton for performance (reflection caching)</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The <code>HttpClient</code> case is the most commonly asked. Creating a new one per request causes socket exhaustion — <code>TIME_WAIT</code> sockets pile up. Microsoft's official guidance is to use <code>IHttpClientFactory</code>, which manages a Singleton <code>HttpMessageHandler</code> pool."</div>
+      </div></div>
+    </div>
+
+    <!-- Q19 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q19: How does Singleton work across multiple servers (horizontal scaling)?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> If you deploy to 5 servers behind a load balancer, how many Singleton instances exist?</div>
+        <div class="body-text">
+          <p class="mb-sm">Singleton is a <strong>per-process</strong> concept, not per-cluster. With <span class="tooltip-trigger">horizontal scaling<span class="tooltip-content">Adding more server instances (scale out) rather than upgrading one server (scale up).</span></span>:</p>
+          <ol class="qa-list">
+            <li>5 servers = <strong>5 separate Singleton instances</strong>, each with its own state</li>
+            <li>In-memory caches will be <strong>inconsistent</strong> across servers</li>
+            <li>Rate limiters counting in a Singleton will be <strong>per-server</strong>, not global</li>
+            <li>Session data stored in a Singleton is <strong>lost</strong> if the next request hits a different server</li>
+          </ol>
+        </div>
+
+        <svg viewBox="0 0 720 260" style="width:100%;max-width:720px;margin:1rem auto;display:block;" role="img" aria-label="Diagram showing how deploying to 5 servers creates 5 separate Singleton instances, each with independent state">
+          <rect width="720" height="260" rx="12" fill="#1e293b"/>
+          <text x="360" y="24" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600">Singleton is Per-Process — Not Per-Cluster</text>
+          <rect x="280" y="40" width="160" height="34" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="360" y="62" text-anchor="middle" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600">Load Balancer</text>
+          <line x1="310" y1="74" x2="80" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="340" y1="74" x2="230" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="360" y1="74" x2="360" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="380" y1="74" x2="490" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <line x1="410" y1="74" x2="640" y2="105" stroke="#94a3b8" stroke-width="1" marker-end="url(#bug1-arrow)"/>
+          <rect x="30" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="82" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 1</text>
+          <text x="82" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton A</text>
+          <text x="82" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 1}</text>
+          <rect x="160" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="212" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 2</text>
+          <text x="212" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton B</text>
+          <text x="212" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 2}</text>
+          <rect x="290" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="342" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 3</text>
+          <text x="342" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton C</text>
+          <text x="342" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 3}</text>
+          <rect x="420" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="472" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 4</text>
+          <text x="472" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton D</text>
+          <text x="472" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {x: 1}</text>
+          <rect x="550" y="108" width="105" height="60" rx="6" fill="#292524" stroke="#78716c" stroke-width="1"/>
+          <text x="602" y="126" text-anchor="middle" fill="#f1f5f9" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="600">Pod 5</text>
+          <text x="602" y="142" text-anchor="middle" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="9">Singleton E</text>
+          <text x="602" y="158" text-anchor="middle" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="8">cache: {}</text>
+          <rect x="30" y="180" width="290" height="65" rx="6" fill="#7f1d1d"/>
+          <text x="175" y="198" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">5 pods = 5 DIFFERENT Singletons</text>
+          <text x="175" y="215" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">Each has its own cache, counters, state.</text>
+          <text x="175" y="232" text-anchor="middle" fill="#fca5a5" font-family="system-ui, -apple-system, sans-serif" font-size="10">User hits Pod 1, then Pod 3 = cache miss!</text>
+          <rect x="340" y="180" width="345" height="65" rx="6" fill="#14532d"/>
+          <text x="512" y="198" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600">Fix: Distributed state (Redis, DB)</text>
+          <text x="512" y="215" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">Singleton becomes a local PROXY to shared store.</text>
+          <text x="512" y="232" text-anchor="middle" fill="#86efac" font-family="system-ui, -apple-system, sans-serif" font-size="10">All pods read/write to the same Redis instance.</text>
+        </svg>
+
+        <p class="body-text"><strong>Solution:</strong> Use a distributed store (<span class="tooltip-trigger">Redis<span class="tooltip-content">An in-memory data store used as a cache, message broker, or distributed lock provider.</span></span>, database) for shared state. The Singleton becomes a <strong>local proxy</strong> to the distributed system.</p>
+
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is why I always clarify scope. A DI Singleton gives you one instance per process. For true global uniqueness in a distributed system, you need a coordination layer — Redis for cache, a database for state, or a distributed lock for mutual exclusion."</div>
+      </div></div>
+    </div>
+
+    <!-- Q20 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q20: What is eager vs lazy initialization? Which is better for Singleton?</div>
+          <div class="qa-meta"><span class="badge badge-green">Easy</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Does it matter when the instance is created if it's going to be used anyway?</div>
+        <div class="body-text">
+          <p class="mb-sm"><strong>Eager</strong> — instance created at class load time:</p>
+          <ul class="qa-list">
+            <li>Simpler, guaranteed thread-safe (CLR handles static init)</li>
+            <li>Downside: pays the cost at startup even if never used</li>
+          </ul>
+          <p class="mb-sm mt-md"><strong>Lazy</strong> — instance created on first access:</p>
+          <ul class="qa-list">
+            <li>Defers cost until actually needed</li>
+            <li>Better for expensive init or optional features</li>
+            <li>Requires thread-safety mechanisms (<code>Lazy&lt;T&gt;</code>, locks)</li>
+          </ul>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "For most production Singletons, the choice doesn't matter — they're used immediately at startup. I default to <code>Lazy&lt;T&gt;</code> for clarity of intent, but if the Singleton is always needed, eager is simpler and has no disadvantage."</div>
+      </div></div>
+    </div>
+
+    <!-- Q21 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q21: Can a Singleton implement the <code>IDisposable</code> pattern?</div>
+          <div class="qa-meta"><span class="badge badge-yellow">Medium</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> A Singleton lives forever. Who calls <code>Dispose()</code>? When?</div>
+        <div class="body-text">
+          <p class="mb-sm">Yes, but the lifecycle question is critical:</p>
+          <ol class="qa-list">
+            <li><strong>DI-managed</strong> — the container calls <code>Dispose()</code> on application shutdown. This is the cleanest approach</li>
+            <li><strong>Manual Singleton</strong> — nobody calls Dispose automatically. You need to hook into <code>AppDomain.ProcessExit</code> or <code>IHostApplicationLifetime.ApplicationStopping</code></li>
+            <li><strong>Using-block anti-pattern</strong> — if someone wraps a Singleton in a <code>using</code> block, it gets disposed while other code still uses it</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The tension between Singleton and IDisposable is a design smell. If an object needs deterministic cleanup, its lifetime should be managed — which is exactly what DI containers do."</div>
+      </div></div>
+    </div>
+
+    <!-- Q22 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q22: How would you implement a Singleton that supports configuration reloading?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> The whole point of Singleton is one instance. How do you refresh its data without creating a new one?</div>
+        <div class="body-text">
+          <p class="mb-sm">Three production approaches:</p>
+          <ol class="qa-list">
+            <li><code>IOptionsMonitor&lt;T&gt;</code> — ASP.NET Core's built-in pattern. Registered as Singleton, automatically detects file changes and exposes updated values via <code>.CurrentValue</code></li>
+            <li><strong>Volatile reference swap</strong> — the Singleton holds a <code>volatile</code> reference to an immutable config object. On reload, create a new config object and atomically swap the reference</li>
+            <li><strong>Event-driven reload</strong> — expose a <code>Reload()</code> method that re-reads the config file. Use a <code>ReaderWriterLockSlim</code> to allow concurrent reads during reload</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I'd use <code>IOptionsMonitor&lt;T&gt;</code> — it's battle-tested, handles file system watchers, and integrates with the configuration pipeline. Rolling your own is error-prone, especially around thread safety during reload."</div>
+      </div></div>
+    </div>
+
+    <!-- Q23 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q23: What is the "Ambient Context" pattern and how does it relate to Singleton?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think about <code>DateTime.Now</code>, <code>Thread.CurrentThread</code>, <code>HttpContext.Current</code>. What do they have in common?</div>
+        <div class="body-text">
+          <p class="mb-sm">Ambient Context provides a <strong>static access point to context-specific data</strong>:</p>
+          <ul class="qa-list">
+            <li>Similar to Singleton in that it uses a static property for access</li>
+            <li>Different because the value can <strong>change per thread, per scope, or per async context</strong></li>
+            <li>Uses <code>AsyncLocal&lt;T&gt;</code> or <code>ThreadLocal&lt;T&gt;</code> under the hood</li>
+            <li>Examples: <code>TimeProvider.System</code>, <code>CultureInfo.CurrentCulture</code>, <code>IHttpContextAccessor</code></li>
+          </ul>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "Ambient Context shares Singleton's biggest flaw — hidden dependencies. In .NET 8+, Microsoft introduced <code>TimeProvider</code> as the recommended abstraction for time, specifically because <code>DateTime.Now</code> is untestable ambient context. The trend is moving away from both patterns toward explicit injection."</div>
+      </div></div>
+    </div>
+
+    <!-- Q24 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q24: How do you handle Singleton in microservices?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Each microservice is a separate process. What does "Singleton" even mean in that context?</div>
+        <div class="body-text">
+          <p class="mb-sm">Singleton in microservices has different semantics:</p>
+          <ol class="qa-list">
+            <li><strong>Per-service Singleton</strong> — standard DI Singleton within one service. Safe and useful for local caches, config, logger</li>
+            <li><strong>Cross-service uniqueness</strong> — requires distributed coordination: leader election (ZooKeeper, etcd), distributed locks (Redis <code>SETNX</code>), or database constraints</li>
+            <li><strong>Shared state</strong> — never use in-memory Singletons for state shared across services. Use Redis, database, or message queues</li>
+            <li><strong>Multiple replicas</strong> — if your service runs 10 pods in Kubernetes, you have 10 Singleton instances, each independent</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In microservices, I think of Singleton as process-scoped, not system-scoped. For system-scoped uniqueness, I use a dedicated service or distributed primitives — trying to make an in-process Singleton behave globally is a recipe for <span class="tooltip-trigger">split-brain<span class="tooltip-content">A distributed systems failure where two partitions each believe they are the sole active instance, leading to conflicting state.</span></span> bugs."</div>
+      </div></div>
+    </div>
+
+    <!-- Q25 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q25: Design a production-ready Singleton: what would you include?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Think beyond just "one instance." What does a production system need?</div>
+        <div class="body-text">
+          <p class="mb-sm">A production-ready Singleton checklist:</p>
+          <ol class="qa-list">
+            <li><strong>Interface-first</strong> — implement <code>IMyService</code> for testability and swappability</li>
+            <li><strong>DI-managed lifetime</strong> — <code>AddSingleton&lt;IMyService, MyService&gt;()</code>, no static Instance</li>
+            <li><strong>Thread-safe internal state</strong> — use <code>ConcurrentDictionary</code>, <code>Interlocked</code>, or immutable data</li>
+            <li><strong>No captured Scoped dependencies</strong> — inject <code>IServiceScopeFactory</code> if needed</li>
+            <li><strong>Health check</strong> — expose state for monitoring (<code>IHealthCheck</code>)</li>
+            <li><strong>Graceful disposal</strong> — implement <code>IAsyncDisposable</code> for clean shutdown</li>
+            <li><strong>Configuration reload</strong> — use <code>IOptionsMonitor&lt;T&gt;</code> for dynamic config</li>
+            <li><strong>Logging</strong> — log initialization, errors, and state transitions</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The best Singleton is one where the class itself doesn't know it's a Singleton. It's a regular class with a regular constructor — the DI container handles the lifetime. That way, you can change it to Scoped or Transient later without touching the class."</div>
+      </div></div>
+    </div>
+
+    <!-- Q26 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q26: How does Singleton behavior differ in Blazor Server vs Blazor WebAssembly?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Where does each Blazor hosting model run? What does that mean for shared state?</div>
+        <div class="body-text">
+          <p class="mb-sm">Completely different semantics:</p>
+          <ol class="qa-list">
+            <li><strong><span class="tooltip-trigger">Blazor Server<span class="tooltip-content">A .NET web framework where UI logic runs on the server and DOM updates are sent to the browser via SignalR.</span></span></strong> — the app runs on the server. A Singleton registered via <code>AddSingleton</code> is shared across <strong>all connected users/circuits</strong>. This is the same as ASP.NET Core — one instance per server process. <em>Danger:</em> mutable state in the Singleton leaks between users</li>
+            <li><strong>Blazor WebAssembly (WASM)</strong> — the app runs in the browser. A Singleton is scoped to <strong>that single browser tab</strong>. Each tab gets its own DI container, so each tab gets its own "singleton." There's no cross-tab sharing. Refreshing the page destroys and recreates the container</li>
+            <li><strong>Blazor WASM + prerendering</strong> — during server-side prerender, the Singleton lives on the server momentarily, then a new one is created client-side. State doesn't transfer automatically</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "In Blazor Server, use Scoped instead of Singleton for per-user state — Scoped is per-circuit (per-connection). Singletons should only hold truly global, thread-safe state like caches or configuration. In WASM, Singleton and Scoped are effectively the same since there's only one 'scope' per tab."</div>
+      </div></div>
+    </div>
+
+    <!-- Q27 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q27: Can you implement a lock-free Singleton? How?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What atomic CPU operations can replace a lock?</div>
+        <div class="body-text">
+          <p class="mb-sm">Yes, using <code>Interlocked.CompareExchange</code>:</p>
+          <sg-code file="LockFreeSingleton.cs">public sealed class LockFreeSingleton
+{
+    private static LockFreeSingleton? _instance;
+
+    public static LockFreeSingleton Instance
+    {
+        get
+        {
+            if (_instance is not null) return _instance;
+
+            var newInstance = new LockFreeSingleton();
+            // Atomically set _instance if it's still null
+            Interlocked.CompareExchange(ref _instance, newInstance, null);
+            // Return whatever is in _instance (might be ours or another thread's)
+            return _instance;
+        }
+    }
+
+    private LockFreeSingleton() { }
+}</sg-code>
+          <p class="body-text"><strong>Trade-off:</strong> Multiple threads may each create an instance, but only one wins the <span class="tooltip-trigger">CAS<span class="tooltip-content">Compare-And-Swap — an atomic CPU instruction that updates a memory location only if it still holds an expected value.</span></span> (Compare-And-Swap). Losers' instances get GC'd. This is fine when construction is cheap and side-effect-free. This is exactly what <code>LazyThreadSafetyMode.PublicationOnly</code> does internally.</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "This is the publication-only pattern. It avoids lock contention entirely — great for high-throughput scenarios. But if the constructor has side effects (opens a file, starts a timer), you'll get duplicate side effects. Use <code>ExecutionAndPublication</code> mode instead when construction has side effects."</div>
+      </div></div>
+    </div>
+
+    <!-- Q28 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q28: Explain the three <code>LazyThreadSafetyMode</code> options and when to use each.</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> What are the trade-offs between safety, performance, and exception handling?</div>
+        <div class="body-text">
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mode</th>
+                  <th>Locking</th>
+                  <th>Duplicate Init?</th>
+                  <th>Exception Cached?</th>
+                  <th>Use When</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>ExecutionAndPublication</code></td>
+                  <td>Full lock (default)</td>
+                  <td>No — exactly one thread creates</td>
+                  <td>Yes — all threads see same exception forever</td>
+                  <td>Constructor has side effects (file I/O, network, timers)</td>
+                </tr>
+                <tr>
+                  <td><code>PublicationOnly</code></td>
+                  <td>Lock-free (CAS)</td>
+                  <td>Yes — multiple threads may create, one wins</td>
+                  <td>No — retries on failure</td>
+                  <td>Cheap, side-effect-free constructor; want retry on transient errors</td>
+                </tr>
+                <tr>
+                  <td><code>None</code></td>
+                  <td>No synchronization</td>
+                  <td>Undefined behavior under concurrency</td>
+                  <td>Yes</td>
+                  <td>Single-threaded scenarios only (startup code, tests)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="body-text mt-sm"><strong>Key insight:</strong> The default <code>Lazy&lt;T&gt;()</code> uses <code>ExecutionAndPublication</code>. The gotcha is exception caching — if the factory throws, the <code>Lazy&lt;T&gt;</code> is permanently broken. Use <code>PublicationOnly</code> when connecting to external resources that might transiently fail.</p>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I'd use <code>PublicationOnly</code> for database connection singletons — if the first attempt fails due to a transient network error, subsequent calls retry instead of caching the exception. The trade-off (potentially creating two connections momentarily) is worth the resilience."</div>
+      </div></div>
+    </div>
+
+    <!-- Q29 -->
+    <div class="qa-item">
+      <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+        <div>
+          <div class="qa-question">Q29: How do you handle async initialization in a Singleton?</div>
+          <div class="qa-meta"><span class="badge badge-red">Hard</span></div>
+        </div>
+        <i class="fa-solid fa-chevron-down qa-chevron"></i>
+      </div>
+      <div class="qa-body"><div class="qa-content">
+        <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Constructors can't be async. How do you initialize a Singleton that needs to await something?</div>
+        <div class="body-text">
+          <p class="mb-sm">Three approaches, from best to acceptable:</p>
+          <ol class="qa-list">
+            <li><strong><span class="tooltip-trigger">IHostedService<span class="tooltip-content">The .NET interface for services that are started and stopped with the application host.</span></span> / IHostedLifecycleService warmup</strong> (recommended):</li>
+          </ol>
+          <sg-code file="WarmupService.cs">public class CacheWarmupService(ICache cache) : IHostedService
+{
+    public async Task StartAsync(CancellationToken ct)
+        =&gt; await cache.InitializeAsync(ct); // Runs before Kestrel accepts requests
+
+    public Task StopAsync(CancellationToken ct) =&gt; Task.CompletedTask;
+}
+
+// Registration
+builder.Services.AddSingleton&lt;ICache, RedisCache&gt;();
+builder.Services.AddHostedService&lt;CacheWarmupService&gt;();</sg-code>
+          <ol class="qa-list" start="2">
+            <li><strong>AsyncLazy&lt;T&gt; pattern</strong> — wrap <code>Lazy&lt;Task&lt;T&gt;&gt;</code>:</li>
+          </ol>
+          <sg-code file="AsyncLazy.cs">public class AsyncLazy&lt;T&gt; : Lazy&lt;Task&lt;T&gt;&gt;
+{
+    // Task.Run offloads to thread pool — remove it if you want
+    // to run on the calling thread (e.g., in ASP.NET Core)
+    public AsyncLazy(Func&lt;Task&lt;T&gt;&gt; factory)
+        : base(factory) { }
+
+    public TaskAwaiter&lt;T&gt; GetAwaiter() =&gt; Value.GetAwaiter();
+}
+
+// Usage — consumers must await
+public class MyService(AsyncLazy&lt;ExpensiveResource&gt; resource)
+{
+    public async Task DoWork()
+    {
+        var r = await resource; // Initializes on first await, cached thereafter
+        r.Execute();
+    }
+}</sg-code>
+          <ol class="qa-list" start="3">
+            <li><strong>Semaphore-guarded InitializeAsync</strong> — use <code>SemaphoreSlim(1,1)</code> to gate first-call initialization. Works but callers must check <code>IsInitialized</code> or call <code>EnsureInitializedAsync()</code> before every operation</li>
+          </ol>
+        </div>
+        <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "I prefer <code>IHostedService</code> because initialization completes before the app starts accepting traffic — no cold-start latency on the first request. If initialization fails, the app fails to start, which is exactly what you want (fail fast). <code>AsyncLazy</code> is my fallback when the resource genuinely should be lazily initialized."</div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ========== 18. EXERCISES ========== -->
+  <div class="section" id="exercises">
+    <div class="section-header">
+      <div class="section-icon cyan"><i class="fa-solid fa-dumbbell"></i></div>
+      <div>
+        <div class="section-num">Section 18</div>
+        <h2 class="section-title">Practice Exercises</h2>
+      </div>
+    </div>
+
+    <!-- Exercise 1 -->
+    <sg-exercise title="Exercise 1: Thread-Safe Singleton Without Lazy&lt;T&gt;" difficulty="Medium">
+      <p class="exercise-card-desc">Implement a thread-safe Singleton for a <code>ConnectionPool</code> class without using <code>Lazy&lt;T&gt;</code>. Use double-checked locking. Ensure correctness with the <code>volatile</code> keyword.</p>
+
+      <sg-hint>
+        <ul class="styled">
+          <li>Use a <code>private static volatile</code> field for the instance</li>
+          <li>Create a <code>private static readonly object</code> for the lock</li>
+          <li>Check null before AND after acquiring the lock</li>
+        </ul>
+      </sg-hint>
+
+      <sg-collapse title="Solution">
+        <sg-code file="ConnectionPool.cs">public sealed class ConnectionPool
+{
+    private static volatile ConnectionPool? _instance;
+    private static readonly object _lock = new();
+
+    public static ConnectionPool Instance
+    {
+        get
+        {
+            if (_instance is null)
+            {
+                lock (_lock)
+                {
+                    _instance ??= new ConnectionPool();
+                }
+            }
+            return _instance;
+        }
+    }
+
+    private ConnectionPool() { /* init pool */ }
+}</sg-code>
+      </sg-collapse>
+    </sg-exercise>
+
+    <!-- Exercise 2 -->
+    <sg-exercise title="Exercise 2: Make Singleton Testable with DI" difficulty="Easy">
+      <p class="exercise-card-desc">You have a <code>FileLogger</code> singleton used throughout the app via <code>FileLogger.Instance</code>. Refactor it so it can be registered with ASP.NET Core's DI container and unit tested with a fake implementation.</p>
+
+      <sg-hint>
+        <ul class="styled">
+          <li>Extract an <code>ILogger</code> interface with <code>void Log(string message)</code></li>
+          <li>Make <code>FileLogger</code> implement <code>ILogger</code></li>
+          <li>Remove the static <code>Instance</code> property — let DI manage the lifetime</li>
+          <li>Register with <code>services.AddSingleton&lt;ILogger, FileLogger&gt;()</code></li>
+        </ul>
+      </sg-hint>
+
+      <sg-collapse title="Solution">
+        <sg-code file="TestableLogger.cs">// 1. Define the interface
+public interface ILogger
+{
+    void Log(string message);
+}
+
+// 2. Implement it (no more static Instance!)
+public sealed class FileLogger : ILogger
+{
+    private readonly StreamWriter _writer;
+
+    public FileLogger()
+    {
+        _writer = new StreamWriter("app.log", append: true);
+    }
+
+    public void Log(string message)
+    {
+        _writer.WriteLine($"[{DateTime.UtcNow:O}] {message}");
+        _writer.Flush();
+    }
+}
+
+// 3. Register in DI
+services.AddSingleton&lt;ILogger, FileLogger&gt;();
+
+// 4. Inject via constructor
+public class OrderService
+{
+    private readonly ILogger _logger;
+    public OrderService(ILogger logger) =&gt; _logger = logger;
+}
+
+// 5. Unit test with fake
+public class FakeLogger : ILogger
+{
+    public List&lt;string&gt; Messages { get; } = new();
+    public void Log(string message) =&gt; Messages.Add(message);
+}
+
+[Fact]
+public void OrderService_Logs_On_PlaceOrder()
+{
+    var fake = new FakeLogger();
+    var svc = new OrderService(fake);
+    svc.PlaceOrder(new Order());
+    Assert.Contains("Order placed", fake.Messages[0]);
+}</sg-code>
+      </sg-collapse>
+    </sg-exercise>
+
+    <!-- Exercise 3 -->
+    <sg-exercise title="Exercise 3: Singleton with Config Reload Support" difficulty="Hard">
+      <p class="exercise-card-desc">Implement a <code>ConfigManager</code> singleton that loads settings from a JSON file on first access. Add a <code>Reload()</code> method that re-reads the file without breaking thread safety. Consumers should always see a consistent snapshot — never a half-updated config.</p>
+
+      <sg-hint>
+        <ul class="styled">
+          <li>Use an immutable settings record/class for the config data</li>
+          <li>Store the current config in a <code>volatile</code> field</li>
+          <li>On reload, build a complete new config object, then swap the reference atomically</li>
+          <li><code>Interlocked.Exchange</code> ensures atomic reference swap</li>
+        </ul>
+      </sg-hint>
+
+      <sg-collapse title="Solution">
+        <sg-code file="ConfigManager.cs">// Immutable snapshot of configuration
+public sealed record AppSettings(
+    string DbConnectionString,
+    int MaxRetries,
+    TimeSpan Timeout
+);
+
+public sealed class ConfigManager
+{
+    private static readonly Lazy&lt;ConfigManager&gt; _instance
+        = new(() =&gt; new ConfigManager());
+
+    public static ConfigManager Instance =&gt; _instance.Value;
+
+    private volatile AppSettings _current;
+    public AppSettings Settings =&gt; _current;
+
+    private ConfigManager()
+    {
+        _current = LoadFromFile();
+    }
+
+    public void Reload()
+    {
+        var newSettings = LoadFromFile();
+        // Atomic swap — readers never see a half-updated object
+        Interlocked.Exchange(ref _current, newSettings);
+    }
+
+    private static AppSettings LoadFromFile()
+    {
+        var json = File.ReadAllText("appsettings.json");
+        var doc = JsonDocument.Parse(json);
+        return new AppSettings(
+            doc.RootElement.GetProperty("ConnectionString").GetString()!,
+            doc.RootElement.GetProperty("MaxRetries").GetInt32(),
+            TimeSpan.FromSeconds(
+                doc.RootElement.GetProperty("TimeoutSeconds").GetInt32())
+        );
+    }
+}</sg-code>
+      </sg-collapse>
+    </sg-exercise>
+
+    <!-- Exercise 4 -->
+    <sg-exercise title="Exercise 4: Break and Fix — Find the Singleton Bugs" difficulty="Medium">
+      <p class="exercise-card-desc">The following <code>CacheManager</code> singleton has <strong>4 bugs</strong>. Find them all and write the corrected version.</p>
+      <sg-code file="BuggyCacheManager.cs">public class CacheManager
+{
+    private static CacheManager _instance;
+    private Dictionary&lt;string, object&gt; _cache = new();
+
+    public CacheManager() { }
+
+    public static CacheManager Instance
+    {
+        get
+        {
+            if (_instance == null)
+                _instance = new CacheManager();
+            return _instance;
+        }
+    }
+
+    public void Set(string key, object val) =&gt; _cache[key] = val;
+    public object Get(string key) =&gt; _cache[key];
+}</sg-code>
+
+      <sg-hint>
+        <ul class="styled">
+          <li>Is the class sealed? Can someone subclass it?</li>
+          <li>Is the constructor private?</li>
+          <li>Is instance creation thread-safe?</li>
+          <li>Is the <code>Dictionary</code> thread-safe for concurrent reads/writes?</li>
+        </ul>
+      </sg-hint>
+
+      <sg-collapse title="Solution">
+        <p class="body-text"><strong>The 4 bugs:</strong></p>
+        <ol class="styled">
+          <li><strong>Not sealed</strong> — subclasses can bypass the singleton guarantee</li>
+          <li><strong>Public constructor</strong> — anyone can call <code>new CacheManager()</code></li>
+          <li><strong>No thread-safe init</strong> — race condition on <code>_instance</code> check</li>
+          <li><strong>Dictionary is not thread-safe</strong> — concurrent writes corrupt data</li>
+        </ol>
+        <sg-code file="FixedCacheManager.cs">public sealed class CacheManager  // Bug 1: sealed
+{
+    private static readonly Lazy&lt;CacheManager&gt; _instance
+        = new(() =&gt; new CacheManager());  // Bug 3: thread-safe
+
+    public static CacheManager Instance =&gt; _instance.Value;
+
+    // Bug 4: ConcurrentDictionary for thread safety
+    private readonly ConcurrentDictionary&lt;string, object&gt; _cache = new();
+
+    private CacheManager() { }  // Bug 2: private constructor
+
+    public void Set(string key, object val) =&gt; _cache[key] = val;
+    public object? Get(string key) =&gt;
+        _cache.TryGetValue(key, out var val) ? val : null;
+}</sg-code>
+      </sg-collapse>
+    </sg-exercise>
+  </div>
