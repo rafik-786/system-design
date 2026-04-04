@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 2 complete pages (How to Approach System Design + Back-of-Envelope Estimation), 202 coming soon.
+**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 3 complete pages (How to Approach System Design, Back-of-Envelope Estimation, Scalability), 1 newly rebuilt (Reliability), 200 coming soon.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
@@ -17,6 +17,7 @@
 - Session State: `c:/Users/Rafikul/Desktop/Learn/System Design/.claude/SESSION.md`
 - Build Spec: `page-spec.md` (root of project — 1600+ lines, 33 component patterns + build rules)
 - Case Study Spec: `case-study-spec.md` (root of project — 18-part framework for all case study pages)
+- Learning Path: `110-days.md` (root — 110-day plan covering all 314 topics, mixed LLD+HLD by difficulty)
 
 ---
 
