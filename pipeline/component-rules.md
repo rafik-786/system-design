@@ -112,10 +112,19 @@
 - `<sg-callout type="tip">` for key phrases
 - Structured pitch format
 
-### S17 Interview Q&As
-- `<sg-card>` accordion for each question
-- SVGs in key answers (Q1, comparison Qs, architecture Qs)
+### S17 Interview Q&As (MINIMUM 30 QUESTIONS — QUALITY OVER QUANTITY)
+- **30 Q&As minimum per page** — but NEVER pad with filler. Every question must be one that:
+  - Interviewers actually ask, OR
+  - Covers a common mistake/misconception developers make, OR
+  - Tests deep understanding (not just definition regurgitation)
+- **Do NOT add generic questions** like "What is X?" repeated 5 ways. Each Q must teach something different.
+- Grouped by difficulty: ~10 Easy, ~10 Medium, ~10 Hard
+- `qa-item` div structure (NOT sg-card) — see template for exact HTML
+- SVGs in key answers (Q1, comparison Qs, architecture Qs) — 8-10 SVGs in this section
 - `<sg-tabs>` for any code comparisons within answers
+- Each question MUST have: Think First prompt, rich prose answer, badge color (green/yellow/red)
+- **Focus on**: real interview questions, common bugs/mistakes, "gotcha" scenarios, design trade-offs, code smells
+- This is the LONGEST section on the page — budget 800-1200 lines for S17 alone
 
 ### S18 Practice Exercises
 - `<sg-exercise>` with `<sg-hint>` for each exercise

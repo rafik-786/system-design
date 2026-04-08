@@ -38,7 +38,7 @@
     <h1>Factory Method Pattern</h1>
     <p class="hero-subtitle">You say what you need, but the subclass decides exactly how to build it. Object creation without locking yourself to a specific class.</p>
     <div class="hero-meta">
-      <span><i class="fa-solid fa-comments"></i> 29 Q&amp;As</span>
+      <span><i class="fa-solid fa-comments"></i> 30 Q&amp;As</span>
       <span><i class="fa-solid fa-bug"></i> 6 Bug Studies</span>
       <span><i class="fa-solid fa-triangle-exclamation"></i> 10 Pitfalls</span>
       <span><i class="fa-solid fa-flask-vial"></i> 4 Testing Strategies</span>
@@ -3385,7 +3385,7 @@ public class FactoryBenchmarks
     </div>
   </div>
 
-  <p>29 questions organized by difficulty. Click any question to reveal the answer. Each one starts with a "Think First" prompt &mdash; try to answer before peeking. The hard questions are the ones that come up in senior/staff-level interviews.</p>
+  <p>30 questions organized by difficulty. Click any question to reveal the answer. Each one starts with a "Think First" prompt &mdash; try to answer before peeking. The hard questions are the ones that come up in senior/staff-level interviews.</p>
 
   <!-- ===== EASY ===== -->
   <h3 class="sub mb-sm"><span class="badge badge-green">Easy</span> Foundations (Q1&mdash;Q6)</h3>
@@ -3666,7 +3666,7 @@ public class OrderController(
   </div>
 
   <!-- ===== HARD ===== -->
-  <h3 class="sub mb-sm"><span class="badge badge-red">Hard</span> Expert Level (Q17&mdash;Q29)</h3>
+  <h3 class="sub mb-sm"><span class="badge badge-red">Hard</span> Expert Level (Q17&mdash;Q30)</h3>
 
   <div class="qa-item">
     <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
@@ -4036,6 +4036,166 @@ services.AddSingleton&lt;INotifierFactory&gt;(sp =&gt;
         <li><strong>Static abstract interface members (C# 11)</strong> enable type-level factory contracts: <code>static abstract IProduct Create()</code> on the Product interface itself.</li>
       </ul>
       <p>The core idea &mdash; "something decides which type to create so the caller doesn't have to" &mdash; is permanent. Only the mechanics simplify with each C# release.</p>
+    </div></div>
+  </div>
+
+  <div class="qa-item">
+    <div class="qa-header" role="button" tabindex="0" aria-expanded="false">
+      <div><div class="qa-question">Q30: Design a plugin system where third-party developers can register their own factories for custom document types. The system should discover and load plugins at runtime using .NET's Assembly loading.</div><div class="qa-meta"><span class="badge badge-red">Hard</span></div></div>
+    </div>
+    <div class="qa-body"><div class="qa-content">
+      <div class="qa-think"><strong><i class="fa-solid fa-brain icon-gap"></i>Think First</strong> Third-party code lives in separate DLLs that don't exist at compile time. How do you discover classes that implement your factory interface without knowing their names? What .NET mechanism lets you load assemblies from a folder and scan for types?</div>
+      <div class="body-text">
+        <p>The plugin system combines Factory Method with <strong>runtime assembly loading</strong>. The core application defines an <code>IDocumentFactory</code> interface and ships it in a shared NuGet package. Third-party developers reference that package, implement the interface in their own DLL, and drop the DLL into a <code>/plugins</code> folder. At startup, the host scans that folder, loads each assembly, finds every class implementing <code>IDocumentFactory</code>, and registers them in the DI container. The application code never references the plugin assemblies directly — it only knows about the interface.</p>
+
+        <p>This is Factory Method at its most powerful: the <em>concrete creators don't even exist in the same codebase</em>. The core defines the contract (<code>IDocumentFactory</code> and <code>IDocument</code>), and third parties provide the implementations. The discovery mechanism (assembly scanning) bridges the gap at runtime.</p>
+
+        <svg viewBox="0 0 760 300" style="width:100%;max-width:760px;margin:1rem auto;display:block;" role="img" aria-label="Plugin architecture: Host app loads assemblies from /plugins folder, scans for IDocumentFactory implementations, and registers them in DI">
+          <defs>
+            <marker id="q30-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a78bfa"/></marker>
+            <marker id="q30-arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e"/></marker>
+          </defs>
+
+          <!-- Shared Contract -->
+          <rect x="250" y="10" width="260" height="45" rx="8" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+          <text x="380" y="30" text-anchor="middle" fill="#a78bfa" font-size="12" font-family="system-ui, sans-serif" font-weight="700">Shared Contract (NuGet Pkg)</text>
+          <text x="380" y="46" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="system-ui, sans-serif">IDocumentFactory + IDocument</text>
+
+          <!-- Host App -->
+          <rect x="30" y="85" width="220" height="120" rx="10" fill="#0f172a" stroke="#3b82f6" stroke-width="2"/>
+          <text x="140" y="108" text-anchor="middle" fill="#3b82f6" font-size="13" font-family="system-ui, sans-serif" font-weight="700">Host Application</text>
+
+          <rect x="50" y="118" width="180" height="28" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="140" y="136" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">PluginLoader (scanner)</text>
+
+          <rect x="50" y="155" width="180" height="28" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+          <text x="140" y="173" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="system-ui, sans-serif">DI Container (registry)</text>
+
+          <!-- Arrow from contract to host -->
+          <line x1="310" y1="55" x2="180" y2="83" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#q30-arr)"/>
+
+          <!-- /plugins folder -->
+          <rect x="310" y="90" width="160" height="40" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+          <text x="390" y="115" text-anchor="middle" fill="#f59e0b" font-size="12" font-family="system-ui, sans-serif" font-weight="700">/plugins folder</text>
+
+          <!-- Arrow host scans plugins -->
+          <line x1="250" y1="132" x2="308" y2="115" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#q30-arr)"/>
+          <text x="275" y="112" text-anchor="middle" fill="#f59e0b" font-size="8" font-family="system-ui, sans-serif">scan</text>
+
+          <!-- Plugin DLLs -->
+          <rect x="520" y="75" width="210" height="50" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="625" y="95" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="700">PdfPlugin.dll</text>
+          <text x="625" y="115" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">PdfDocumentFactory : IDocumentFactory</text>
+
+          <rect x="520" y="135" width="210" height="50" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="625" y="155" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="700">MarkdownPlugin.dll</text>
+          <text x="625" y="175" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">MdDocumentFactory : IDocumentFactory</text>
+
+          <rect x="520" y="195" width="210" height="50" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="625" y="215" text-anchor="middle" fill="#22c55e" font-size="11" font-family="system-ui, sans-serif" font-weight="700">ExcelPlugin.dll</text>
+          <text x="625" y="235" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="system-ui, sans-serif">ExcelDocumentFactory : IDocumentFactory</text>
+
+          <!-- Arrows from plugins folder to DLLs -->
+          <line x1="470" y1="100" x2="518" y2="100" stroke="#22c55e" stroke-width="1.5" marker-end="url(#q30-arr-g)"/>
+          <line x1="470" y1="110" x2="518" y2="155" stroke="#22c55e" stroke-width="1.5" marker-end="url(#q30-arr-g)"/>
+          <line x1="470" y1="120" x2="518" y2="215" stroke="#22c55e" stroke-width="1.5" marker-end="url(#q30-arr-g)"/>
+
+          <!-- Arrow from contract to plugins -->
+          <line x1="450" y1="55" x2="580" y2="73" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#q30-arr)"/>
+
+          <!-- Bottom label -->
+          <text x="380" y="280" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui, sans-serif">Third parties implement the shared contract. The host discovers them at startup. Zero compile-time coupling.</text>
+        </svg>
+
+        <p>The key moving parts: <strong>(1)</strong> a shared contract package containing only interfaces, <strong>(2)</strong> a plugin loader that scans a folder for DLLs and finds types implementing <code>IDocumentFactory</code>, and <strong>(3)</strong> a registry (the DI container) that maps document type names to their factories. When application code needs to create a document, it asks the registry by name — it never needs to know which assembly the factory came from.</p>
+
+        <sg-code file="PluginFactory.cs">// ── Shared contract (shipped as a NuGet package) ──
+public interface IDocument
+{
+    string Extension { get; }
+    void Open(Stream content);
+    void Save(Stream output);
+}
+
+public interface IDocumentFactory
+{
+    /// &lt;summary&gt;The file extension this factory handles (e.g., ".pdf")&lt;/summary&gt;
+    string SupportedExtension { get; }
+    IDocument Create();
+}
+
+// ── Plugin Loader (host application) ──
+public static class PluginLoader
+{
+    public static IServiceCollection LoadPlugins(
+        this IServiceCollection services, string pluginPath)
+    {
+        if (!Directory.Exists(pluginPath))
+            return services;
+
+        foreach (var dll in Directory.GetFiles(pluginPath, "*.dll"))
+        {
+            // Load the assembly into a collectible context for unload support
+            var context = new PluginLoadContext(dll);
+            var assembly = context.LoadFromAssemblyPath(
+                Path.GetFullPath(dll));
+
+            // Find every class that implements IDocumentFactory
+            var factoryTypes = assembly.GetTypes()
+                .Where(t =&gt; typeof(IDocumentFactory).IsAssignableFrom(t)
+                         &amp;&amp; t is { IsAbstract: false, IsInterface: false });
+
+            foreach (var type in factoryTypes)
+            {
+                // Register each factory as a keyed service using its extension
+                var temp = (IDocumentFactory)Activator.CreateInstance(type)!;
+                services.AddKeyedSingleton(
+                    typeof(IDocumentFactory),
+                    temp.SupportedExtension,   // key = ".pdf", ".md", etc.
+                    (_, _) =&gt; temp);
+            }
+        }
+
+        return services;
+    }
+}
+
+// ── Custom AssemblyLoadContext for isolation ──
+public class PluginLoadContext(string pluginPath)
+    : AssemblyLoadContext(isCollectible: true)
+{
+    private readonly AssemblyDependencyResolver _resolver = new(pluginPath);
+
+    protected override Assembly? Load(AssemblyName name)
+    {
+        var path = _resolver.ResolveAssemblyToPath(name);
+        return path is not null ? LoadFromAssemblyPath(path) : null;
+    }
+}
+
+// ── Usage: resolve factory by extension ──
+app.MapGet("/documents/{ext}", (
+    [FromRoute] string ext,
+    [FromKeyedServices(".pdf")] IDocumentFactory? factory) =&gt;
+{
+    // Or resolve dynamically:
+    // var factory = provider.GetKeyedService&lt;IDocumentFactory&gt;(ext);
+    if (factory is null)
+        return Results.NotFound($"No plugin for '{ext}'");
+
+    var doc = factory.Create();
+    return Results.Ok($"Created {doc.Extension} document");
+});
+
+// ── Startup wiring ──
+builder.Services.LoadPlugins(
+    Path.Combine(AppContext.BaseDirectory, "plugins"));</sg-code>
+
+        <p>A few important design decisions in this code. First, <code>PluginLoadContext</code> creates an <strong>isolated, collectible assembly context</strong> — this means you can unload plugins at runtime without restarting the app (hot-reload). Second, <strong>keyed services</strong> (.NET 8+) let you register multiple factories under different keys (the file extension), so resolving the right factory is a simple dictionary lookup by the DI container. Third, the <code>SupportedExtension</code> property on the interface is the plugin's self-declaration — the host never hardcodes extension-to-factory mappings.</p>
+
+        <p>For production hardening, you would add: <strong>(a)</strong> a <code>FileSystemWatcher</code> on the plugins folder for hot-reload, <strong>(b)</strong> signature verification on plugin DLLs to prevent loading untrusted code, <strong>(c)</strong> a sandboxed <code>AppDomain</code> or process isolation for plugins you don't fully trust, and <strong>(d)</strong> version compatibility checks between the shared contract NuGet version and the plugin's compiled-against version.</p>
+      </div>
+      <div class="qa-great"><strong><i class="fa-solid fa-star icon-gap"></i>Great Answer Bonus</strong> "The real insight is that Factory Method's power scales with how far apart the creator and the product are. In a monolith, they're in different classes. In a plugin system, they're in different assemblies that don't exist at compile time. The pattern is identical — only the discovery mechanism changes. I'd use AssemblyLoadContext for isolation and keyed services for O(1) factory lookup by extension."</div>
     </div></div>
   </div>
 

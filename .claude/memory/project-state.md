@@ -8,7 +8,7 @@
 
 **Location:** `c:/Users/Rafikul/Desktop/Learn/System Design/`
 
-**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 3 complete pages (How to Approach System Design, Back-of-Envelope Estimation, Scalability), 1 newly rebuilt (Reliability), 200 coming soon.
+**Scope:** 110 LLD topics + 204 HLD topics. LLD: Currently 18 complete pages (Singleton through Logging Framework), 92 coming soon. HLD: 8 rebuilt pages (How to Approach SD, Scalability, Reliability, Availability, Performance, CAP Theorem, ACID vs BASE, Estimation). LLD: SRP + OCP + LSP + Observer + Decorator rebuilt. All 8 pattern/SOLID pages have 30 Q&As. 8 pages still need rebuild, then resume learning path.
 
 **GitHub:** `https://github.com/rafik-786/system-design.git` (branch: `main`)
 
